@@ -1,5 +1,10 @@
 # Registro de cambios
 
+## v0.3.5. Tab bar pegada abajo (31 de octubre de 2026)
+
+- El área segura inferior se contaba dos veces (la página y la tab bar), lo que dejaba la barra flotando sobre un relleno vacío y una banda negra. Ahora la tab bar llega al borde inferior y cubre ella sola la zona del indicador de inicio.
+- Barra más baja: 48 puntos de contenido, iconos de 24 px. El botón + y los avisos se recolocan justo encima.
+
 ## v0.3.4. Vencidas a hoy y tope del deslizamiento (31 de octubre de 2026)
 
 - Al abrir la app, y cada vez que vuelve a primer plano, toda tarea pendiente con fecha anterior a hoy pasa a hoy y queda marcada como aplazada (campo nuevo `carried`). Ya no hay tareas vencidas ni fechas en rojo. Cambiar la fecha a mano (Mañana, selector de fecha) quita la marca.

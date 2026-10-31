@@ -1,5 +1,16 @@
 # Registro de cambios
 
+## v0.9.0. Lote 6 (31 de octubre de 2026)
+
+- Copias de seguridad locales: una instantánea diaria en IndexedDB (fuera de `localStorage`), se conservan las últimas siete. En Ajustes, "Copias de seguridad": lista con fecha y número de tareas, "Crear copia ahora" y restaurar tocando una (con confirmación y Deshacer).
+- Título del detalle a varias líneas: crece con el texto; Enter cierra el teclado.
+- Recordatorio con atajos "Hoy a las 18:00" (hasta las 17:00), "Mañana a las 9:00" y "En una hora".
+- "Completadas (22), 3 hoy" en el pie de la lista; cuando no queda nada en Hoy, el resumen muestra "Todo hecho por hoy".
+- Al final de la lista Hoy, "Mañana: N tareas" lleva a Todas.
+- Primera apertura: hoja "Tres gestos" (deslizar, mantener pulsado, fecha en el título). Se muestra una vez.
+- Entrada por URL: `?add=texto` abre Nueva tarea con el texto y la fecha interpretada. Pensado para un Atajo de iOS "Añadir a Tareas".
+- Agitar para deshacer: interruptor en Ajustes, sección Gestos, apagado por defecto. Pide permiso de movimiento al activarlo; deshace la acción cuyo aviso esté visible.
+
 ## v0.8.0. Lote 5 (31 de octubre de 2026)
 
 Estética

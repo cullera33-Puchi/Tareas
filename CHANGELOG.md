@@ -1,5 +1,11 @@
 # Registro de cambios
 
+## v0.2.1. Notas de voz con dictado del teclado (31 de octubre de 2026)
+
+- Probado en el iPhone instalado: la Web Speech API de Safari no transcribe en modo pantalla de inicio. Según prevé el diseño, el dictado del teclado de iOS pasa a ser la vía principal: la hoja Nota de voz abre con el área de texto enfocada y el teclado desplegado; el micrófono de la app solo se ofrece en una pestaña normal de Safari y, si falla, cede al teclado.
+- El foco de los campos de las hojas (nueva tarea, proyecto, nota de voz) se pone de forma síncrona dentro del toque, que es la única manera de que iOS abra el teclado solo.
+- Guardar una nota vacía ya no cierra la hoja: devuelve el foco al texto.
+
 ## v0.2.0. Bloque 0 bis: repositorio y PWA (31 de octubre de 2026)
 
 - `index.html` a partir de la v0.1 (`tareas.html`), sin cambios de comportamiento ni de aspecto.

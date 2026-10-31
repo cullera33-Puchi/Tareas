@@ -247,7 +247,7 @@ input,textarea,select{font-size:17px;}
 
 <script>
 'use strict';
-const APP_VERSION = '0.2.0';
+const APP_VERSION = '0.2.1';
 
 /* ---------- Utilities ---------- */
 const $ = (s, el=document) => el.querySelector(s);
@@ -604,7 +604,7 @@ function addSheet(projectId){
       '<button class="chip'+(st.priority!=='none'?' on':'')+'" data-c="pri">'+I.flag+(st.priority==='high'?'Alta':st.priority==='mid'?'Media':'Prioridad')+'</button>';
   };
   openSheet('<h2>Nueva tarea</h2><input class="titlein" placeholder="Qué hay que hacer" autocomplete="off" enterkeyhint="done"><div class="chips" id="chips"></div><input type="date" id="hiddenDate" style="position:absolute;opacity:0;width:1px;height:1px;left:-10px"><div class="sheet-actions"><button class="btn" data-x="cancel">Cancelar</button><button class="btn primary" data-x="ok">Añadir</button></div>', s=>{
-    const inp=$('.titlein',s); setTimeout(()=>inp.focus(),120); draw();
+    const inp=$('.titlein',s); inp.focus(); draw();
     const ok=()=>{ const t=inp.value.trim(); if(!t){ inp.focus(); return; } addTask({title:t,date:st.date,projectId:st.projectId,priority:st.priority}); haptic(8); closeSheet(); render(); toast('Tarea añadida'); };
     inp.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); ok(); } });
     s.onclick=e=>{ const b=e.target.closest('[data-x]'); if(b){ b.dataset.x==='ok'?ok():closeSheet(); return; }
@@ -623,7 +623,7 @@ function addSheet(projectId){
 function projectSheet(id){
   const p=id?proj(id):null; let color=p?p.color:COLORS[4];
   openSheet('<h2>'+(p?'Editar proyecto':'Nuevo proyecto')+'</h2><input class="titlein" placeholder="Nombre" value="'+(p?esc(p.name):'')+'" autocomplete="off"><div class="colors">'+COLORS.map(c=>'<button data-col="'+c+'" style="background:'+c+'" class="'+(c===color?'on':'')+'" aria-label="Color"></button>').join('')+'</div><div class="sheet-actions"><button class="btn" data-x="cancel">Cancelar</button><button class="btn primary" data-x="ok">'+(p?'Guardar':'Crear')+'</button></div>', s=>{
-    const inp=$('.titlein',s); setTimeout(()=>inp.focus(),120);
+    const inp=$('.titlein',s); inp.focus();
     s.onclick=e=>{ const cb=e.target.closest('[data-col]'); if(cb){ color=cb.dataset.col; s.querySelectorAll('[data-col]').forEach(b=>b.classList.toggle('on',b.dataset.col===color)); return; }
       const b=e.target.closest('[data-x]'); if(!b) return; if(b.dataset.x==='cancel'){ closeSheet(); return; }
       const n=inp.value.trim(); if(!n){ inp.focus(); return; } if(p){ p.name=n; p.color=color; p.modified=new Date().toISOString(); save(); } else addProject(n,color); closeSheet(); render(); };
@@ -635,23 +635,32 @@ function dateSheet(id){ const x=task(id); openSheet('<h2>Fecha</h2><div class="c
 function reminderSheet(id){ const x=task(id); const tm=new Date(); tm.setDate(tm.getDate()+1); tm.setHours(9,0,0,0); const local=d=>{ const p=n=>String(n).padStart(2,'0'); return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'T'+p(d.getHours())+':'+p(d.getMinutes()); };
   openSheet('<h2>Recordatorio</h2><div class="chips" style="margin-top:0"><button class="chip" data-r="'+tm.toISOString()+'">Mañana a las 9:00</button><button class="chip" data-r="">Quitar</button></div><input type="datetime-local" value="'+(x.reminder?local(new Date(x.reminder)):local(tm))+'" style="margin-top:8px"><div class="hint" style="margin-top:10px">La notificación en el iPhone se activa con la sincronización. Mientras tanto se muestra en el resumen del día.</div><div class="sheet-actions"><button class="btn primary" data-x="ok">Guardar</button></div>', s=>{ const inp=$('input[type=datetime-local]',s); s.onclick=e=>{ const c=e.target.closest('[data-r]'); if(c){ updTask(id,{reminder:c.dataset.r||null}); closeSheet(); render(); return; } if(e.target.closest('[data-x=ok]')){ updTask(id,{reminder:inp.value?new Date(inp.value).toISOString():null}); closeSheet(); render(); } }; }); }
 
-/* Voice note */
+/* Voice note.
+   Primary route: the iOS keyboard dictation, typing into a focused textarea.
+   SpeechRecognition is only offered in a browser tab where it is known to work;
+   in standalone (home screen) mode Safari refuses it, so it is not shown. */
 let stopRec=null;
+const isStandalone = () => { try{ return navigator.standalone===true || matchMedia('(display-mode: standalone)').matches; }catch(e){ return false; } };
 function voiceSheet(id){
-  const SR = window.SpeechRecognition||window.webkitSpeechRecognition; let rec=null, recording=false, final='';
-  openSheet('<h2>Nota de voz</h2><button class="mic" data-x="mic" aria-label="Grabar">'+I.mic+'</button><div class="hint">'+(SR?'Toca para empezar a dictar':'Dictado no disponible: usa el micrófono del teclado')+'</div><textarea placeholder="El texto aparecerá aquí"></textarea><div class="sheet-actions"><button class="btn" data-x="cancel">Descartar</button><button class="btn primary" data-x="ok">Guardar</button></div>', s=>{
+  const SR = (!isStandalone() && (window.SpeechRecognition||window.webkitSpeechRecognition)) || null; let rec=null, recording=false, final='';
+  openSheet('<h2>Nota de voz</h2>'+(SR?'<button class="mic" data-x="mic" aria-label="Grabar">'+I.mic+'</button>':'')+'<div class="hint">'+(SR?'Toca para empezar a dictar':'Toca el micrófono del teclado para dictar. Revisa el texto y guarda.')+'</div><textarea placeholder="El texto aparecerá aquí" enterkeyhint="done"></textarea><div class="sheet-actions"><button class="btn" data-x="cancel">Descartar</button><button class="btn primary" data-x="ok">Guardar</button></div>', s=>{
     const ta=$('textarea',s), mic=$('.mic',s), hint=$('.hint',s);
-    if(!SR){ setTimeout(()=>ta.focus(),200); }
+    // Focus synchronously inside the tap handler: iOS only opens the keyboard then.
+    if(!SR) ta.focus();
+    const fallback=msg=>{ if(mic) mic.style.display='none'; hint.textContent=msg||'Toca el micrófono del teclado para dictar. Revisa el texto y guarda.'; ta.focus(); };
+    const stop=()=>{ recording=false; mic&&mic.classList.remove('rec'); try{ rec&&rec.stop(); }catch(e){} rec=null; if(SR&&mic&&mic.style.display!=='none') hint.textContent='Revisa el texto y guarda'; };
     const start=()=>{ try{ rec=new SR(); rec.lang='es-ES'; rec.continuous=true; rec.interimResults=true; final=ta.value?ta.value+' ':'';
       rec.onresult=ev=>{ let interim=''; for(let i=ev.resultIndex;i<ev.results.length;i++){ const r=ev.results[i]; if(r.isFinal) final+=r[0].transcript+' '; else interim+=r[0].transcript; } ta.value=(final+interim).trim(); };
-      rec.onerror=ev=>{ hint.textContent='No se pudo dictar ('+ev.error+'). Usa el micrófono del teclado.'; stop(); ta.focus(); };
-      rec.onend=()=>{ if(recording){ try{rec.start();}catch(e){} } };
-      rec.start(); recording=true; mic.classList.add('rec'); hint.textContent='Escuchando. Toca para parar'; haptic(10); }catch(e){ hint.textContent='Dictado no disponible: usa el micrófono del teclado'; ta.focus(); } };
-    const stop=()=>{ recording=false; mic.classList.remove('rec'); try{ rec&&rec.stop(); }catch(e){} rec=null; if(SR) hint.textContent='Revisa el texto y guarda'; };
+      rec.onerror=()=>{ stop(); fallback('El dictado automático no está disponible. Usa el micrófono del teclado.'); };
+      rec.onend=()=>{ if(recording){ try{rec.start();}catch(e){ stop(); fallback(); } } };
+      rec.start(); recording=true; mic.classList.add('rec'); hint.textContent='Escuchando. Toca para parar'; haptic(10); }catch(e){ stop(); fallback(); } };
     stopRec=stop;
+    const saveNote=()=>{ const t=ta.value.trim(); if(!t){ ta.focus(); return false; } DB.voiceNotes.push({id:uid(), taskId:id, text:t, created:new Date().toISOString()}); updTask(id,{}); haptic(8); return true; };
     s.onclick=e=>{ const b=e.target.closest('[data-x]'); if(!b) return;
-      if(b.dataset.x==='mic'){ if(!SR){ ta.focus(); return; } recording?stop():start(); return; }
-      stop(); if(b.dataset.x==='ok'){ const t=ta.value.trim(); if(t){ DB.voiceNotes.push({id:uid(), taskId:id, text:t, created:new Date().toISOString()}); updTask(id,{}); } } closeSheet(); render(); };
+      if(b.dataset.x==='mic'){ recording?stop():start(); return; }
+      stop();
+      if(b.dataset.x==='ok'){ if(!saveNote()) return; }
+      closeSheet(); render(); };
   });
 }
 

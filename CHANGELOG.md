@@ -1,5 +1,35 @@
 # Registro de cambios
 
+## v0.6.0. Lote de estética y usabilidad (31 de octubre de 2026)
+
+Estética
+- Al completar, aplazar o eliminar, la fila se desvanece y las demás se deslizan a su sitio (FLIP con `transform` y `opacity`). Las filas nuevas aparecen con fundido.
+- Icono relleno en la pestaña activa de la tab bar.
+- Separadores de fila con sangría a la altura del texto, como en iOS.
+- Prioridad como en Recordatorios: "!!!" rojo para alta, "!!" naranja para media.
+- Contador de pendientes de cada proyecto en una píldora gris.
+- Al abrir una hoja (nueva tarea, fecha, nota de voz, menús), la pantalla de detrás se encoge ligeramente y se oscurece.
+- Estados vacíos con acción: "Ver todas" y "Añadir tarea" en Hoy, "Borrar búsqueda" en la búsqueda, "Quitar filtro" en los filtros del resumen.
+- Tamaño de texto del sistema (Dynamic Type): los tamaños pasan a `rem` sobre `font: -apple-system-body`; los campos de texto no bajan de 16 px para que Safari no haga zoom.
+- Queda fuera, a propósito, la barra de estado integrada (E7).
+
+Usabilidad
+- "Todas" agrupada por tramos: Hoy, Mañana, Esta semana, Más adelante y Sin fecha.
+- Contadores en el segmento Hoy y Todas.
+- Las tres cifras del resumen filtran la lista al tocarlas (aplazadas, prioritarias); "para hoy" quita el filtro.
+- Nueva tarea en serie: Enter guarda y deja la hoja abierta con los mismos chips; "Añadir" guarda y cierra; Enter con el campo vacío cierra. Aviso con el recuento.
+- Fecha escrita en el título: "mañana", "pasado mañana", "hoy", un día de la semana, "el 12", "12/11" o "12 de noviembre" al final del título marcan el chip de fecha y se quitan del título al guardar. Si eliges una fecha a mano, deja de interpretarse.
+- Menú de pulsación larga completo: Prioridad, Mañana, Elegir fecha, Mover a proyecto, Completar o Marcar pendiente, Eliminar.
+- Subir y Bajar en el menú de un proyecto.
+- Búsqueda con botón Cancelar y recuento de resultados; el segmento se oculta mientras buscas.
+- Hoja Fecha con "Este viernes" (de lunes a jueves) y "Próxima semana".
+- Títulos de fila a dos líneas.
+- El área de notas del detalle crece con el texto.
+- Eliminar desde la fila pide confirmación, como fijaba el diseño; Deshacer se mantiene después.
+
+Otros
+- La primera instalación del service worker ya no recarga la página (solo lo hace al aplicar una actualización).
+
 ## v0.5.1. Sin destellos de color al hacer scroll rápido (31 de octubre de 2026)
 
 - Los fondos de los botones de acción (verde, naranja, rojo) que hay detrás de cada fila solo existen mientras la fila se está deslizando o queda abierta. Antes estaban siempre debajo y, con scroll rápido, Safari los dejaba ver antes de pintar la fila.

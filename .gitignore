@@ -4,3 +4,6 @@ config.js
 .env.*
 supabase/.temp/
 .DS_Store
+
+# Test screenshots never belong in the repository (icons live in icons/)
+/*.png

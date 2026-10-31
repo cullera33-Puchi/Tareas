@@ -1,5 +1,17 @@
 # Registro de cambios
 
+## v0.13.0. Versión de escritorio (31 de octubre de 2026)
+
+A partir de 900 px de ancho la misma app cambia de disposición; en el iPhone no cambia nada.
+
+- Barra lateral fija: espacio activo (tocar para cambiar), Hoy, Todas, Semana, proyectos con color y contador, Nuevo proyecto y Ajustes.
+- Columna central con barra de alta siempre visible ("Nueva tarea… escribe la fecha al final"); Enter añade y, en Hoy, pone la fecha de hoy si no se escribe otra. Resumen, chips de proyecto, agrupaciones y búsqueda como en el móvil.
+- Panel de detalle a la derecha al abrir una tarea; "Cerrar" o Escape lo cierran.
+- Vista Semana: siete columnas de lunes a domingo, hoy destacado, tarjetas con color de proyecto y prioridad, flechas y botón Hoy, "+" por día para añadir con esa fecha, y arrastrar una tarjeta a otro día (o a "Sin fecha") para cambiarle la fecha, con Deshacer. Respeta el filtro por proyecto.
+- Ratón: resaltado de fila, botón "•••" por fila y clic derecho abren el menú de la tarea. Las hojas y menús pasan a ser ventanas centradas.
+- Teclado: N enfoca la barra de alta, / la búsqueda, Escape cierra hoja, panel o búsqueda.
+- Los datos siguen siendo locales de cada navegador hasta la sincronización (bloque 8): para probar en el ordenador, exportar JSON en el iPhone e importarlo.
+
 ## v0.12.1 (31 de octubre de 2026)
 
 - "Pasar lo pendiente a mañana" aparece a partir de las 19:00 en lugar de las 18:00.

@@ -43,6 +43,92 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;cu
 input,textarea{font:inherit;color:inherit;-webkit-user-select:text;user-select:text;}
 input,textarea,select{font-size:max(16px,1rem);} /* under 16px Safari zooms on focus */
 
+/* Desktop (wide screens): sidebar, main column, detail pane. Mobile code paths stay untouched. */
+.desk{display:none;}
+.app.desktop .screen,.app.desktop .tabbar,.app.desktop .selbar{display:none !important;}
+.app.desktop{overflow:hidden;}
+.app.desktop .desk{display:grid;grid-template-columns:240px minmax(0,1fr);height:100%;background:var(--bg);}
+.app.desktop.has-pane .desk{grid-template-columns:240px minmax(0,1fr) 400px;}
+.side{background:var(--card);border-right:.5px solid var(--sep);display:flex;flex-direction:column;padding:14px 10px calc(10px + env(safe-area-inset-bottom,0px));overflow-y:auto;}
+.side .sp{display:flex;align-items:center;gap:6px;font-size:1.176rem;font-weight:700;padding:6px 10px 14px;letter-spacing:-.3px;width:100%;text-align:left;}
+.side .sp svg{width:12px;height:12px;color:var(--ink3);}
+.side .sec{font-size:0.706rem;font-weight:600;color:var(--ink2);text-transform:uppercase;letter-spacing:.4px;padding:14px 10px 6px;}
+.side .it{display:flex;align-items:center;gap:10px;width:100%;height:36px;padding:0 10px;border-radius:8px;font-size:0.941rem;text-align:left;color:var(--ink);}
+.side .it:hover{background:var(--fill);}
+.side .it.on{background:var(--blue);color:#fff;}
+.side .it svg{width:18px;height:18px;flex:none;}
+.side .it .dot{width:10px;height:10px;border-radius:50%;flex:none;margin:0 4px;}
+.side .it .n{margin-left:auto;font-size:0.765rem;color:var(--ink2);}
+.side .it.on .n{color:rgba(255,255,255,.85);}
+.side .grow{flex:1;}
+.side .it.add{color:var(--blue);}
+.main{display:flex;flex-direction:column;min-width:0;height:100%;}
+.main .mhead{display:flex;align-items:center;gap:14px;padding:16px 28px 8px;}
+.main .mhead h1{margin:0;font-size:1.647rem;font-weight:700;letter-spacing:-.4px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.main .mhead .searchbar{margin:0;width:260px;}
+.main .mbody{flex:1;overflow-y:auto;padding:0 28px 40px;}
+.main .mbody .scroll{padding:0;overflow:visible;flex:none;}
+.main .inner{max-width:760px;}
+.addbar{display:flex;align-items:center;gap:10px;background:var(--card);border-radius:12px;padding:0 14px;height:46px;margin:6px 0 14px;border:.5px solid var(--sep);}
+.addbar svg{width:18px;height:18px;color:var(--blue);flex:none;}
+.addbar input{flex:1;min-width:0;background:none;border:0;outline:0;font-size:max(16px,1rem);color:var(--ink);}
+.addbar input::placeholder{color:var(--ink2);}
+.addbar .kbd{font-size:0.706rem;color:var(--ink3);border:.5px solid var(--sep);border-radius:5px;padding:1px 6px;}
+.pane{background:var(--card);border-left:.5px solid var(--sep);height:100%;overflow:hidden;display:flex;flex-direction:column;}
+.app.desktop .pane .screen{position:relative;display:flex !important;transform:none;background:var(--card);height:100%;will-change:auto;}
+.pane .nav{background:var(--card);}
+.pane .nav .back span{display:none;}
+.pane .group{background:var(--bg);}
+.pane .scroll{padding-bottom:40px;}
+.desktop .row-content:hover{background:var(--press);cursor:default;}
+.desktop .rowmore{flex:none;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--ink2);opacity:0;transition:opacity .15s;}
+.desktop .row:hover .rowmore{opacity:1;}
+.desktop .rowmore svg{width:18px;height:18px;}
+.desktop .fab{display:none;}
+.desktop .check,.desktop .cell,.desktop .chip,.desktop button{cursor:pointer;}
+.desktop .row-title{-webkit-line-clamp:1;}
+body.desktop .sheet{left:50%;right:auto;bottom:auto;top:50%;width:440px;max-height:80%;border-radius:16px;transform:translate(-50%,-50%) scale(.96);opacity:0;transition:transform .2s,opacity .2s;padding:10px 20px 20px;}
+body.desktop .sheet.on{transform:translate(-50%,-50%) scale(1);opacity:1;}
+body.desktop .sheet .handle{display:none;}
+body.desktop .asheet{left:50%;right:auto;bottom:auto;top:50%;width:320px;transform:translate(-50%,-50%) scale(.96);opacity:0;transition:transform .2s,opacity .2s;}
+body.desktop .asheet.on{transform:translate(-50%,-50%) scale(1);opacity:1;}
+body.desktop .asheet button.it{height:46px;font-size:1rem;}
+body.desktop .app.sheet-open{transform:none;border-radius:0;}
+body.desktop .toast{left:auto;right:28px;bottom:28px;width:360px;}
+/* Week view */
+.week{display:flex;flex-direction:column;height:100%;min-height:0;}
+.week .whead{display:flex;align-items:center;gap:8px;padding:0 0 12px;}
+.week .whead h2{margin:0 8px 0 0;font-size:1.06rem;font-weight:600;}
+.week .whead button.nav-b{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--blue);background:var(--card);border:.5px solid var(--sep);}
+.week .whead button.nav-b svg{width:9px;height:14px;}
+.week .whead button.today-b{height:32px;padding:0 12px;border-radius:8px;background:var(--card);border:.5px solid var(--sep);color:var(--blue);font-weight:600;font-size:0.882rem;}
+.wgrid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:10px;align-items:start;}
+.wday{background:var(--card);border-radius:12px;min-height:220px;padding:8px;border:1.5px solid transparent;transition:border-color .15s,background .15s;}
+.wday.today{border-color:var(--blue);}
+.wday.over{background:var(--fill);border-color:var(--blue);}
+.wday.past{opacity:.75;}
+.wday .dh{display:flex;align-items:baseline;justify-content:space-between;padding:2px 4px 8px;}
+.wday .dh b{font-size:0.882rem;font-weight:600;}
+.wday .dh b small{font-weight:400;color:var(--ink2);margin-left:4px;}
+.wday.today .dh b{color:var(--blue);}
+.wday .dh button{width:24px;height:24px;border-radius:6px;color:var(--ink2);display:flex;align-items:center;justify-content:center;}
+.wday .dh button:hover{background:var(--fill);color:var(--blue);}
+.wday .dh button svg{width:14px;height:14px;}
+.wcard{display:flex;align-items:flex-start;gap:8px;padding:8px;border-radius:8px;background:var(--bg);margin-bottom:6px;cursor:grab;border-left:3px solid var(--pc,var(--ink3));}
+.wcard:hover{background:var(--fill);}
+.wcard.dragging{opacity:.4;}
+.wcard .check{width:18px;height:18px;margin-top:1px;}
+.wcard .check svg{width:10px;height:10px;}
+.wcard .t{flex:1;min-width:0;font-size:0.824rem;line-height:1.3;}
+.wcard .t .m{display:block;color:var(--ink2);font-size:0.706rem;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.wcard .pri{font-size:0.765rem;min-width:0;}
+.wcard.done .t{text-decoration:line-through;color:var(--ink2);}
+.wundated{margin-top:14px;background:var(--card);border-radius:12px;padding:10px 12px;border:1.5px solid transparent;}
+.wundated.over{background:var(--fill);border-color:var(--blue);}
+.wundated h3{margin:0 0 8px;font-size:0.824rem;color:var(--ink2);font-weight:600;}
+.wundated .cards{display:flex;flex-wrap:wrap;gap:8px;}
+.wundated .wcard{margin:0;width:220px;}
+
 /* Screens */
 .app{height:100%;position:relative;overflow:hidden;transition:transform .35s cubic-bezier(.32,.72,0,1);}
 .app.sheet-open{transform:scale(.96);border-radius:14px;}
@@ -333,7 +419,7 @@ input,textarea,select{font-size:max(16px,1rem);} /* under 16px Safari zooms on f
 
 <script>
 'use strict';
-const APP_VERSION = '0.12.1';
+const APP_VERSION = '0.13.0';
 let pendingSW = null; // service worker installed and waiting to take over
 
 /* ---------- Log: errors and app events, kept in localStorage for copy-and-paste debugging ---------- */
@@ -474,7 +560,7 @@ function doneList(projectId){
 }
 
 /* ---------- UI state ---------- */
-const UI = { tab:'tareas', query:'', stack:[], scroll:{}, sumFilter:null, summaryFirst:false, searchDone:false, select:null, projFilter:null };
+const UI = { tab:'tareas', query:'', stack:[], scroll:{}, sumFilter:null, summaryFirst:false, searchDone:false, select:null, projFilter:null, wide:false, deskView:'hoy', deskDetail:null, weekStart:null };
 
 /* ---------- Toast with undo ---------- */
 let toastTimer=null, undoFn=null;
@@ -546,6 +632,7 @@ function swapHTML(scr, html){
   bindCommon(scr);
 }
 function render(){
+  if(UI.wide){ renderDesktop(); return; }
   const scr = rootScreen(UI.tab);
   app.querySelectorAll('.screen.root').forEach(s=>{ if(s!==scr){ s.classList.add('hidden-tab'); s.style.transform=''; } });
   scr.classList.remove('hidden-tab'); scr.style.transform='';
@@ -605,7 +692,7 @@ function rowHTML(x, opts={}){
   return '<div class="row'+(done?' done':'')+(selected?' selected':'')+'" data-id="'+x.id+'"'+(pc?' style="--pc:'+pc+';--tagbg:'+tint(pc,.15)+'"':'')+'>'+
     (opts.simple||selecting?'':'<div class="row-bg left"><span>'+I.check+'</span></div><div class="row-bg right"><button class="b-tomorrow" data-act="postpone">Aplazar</button><button class="b-delete" data-act="delete">Eliminar</button></div>')+
     '<div class="row-content">'+(selecting?'<span class="selbox">'+I.check+'</span>':'<button class="check'+(x.status==='done'?' done':'')+'" data-act="check" aria-label="Completar">'+I.check+'</button>')+
-    '<div class="row-text"><div class="row-title">'+esc(x.title||'Sin título')+'</div>'+(meta.length?'<div class="row-meta">'+meta.join('<span class="sep">·</span>')+'</div>':'')+'</div>'+pri+'</div></div>';
+    '<div class="row-text"><div class="row-title">'+esc(x.title||'Sin título')+'</div>'+(meta.length?'<div class="row-meta">'+meta.join('<span class="sep">·</span>')+'</div>':'')+'</div>'+pri+(UI.wide&&!selecting&&!opts.simple?'<button class="rowmore" data-act="rowMenu" aria-label="Más">'+I.more+'</button>':'')+'</div></div>';
 }
 function summaryCollapsed(n){ const st=DB.settings.summaryState||'auto'; if(st==='auto' && UI.summaryFirst) return false; return st==='closed' || (st==='auto' && n>20); }
 function summaryHTML(){
@@ -721,7 +808,7 @@ function viewDetail(id){
   const x=task(id); if(!x) return '';
   const p=x.projectId?proj(x.projectId):null; const vns=DB.voiceNotes.filter(v=>v.taskId===id).sort((a,b)=>a.created<b.created?1:-1);
   const pl={high:'Alta',mid:'Media',none:'Ninguna'}[x.priority]||'Ninguna'; const chev=I.chev.replace('<svg','<svg class="chev"'); const links=extractLinks(x.notes).slice(0,6);
-  return '<header class="nav"><div class="nav-row"><button class="back" data-act="back">'+I.back+'Atrás</button><div class="nav-title">Detalles</div><div class="actions"><button class="action" data-act="share" aria-label="Compartir">'+I.share+'</button><button class="action" data-act="menu" aria-label="Más">'+I.more+'</button></div></div></header>'+
+  return '<header class="nav"><div class="nav-row"><button class="back" data-act="back">'+(UI.wide?'Cerrar':I.back+'Atrás')+'</button><div class="nav-title">Detalles</div><div class="actions"><button class="action" data-act="share" aria-label="Compartir">'+I.share+'</button><button class="action" data-act="menu" aria-label="Más">'+I.more+'</button></div></div></header>'+
    '<div class="scroll">'+
    '<div class="group"><div class="cell input"><textarea class="titlein" data-role="title" rows="1" placeholder="Título" enterkeyhint="done">'+esc(x.title)+'</textarea></div><div class="cell input"><textarea data-role="notes" placeholder="Notas">'+esc(x.notes)+'</textarea></div>'+(links.length?'<div class="links">'+links.map(l=>'<a href="'+esc(l.href)+'"'+(l.href.startsWith('tel:')?'':' target="_blank" rel="noopener"')+'>'+esc(l.label)+'</a>').join('')+'</div>':'')+'</div>'+
    '<div class="group"><button class="cell" data-act="pickProject"><span class="lbl">Proyecto</span><span class="val">'+(p?'<span class="dot" style="background:'+p.color+'"></span>'+esc(p.name):'Ninguno')+'</span>'+chev+'</button>'+
@@ -754,10 +841,13 @@ function bindCommon(scr){
 }
 function onClick(e){
   const scr=e.currentTarget;
-  const f=e.target.closest('[data-filter]'); if(f){ DB.settings.filter=f.dataset.filter; UI.sumFilter=null; save(); render(); return; }
+  const f=e.target.closest('[data-filter]'); if(f){ DB.settings.filter=f.dataset.filter; UI.sumFilter=null; if(UI.wide) UI.deskView=f.dataset.filter; save(); render(); return; }
   const sm=e.target.closest('[data-sum]'); if(sm){ const k=sm.dataset.sum; UI.sumFilter=(k==='all'||UI.sumFilter===k)?null:k; haptic(6); render(); return; }
   const th=e.target.closest('[data-theme]'); if(th){ DB.settings.theme=th.dataset.theme; save(); applyTheme(); render(); return; }
-  const op=e.target.closest('[data-open-project]'); if(op){ push('project', op.dataset.openProject); return; }
+  const op=e.target.closest('[data-open-project]'); if(op){ if(UI.wide){ setDeskView('project:'+op.dataset.openProject); } else push('project', op.dataset.openProject); return; }
+  const dv=e.target.closest('[data-view]'); if(dv){ setDeskView(dv.dataset.view); return; }
+  const wk=e.target.closest('[data-week]'); if(wk){ const d=wk.dataset.week; UI.weekStart = d==='today' ? mondayOf(todayStr()) : addDays(UI.weekStart||mondayOf(todayStr()), +d*7); render(); return; }
+  const wa=e.target.closest('[data-add-date]'); if(wa){ addSheet(null,'',{date:wa.dataset.addDate}); return; }
   const es=e.target.closest('[data-edit-space]'); if(es){ spaceSheet(es.dataset.editSpace); return; }
   const rb=e.target.closest('[data-restore]'); if(rb){ restoreBackup(rb.dataset.restore); return; }
   const ua=e.target.closest('[data-unarchive]'); if(ua){ const p=proj(ua.dataset.unarchive); p.archived=false; save(); render(); return; }
@@ -787,6 +877,8 @@ function onClick(e){
     case 'add': addSheet(act.dataset.project||null); break;
     case 'spaceMenu': actionSheet('Espacio', DB.spaces.slice().sort((a,b)=>a.order-b.order).map(s=>({label:s.name+(s.id===space().id?'  ✓':''), fn:()=>{ DB.settings.activeSpace=s.id; save(); UI.query=''; UI.sumFilter=null; UI.projFilter=null; render(); }})).concat([{label:'Nuevo espacio', fn:()=>spaceSheet(null)}])); break;
     case 'back': pop(); break;
+    case 'rowMenu': if(row) rowMenu(row.dataset.id); break;
+    case 'wcheck': { const c=act.closest('.wcard'); if(c){ act.classList.toggle('done'); act.classList.add('just'); setTimeout(()=>{ completeTask(c.dataset.id); renderAnimated(); },220); } break; }
     case 'newProject': projectSheet(null); break;
     case 'newSpace': spaceSheet(null); break;
     case 'menu': detailMenu(detailId); break;
@@ -817,8 +909,9 @@ function push(kind,id){
   app.appendChild(el); UI.stack.push({kind,id,el}); render();
   requestAnimationFrame(()=>requestAnimationFrame(()=>{ el.classList.remove('pushed'); el.classList.add('shown'); }));
 }
-function openDetail(id){ push('detail', id); }
+function openDetail(id){ if(UI.wide){ UI.deskDetail=id; render(); return; } push('detail', id); }
 function pop(){
+  if(UI.wide){ UI.deskDetail=null; render(); return; }
   if(UI.select&&UI.select.scope==='project'){ UI.select=null; app.classList.remove('selecting'); }
   const s=UI.stack.pop(); if(!s) return;
   s.el.classList.remove('shown','dragging'); s.el.classList.add('pushed');
@@ -918,7 +1011,7 @@ function rowMenu(id){ const x=task(id); if(!x) return; const pl={high:'alta',mid
     {label:'Aplazar', fn:()=>postponeSheet(id)},
     {label:'Mover a proyecto', fn:()=>pickProjectSheet(id)}].concat(DB.spaces.length>1?[{label:'Mover a otro espacio', fn:()=>moveToSpaceSheet(id)}]:[], [
     {label:'Duplicar', fn:()=>duplicateTask(id)},
-    {label:'Seleccionar varias', fn:()=>startSelect(id)},
+    ...(UI.wide?[]:[{label:'Seleccionar varias', fn:()=>startSelect(id)}]),
     {label:x.status==='done'?'Marcar pendiente':'Completar', fn:()=>{ leaveRows(id); setTimeout(()=>{ completeTask(id); renderAnimated(); },200); }},
     {label:'Eliminar', red:true, fn:()=>confirmDelete(id)} ])); }
 function moveProject(id, dir){ const ps=activeProjects(); ps.forEach((p,i)=>p.order=i); const i=ps.findIndex(p=>p.id===id), j=i+dir; if(i<0||j<0||j>=ps.length) return; ps[i].order=j; ps[j].order=i; ps[i].modified=ps[j].modified=new Date().toISOString(); save(); haptic(6); renderAnimated(); }
@@ -941,7 +1034,7 @@ function addSheet(projectId){
       '<button class="chip'+(p?' on':'')+'" data-c="proj">'+(p?'<span class="dot" style="background:'+p.color+'"></span>'+esc(p.name):I.folder.replace('<svg','<svg style="width:14px;height:14px"')+'Proyecto')+'</button>'+
       '<button class="chip'+(st.priority!=='none'?' on':'')+'" data-c="pri">'+I.flag+(st.priority==='high'?'Alta':st.priority==='mid'?'Media':'Prioridad')+'</button>';
   };
-  const prefill = arguments[1]||'';
+  const prefill = arguments[1]||''; const preset = arguments[2]||{}; if(preset.date){ st.date=preset.date; st.manual=true; }
   openSheet('<h2>Nueva tarea</h2><input class="titlein" placeholder="Qué hay que hacer" autocomplete="off" enterkeyhint="done"><div class="chips" id="chips"></div><div class="hint" id="addHint" style="text-align:left;margin:6px 2px 0">Escribe "mañana", "viernes" o "el 12" al final y se toma como fecha. Enter añade y sigue; Añadir termina.</div><input type="date" id="hiddenDate" style="position:absolute;opacity:0;width:1px;height:1px;left:-10px"><div class="sheet-actions"><button class="btn" data-x="cancel">Cancelar</button><button class="btn primary" data-x="ok">Añadir</button></div><div class="sheet-actions" style="margin-top:10px"><button class="btn" data-x="open" style="height:40px;font-weight:500">Añadir y abrir</button></div>', s=>{
     const inp=$('.titlein',s), hint=$('#addHint',s); inp.focus(); draw();
     if(prefill){ inp.value=prefill; setTimeout(()=>inp.dispatchEvent(new Event('input')),0); }
@@ -1215,6 +1308,80 @@ function tipsSheet(){ openSheet('<h2>Tres gestos</h2><div class="tips"><p><b>Des
 let hiddenAt=0;
 function returnHome(){ UI.stack.forEach(s=>s.el.remove()); UI.stack=[]; UI.tab='tareas'; UI.query=''; UI.sumFilter=null; DB.settings.filter='hoy'; save(); closeSheet(); render(); const sc=rootScreen('tareas').querySelector('.scroll'); if(sc) sc.scrollTop=0; log('info','Vuelta a Hoy tras más de dos horas fuera'); }
 document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='hidden'){ hiddenAt=Date.now(); return; } const n=rollOver(); if(n) log('info','Tareas pasadas a hoy: '+n); if(hiddenAt && Date.now()-hiddenAt>2*36e5) returnHome(); else if(n) render(); });
+
+/* ---------- Desktop layout ---------- */
+const wideMQ = matchMedia('(min-width: 900px)');
+function mondayOf(d){ const x=new Date(d+'T00:00:00'); return addDays(d, -((x.getDay()+6)%7)); }
+function setDeskView(v){ if(v==='project:none') v='project:none'; UI.deskView=v; UI.deskDetail=null; UI.query=''; UI.searchDone=false; UI.sumFilter=null; if(v==='hoy'||v==='todas'){ DB.settings.filter=v; save(); } render(); }
+function applyWide(){ const w=wideMQ.matches; if(w===UI.wide) return; UI.wide=w; document.body.classList.toggle('desktop', w); app.classList.toggle('desktop', w);
+  if(w){ // leave any pushed mobile screens behind; the last one maps onto the desktop state
+    const top=UI.stack[UI.stack.length-1]; if(top&&top.kind==='detail') UI.deskDetail=top.id; if(top&&top.kind==='project') UI.deskView='project:'+top.id; UI.stack.forEach(s=>s.el.remove()); UI.stack=[]; if(UI.select){ UI.select=null; app.classList.remove('selecting'); } if(UI.tab==='ajustes') UI.deskView='settings'; else if(UI.deskView==='hoy'||UI.deskView==='todas') UI.deskView=DB.settings.filter; }
+  else { const d=$('#desk'); if(d) d.remove(); app.classList.remove('has-pane'); if(UI.deskView==='settings') UI.tab='ajustes'; else UI.tab='tareas'; }
+  log('info', w?'Modo escritorio':'Modo móvil'); render(); }
+function deskSide(){
+  const ps=activeProjects(); const pend=spaceTasks().filter(x=>x.status==='pending'); const cnt=id=>pend.filter(x=> id===null?!x.projectId:x.projectId===id).length; const v=UI.deskView;
+  const it=(view,ic,label,n,on)=>'<button class="it'+(on?' on':'')+'" data-view="'+view+'">'+ic+'<span>'+label+'</span>'+(n!==undefined?'<span class="n">'+n+'</span>':'')+'</button>';
+  return '<aside class="side"><button class="sp" data-act="spaceMenu">'+esc(space().name)+I.chevD+'</button>'+
+    it('hoy',I.list,'Hoy',pendingFor('hoy').length,v==='hoy')+it('todas',I.inbox.replace('viewBox="0 0 48 48"','viewBox="0 0 48 48" stroke-width="3"'),'Todas',pendingFor('todas').length,v==='todas')+it('week',I.cal,'Semana',undefined,v==='week')+
+    '<div class="sec">Proyectos</div>'+ps.map(p=>'<button class="it'+(v==='project:'+p.id?' on':'')+'" data-view="project:'+p.id+'"><span class="dot" style="background:'+p.color+'"></span><span>'+esc(p.name)+'</span><span class="n">'+cnt(p.id)+'</span></button>').join('')+
+    '<button class="it'+(v==='project:none'?' on':'')+'" data-view="project:none"><span class="dot" style="background:var(--ink3)"></span><span>Sin proyecto</span><span class="n">'+cnt(null)+'</span></button>'+
+    '<button class="it add" data-act="newProject">'+I.plus+'<span>Nuevo proyecto</span></button>'+
+    '<div class="grow"></div>'+it('settings',I.gear,'Ajustes',undefined,v==='settings')+'</aside>';
+}
+function addBarHTML(projectId){ return '<div class="addbar">'+I.plus+'<input type="text" placeholder="Nueva tarea… escribe la fecha al final: mañana, viernes, el 12" data-role="addbar"'+(projectId?' data-project="'+projectId+'"':'')+' autocomplete="off"><span class="kbd">N</span></div>'; }
+function deskMain(){
+  const v=UI.deskView; let title='', body='', search=true;
+  if(v==='hoy'||v==='todas'){ const f=v; const nTodas=pendingFor('todas').length; title=f==='hoy'?'Hoy':'Todas';
+    body = addBarHTML(null)+(f==='hoy'&&!UI.query?summaryHTML():'')+
+      (!UI.query&&activeProjects().length?'<div class="pchips">'+activeProjects().map(p=>'<button class="chip'+(UI.projFilter===p.id?' on':'')+'" data-pf="'+p.id+'"'+(UI.projFilter===p.id?' style="background:'+p.color+'"':'')+'><span class="dot" style="background:'+(UI.projFilter===p.id?'#fff':p.color)+'"></span>'+esc(p.name)+'</button>').join('')+'<button class="chip'+(UI.projFilter==='none'?' on':'')+'" data-pf="none"><span class="dot" style="background:'+(UI.projFilter==='none'?'#fff':'var(--ink3)')+'"></span>Sin proyecto</button></div>':'')+
+      (!UI.query&&f==='todas'&&nTodas?'<div class="seg mini" style="max-width:260px"><button data-group="date" class="'+(DB.settings.allGroup!=='project'?'on':'')+'">Por fecha</button><button data-group="project" class="'+(DB.settings.allGroup==='project'?'on':'')+'">Por proyecto</button></div>':'')+
+      listHTML(UI.query?'todas':f); }
+  else if(v==='week'){ title='Semana'; body=weekHTML(); }
+  else if(v.startsWith('project:')){ const id=v.slice(8); const p=id==='none'?null:proj(id); if(id!=='none'&&!p){ UI.deskView='hoy'; return deskMain(); } title=p?p.name:'Sin proyecto'; body=addBarHTML(p?p.id:null)+listHTML('todas', p?p.id:null); }
+  else if(v==='settings'){ title='Ajustes'; search=false; const h=viewAjustes(); body=h.slice(h.indexOf('<div class="scroll">')); }
+  return '<main class="main"><div class="mhead"><h1>'+esc(title)+'</h1>'+(search?'<div class="searchbar"><div class="search">'+I.search+'<input type="search" placeholder="Buscar" value="'+esc(UI.query)+'" data-role="search" autocomplete="off"></div>'+(UI.query?'<button class="cancel" data-act="clearSearch">Cancelar</button>':'')+'</div>':'')+'</div><div class="mbody"><div class="inner'+(v==='week'?' week-inner':'')+'">'+body+'</div></div></main>';
+}
+function weekHTML(){
+  const t=todayStr(); const start=UI.weekStart||mondayOf(t); const days=[...Array(7)].map((_,i)=>addDays(start,i)); const end=days[6];
+  const all=spaceTasks().filter(x=>x.date&&x.date>=start&&x.date<=end&&(x.status==='pending'||(x.completed&&localDay(x.completed)>=start)));
+  let pf=x=>true; if(UI.projFilter!==null) pf=x=> UI.projFilter==='none' ? !x.projectId : x.projectId===UI.projFilter;
+  const card=x=>{ const p=x.projectId?proj(x.projectId):null; return '<div class="wcard'+(x.status==='done'?' done':'')+'" draggable="true" data-id="'+x.id+'"'+(p?' style="--pc:'+p.color+'"':'')+'><button class="check'+(x.status==='done'?' done':'')+'" data-act="wcheck" aria-label="Completar">'+I.check+'</button><div class="t">'+esc(x.title)+(p?'<span class="m">'+esc(p.name)+'</span>':'')+'</div>'+(x.priority==='high'?'<span class="pri high">!!!</span>':x.priority==='mid'?'<span class="pri mid">!!</span>':'')+'</div>'; };
+  const sm=new Date(start+'T00:00:00'), em=new Date(end+'T00:00:00'); const label=sm.getMonth()===em.getMonth()? sm.getDate()+' al '+em.getDate()+' de '+MESES_FULL[em.getMonth()] : sm.getDate()+' de '+MESES_FULL[sm.getMonth()]+' al '+em.getDate()+' de '+MESES_FULL[em.getMonth()];
+  const undated=orderTasks(spaceTasks().filter(x=>x.status==='pending'&&!x.date).filter(pf));
+  return '<div class="week"><div class="whead"><h2>Semana del '+label+'</h2><button class="nav-b" data-week="-1" aria-label="Semana anterior">'+I.back+'</button><button class="today-b" data-week="today">Hoy</button><button class="nav-b" data-week="1" aria-label="Semana siguiente">'+I.chev+'</button></div>'+
+    '<div class="wgrid">'+days.map(d=>{ const xs=orderTasks(all.filter(x=>x.date===d).filter(pf)); const dd=new Date(d+'T00:00:00'); return '<div class="wday'+(d===t?' today':'')+(d<t?' past':'')+'" data-day="'+d+'"><div class="dh"><b>'+DIAS_FULL[dd.getDay()].slice(0,3)+'<small>'+dd.getDate()+(dd.getDate()===1?' '+MESES[dd.getMonth()]:'')+'</small></b><button data-add-date="'+d+'" aria-label="Añadir">'+I.plus+'</button></div>'+xs.map(card).join('')+'</div>'; }).join('')+'</div>'+
+    (undated.length?'<div class="wundated" data-day=""><h3>Sin fecha ('+undated.length+'): arrastra a un día</h3><div class="cards">'+undated.slice(0,40).map(card).join('')+'</div></div>':'')+'</div>';
+}
+function renderDesktop(){
+  let d=$('#desk'); if(!d){ d=document.createElement('div'); d.id='desk'; d.className='desk'; app.appendChild(d); d.addEventListener('click', onClick); bindDeskEvents(d); }
+  const body=d.querySelector('.mbody'); const st=body?body.scrollTop:0; const side=d.querySelector('.side'); const sst=side?side.scrollTop:0;
+  const pane = UI.deskDetail && task(UI.deskDetail) ? '<section class="pane"><div class="screen detail">'+viewDetail(UI.deskDetail)+'</div></section>' : '';
+  if(!pane) UI.deskDetail=null; app.classList.toggle('has-pane', !!pane);
+  d.innerHTML = deskSide()+deskMain()+pane;
+  const b2=d.querySelector('.mbody'); if(b2) b2.scrollTop=st; const s2=d.querySelector('.side'); if(s2) s2.scrollTop=sst;
+  if(UI.deskDetail) bindDetail(d.querySelector('.pane'), UI.deskDetail);
+  const s=$('[data-role=search]',d); if(s){ s.addEventListener('input',()=>{ UI.query=s.value; render(); const n=$('#desk [data-role=search]'); if(n){ n.focus(); n.setSelectionRange(n.value.length,n.value.length); } }); }
+  const ab=$('[data-role=addbar]',d); if(ab){ ab.addEventListener('keydown',e=>{ if(e.key!=='Enter') return; e.preventDefault(); let t=ab.value.trim(); if(!t) return; const r=parseQuickDate(t); let date=null; if(r){ t=r.title; date=r.date; } else if(UI.deskView==='hoy') date=todayStr(); const x=addTask({title:t, date, projectId:ab.dataset.project||null}); haptic(6); renderAnimated(); toast('Añadida: '+x.title); const n=$('#desk [data-role=addbar]'); if(n) n.focus(); }); }
+  renderTabbar();
+}
+function bindDeskEvents(d){
+  // Right click opens the row menu
+  d.addEventListener('contextmenu', e=>{ const row=e.target.closest('.row[data-id], .wcard[data-id]'); if(!row) return; e.preventDefault(); rowMenu(row.dataset.id); });
+  // Week view: drag a card onto a day (or onto "Sin fecha") to reschedule it
+  let dragId=null;
+  d.addEventListener('dragstart', e=>{ const c=e.target.closest('.wcard'); if(!c) return; dragId=c.dataset.id; c.classList.add('dragging'); try{ e.dataTransfer.setData('text/plain', dragId); e.dataTransfer.effectAllowed='move'; }catch(err){} });
+  d.addEventListener('dragend', e=>{ const c=e.target.closest('.wcard'); if(c) c.classList.remove('dragging'); d.querySelectorAll('.over').forEach(x=>x.classList.remove('over')); });
+  d.addEventListener('dragover', e=>{ const z=e.target.closest('[data-day]'); if(!z||!dragId) return; e.preventDefault(); e.dataTransfer.dropEffect='move'; d.querySelectorAll('.over').forEach(x=>{ if(x!==z) x.classList.remove('over'); }); z.classList.add('over'); });
+  d.addEventListener('dragleave', e=>{ const z=e.target.closest('[data-day]'); if(z && !z.contains(e.relatedTarget)) z.classList.remove('over'); });
+  d.addEventListener('drop', e=>{ const z=e.target.closest('[data-day]'); if(!z||!dragId) return; e.preventDefault(); const id=dragId; dragId=null; const x=task(id); if(!x) return; const day=z.dataset.day||null; if(x.date===day) { render(); return; } const old=x.date, oldC=x.carried; updTask(id,{date:day}); haptic(6); renderAnimated(); toast(day?'Movida a '+fmtDate(day):'Sin fecha', ()=>updTask(id,{date:old, carried:oldC})); });
+  // Week cards open the detail on click
+  d.addEventListener('click', e=>{ const c=e.target.closest('.wcard'); if(!c||e.target.closest('[data-act]')) return; openDetail(c.dataset.id); });
+}
+document.addEventListener('keydown', e=>{ if(!UI.wide) return; const tag=(e.target.tagName||'').toLowerCase(); const typing=tag==='input'||tag==='textarea';
+  if(e.key==='Escape'){ if(sheet.classList.contains('on')||asheet.classList.contains('on')) closeSheet(); else if(UI.deskDetail) pop(); else if(UI.query){ UI.query=''; render(); } return; }
+  if(!typing && (e.key==='n'||e.key==='N')){ const ab=$('#desk [data-role=addbar]'); if(ab){ e.preventDefault(); ab.focus(); } return; }
+  if(!typing && e.key==='/' ){ const s=$('#desk [data-role=search]'); if(s){ e.preventDefault(); s.focus(); } } });
+wideMQ.addEventListener('change', applyWide); applyWide();
 
 /* ---------- Service worker: offline cache and update notice ---------- */
 function applyUpdate(){ if(!pendingSW) return; toast('Actualizando'); log('info','Actualización aplicada por el usuario'); pendingSW.postMessage({type:'SKIP_WAITING'}); }

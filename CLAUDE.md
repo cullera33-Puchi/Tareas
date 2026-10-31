@@ -90,7 +90,8 @@ Cambios acordados con Enric sobre el diseño de abajo. Mandan sobre el texto del
 12. **Lote 6 (v0.9.0).** Copias locales diarias en IndexedDB (`BK`, base `tareas-backups`, siete copias, restaurar desde Ajustes); título del detalle en `textarea` que crece; atajos de hora en Recordatorio; "N hoy" en Completadas y "Todo hecho por hoy"; vista previa "Mañana: N tareas"; hoja de bienvenida (`tipsSeen`); entrada `?add=texto` para el Atajo de iOS; agitar para deshacer (`shakeUndo`, DeviceMotion con permiso).
 13. **v0.11.0.** Calendario propio (`calendarHTML`) en Fecha y Recordatorio; Completadas con enlace y agrupadas por día; selección múltiple (`UI.select`, `startSelect`, barra `#selbar` con `bulkComplete`, `bulkPostponeSheet`, `bulkMoveSheet`, `bulkDelete`); Todas agrupada por fecha o por proyecto (`allGroup`).
 14. **v0.12.0.** Filtro por proyecto en la lista (`UI.projFilter`, chips `.pchips`); "Pasar lo pendiente a mañana" desde las 19:00 (`closeDaySheet`, `rescheduleMany`); planificar las sin fecha una a una (`planStart`, `planStep`); exportar CSV para Excel (`csvText`, `exportCSV`, separador `;`, BOM).
-15. **Foco en hojas.** Los campos de las hojas se enfocan de forma síncrona dentro del toque; con `setTimeout` iOS no abre el teclado.
+15. **Escritorio (v0.13.0).** Decidido con Enric: en el iPhone se mantiene la tab bar (hasta cinco pestañas y "Más" si hiciera falta; nada de cajón lateral); a partir de 900 px (`wideMQ`, `UI.wide`) la app pasa a barra lateral, columna central con barra de alta (`addBarHTML`), panel de detalle (`UI.deskDetail`) y vista Semana (`weekHTML`, arrastrar para cambiar fecha). Código en `renderDesktop`, `deskSide`, `deskMain`, `bindDeskEvents`. Sin tablet. Los datos son locales por navegador hasta el bloque 8.
+16. **Foco en hojas.** Los campos de las hojas se enfocan de forma síncrona dentro del toque; con `setTimeout` iOS no abre el teclado.
 
 
 ---

@@ -1,5 +1,23 @@
 # Registro de cambios
 
+## v0.8.0. Lote 5 (31 de octubre de 2026)
+
+Estética
+- Icono nuevo: degradado azul del sistema con círculo de verificación y dos líneas de lista. Incluye `apple-touch-icon` de 180 px.
+- Proyectos como listas de Recordatorios: círculo de color con icono blanco; "Sin proyecto" en gris.
+- Fechas de los próximos siete días con el nombre completo del día (Martes, Viernes).
+- Indicadores de notas y de notas de voz en la línea gris de la fila.
+- Toque háptico experimental en iOS: interruptor nativo oculto (`input type=checkbox switch`) que iOS 17.4 y posteriores acompañan de un toque al cambiar; se activa al completar, cambiar prioridad y cruzar el umbral del deslizamiento. Si tu iOS no lo soporta, no pasa nada.
+
+Usabilidad
+- Mover a otro espacio desde la pulsación larga y desde el menú del detalle (el proyecto se vacía). Con Deshacer.
+- Enlaces y teléfonos de las notas en una franja tocable bajo el texto; en las notas de voz, tocables dentro del propio texto.
+- Duplicar tarea (misma copia sin fecha) y abrir su detalle.
+- "Añadir y abrir" en Nueva tarea.
+- Buscar: enlace "Incluir N completadas" cuando hay completadas que coinciden.
+- El resumen se muestra abierto la primera vez de cada día aunque esté plegado por volumen.
+- Deshacer también al cambiar prioridad y al mover a proyecto.
+
 ## v0.7.1. Deslizar a la derecha (31 de octubre de 2026)
 
 - Corregido: al deslizar a la derecha aparecía el fondo rojo de Eliminar en lugar del verde de completar, porque ambos fondos ocupaban la fila entera. Ahora solo se muestra el del lado hacia el que se desliza.

@@ -1,7 +1,7 @@
 /* Service worker: app shell cache and update notice.
    Bump CACHE on every release so installed devices pick up the new version. */
-const CACHE = 'tareas-v0.7.1';
-const SHELL = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png'];
+const CACHE = 'tareas-v0.8.0';
+const SHELL = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
   // cache: 'reload' skips the HTTP cache so a stale copy from the host never gets installed.

@@ -1,0 +1,6 @@
+# Supabase keys and local config never go in commits
+config.js
+.env
+.env.*
+supabase/.temp/
+.DS_Store

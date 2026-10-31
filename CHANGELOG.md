@@ -1,5 +1,24 @@
 # Registro de cambios
 
+## v0.7.0. Lotes 3 y 4: estética iOS y usabilidad (31 de octubre de 2026)
+
+Estética
+- Detalle al estilo Recordatorios: título y notas en el primer grupo de celdas; Proyecto, Fecha, Recordatorio y Prioridad como filas con valor y chevron; Compartir y el menú (Marcar completada, Eliminar) en la barra superior; "Añadir nota de voz" como fila del grupo de notas de voz. Desaparecen los dos botones grandes y el desplegable.
+- Círculo de completar: al tocarlo se encoge, se rellena con el color del proyecto (azul si no tiene) y el tick entra con rebote.
+- Resumen sin cajas: tres cifras grandes en línea; la cifra activa como filtro se marca con fondo gris.
+- Barras, hojas, menús y avisos con material translúcido (desenfoque) en lugar de color sólido.
+- Etiqueta de proyecto como cápsula tintada con el color del proyecto.
+- Pies de Ajustes y del detalle recortados a una línea.
+- Interletrado ligeramente negativo en el título y en las cifras, como SF Pro Display.
+
+Usabilidad
+- Hoy en dos bloques cuando hay aplazadas: "Aplazadas" y "Hoy".
+- El resumen aparece plegado por defecto con más de 20 tareas en Hoy; al tocar el chevron la elección se recuerda (`summaryState`: auto, open, closed).
+- Búsqueda sin acentos y también por nombre de proyecto.
+- El botón del deslizamiento pasa de "Mañana" a "Aplazar", con hoja de opciones: Mañana, Fin de semana, Próxima semana, Elegir fecha. El menú de pulsación larga usa la misma hoja.
+- Nueva tarea con chips Viernes y Próx. semana además de Hoy y Mañana; los chips se disponen en dos filas.
+- Si la app lleva más de dos horas en segundo plano, al volver se coloca en Tareas, filtro Hoy, arriba del todo.
+
 ## v0.6.3 (31 de octubre de 2026)
 
 - El campo de búsqueda ya no se desborda sobre el botón Cancelar.

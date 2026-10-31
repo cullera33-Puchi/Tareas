@@ -1,5 +1,10 @@
 # Registro de cambios
 
+## v0.5.1. Sin destellos de color al hacer scroll rápido (31 de octubre de 2026)
+
+- Los fondos de los botones de acción (verde, naranja, rojo) que hay detrás de cada fila solo existen mientras la fila se está deslizando o queda abierta. Antes estaban siempre debajo y, con scroll rápido, Safari los dejaba ver antes de pintar la fila.
+- Las filas dejan de ser capas de composición en reposo (sin `transform` fijo), lo que además alivia el scroll con muchas tareas.
+
 ## v0.5.0. Herramientas de prueba en Ajustes (31 de octubre de 2026)
 
 - Datos: "Exportar a archivo" genera `tareas-AAAA-MM-DD.json` con espacios, proyectos, tareas y notas de voz (por la hoja de compartir de iOS, para guardarlo en Archivos o enviarlo; descarga directa como respaldo). "Importar desde archivo" lee ese JSON; lo nuevo se añade y lo existente se actualiza si la copia es más reciente. Se mantiene "Importar pegando texto".

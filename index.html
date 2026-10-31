@@ -109,7 +109,8 @@ input,textarea,select{font-size:17px;}
 .group-title{font-size:13px;color:var(--ink2);padding:0 4px 6px;margin-top:4px;}
 .row{position:relative;overflow:hidden;background:var(--card);}
 .row + .row .row-content{border-top:.5px solid var(--sep);}
-.row-bg{position:absolute;inset:0;display:flex;align-items:stretch;}
+.row-bg{position:absolute;inset:0;display:none;align-items:stretch;}
+.row.swiping .row-bg{display:flex;}
 .row-bg.left{justify-content:flex-start;background:var(--green);}
 .row-bg.right{justify-content:flex-end;background:var(--red);}
 .row-bg.left span{display:flex;align-items:center;padding-left:20px;color:#fff;}
@@ -117,7 +118,7 @@ input,textarea,select{font-size:17px;}
 .row-bg.right button{width:80px;color:#fff;font-size:15px;font-weight:500;}
 .row-bg.right .b-tomorrow{background:var(--orange);}
 .row-bg.right .b-delete{background:var(--red);}
-.row-content{position:relative;background:var(--card);display:flex;align-items:center;gap:12px;padding:10px 16px 10px 16px;min-height:52px;transform:translate3d(0,0,0);transition:transform .3s cubic-bezier(.32,.72,0,1);}
+.row-content{position:relative;background:var(--card);display:flex;align-items:center;gap:12px;padding:10px 16px 10px 16px;min-height:52px;transition:transform .3s cubic-bezier(.32,.72,0,1);}
 .row-content.drag{transition:none;}
 .row-content:active{background:var(--press);}
 .first .row-content{padding:8px 0;min-height:44px;}
@@ -252,7 +253,7 @@ input,textarea,select{font-size:17px;}
 
 <script>
 'use strict';
-const APP_VERSION = '0.5.0';
+const APP_VERSION = '0.5.1';
 let pendingSW = null; // service worker installed and waiting to take over
 
 /* ---------- Log: errors and app events, kept in localStorage for copy-and-paste debugging ---------- */
@@ -636,14 +637,14 @@ function bindBackSwipe(scr){
 
 /* ---------- Row gestures ---------- */
 let openRow=null;
-function closeRow(row){ if(!row) return; const c=row.querySelector('.row-content'); c.classList.remove('drag'); c.style.transform=''; row.dataset.open='0'; if(openRow===row) openRow=null; }
+function closeRow(row){ if(!row) return; const c=row.querySelector('.row-content'); c.classList.remove('drag'); c.style.transform=''; row.dataset.open='0'; if(openRow===row) openRow=null; setTimeout(()=>{ if(row.dataset.open!=='1'&&!c.classList.contains('drag')) row.classList.remove('swiping'); },320); }
 function bindRowGestures(row){
   const c=row.querySelector('.row-content'); if(!c||!row.querySelector('.row-bg')) return;
   let x0=0,y0=0,dx=0,mode=null,lp=null,thr=false;
   row.addEventListener('touchstart',e=>{ const t=e.touches[0]; x0=t.clientX;y0=t.clientY;dx=0;mode=null;thr=false; if(openRow&&openRow!==row) closeRow(openRow);
     lp=setTimeout(()=>{ if(mode===null){ mode='lp'; haptic(15); priorityMenu(row.dataset.id); } },500); },{passive:true});
   row.addEventListener('touchmove',e=>{ const t=e.touches[0]; const mx=t.clientX-x0, my=t.clientY-y0;
-    if(mode===null){ if(Math.abs(my)>8){ mode='scroll'; clearTimeout(lp); } else if(Math.abs(mx)>10){ mode='swipe'; clearTimeout(lp); c.classList.add('drag'); } }
+    if(mode===null){ if(Math.abs(my)>8){ mode='scroll'; clearTimeout(lp); } else if(Math.abs(mx)>10){ mode='swipe'; clearTimeout(lp); row.classList.add('swiping'); c.classList.add('drag'); } }
     if(mode!=='swipe') return;
     e.preventDefault(); const base=row.dataset.open==='1'?-160:0; let raw=base+mx;
     if(raw<-160) raw=-160+(raw+160)*0.15; // elastic stop at the buttons

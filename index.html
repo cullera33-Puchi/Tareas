@@ -200,6 +200,20 @@ input,textarea,select{font-size:max(16px,1rem);} /* under 16px Safari zooms on f
 .switch::after{content:"";position:absolute;top:2px;left:2px;width:27px;height:27px;border-radius:50%;background:#fff;box-shadow:0 3px 8px rgba(0,0,0,.15),0 1px 1px rgba(0,0,0,.16);transition:transform .2s;}
 .switch.on{background:var(--green);}
 .switch.on::after{transform:translateX(20px);}
+.seg.mini{margin:-4px 0 12px;padding:2px;}
+.seg.mini button{height:24px;font-size:0.706rem;}
+.selbox{flex:none;width:22px;height:22px;border-radius:50%;border:1.5px solid var(--ink3);display:flex;align-items:center;justify-content:center;transition:background .15s,border-color .15s;}
+.selbox svg{width:12px;height:12px;color:#fff;opacity:0;}
+.row.selected .selbox{background:var(--blue);border-color:var(--blue);}
+.row.selected .selbox svg{opacity:1;}
+.row.selected .row-content{background:var(--fill);}
+.selbar{position:absolute;left:0;right:0;bottom:0;height:calc(48px + env(safe-area-inset-bottom,0px));padding-bottom:env(safe-area-inset-bottom,0px);background:var(--bar);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-top:.5px solid var(--sep);display:none;z-index:7;}
+.selbar button{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;font-size:0.588rem;color:var(--blue);height:48px;}
+.selbar button.red{color:var(--red);}
+.selbar button:disabled{opacity:.35;}
+.selbar svg{width:22px;height:22px;}
+.app.selecting .tabbar,.app.selecting .fab{display:none;}
+.app.selecting .selbar{display:flex;}
 .preview{display:flex;align-items:center;justify-content:space-between;width:100%;padding:4px 20px 16px;color:var(--ink2);font-size:0.882rem;}
 .preview svg{width:8px;height:14px;color:var(--ink3);}
 .alldone{display:flex;align-items:center;gap:8px;margin-top:10px;padding-top:10px;border-top:.5px solid var(--sep);color:var(--green);font-weight:600;font-size:0.882rem;}
@@ -269,7 +283,7 @@ input,textarea,select{font-size:max(16px,1rem);} /* under 16px Safari zooms on f
 .colors button.on{border-color:var(--ink);}
 
 /* Action menu */
-.asheet{position:fixed;left:8px;right:8px;bottom:calc(8px + env(safe-area-inset-bottom,0px));z-index:21;transform:translate3d(0,120%,0);transition:transform .3s cubic-bezier(.32,.72,0,1);}
+.asheet{position:fixed;left:8px;right:8px;bottom:calc(8px + env(safe-area-inset-bottom,0px));z-index:21;max-height:calc(100% - 60px);overflow-y:auto;transform:translate3d(0,120%,0);transition:transform .3s cubic-bezier(.32,.72,0,1);}
 .asheet.on{transform:translate3d(0,0,0);}
 .asheet .grp{background:var(--mat);-webkit-backdrop-filter:saturate(180%) blur(24px);backdrop-filter:saturate(180%) blur(24px);border-radius:14px;overflow:hidden;margin-bottom:8px;}
 .asheet .grp .t{text-align:center;font-size:0.765rem;color:var(--ink2);padding:12px;border-bottom:.5px solid var(--sep);}
@@ -302,7 +316,7 @@ input,textarea,select{font-size:max(16px,1rem);} /* under 16px Safari zooms on f
 </style>
 </head>
 <body>
-<div class="app" id="app"><nav class="tabbar" id="tabbar"></nav></div>
+<div class="app" id="app"><nav class="tabbar" id="tabbar"></nav><nav class="selbar" id="selbar"></nav></div>
 <div class="scrim" id="scrim"></div>
 <div class="sheet" id="sheet"></div>
 <div class="asheet" id="asheet"></div>
@@ -311,7 +325,7 @@ input,textarea,select{font-size:max(16px,1rem);} /* under 16px Safari zooms on f
 
 <script>
 'use strict';
-const APP_VERSION = '0.10.0';
+const APP_VERSION = '0.11.0';
 let pendingSW = null; // service worker installed and waiting to take over
 
 /* ---------- Log: errors and app events, kept in localStorage for copy-and-paste debugging ---------- */
@@ -389,6 +403,7 @@ const I = {
   mic:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></svg>',
   share:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13M7 8l5-5 5 5M5 13v7h14v-7"/></svg>',
   bell:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9a6 6 0 0112 0v4l2 3H4l2-3zM10 20a2 2 0 004 0"/></svg>',
+  trash:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>',
   more:'<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>',
   list:'<svg viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="6" cy="7" r="2"/><circle cx="6" cy="13" r="2"/><circle cx="6" cy="19" r="2"/><path d="M11 7h10M11 13h10M11 19h10"/></svg>',
   folder:'<svg viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 7a2 2 0 012-2h5l2 3h9a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>',
@@ -408,7 +423,7 @@ const KEY = 'tareas-v1';
 let DB = null;
 function blank(){
   const t=new Date().toISOString();
-  return { spaces:[{id:'trabajo',name:'Trabajo',order:0,created:t},{id:'personal',name:'Personal',order:1,created:t}], projects:[], tasks:[], voiceNotes:[], settings:{activeSpace:'trabajo', summaryState:'auto', filter:'hoy', doneOpen:false, theme:'auto', tipsSeen:false, shakeUndo:false} };
+  return { spaces:[{id:'trabajo',name:'Trabajo',order:0,created:t},{id:'personal',name:'Personal',order:1,created:t}], projects:[], tasks:[], voiceNotes:[], settings:{activeSpace:'trabajo', summaryState:'auto', filter:'hoy', doneOpen:false, theme:'auto', tipsSeen:false, shakeUndo:false, allGroup:'date'} };
 }
 function load(){ try{ const raw=localStorage.getItem(KEY); if(raw){ const d=JSON.parse(raw); if(d&&d.spaces&&d.tasks) return Object.assign(blank(),d,{settings:Object.assign(blank().settings,d.settings||{})}); } }catch(e){} return blank(); }
 function save(){ try{ localStorage.setItem(KEY, JSON.stringify(DB)); }catch(e){ log('error','No se pudo guardar: '+(e&&e.message||e)); toast('No se pudo guardar en el dispositivo'); } }
@@ -451,7 +466,7 @@ function doneList(projectId){
 }
 
 /* ---------- UI state ---------- */
-const UI = { tab:'tareas', query:'', stack:[], scroll:{}, sumFilter:null, summaryFirst:false, searchDone:false };
+const UI = { tab:'tareas', query:'', stack:[], scroll:{}, sumFilter:null, summaryFirst:false, searchDone:false, select:null };
 
 /* ---------- Toast with undo ---------- */
 let toastTimer=null, undoFn=null;
@@ -537,15 +552,17 @@ function renderTabbar(){
   const b=(id,ic,icF,l)=>'<button data-tab="'+id+'" class="'+(UI.tab===id?'on':'')+'">'+(UI.tab===id?icF:ic)+'<span>'+l+'</span></button>';
   tabbarEl.innerHTML = b('tareas',I.list,I.listF,'Tareas')+b('proyectos',I.folder,I.folderF,'Proyectos')+b('ajustes',I.gear,I.gearF,'Ajustes');
 }
-function switchTab(tab){ if(UI.tab===tab){ const sc=rootScreen(tab).querySelector('.scroll'); sc&&sc.scrollTo({top:0,behavior:'smooth'}); return; } UI.tab=tab; UI.query=''; UI.sumFilter=null; render(); }
+function switchTab(tab){ if(UI.select){ UI.select=null; app.classList.remove('selecting'); }
+  if(UI.tab===tab){ const sc=rootScreen(tab).querySelector('.scroll'); sc&&sc.scrollTo({top:0,behavior:'smooth'}); return; } UI.tab=tab; UI.query=''; UI.sumFilter=null; render(); }
 tabbarEl.addEventListener('click', e=>{ const b=e.target.closest('[data-tab]'); if(b) switchTab(b.dataset.tab); });
+$('#selbar').addEventListener('click', e=>{ const b=e.target.closest('[data-act]'); if(!b||b.disabled||!UI.select) return; ({bulkComplete, bulkPostpone:bulkPostponeSheet, bulkMove:bulkMoveSheet, bulkDelete})[b.dataset.act](); });
 
 /* ---------- Swipe between tabs: the screen follows the finger, iOS style.
    Task rows keep their own horizontal gestures, so a swipe that starts on one is theirs. ---------- */
 (function bindTabSwipe(){
   let x0=0,y0=0,mode=null,cur=null,nb=null,dir=0,w=0,lastX=0,lastT=0,vx=0;
   const neighbor=d=>{ const i=TABS.indexOf(UI.tab)+d; return i>=0&&i<TABS.length?TABS[i]:null; };
-  app.addEventListener('touchstart',e=>{ mode=null; if(UI.stack.length||e.touches.length>1) return; const t=e.touches[0]; const root=e.target.closest('.screen.root'); if(!root||root.dataset.root!==UI.tab) return;
+  app.addEventListener('touchstart',e=>{ mode=null; if(UI.stack.length||e.touches.length>1||UI.select) return; const t=e.touches[0]; const root=e.target.closest('.screen.root'); if(!root||root.dataset.root!==UI.tab) return;
     const row=e.target.closest('.row'); if(row&&row.querySelector('.row-bg')) return;
     x0=lastX=t.clientX; y0=t.clientY; lastT=e.timeStamp; mode='pending'; cur=root; nb=null; w=innerWidth; vx=0; },{passive:true});
   app.addEventListener('touchmove',e=>{ if(!mode||mode==='off') return; const t=e.touches[0]; const dx=t.clientX-x0, dy=t.clientY-y0;
@@ -576,9 +593,10 @@ function rowHTML(x, opts={}){
   const ind=(x.notes&&x.notes.trim()?'<span class="ind">'+I.note+'</span>':'')+(DB.voiceNotes.some(v=>v.taskId===x.id)?'<span class="ind">'+I.mic+'</span>':''); if(ind) meta.push(ind);
   const pri = done?'':x.priority==='high'?'<span class="pri high">!!!</span>':x.priority==='mid'?'<span class="pri mid">!!</span>':'';
   const pc=p?p.color:null;
-  return '<div class="row'+(done?' done':'')+'" data-id="'+x.id+'"'+(pc?' style="--pc:'+pc+';--tagbg:'+tint(pc,.15)+'"':'')+'>'+
-    (opts.simple?'':'<div class="row-bg left"><span>'+I.check+'</span></div><div class="row-bg right"><button class="b-tomorrow" data-act="postpone">Aplazar</button><button class="b-delete" data-act="delete">Eliminar</button></div>')+
-    '<div class="row-content"><button class="check'+(x.status==='done'?' done':'')+'" data-act="check" aria-label="Completar">'+I.check+'</button>'+
+  const selecting = UI.select && !opts.simple; const selected = selecting && UI.select.ids.has(x.id);
+  return '<div class="row'+(done?' done':'')+(selected?' selected':'')+'" data-id="'+x.id+'"'+(pc?' style="--pc:'+pc+';--tagbg:'+tint(pc,.15)+'"':'')+'>'+
+    (opts.simple||selecting?'':'<div class="row-bg left"><span>'+I.check+'</span></div><div class="row-bg right"><button class="b-tomorrow" data-act="postpone">Aplazar</button><button class="b-delete" data-act="delete">Eliminar</button></div>')+
+    '<div class="row-content">'+(selecting?'<span class="selbox">'+I.check+'</span>':'<button class="check'+(x.status==='done'?' done':'')+'" data-act="check" aria-label="Completar">'+I.check+'</button>')+
     '<div class="row-text"><div class="row-title">'+esc(x.title||'Sin título')+'</div>'+(meta.length?'<div class="row-meta">'+meta.join('<span class="sep">·</span>')+'</div>':'')+'</div>'+pri+'</div></div>';
 }
 function summaryCollapsed(n){ const st=DB.settings.summaryState||'auto'; if(st==='auto' && UI.summaryFirst) return false; return st==='closed' || (st==='auto' && n>20); }
@@ -614,6 +632,9 @@ function listHTML(filter, projectId){
   }
   else if(UI.query){ h += '<div class="group-title">'+list.length+(list.length===1?' resultado':' resultados')+'</div><div class="group">'+list.map(x=>rowHTML(x)).join('')+'</div>'; }
   if(UI.query){ const dm=done.filter(x=>matchesQuery(x,UI.query)); if(dm.length){ h += UI.searchDone ? '<div class="group-title">Completadas</div><div class="group">'+dm.map(x=>rowHTML(x)).join('')+'</div>' : '<div class="empty" style="padding:8px 0 16px"><div class="acts"><button class="btn-link" data-act="searchDone">Incluir '+dm.length+(dm.length===1?' completada':' completadas')+'</button></div></div>'; } return h; }
+  else if(filter==='todas' && root && DB.settings.allGroup==='project'){ const ps=activeProjects(); const by={}; list.forEach(x=>{ const k=x.projectId&&ps.some(p=>p.id===x.projectId)?x.projectId:'none'; (by[k]=by[k]||[]).push(x); });
+    ps.forEach(p=>{ if(by[p.id]) h += '<div class="group-title"><span class="dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+p.color+';margin-right:6px;vertical-align:1px"></span>'+esc(p.name)+' <span style="color:var(--ink3)">'+by[p.id].length+'</span></div><div class="group">'+by[p.id].map(x=>rowHTML(x)).join('')+'</div>'; });
+    if(by.none) h += '<div class="group-title">Sin proyecto <span style="color:var(--ink3)">'+by.none.length+'</span></div><div class="group">'+by.none.map(x=>rowHTML(x)).join('')+'</div>'; }
   else if(filter==='todas'){ const t=todayStr(); const by={}; list.forEach(x=>{ (by[dateBucket(x,t)]=by[dateBucket(x,t)]||[]).push(x); });
     BUCKETS.forEach(([k,label])=>{ if(by[k]) h += '<div class="group-title">'+label+'</div><div class="group">'+by[k].map(x=>rowHTML(x)).join('')+'</div>'; }); }
   else if(filter==='hoy' && root && list.some(x=>x.carried) && list.some(x=>!x.carried)){ const c=list.filter(x=>x.carried), d=list.filter(x=>!x.carried); h += '<div class="group-title">Aplazadas</div><div class="group">'+c.map(x=>rowHTML(x)).join('')+'</div><div class="group-title">Hoy</div><div class="group">'+d.map(x=>rowHTML(x)).join('')+'</div>'; }
@@ -626,12 +647,15 @@ function listHTML(filter, projectId){
       order.forEach(d=>{ const label=d===t?'Hoy':d===yd?'Ayer':d==='0000'?'Sin fecha':fmtDate(d); h += '<div class="group-title">'+label+'</div><div class="group">'+by[d].map(x=>rowHTML(x)).join('')+'</div>'; }); } }
   return h;
 }
+function selectNav(){ const n=UI.select.ids.size; return '<header class="nav"><div class="nav-row"><button class="action" data-act="selAll">'+(UI.select.all?'Ninguna':'Todas')+'</button><div class="nav-title" id="selTitle">'+(n?n+(n===1?' seleccionada':' seleccionadas'):'Seleccionar')+'</div><button class="action strong" data-act="selDone">OK</button></div></header>'; }
 function viewTareas(){
   const f=DB.settings.filter; const nHoy=pendingFor('hoy').length, nTodas=pendingFor('todas').length;
+  if(UI.select && UI.select.scope==='root') return selectNav()+'<div class="scroll">'+listHTML(UI.query?'todas':f)+'</div>';
   return '<header class="nav"><div class="nav-row"><button class="title" data-act="spaceMenu" aria-label="Cambiar espacio">'+esc(space().name)+I.chevD+'</button><span></span></div></header>'+
    '<div class="scroll">'+(f==='hoy'&&!UI.query?summaryHTML():'')+
    '<div class="searchbar"><div class="search">'+I.search+'<input type="search" placeholder="Buscar" value="'+esc(UI.query)+'" data-role="search" autocomplete="off"></div>'+(UI.query?'<button class="cancel" data-act="clearSearch">Cancelar</button>':'')+'</div>'+
    (UI.query?'':'<div class="seg"><button data-filter="hoy" class="'+(f==='hoy'?'on':'')+'">Hoy<span class="n">'+nHoy+'</span></button><button data-filter="todas" class="'+(f==='todas'?'on':'')+'">Todas<span class="n">'+nTodas+'</span></button></div>')+
+   (!UI.query&&f==='todas'&&nTodas?'<div class="seg mini"><button data-group="date" class="'+(DB.settings.allGroup!=='project'?'on':'')+'">Por fecha</button><button data-group="project" class="'+(DB.settings.allGroup==='project'?'on':'')+'">Por proyecto</button></div>':'')+
    listHTML(UI.query?'todas':f)+'</div>'+
    '<button class="fab" data-act="add" aria-label="Añadir tarea">'+I.plus+'</button>';
 }
@@ -649,6 +673,7 @@ function viewProyectos(){
 }
 function viewProject(id){
   const p = id==='none'?null:proj(id); const title=p?p.name:'Sin proyecto';
+  if(UI.select && UI.select.scope==='project') return selectNav()+'<div class="scroll">'+listHTML('todas', p?p.id:null)+'</div>';
   return '<header class="nav"><div class="nav-row"><button class="back" data-act="back">'+I.back+'Atrás</button><div class="nav-title">'+(p?'<span class="pdot" style="width:10px;height:10px;border-radius:50%;background:'+p.color+';display:inline-block;margin-right:6px;vertical-align:1px"></span>':'')+esc(title)+'</div><span></span></div></header>'+
    '<div class="scroll">'+listHTML('todas', p?p.id:null)+'</div>'+
    '<button class="fab" data-act="add" data-project="'+(p?p.id:'')+'" aria-label="Añadir tarea">'+I.plus+'</button>';
@@ -709,7 +734,7 @@ function bindDetail(el, id){
 /* ---------- Shared events ---------- */
 function bindCommon(scr){
   scr.addEventListener('click', onClick);
-  scr.querySelectorAll('.row:not(.first .row)').forEach(bindRowGestures);
+  if(!UI.select) scr.querySelectorAll('.row:not(.first .row)').forEach(bindRowGestures);
   scr.querySelectorAll('.first .row').forEach(r=>{ r.addEventListener('click',e=>{ if(e.target.closest('[data-act=check]')) return; openDetail(r.dataset.id); }); });
   scr.querySelectorAll('[data-open-project]').forEach(b=>bindLongPress(b, ()=>{ if(b.dataset.openProject!=='none') projectMenu(b.dataset.openProject); }));
   const s=$('[data-role=search]',scr); if(s){ s.addEventListener('input',()=>{ UI.query=s.value; const scr2=s.closest('.screen'); const st=scr2.querySelector('.scroll').scrollTop; render(); const n=$('[data-role=search]'); if(n){ n.focus(); n.setSelectionRange(n.value.length,n.value.length);} }); }
@@ -724,6 +749,8 @@ function onClick(e){
   const es=e.target.closest('[data-edit-space]'); if(es){ spaceSheet(es.dataset.editSpace); return; }
   const rb=e.target.closest('[data-restore]'); if(rb){ restoreBackup(rb.dataset.restore); return; }
   const ua=e.target.closest('[data-unarchive]'); if(ua){ const p=proj(ua.dataset.unarchive); p.archived=false; save(); render(); return; }
+  const gb=e.target.closest('[data-group]'); if(gb){ DB.settings.allGroup=gb.dataset.group; save(); render(); return; }
+  if(UI.select){ const row=e.target.closest('.row'); if(row && !row.closest('.first')){ toggleSelected(row); return; } }
   const act=e.target.closest('[data-act]'); if(!act) { const row=e.target.closest('.row'); if(row && !row.closest('.first')) { if(row.dataset.open==='1'){ closeRow(row); return; } openDetail(row.dataset.id); } return; }
   const row=act.closest('.row'); const a=act.dataset.act;
   const cur = UI.stack[UI.stack.length-1]; const detailId = cur&&cur.kind==='detail'?cur.id:null;
@@ -732,6 +759,12 @@ function onClick(e){
     case 'tomorrow': { const id=row.dataset.id; closeRow(row); leaveRows(id); setTimeout(()=>{ tomorrowTask(id); renderAnimated(); },200); break; }
     case 'delete': if(row){ closeRow(row); confirmDelete(row.dataset.id); } else if(detailId){ confirmDelete(detailId, ()=>pop()); } break;
     case 'clearSearch': UI.query=''; UI.searchDone=false; render(); break;
+    case 'selDone': endSelect(); break;
+    case 'selAll': selectAllVisible(); break;
+    case 'bulkComplete': bulkComplete(); break;
+    case 'bulkPostpone': bulkPostponeSheet(); break;
+    case 'bulkMove': bulkMoveSheet(); break;
+    case 'bulkDelete': bulkDelete(); break;
     case 'searchDone': UI.searchDone=true; render(); break;
     case 'toggleSummary': DB.settings.summaryState = summaryCollapsed(pendingFor('hoy').length)?'open':'closed'; UI.summaryFirst=false; save(); render(); break;
     case 'toggleDone': DB.settings.doneOpen=!DB.settings.doneOpen; save(); render(); break;
@@ -770,6 +803,7 @@ function push(kind,id){
 }
 function openDetail(id){ push('detail', id); }
 function pop(){
+  if(UI.select&&UI.select.scope==='project'){ UI.select=null; app.classList.remove('selecting'); }
   const s=UI.stack.pop(); if(!s) return;
   s.el.classList.remove('shown','dragging'); s.el.classList.add('pushed');
   const under = underScreen(); under.classList.remove('under','dragging-under');
@@ -841,12 +875,30 @@ function detailMenu(id){ const x=task(id); if(!x) return; actionSheet(x.title, [
   {label:'Eliminar tarea', red:true, fn:()=>confirmDelete(id, ()=>pop())} ])); }
 function postponeSheet(id){ const t=todayStr(); const opts=[['Mañana',addDays(t,1)],['Fin de semana',nextWeekday(6,true)],['Próxima semana',nextWeekday(1,true)]];
   actionSheet('Aplazar', opts.map(([l,d])=>({label:l+(l==='Mañana'?'':'  ('+fmtDate(d)+')'), fn:()=>{ leaveRows(id); setTimeout(()=>{ rescheduleTask(id,d,l.toLowerCase()); renderAnimated(); },200); }})).concat([{label:'Elegir fecha', fn:()=>dateSheet(id)}])); }
+/* Multi-select: entered from the long-press menu; a bottom bar replaces the tab bar */
+function renderSelbar(){ const n=UI.select?UI.select.ids.size:0; const b=(act,ic,l,red)=>'<button data-act="'+act+'"'+(n?'':' disabled')+(red?' class="red"':'')+'>'+ic+'<span>'+l+'</span></button>'; $('#selbar').innerHTML=b('bulkComplete',I.check,'Completar')+b('bulkPostpone',I.cal,'Aplazar')+b('bulkMove',I.folder,'Mover')+b('bulkDelete',I.trash,'Eliminar',true); }
+function startSelect(id){ const top=UI.stack[UI.stack.length-1]; UI.select={scope: top&&top.kind==='project'?'project':'root', ids:new Set(id?[id]:[]), all:false}; if(openRow) closeRow(openRow); app.classList.add('selecting'); render(); renderSelbar(); haptic(6); }
+function endSelect(){ UI.select=null; app.classList.remove('selecting'); render(); }
+function visibleRowIds(){ const scr=UI.select.scope==='project'?UI.stack[UI.stack.length-1].el:rootScreen('tareas'); return [...scr.querySelectorAll('.scroll .row[data-id]')].filter(r=>!r.closest('.first')).map(r=>r.dataset.id); }
+function updateSelectUI(){ const n=UI.select.ids.size; const t=$('#selTitle'); if(t) t.textContent=n?n+(n===1?' seleccionada':' seleccionadas'):'Seleccionar'; renderSelbar(); }
+function toggleSelected(row){ const id=row.dataset.id; if(UI.select.ids.has(id)){ UI.select.ids.delete(id); row.classList.remove('selected'); } else { UI.select.ids.add(id); row.classList.add('selected'); } UI.select.all=false; haptic(4); updateSelectUI(); }
+function selectAllVisible(){ const ids=visibleRowIds(); if(UI.select.all){ UI.select.ids.clear(); UI.select.all=false; } else { ids.forEach(i=>UI.select.ids.add(i)); UI.select.all=true; } render(); renderSelbar(); }
+function selectedTasks(){ return [...UI.select.ids].map(task).filter(Boolean); }
+function bulkComplete(){ const xs=selectedTasks(); if(!xs.length) return; const prev=xs.map(x=>({id:x.id, status:x.status, completed:x.completed})); const now=new Date().toISOString(); xs.forEach(x=>{ if(x.status==='pending') updTask(x.id,{status:'done', completed:now}); }); const n=prev.filter(p=>p.status==='pending').length; log('info','Completadas en bloque: '+n); endSelect(); toast(n+(n===1?' tarea completada':' tareas completadas'), ()=>prev.forEach(p=>updTask(p.id,{status:p.status, completed:p.completed}))); }
+function bulkDelete(){ const xs=selectedTasks(); if(!xs.length) return; confirmSheet('Eliminar '+xs.length+(xs.length===1?' tarea':' tareas'), 'Podrás deshacerlo durante unos segundos.', ()=>{ const ids=new Set(xs.map(x=>x.id)); const removedT=DB.tasks.filter(x=>ids.has(x.id)), removedV=DB.voiceNotes.filter(v=>ids.has(v.taskId)); DB.tasks=DB.tasks.filter(x=>!ids.has(x.id)); DB.voiceNotes=DB.voiceNotes.filter(v=>!ids.has(v.taskId)); save(); log('info','Eliminadas en bloque: '+removedT.length); endSelect(); haptic(14); toast(removedT.length+(removedT.length===1?' tarea eliminada':' tareas eliminadas'), ()=>{ DB.tasks.push(...removedT); DB.voiceNotes.push(...removedV); save(); }); }); }
+function bulkReschedule(date, label){ const xs=selectedTasks(); if(!xs.length) return; const prev=xs.map(x=>({id:x.id, date:x.date, carried:x.carried})); xs.forEach(x=>updTask(x.id,{date})); endSelect(); toast(xs.length+(xs.length===1?' tarea aplazada a ':' tareas aplazadas a ')+label, ()=>prev.forEach(p=>updTask(p.id,{date:p.date, carried:p.carried}))); }
+function bulkPostponeSheet(){ if(!UI.select||!UI.select.ids.size) return; const t=todayStr(); const opts=[['Mañana',addDays(t,1)],['Fin de semana',nextWeekday(6,true)],['Próxima semana',nextWeekday(1,true)],['En una semana',addDays(t,7)]];
+  actionSheet('Aplazar '+UI.select.ids.size+(UI.select.ids.size===1?' tarea':' tareas'), opts.map(([l,d])=>({label:l+(l==='Mañana'?'':'  ('+fmtDate(d)+')'), fn:()=>bulkReschedule(d,l.toLowerCase())})).concat([{label:'Sin fecha', fn:()=>bulkReschedule(null,'sin fecha')}])); }
+function bulkMoveSheet(){ if(!UI.select||!UI.select.ids.size) return; const ps=activeProjects(); const n=UI.select.ids.size;
+  actionSheet('Mover '+n+(n===1?' tarea':' tareas'), [{label:'Sin proyecto', fn:()=>bulkMove(null)}].concat(ps.map(p=>({label:p.name, fn:()=>bulkMove(p.id)})))); }
+function bulkMove(projectId){ const xs=selectedTasks(); if(!xs.length) return; const prev=xs.map(x=>({id:x.id, projectId:x.projectId})); xs.forEach(x=>updTask(x.id,{projectId})); const p=projectId?proj(projectId):null; endSelect(); toast(xs.length+(xs.length===1?' tarea movida a ':' tareas movidas a ')+(p?p.name:'Sin proyecto'), ()=>prev.forEach(q=>updTask(q.id,{projectId:q.projectId}))); }
 function rowMenu(id){ const x=task(id); if(!x) return; const pl={high:'alta',mid:'media',none:'ninguna'}[x.priority];
   actionSheet(x.title, [
     {label:'Prioridad: '+pl, fn:()=>priorityMenu(id)},
     {label:'Aplazar', fn:()=>postponeSheet(id)},
     {label:'Mover a proyecto', fn:()=>pickProjectSheet(id)}].concat(DB.spaces.length>1?[{label:'Mover a otro espacio', fn:()=>moveToSpaceSheet(id)}]:[], [
     {label:'Duplicar', fn:()=>duplicateTask(id)},
+    {label:'Seleccionar varias', fn:()=>startSelect(id)},
     {label:x.status==='done'?'Marcar pendiente':'Completar', fn:()=>{ leaveRows(id); setTimeout(()=>{ completeTask(id); renderAnimated(); },200); }},
     {label:'Eliminar', red:true, fn:()=>confirmDelete(id)} ])); }
 function moveProject(id, dir){ const ps=activeProjects(); ps.forEach((p,i)=>p.order=i); const i=ps.findIndex(p=>p.id===id), j=i+dir; if(i<0||j<0||j>=ps.length) return; ps[i].order=j; ps[j].order=i; ps[i].modified=ps[j].modified=new Date().toISOString(); save(); haptic(6); renderAnimated(); }

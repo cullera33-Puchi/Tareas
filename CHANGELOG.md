@@ -1,5 +1,14 @@
 # Registro de cambios
 
+## v0.11.0. Calendario propio, Completadas por día, selección múltiple y Todas por proyecto (31 de octubre de 2026)
+
+- Fecha: hoja con atajos (Hoy, Mañana, Este viernes, Próxima semana, Sin fecha) y calendario mensual propio, lunes primero, hoy en azul, punto bajo los días con tareas pendientes, navegación por meses. Tocar un día guarda y cierra.
+- Recordatorio: mismo calendario más la hora con el selector nativo de iOS, atajos "Hoy a las 18:00", "Mañana a las 9:00", "En una hora" y Quitar.
+- Completadas al estilo Recordatorios: enlace "Mostrar completadas (N, M hoy)" y, abiertas, agrupadas por Hoy, Ayer y fecha.
+- Selección múltiple: "Seleccionar varias" en la pulsación larga. La barra superior pasa a "Todas / N seleccionadas / OK" y la tab bar se sustituye por Completar, Aplazar, Mover y Eliminar. Tocar filas las marca; Aplazar y Mover abren sus opciones; Eliminar pide confirmación; todo con Deshacer. Funciona en Tareas y dentro de un proyecto; salir del proyecto o cambiar de pestaña termina la selección.
+- Todas: control "Por fecha / Por proyecto" bajo el segmento. Por proyecto agrupa en el orden de la pestaña Proyectos con "Sin proyecto" al final; se recuerda (`allGroup`).
+- Los menús de acción se desplazan si no caben en pantalla.
+
 ## v0.9.0. Lote 6 (31 de octubre de 2026)
 
 - Copias de seguridad locales: una instantánea diaria en IndexedDB (fuera de `localStorage`), se conservan las últimas siete. En Ajustes, "Copias de seguridad": lista con fecha y número de tareas, "Crear copia ahora" y restaurar tocando una (con confirmación y Deshacer).

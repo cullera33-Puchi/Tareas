@@ -1,6 +1,6 @@
 /* Service worker: app shell cache and update notice.
    Bump CACHE on every release so installed devices pick up the new version. */
-const CACHE = 'tareas-v0.9.0';
+const CACHE = 'tareas-v0.11.0';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png'];
 
 self.addEventListener('install', e => {

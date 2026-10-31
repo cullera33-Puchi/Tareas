@@ -1,5 +1,11 @@
 # Registro de cambios
 
+## v0.7.1. Deslizar a la derecha (31 de octubre de 2026)
+
+- Corregido: al deslizar a la derecha aparecía el fondo rojo de Eliminar en lugar del verde de completar, porque ambos fondos ocupaban la fila entera. Ahora solo se muestra el del lado hacia el que se desliza.
+- El tick del fondo verde acompaña al borde de la fila y crece con el recorrido; al cruzar el umbral da un pequeño rebote y el verde se aviva. Hay un tope elástico pasado el umbral.
+- Al soltar, la fila vuelve a su sitio mientras el círculo se rellena, y a continuación se desvanece y la lista se cierra. Antes salía volando por la derecha y la lista se repintaba de golpe.
+
 ## v0.7.0. Lotes 3 y 4: estética iOS y usabilidad (31 de octubre de 2026)
 
 Estética

@@ -125,11 +125,16 @@ input,textarea,select{font-size:max(16px,1rem);} /* under 16px Safari zooms on f
 .row + .row .row-content::before{content:"";position:absolute;left:50px;right:0;top:0;height:.5px;background:var(--sep);}
 .first .row + .row .row-content::before{left:34px;}
 .row-bg{position:absolute;inset:0;display:none;align-items:stretch;}
-.row.swiping .row-bg{display:flex;}
+.row.swiping.dir-r .row-bg.left{display:flex;}
+.row.swiping.dir-l .row-bg.right{display:flex;}
 .row-bg.left{justify-content:flex-start;background:var(--green);}
 .row-bg.right{justify-content:flex-end;background:var(--red);}
-.row-bg.left span{display:flex;align-items:center;padding-left:20px;color:#fff;}
-.row-bg.left svg{width:22px;height:22px;}
+.row-bg.left span{position:absolute;left:0;top:0;bottom:0;display:flex;align-items:center;color:#fff;transform:translate3d(10px,0,0) scale(.6);will-change:transform;}
+.row-bg.left svg{width:24px;height:24px;}
+.row.armed .row-bg.left{background:#2DBE54;}
+.row.armed .row-bg.left svg{animation:pop .3s cubic-bezier(.34,1.56,.64,1);}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .row.armed .row-bg.left{background:#28C250;}}
+:root[data-theme="dark"] .row.armed .row-bg.left{background:#28C250;}
 .row-bg.right button{width:80px;color:#fff;font-size:0.882rem;font-weight:500;}
 .row-bg.right .b-tomorrow{background:var(--orange);}
 .row-bg.right .b-delete{background:var(--red);}
@@ -272,7 +277,7 @@ input,textarea,select{font-size:max(16px,1rem);} /* under 16px Safari zooms on f
 
 <script>
 'use strict';
-const APP_VERSION = '0.7.0';
+const APP_VERSION = '0.7.1';
 let pendingSW = null; // service worker installed and waiting to take over
 
 /* ---------- Log: errors and app events, kept in localStorage for copy-and-paste debugging ---------- */
@@ -720,7 +725,7 @@ function bindBackSwipe(scr){
 
 /* ---------- Row gestures ---------- */
 let openRow=null;
-function closeRow(row){ if(!row) return; const c=row.querySelector('.row-content'); c.classList.remove('drag'); c.style.transform=''; row.dataset.open='0'; if(openRow===row) openRow=null; setTimeout(()=>{ if(row.dataset.open!=='1'&&!c.classList.contains('drag')) row.classList.remove('swiping'); },320); }
+function closeRow(row){ if(!row) return; const c=row.querySelector('.row-content'); c.classList.remove('drag'); c.style.transform=''; row.classList.remove('armed'); const ic=row.querySelector('.row-bg.left span'); if(ic) ic.style.transform=''; row.dataset.open='0'; if(openRow===row) openRow=null; setTimeout(()=>{ if(row.dataset.open!=='1'&&!c.classList.contains('drag')) row.classList.remove('swiping','dir-l','dir-r'); },320); }
 function bindRowGestures(row){
   const c=row.querySelector('.row-content'); if(!c||!row.querySelector('.row-bg')) return;
   let x0=0,y0=0,dx=0,mode=null,lp=null,thr=false;
@@ -731,12 +736,17 @@ function bindRowGestures(row){
     if(mode!=='swipe') return;
     e.preventDefault(); const base=row.dataset.open==='1'?-160:0; let raw=base+mx;
     if(raw<-160) raw=-160+(raw+160)*0.15; // elastic stop at the buttons
-    dx=Math.max(-176,Math.min(140, raw));
-    c.style.transform='translate3d('+dx+'px,0,0)';
-    const passed = dx>90; if(passed&&!thr){thr=true;haptic(8);} if(!passed) thr=false;
+    if(raw>110) raw=110+(raw-110)*0.25;   // and a softer one past the complete threshold
+    dx=Math.max(-176,Math.min(150, raw));
+    c.style.transform='translate3d('+dx+'px,0,0)'; row.classList.toggle('dir-r', dx>0); row.classList.toggle('dir-l', dx<0);
+    if(dx>0){ const ic=row.querySelector('.row-bg.left span'); if(ic) ic.style.transform='translate3d('+Math.max(10,dx-40)+'px,0,0) scale('+(0.6+0.4*Math.min(1,dx/90)).toFixed(3)+')'; }
+    const passed = dx>90; if(passed&&!thr){thr=true;haptic(8);} if(!passed) thr=false; row.classList.toggle('armed', passed);
   },{passive:false});
   const end=e=>{ clearTimeout(lp); if(mode!=='swipe'){ mode=null; return; } c.classList.remove('drag'); mode=null;
-    if(dx>90){ c.style.transform='translate3d(100%,0,0)'; setTimeout(()=>{ completeTask(row.dataset.id); renderAnimated(); },180); }
+    if(dx>90){ // Commit: the row settles back while the circle fills, then it fades out and the list closes up
+      const id=row.dataset.id, wasDone=row.classList.contains('done'); c.style.transform=''; row.classList.remove('armed');
+      const chk=row.querySelector('.check'); if(chk){ chk.classList.toggle('done', !wasDone); chk.classList.add('just'); }
+      setTimeout(()=>leaveRows(id),160); setTimeout(()=>{ completeTask(id); renderAnimated(); },380); }
     else if(dx<-70){ c.style.transform='translate3d(-160px,0,0)'; row.dataset.open='1'; openRow=row; }
     else closeRow(row);
   };

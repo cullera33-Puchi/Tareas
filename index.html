@@ -201,6 +201,14 @@ input,textarea,select{font-size:max(16px,1rem);} /* under 16px Safari zooms on f
 .switch.on{background:var(--green);}
 .switch.on::after{transform:translateX(20px);}
 .seg.mini{margin:-4px 0 12px;padding:2px;}
+.pchips{display:flex;gap:8px;overflow-x:auto;margin:-4px -16px 12px;padding:0 16px 2px;scrollbar-width:none;}
+.pchips::-webkit-scrollbar{display:none;}
+.pchips .chip{height:30px;font-size:0.824rem;}
+.pchips .chip .dot{width:8px;height:8px;border-radius:50%;}
+.pchips .chip.on{color:#fff;}
+.plan-title{font-size:1.06rem;font-weight:600;text-align:center;margin:2px 0 10px;line-height:1.3;}
+.closeday{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:10px;padding:10px 0 2px;border-top:.5px solid var(--sep);color:var(--blue);font-weight:600;font-size:0.882rem;}
+.closeday svg{width:16px;height:16px;}
 .seg.mini button{height:24px;font-size:0.706rem;}
 .selbox{flex:none;width:22px;height:22px;border-radius:50%;border:1.5px solid var(--ink3);display:flex;align-items:center;justify-content:center;transition:background .15s,border-color .15s;}
 .selbox svg{width:12px;height:12px;color:#fff;opacity:0;}
@@ -325,7 +333,7 @@ input,textarea,select{font-size:max(16px,1rem);} /* under 16px Safari zooms on f
 
 <script>
 'use strict';
-const APP_VERSION = '0.11.0';
+const APP_VERSION = '0.12.0';
 let pendingSW = null; // service worker installed and waiting to take over
 
 /* ---------- Log: errors and app events, kept in localStorage for copy-and-paste debugging ---------- */
@@ -466,7 +474,7 @@ function doneList(projectId){
 }
 
 /* ---------- UI state ---------- */
-const UI = { tab:'tareas', query:'', stack:[], scroll:{}, sumFilter:null, summaryFirst:false, searchDone:false, select:null };
+const UI = { tab:'tareas', query:'', stack:[], scroll:{}, sumFilter:null, summaryFirst:false, searchDone:false, select:null, projFilter:null };
 
 /* ---------- Toast with undo ---------- */
 let toastTimer=null, undoFn=null;
@@ -608,6 +616,7 @@ function summaryHTML(){
   const soon = spaceTasks().filter(x=>x.status==='pending'&&x.reminder).map(x=>({x,d:new Date(x.reminder).getTime()-Date.now()})).filter(o=>o.d>-5*6e4&&o.d<2*36e5).sort((a,b)=>a.d-b.d)[0];
   return '<section class="summary'+(summaryCollapsed(hoy.length)?' collapsed':'')+'"><div class="summary-head"><h3>Resumen del día</h3><button data-act="toggleSummary" aria-label="Plegar">'+I.chevD+'</button></div>'+
    '<div class="summary-body"><div class="nums"><button class="num" data-sum="all"><b>'+deHoy+'</b><span>para hoy</span></button><button class="num'+(carried?' orange':'')+(UI.sumFilter==='carried'?' on':'')+'" data-sum="carried"><b>'+carried+'</b><span>aplazadas</span></button><button class="num'+(prio?' red':'')+(UI.sumFilter==='high'?' on':'')+'" data-sum="high"><b>'+prio+'</b><span>prioritarias</span></button></div>'+
+   (hoy.length&&new Date().getHours()>=18?'<button class="closeday" data-act="closeDay">'+I.cal+'<span>Pasar lo pendiente a mañana ('+hoy.length+')</span></button>':'')+
    (!hoy.length&&doneToday?'<div class="alldone">'+I.check+'<span>Todo hecho por hoy: '+doneToday+(doneToday===1?' tarea completada':' tareas completadas')+'</span></div>':'')+
    ((first.length||soon)?'<div class="first">'+(first.length?'<h4>Lo primero</h4>'+first.map(x=>rowHTML(x,{simple:true})).join(''):'')+
    (soon?'<div class="soon"'+(first.length?'':' style="border-top:0;padding-top:0"')+'>'+I.bell+'<span>Recordatorio a las '+fmtTime(soon.x.reminder)+': '+esc(soon.x.title)+'</span></div>':'')+'</div>':'')+'</div></section>';
@@ -619,6 +628,7 @@ function listHTML(filter, projectId){
   let list = pendingFor(filter, projectId, UI.query);
   const root = projectId===undefined;
   if(root && filter==='hoy' && !UI.query && UI.sumFilter) list = list.filter(x=> UI.sumFilter==='carried' ? x.carried : x.priority==='high');
+  if(root && !UI.query && UI.projFilter!==null) list = list.filter(x=> UI.projFilter==='none' ? !x.projectId : x.projectId===UI.projFilter);
   const done = doneList(projectId);
   const addBtn = '<button class="btn-link" data-act="add"'+(projectId!==undefined?' data-project="'+(projectId||'')+'"':'')+'>Añadir tarea</button>';
   let h='';
@@ -626,6 +636,7 @@ function listHTML(filter, projectId){
     let title, sub, acts;
     if(UI.query){ title='Sin resultados'; sub='Prueba con otra palabra'; acts='<button class="btn-link" data-act="clearSearch">Borrar búsqueda</button>'; }
     else if(root && filter==='hoy' && UI.sumFilter){ title=UI.sumFilter==='carried'?'Sin aplazadas':'Sin prioritarias'; sub='Hoy no hay ninguna'; acts='<button class="btn-link" data-sum="all">Quitar filtro</button>'; }
+    else if(root && UI.projFilter!==null){ const pf=UI.projFilter==='none'?null:proj(UI.projFilter); title='Nada '+(pf?'de '+esc(pf.name):'sin proyecto'); sub=filter==='hoy'?'Hoy no hay ninguna':'No hay pendientes'; acts='<button class="btn-link" data-pf="">Quitar filtro</button>'; }
     else if(filter==='hoy'){ title='Nada para hoy'; sub='Nada pendiente con fecha de hoy'; acts='<button class="btn-link" data-filter="todas">Ver todas</button>'+addBtn; }
     else { title='Sin tareas pendientes'; sub='Toca + o añade una desde aquí'; acts=addBtn; }
     h += '<div class="empty">'+I.inbox+'<b>'+title+'</b>'+sub+'<div class="acts">'+acts+'</div></div>';
@@ -636,7 +647,7 @@ function listHTML(filter, projectId){
     ps.forEach(p=>{ if(by[p.id]) h += '<div class="group-title"><span class="dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+p.color+';margin-right:6px;vertical-align:1px"></span>'+esc(p.name)+' <span style="color:var(--ink3)">'+by[p.id].length+'</span></div><div class="group">'+by[p.id].map(x=>rowHTML(x)).join('')+'</div>'; });
     if(by.none) h += '<div class="group-title">Sin proyecto <span style="color:var(--ink3)">'+by.none.length+'</span></div><div class="group">'+by.none.map(x=>rowHTML(x)).join('')+'</div>'; }
   else if(filter==='todas'){ const t=todayStr(); const by={}; list.forEach(x=>{ (by[dateBucket(x,t)]=by[dateBucket(x,t)]||[]).push(x); });
-    BUCKETS.forEach(([k,label])=>{ if(by[k]) h += '<div class="group-title">'+label+'</div><div class="group">'+by[k].map(x=>rowHTML(x)).join('')+'</div>'; }); }
+    BUCKETS.forEach(([k,label])=>{ if(by[k]) h += '<div class="group-title" style="display:flex;justify-content:space-between;align-items:center"><span>'+label+'</span>'+(k==='none'&&root&&!UI.select?'<button class="btn-link" data-act="plan" style="font-size:0.765rem;font-weight:600">Planificar ('+by[k].length+')</button>':'')+'</div><div class="group">'+by[k].map(x=>rowHTML(x)).join('')+'</div>'; }); }
   else if(filter==='hoy' && root && list.some(x=>x.carried) && list.some(x=>!x.carried)){ const c=list.filter(x=>x.carried), d=list.filter(x=>!x.carried); h += '<div class="group-title">Aplazadas</div><div class="group">'+c.map(x=>rowHTML(x)).join('')+'</div><div class="group-title">Hoy</div><div class="group">'+d.map(x=>rowHTML(x)).join('')+'</div>'; }
   else h += '<div class="group">'+list.map(x=>rowHTML(x)).join('')+'</div>';
   if(root && filter==='hoy' && !UI.query && !UI.sumFilter){ const tm=pendingFor('todas').filter(x=>x.date===addDays(todayStr(),1)).length; if(tm) h += '<button class="preview" data-filter="todas"><span>Mañana: '+tm+(tm===1?' tarea':' tareas')+'</span>'+I.chev+'</button>'; }
@@ -655,6 +666,7 @@ function viewTareas(){
    '<div class="scroll">'+(f==='hoy'&&!UI.query?summaryHTML():'')+
    '<div class="searchbar"><div class="search">'+I.search+'<input type="search" placeholder="Buscar" value="'+esc(UI.query)+'" data-role="search" autocomplete="off"></div>'+(UI.query?'<button class="cancel" data-act="clearSearch">Cancelar</button>':'')+'</div>'+
    (UI.query?'':'<div class="seg"><button data-filter="hoy" class="'+(f==='hoy'?'on':'')+'">Hoy<span class="n">'+nHoy+'</span></button><button data-filter="todas" class="'+(f==='todas'?'on':'')+'">Todas<span class="n">'+nTodas+'</span></button></div>')+
+   (!UI.query&&activeProjects().length?'<div class="pchips">'+activeProjects().map(p=>'<button class="chip'+(UI.projFilter===p.id?' on':'')+'" data-pf="'+p.id+'"'+(UI.projFilter===p.id?' style="background:'+p.color+'"':'')+'><span class="dot" style="background:'+(UI.projFilter===p.id?'#fff':p.color)+'"></span>'+esc(p.name)+'</button>').join('')+'<button class="chip'+(UI.projFilter==='none'?' on':'')+'" data-pf="none"><span class="dot" style="background:'+(UI.projFilter==='none'?'#fff':'var(--ink3)')+'"></span>Sin proyecto</button></div>':'')+
    (!UI.query&&f==='todas'&&nTodas?'<div class="seg mini"><button data-group="date" class="'+(DB.settings.allGroup!=='project'?'on':'')+'">Por fecha</button><button data-group="project" class="'+(DB.settings.allGroup==='project'?'on':'')+'">Por proyecto</button></div>':'')+
    listHTML(UI.query?'todas':f)+'</div>'+
    '<button class="fab" data-act="add" aria-label="Añadir tarea">'+I.plus+'</button>';
@@ -688,7 +700,7 @@ function viewAjustes(){
    '<div class="footnote">Los datos viven en este iPhone hasta activar la sincronización.</div>'+
    '<div class="group-title">Espacios</div><div class="group">'+DB.spaces.slice().sort((a,b)=>a.order-b.order).map(sp=>'<button class="cell" data-edit-space="'+sp.id+'"><span class="lbl">'+esc(sp.name)+'</span>'+(sp.id===space().id?'<span class="val">Activo</span>':'')+I.chev.replace('<svg','<svg class="chev"')+'</button>').join('')+'<button class="cell link" data-act="newSpace">'+I.plus.replace('<svg','<svg style="width:18px;height:18px"')+'<span class="lbl">Nuevo espacio</span></button></div>'+
    '<div class="footnote">Un espacio solo se elimina si está vacío.</div>'+
-   '<div class="group-title">Datos</div><div class="group"><button class="cell" data-act="exportFile"><span class="lbl">Exportar a archivo</span><span class="val">JSON</span></button><button class="cell" data-act="importFile"><span class="lbl">Importar desde archivo</span><span class="val">JSON</span></button><button class="cell" data-act="import"><span class="lbl">Importar pegando texto</span></button></div>'+
+   '<div class="group-title">Datos</div><div class="group"><button class="cell" data-act="exportFile"><span class="lbl">Exportar a archivo</span><span class="val">JSON</span></button><button class="cell" data-act="exportCSV"><span class="lbl">Exportar a Excel</span><span class="val">CSV</span></button><button class="cell" data-act="importFile"><span class="lbl">Importar desde archivo</span><span class="val">JSON</span></button><button class="cell" data-act="import"><span class="lbl">Importar pegando texto</span></button></div>'+
    '<div class="footnote">Al importar, lo existente se actualiza si la copia es más reciente.</div>'+
    '<div class="group-title">Copias de seguridad</div><div class="group">'+(BACKUPS.length?BACKUPS.map(b=>'<button class="cell" data-restore="'+b.date+'"><span class="lbl">'+fmtDate(b.date)+(b.date===todayStr()?'':'')+'</span><span class="val">'+b.tasks+' tareas</span>'+I.chev.replace('<svg','<svg class="chev"')+'</button>').join(''):'<div class="cell"><span class="lbl" style="color:var(--ink2)">Todavía ninguna</span></div>')+'<button class="cell link" data-act="backupNow">'+I.plus.replace('<svg','<svg style="width:18px;height:18px"')+'<span class="lbl">Crear copia ahora</span></button></div>'+
    '<div class="footnote">Una copia automática al día en este iPhone; se conservan las últimas siete. Toca una para restaurarla.</div>'+
@@ -750,6 +762,7 @@ function onClick(e){
   const rb=e.target.closest('[data-restore]'); if(rb){ restoreBackup(rb.dataset.restore); return; }
   const ua=e.target.closest('[data-unarchive]'); if(ua){ const p=proj(ua.dataset.unarchive); p.archived=false; save(); render(); return; }
   const gb=e.target.closest('[data-group]'); if(gb){ DB.settings.allGroup=gb.dataset.group; save(); render(); return; }
+  const pf=e.target.closest('[data-pf]'); if(pf){ const v=pf.dataset.pf; UI.projFilter=(v===''||UI.projFilter===v)?null:v; haptic(4); render(); return; }
   if(UI.select){ const row=e.target.closest('.row'); if(row && !row.closest('.first')){ toggleSelected(row); return; } }
   const act=e.target.closest('[data-act]'); if(!act) { const row=e.target.closest('.row'); if(row && !row.closest('.first')) { if(row.dataset.open==='1'){ closeRow(row); return; } openDetail(row.dataset.id); } return; }
   const row=act.closest('.row'); const a=act.dataset.act;
@@ -760,6 +773,9 @@ function onClick(e){
     case 'delete': if(row){ closeRow(row); confirmDelete(row.dataset.id); } else if(detailId){ confirmDelete(detailId, ()=>pop()); } break;
     case 'clearSearch': UI.query=''; UI.searchDone=false; render(); break;
     case 'selDone': endSelect(); break;
+    case 'closeDay': closeDaySheet(); break;
+    case 'plan': planStart(); break;
+    case 'exportCSV': exportCSV(); break;
     case 'selAll': selectAllVisible(); break;
     case 'bulkComplete': bulkComplete(); break;
     case 'bulkPostpone': bulkPostponeSheet(); break;
@@ -769,7 +785,7 @@ function onClick(e){
     case 'toggleSummary': DB.settings.summaryState = summaryCollapsed(pendingFor('hoy').length)?'open':'closed'; UI.summaryFirst=false; save(); render(); break;
     case 'toggleDone': DB.settings.doneOpen=!DB.settings.doneOpen; save(); render(); break;
     case 'add': addSheet(act.dataset.project||null); break;
-    case 'spaceMenu': actionSheet('Espacio', DB.spaces.slice().sort((a,b)=>a.order-b.order).map(s=>({label:s.name+(s.id===space().id?'  ✓':''), fn:()=>{ DB.settings.activeSpace=s.id; save(); UI.query=''; UI.sumFilter=null; render(); }})).concat([{label:'Nuevo espacio', fn:()=>spaceSheet(null)}])); break;
+    case 'spaceMenu': actionSheet('Espacio', DB.spaces.slice().sort((a,b)=>a.order-b.order).map(s=>({label:s.name+(s.id===space().id?'  ✓':''), fn:()=>{ DB.settings.activeSpace=s.id; save(); UI.query=''; UI.sumFilter=null; UI.projFilter=null; render(); }})).concat([{label:'Nuevo espacio', fn:()=>spaceSheet(null)}])); break;
     case 'back': pop(); break;
     case 'newProject': projectSheet(null); break;
     case 'newSpace': spaceSheet(null); break;
@@ -892,6 +908,10 @@ function bulkPostponeSheet(){ if(!UI.select||!UI.select.ids.size) return; const 
 function bulkMoveSheet(){ if(!UI.select||!UI.select.ids.size) return; const ps=activeProjects(); const n=UI.select.ids.size;
   actionSheet('Mover '+n+(n===1?' tarea':' tareas'), [{label:'Sin proyecto', fn:()=>bulkMove(null)}].concat(ps.map(p=>({label:p.name, fn:()=>bulkMove(p.id)})))); }
 function bulkMove(projectId){ const xs=selectedTasks(); if(!xs.length) return; const prev=xs.map(x=>({id:x.id, projectId:x.projectId})); xs.forEach(x=>updTask(x.id,{projectId})); const p=projectId?proj(projectId):null; endSelect(); toast(xs.length+(xs.length===1?' tarea movida a ':' tareas movidas a ')+(p?p.name:'Sin proyecto'), ()=>prev.forEach(q=>updTask(q.id,{projectId:q.projectId}))); }
+function rescheduleMany(xs, date, label){ if(!xs.length) return; const prev=xs.map(x=>({id:x.id, date:x.date, carried:x.carried})); xs.forEach(x=>updTask(x.id,{date})); renderAnimated(); haptic(8); log('info','Aplazadas en bloque: '+xs.length+' a '+date); toast(xs.length+(xs.length===1?' tarea pasada a ':' tareas pasadas a ')+label, ()=>prev.forEach(p=>updTask(p.id,{date:p.date, carried:p.carried}))); }
+function closeDaySheet(){ const hoy=pendingFor('hoy'); if(!hoy.length) return; const high=hoy.filter(x=>x.priority==='high'), rest=hoy.filter(x=>x.priority!=='high'); const tm=addDays(todayStr(),1);
+  const items=[{label:'Todas ('+hoy.length+')', fn:()=>rescheduleMany(hoy, tm, 'mañana')}]; if(high.length&&rest.length) items.push({label:'Solo las no prioritarias ('+rest.length+')', fn:()=>rescheduleMany(rest, tm, 'mañana')});
+  actionSheet('Pasar lo pendiente a mañana', items); }
 function rowMenu(id){ const x=task(id); if(!x) return; const pl={high:'alta',mid:'media',none:'ninguna'}[x.priority];
   actionSheet(x.title, [
     {label:'Prioridad: '+pl, fn:()=>priorityMenu(id)},
@@ -1005,6 +1025,19 @@ function reminderSheet(id){ const x=task(id); const t=todayStr(); const pad=n=>S
       const c=e.target.closest('[data-r]'); if(c){ updTask(id,{reminder:c.dataset.r||null}); closeSheet(); render(); return; }
       if(e.target.closest('[data-x=ok]')){ const [hh,mi]=(inp.value||time).split(':').map(Number); const dt=new Date(day+'T00:00:00'); dt.setHours(hh||0, mi||0, 0, 0); updTask(id,{reminder:dt.toISOString()}); closeSheet(); render(); } }; }); }
 
+/* Plan the undated tasks one by one */
+function planStart(){ let ids=pendingFor('todas').filter(x=>!x.date); if(UI.projFilter!==null) ids=ids.filter(x=> UI.projFilter==='none' ? !x.projectId : x.projectId===UI.projFilter); ids=ids.map(x=>x.id); if(!ids.length) return; planStep(ids, 0, {done:0, skipped:0}); }
+function planStep(ids, i, st){
+  if(i>=ids.length){ closeSheet(); renderAnimated(); toast(st.done+(st.done===1?' planificada':' planificadas')+(st.skipped?', '+st.skipped+(st.skipped===1?' saltada':' saltadas'):'')); log('info','Planificar sin fecha', st); return; }
+  const x=task(ids[i]); if(!x){ planStep(ids, i+1, st); return; }
+  const t=todayStr(); const dow=new Date(t+'T00:00:00').getDay(); const chips=[[t,'Hoy'],[addDays(t,1),'Mañana']]; if(dow>=1&&dow<=4) chips.push([nextWeekday(5,true),'Este viernes']); chips.push([nextWeekday(1,true),'Próxima semana']);
+  let ym=t.slice(0,7); const p=x.projectId?proj(x.projectId):null;
+  openSheet('<h2>Planificar</h2><div class="hint" style="margin-top:-6px">'+(i+1)+' de '+ids.length+(p?' · '+esc(p.name):'')+'</div><div class="plan-title">'+esc(x.title)+'</div><div class="chips" style="margin-top:0">'+chips.map(c=>'<button class="chip" data-d="'+c[0]+'">'+c[1]+'</button>').join('')+'</div><div id="calwrap">'+calendarHTML(ym, null)+'</div><div class="sheet-actions"><button class="btn" data-x="skip">Saltar</button><button class="btn" data-x="end">Terminar</button></div>', s=>{
+    s.onclick=e=>{ const nav=e.target.closest('[data-cal]'); if(nav){ ym=shiftMonth(ym,+nav.dataset.cal); $('#calwrap',s).innerHTML=calendarHTML(ym, null); return; }
+      const d=e.target.closest('[data-d]'); if(d){ updTask(x.id,{date:d.dataset.d}); st.done++; haptic(6); planStep(ids, i+1, st); return; }
+      const b=e.target.closest('[data-x]'); if(!b) return; if(b.dataset.x==='skip'){ st.skipped++; planStep(ids, i+1, st); } else { st.skipped+=ids.length-i; planStep(ids, ids.length, st); } }; });
+}
+
 /* Voice note.
    Primary route: the iOS keyboard dictation, typing into a focused textarea.
    SpeechRecognition is only offered in a browser tab where it is known to work;
@@ -1066,6 +1099,19 @@ function restoreBackup(date){ const b=BACKUPS.find(x=>x.date===date); if(!b) ret
 /* Export and import */
 function exportData(){ return { app:'tareas', version:APP_VERSION, exported:new Date().toISOString(), spaces:DB.spaces, projects:DB.projects, tasks:DB.tasks, voiceNotes:DB.voiceNotes }; }
 function exportJSON(){ const t=JSON.stringify(exportData(),null,2); if(navigator.share){ navigator.share({title:'Tareas (copia)', text:t}).catch(()=>copyText(t,'Copia JSON en el portapapeles')); } else copyText(t,'Copia JSON en el portapapeles'); }
+// CSV for Excel in Spanish locales: semicolon separated, UTF-8 with BOM, one row per task
+function csvText(){ const q=v=>'"'+String(v==null?'':v).replace(/"/g,'""').replace(/\r?\n/g,' ')+'"'; const sp=Object.fromEntries(DB.spaces.map(s=>[s.id,s.name])); const pr={high:'Alta',mid:'Media',none:''};
+  const head=['Espacio','Proyecto','Título','Fecha','Prioridad','Estado','Completada','Recordatorio','Aplazada','Notas','Notas de voz','Creada'];
+  const rows=DB.tasks.slice().sort((a,b)=>(a.spaceId+(a.date||'9999')+a.created)<(b.spaceId+(b.date||'9999')+b.created)?-1:1).map(x=>{ const p=x.projectId?proj(x.projectId):null; const vn=DB.voiceNotes.filter(v=>v.taskId===x.id).map(v=>v.text).join(' | ');
+    return [sp[x.spaceId]||'', p?p.name:'', x.title, x.date||'', pr[x.priority]||'', x.status==='done'?'Hecha':'Pendiente', x.completed?localDay(x.completed)+' '+fmtTime(x.completed):'', x.reminder?localDay(x.reminder)+' '+fmtTime(x.reminder):'', x.carried?'Sí':'', x.notes||'', vn, localDay(x.created)].map(q).join(';'); });
+  return '﻿'+head.map(q).join(';')+'\r\n'+rows.join('\r\n')+'\r\n'; }
+async function exportCSV(){
+  const name='tareas-'+todayStr()+'.csv'; const blob=new Blob([csvText()],{type:'text/csv;charset=utf-8'});
+  try{ const file=new File([blob],name,{type:'text/csv'}); if(navigator.canShare&&navigator.canShare({files:[file]})){ await navigator.share({files:[file],title:'Tareas'}); log('info','Exportado CSV (compartir)',name); return; } }
+  catch(e){ if(e&&e.name==='AbortError') return; log('warn','Compartir CSV no disponible: '+(e&&e.message||e)); }
+  try{ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },1500); toast('Archivo '+name+' generado'); log('info','Exportado CSV (descarga)',name); }
+  catch(e){ log('error','Exportar CSV falló: '+(e&&e.message||e)); copyText(csvText(),'CSV copiado al portapapeles'); }
+}
 async function exportFile(){
   const name='tareas-'+todayStr()+'.json'; const text=JSON.stringify(exportData(),null,2); const blob=new Blob([text],{type:'application/json'});
   try{ const file=new File([blob],name,{type:'application/json'}); if(navigator.canShare&&navigator.canShare({files:[file]})){ await navigator.share({files:[file],title:'Tareas'}); log('info','Exportado a archivo (compartir)',name); return; } }

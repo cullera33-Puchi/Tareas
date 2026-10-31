@@ -89,7 +89,8 @@ Cambios acordados con Enric sobre el diseño de abajo. Mandan sobre el texto del
 11. **Lote 5 (v0.8.0).** Icono nuevo; proyectos con icono de color; nombres de día completos; indicadores de notas y voz en la fila; háptico por interruptor nativo (`#hap`); mover a otro espacio (`moveToSpaceSheet`); enlaces y teléfonos tocables en notas (`extractLinks`, `linkify`); duplicar (`duplicateTask`); Añadir y abrir; búsqueda con completadas bajo demanda (`UI.searchDone`); resumen abierto la primera vez del día (`summaryDay`); Deshacer en prioridad y proyecto (`setPriority`, `moveToProject`).
 12. **Lote 6 (v0.9.0).** Copias locales diarias en IndexedDB (`BK`, base `tareas-backups`, siete copias, restaurar desde Ajustes); título del detalle en `textarea` que crece; atajos de hora en Recordatorio; "N hoy" en Completadas y "Todo hecho por hoy"; vista previa "Mañana: N tareas"; hoja de bienvenida (`tipsSeen`); entrada `?add=texto` para el Atajo de iOS; agitar para deshacer (`shakeUndo`, DeviceMotion con permiso).
 13. **v0.11.0.** Calendario propio (`calendarHTML`) en Fecha y Recordatorio; Completadas con enlace y agrupadas por día; selección múltiple (`UI.select`, `startSelect`, barra `#selbar` con `bulkComplete`, `bulkPostponeSheet`, `bulkMoveSheet`, `bulkDelete`); Todas agrupada por fecha o por proyecto (`allGroup`).
-14. **Foco en hojas.** Los campos de las hojas se enfocan de forma síncrona dentro del toque; con `setTimeout` iOS no abre el teclado.
+14. **v0.12.0.** Filtro por proyecto en la lista (`UI.projFilter`, chips `.pchips`); "Pasar lo pendiente a mañana" desde las 18:00 (`closeDaySheet`, `rescheduleMany`); planificar las sin fecha una a una (`planStart`, `planStep`); exportar CSV para Excel (`csvText`, `exportCSV`, separador `;`, BOM).
+15. **Foco en hojas.** Los campos de las hojas se enfocan de forma síncrona dentro del toque; con `setTimeout` iOS no abre el teclado.
 
 
 ---

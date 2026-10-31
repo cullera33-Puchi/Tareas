@@ -1,5 +1,12 @@
 # Registro de cambios
 
+## v0.12.0. Filtro por proyecto, cerrar el día, planificar sin fecha y CSV (31 de octubre de 2026)
+
+- Filtro por proyecto: fila de chips bajo el segmento con los proyectos del espacio y "Sin proyecto". Tocar uno filtra Hoy o Todas; volver a tocarlo quita el filtro. Se pierde al cambiar de espacio.
+- Cerrar el día: a partir de las 18:00, si quedan pendientes en Hoy, el resumen ofrece "Pasar lo pendiente a mañana (N)" con la opción de dejar fuera las prioritarias. Con Deshacer.
+- Planificar sin fecha: en Todas, el grupo "Sin fecha" lleva el enlace "Planificar (N)". Recorre las tareas una a una con atajos y calendario, "Saltar" y "Terminar"; al final, "N planificadas, M saltadas". Respeta el filtro por proyecto.
+- Exportar a Excel: en Ajustes, "Exportar a Excel (CSV)" genera un CSV separado por punto y coma con BOM UTF-8 y una fila por tarea (espacio, proyecto, título, fecha, prioridad, estado, completada, recordatorio, aplazada, notas, notas de voz, creada), por la hoja de compartir.
+
 ## v0.11.0. Calendario propio, Completadas por día, selección múltiple y Todas por proyecto (31 de octubre de 2026)
 
 - Fecha: hoja con atajos (Hoy, Mañana, Este viernes, Próxima semana, Sin fecha) y calendario mensual propio, lunes primero, hoy en azul, punto bajo los días con tareas pendientes, navegación por meses. Tocar un día guarda y cierra.

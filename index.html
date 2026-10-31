@@ -252,7 +252,7 @@ input,textarea,select{font-size:17px;}
 
 <script>
 'use strict';
-const APP_VERSION = '0.3.5';
+const APP_VERSION = '0.4.0';
 let pendingSW = null; // service worker installed and waiting to take over
 
 /* ---------- Utilities ---------- */
@@ -369,6 +369,9 @@ function deleteTask(id){
   const [x]=DB.tasks.splice(i,1); const vn=DB.voiceNotes.filter(v=>v.taskId===id); DB.voiceNotes=DB.voiceNotes.filter(v=>v.taskId!==id); save(); haptic(14);
   toast('Tarea eliminada', ()=>{ DB.tasks.push(x); DB.voiceNotes.push(...vn); save(); });
 }
+function addSpace(name){ const t=new Date().toISOString(); const sp={id:uid(), name, order:DB.spaces.length, created:t, modified:t}; DB.spaces.push(sp); save(); return sp; }
+const spaceIsEmpty = id => !DB.projects.some(p=>p.spaceId===id) && !DB.tasks.some(x=>x.spaceId===id);
+function deleteSpace(id){ if(DB.spaces.length<2||!spaceIsEmpty(id)) return false; DB.spaces=DB.spaces.filter(sp=>sp.id!==id); if(DB.settings.activeSpace===id) DB.settings.activeSpace=DB.spaces[0].id; save(); return true; }
 function addProject(name, color){ const t=new Date().toISOString(); const p={id:uid(), spaceId:space().id, name, color, order:DB.projects.length, archived:false, created:t, modified:t}; DB.projects.push(p); save(); return p; }
 
 /* ---------- Root render ---------- */
@@ -499,6 +502,8 @@ function viewAjustes(){
    '<div class="scroll">'+
    '<div class="group-title">Cuenta</div><div class="group"><div class="cell"><span class="lbl">Sincronización</span><span class="val">Solo en este dispositivo</span></div></div>'+
    '<div class="footnote">El inicio de sesión con Google y la sincronización llegan en el siguiente bloque. Mientras tanto, los datos viven en este iPhone.</div>'+
+   '<div class="group-title">Espacios</div><div class="group">'+DB.spaces.slice().sort((a,b)=>a.order-b.order).map(sp=>'<button class="cell" data-edit-space="'+sp.id+'"><span class="lbl">'+esc(sp.name)+'</span>'+(sp.id===space().id?'<span class="val">Activo</span>':'')+I.chev.replace('<svg','<svg class="chev"')+'</button>').join('')+'<button class="cell link" data-act="newSpace">'+I.plus.replace('<svg','<svg style="width:18px;height:18px"')+'<span class="lbl">Nuevo espacio</span></button></div>'+
+   '<div class="footnote">Cada espacio tiene sus propios proyectos y tareas. Un espacio solo se puede eliminar si está vacío.</div>'+
    '<div class="group-title">Datos</div><div class="group"><button class="cell" data-act="export"><span class="lbl">Exportar JSON</span><span class="val">Copiar</span></button><button class="cell" data-act="import"><span class="lbl">Importar JSON</span><span class="val">Pegar</span></button></div>'+
    '<div class="group-title">Aspecto</div><div class="group"><div class="cell"><span class="lbl">Tema</span></div><div style="padding:0 16px 12px"><div class="seg" style="margin:0"><button data-theme="auto" class="'+(th==='auto'?'on':'')+'">Automático</button><button data-theme="light" class="'+(th==='light'?'on':'')+'">Claro</button><button data-theme="dark" class="'+(th==='dark'?'on':'')+'">Oscuro</button></div></div></div>'+
    '<div class="group-title">Proyectos archivados</div><div class="group">'+(DB.projects.filter(p=>p.archived&&p.spaceId===space().id).map(p=>'<button class="cell" data-unarchive="'+p.id+'"><span class="pdot" style="background:'+p.color+'"></span><span class="lbl">'+esc(p.name)+'</span><span class="val">Restaurar</span></button>').join('')||'<div class="cell"><span class="lbl" style="color:var(--ink2)">Ninguno en '+esc(space().name)+'</span></div>')+'</div>'+
@@ -545,6 +550,7 @@ function onClick(e){
   const f=e.target.closest('[data-filter]'); if(f){ DB.settings.filter=f.dataset.filter; save(); render(); return; }
   const th=e.target.closest('[data-theme]'); if(th){ DB.settings.theme=th.dataset.theme; save(); applyTheme(); render(); return; }
   const op=e.target.closest('[data-open-project]'); if(op){ push('project', op.dataset.openProject); return; }
+  const es=e.target.closest('[data-edit-space]'); if(es){ spaceSheet(es.dataset.editSpace); return; }
   const ua=e.target.closest('[data-unarchive]'); if(ua){ const p=proj(ua.dataset.unarchive); p.archived=false; save(); render(); return; }
   const act=e.target.closest('[data-act]'); if(!act) { const row=e.target.closest('.row'); if(row && !row.closest('.first')) { if(row.dataset.open==='1'){ closeRow(row); return; } openDetail(row.dataset.id); } return; }
   const row=act.closest('.row'); const a=act.dataset.act;
@@ -556,9 +562,10 @@ function onClick(e){
     case 'toggleSummary': DB.settings.summaryCollapsed=!DB.settings.summaryCollapsed; save(); render(); break;
     case 'toggleDone': if(detailId){ completeTask(detailId,true); closeMenu(); render(); } else { DB.settings.doneOpen=!DB.settings.doneOpen; save(); render(); } break;
     case 'add': addSheet(act.dataset.project||null); break;
-    case 'spaceMenu': actionSheet('Espacio', DB.spaces.map(s=>({label:s.name+(s.id===space().id?'  ✓':''), fn:()=>{ DB.settings.activeSpace=s.id; save(); UI.query=''; render(); }}))); break;
+    case 'spaceMenu': actionSheet('Espacio', DB.spaces.slice().sort((a,b)=>a.order-b.order).map(s=>({label:s.name+(s.id===space().id?'  ✓':''), fn:()=>{ DB.settings.activeSpace=s.id; save(); UI.query=''; render(); }})).concat([{label:'Nuevo espacio', fn:()=>spaceSheet(null)}])); break;
     case 'back': pop(); break;
     case 'newProject': projectSheet(null); break;
+    case 'newSpace': spaceSheet(null); break;
     case 'menu': $('#dmenu',scr).classList.toggle('on'); break;
     case 'share': closeMenu(); shareTask(detailId); break;
     case 'pickProject': closeMenu(); pickProjectSheet(detailId); break;
@@ -673,6 +680,23 @@ function projectSheet(id){
     s.onclick=e=>{ const cb=e.target.closest('[data-col]'); if(cb){ color=cb.dataset.col; s.querySelectorAll('[data-col]').forEach(b=>b.classList.toggle('on',b.dataset.col===color)); return; }
       const b=e.target.closest('[data-x]'); if(!b) return; if(b.dataset.x==='cancel'){ closeSheet(); return; }
       const n=inp.value.trim(); if(!n){ inp.focus(); return; } if(p){ p.name=n; p.color=color; p.modified=new Date().toISOString(); save(); } else addProject(n,color); closeSheet(); render(); };
+    inp.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); s.querySelector('[data-x=ok]').click(); } });
+  });
+}
+/* New or edited space */
+function spaceSheet(id){
+  const sp=id?DB.spaces.find(x=>x.id===id):null; const canDelete=sp&&DB.spaces.length>1&&spaceIsEmpty(sp.id);
+  openSheet('<h2>'+(sp?'Editar espacio':'Nuevo espacio')+'</h2><input class="titlein" placeholder="Nombre" value="'+(sp?esc(sp.name):'')+'" autocomplete="off" enterkeyhint="done">'+
+    (sp&&!canDelete?'<div class="hint" style="margin-top:10px">'+(DB.spaces.length>1?'Para eliminarlo, antes vacíalo de proyectos y tareas.':'Es el único espacio; no se puede eliminar.')+'</div>':'')+
+    '<div class="sheet-actions"><button class="btn" data-x="cancel">Cancelar</button><button class="btn primary" data-x="ok">'+(sp?'Guardar':'Crear')+'</button></div>'+
+    (canDelete?'<div class="sheet-actions" style="margin-top:10px"><button class="btn red" data-x="del">Eliminar espacio</button></div>':''), s=>{
+    const inp=$('.titlein',s); inp.focus();
+    s.onclick=e=>{ const b=e.target.closest('[data-x]'); if(!b) return;
+      if(b.dataset.x==='cancel'){ closeSheet(); return; }
+      if(b.dataset.x==='del'){ closeSheet(); confirmSheet('Eliminar espacio', 'Se elimina el espacio "'+sp.name+'". Está vacío, no se pierden tareas.', ()=>{ deleteSpace(sp.id); haptic(10); render(); toast('Espacio eliminado'); }); return; }
+      const n=inp.value.trim(); if(!n){ inp.focus(); return; }
+      if(sp){ sp.name=n; sp.modified=new Date().toISOString(); save(); } else { const ns=addSpace(n); DB.settings.activeSpace=ns.id; save(); UI.query=''; }
+      closeSheet(); render(); };
     inp.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); s.querySelector('[data-x=ok]').click(); } });
   });
 }

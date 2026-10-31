@@ -1,5 +1,11 @@
 # Registro de cambios
 
+## v0.4.0. Espacios editables (31 de octubre de 2026)
+
+- Los espacios dejan de ser fijos. En Ajustes, sección "Espacios": tocar uno permite renombrarlo; "Nuevo espacio" crea otro. El selector del título también ofrece "Nuevo espacio". El espacio recién creado queda activo.
+- Eliminar un espacio solo es posible si está vacío (sin proyectos ni tareas) y no es el único; la hoja lo explica cuando no se puede. Pide confirmación.
+- Modelo: el espacio incorpora `modified`. Trabajo y Personal se mantienen como espacios iniciales.
+
 ## v0.3.5. Tab bar pegada abajo (31 de octubre de 2026)
 
 - El área segura inferior se contaba dos veces (la página y la tab bar), lo que dejaba la barra flotando sobre un relleno vacío y una banda negra. Ahora la tab bar llega al borde inferior y cubre ella sola la zona del indicador de inicio.

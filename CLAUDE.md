@@ -82,7 +82,8 @@ Cambios acordados con Enric sobre el diseño de abajo. Mandan sobre el texto del
 4. **Resumen del día (v0.3.3).** Tres cifras y, debajo, "Lo primero" solo con las tareas de prioridad alta de hoy (hasta tres). Sin prioritarias, la sección no se muestra.
 5. **Vencidas (v0.3.4).** No existen tareas vencidas: al abrir la app, las pendientes con fecha pasada pasan a hoy con la marca `carried` (campo nuevo en Tarea, booleano; en Supabase, `carried`). La marca se quita al cambiar la fecha a mano. El resumen muestra "para hoy", "aplazadas" y "prioritarias".
 6. **Deslizar fila a la izquierda (v0.3.4).** Se detiene en los botones Mañana y Eliminar; no hay deslizamiento largo que ejecute una acción. A la derecha se mantiene: deslizamiento largo completa.
-7. **Foco en hojas.** Los campos de las hojas se enfocan de forma síncrona dentro del toque; con `setTimeout` iOS no abre el teclado.
+7. **Espacios editables (v0.4.0).** Trabajo y Personal son solo los iniciales: se pueden renombrar y crear más (Ajustes, sección Espacios, y "Nuevo espacio" en el selector del título). Un espacio se elimina solo si está vacío y no es el único. Sustituye a "no se crean más en fase 1" del modelo de datos.
+8. **Foco en hojas.** Los campos de las hojas se enfocan de forma síncrona dentro del toque; con `setTimeout` iOS no abre el teclado.
 
 
 ---

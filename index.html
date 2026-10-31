@@ -50,7 +50,10 @@ input,textarea,select{font-size:17px;}
 .screen.under{transform:translate3d(-33%,0,0);transition:transform .35s cubic-bezier(.32,.72,0,1);}
 .screen.dragging,.screen.dragging-under{transition:none;}
 .screen.hidden-tab{display:none;}
-@media (prefers-reduced-motion: reduce){.screen.pushed,.screen.shown,.screen.under{transition:opacity .2s;}}
+.screen.root{touch-action:pan-y;}
+.screen.pushed-screen{z-index:8;}
+.screen.tabanim{transition:transform .3s cubic-bezier(.32,.72,0,1);}
+@media (prefers-reduced-motion: reduce){.screen.pushed,.screen.shown,.screen.under{transition:opacity .2s;}.screen.tabanim{transition:none;}}
 
 .nav{position:sticky;top:0;z-index:5;background:var(--bar);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);padding:0 16px;}
 .nav-row{height:44px;display:flex;align-items:center;justify-content:space-between;position:relative;}
@@ -163,7 +166,7 @@ input,textarea,select{font-size:17px;}
 .fab svg{width:26px;height:26px;}
 
 /* Tab bar */
-.tabbar{position:fixed;left:0;right:0;bottom:0;height:calc(49px + env(safe-area-inset-bottom,0px));padding-bottom:env(safe-area-inset-bottom,0px);background:var(--bar);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-top:.5px solid var(--sep);display:flex;z-index:7;}
+.tabbar{position:absolute;left:0;right:0;bottom:0;height:calc(49px + env(safe-area-inset-bottom,0px));padding-bottom:env(safe-area-inset-bottom,0px);background:var(--bar);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-top:.5px solid var(--sep);display:flex;z-index:7;}
 .tabbar button{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:10px;color:var(--ink2);height:49px;}
 .tabbar button.on{color:var(--blue);}
 .tabbar svg{width:26px;height:26px;}
@@ -239,7 +242,7 @@ input,textarea,select{font-size:17px;}
 </style>
 </head>
 <body>
-<div class="app" id="app"></div>
+<div class="app" id="app"><nav class="tabbar" id="tabbar"></nav></div>
 <div class="scrim" id="scrim"></div>
 <div class="sheet" id="sheet"></div>
 <div class="asheet" id="asheet"></div>
@@ -247,7 +250,7 @@ input,textarea,select{font-size:17px;}
 
 <script>
 'use strict';
-const APP_VERSION = '0.2.1';
+const APP_VERSION = '0.3.0';
 
 /* ---------- Utilities ---------- */
 const $ = (s, el=document) => el.querySelector(s);
@@ -363,28 +366,63 @@ function deleteTask(id){
 function addProject(name, color){ const t=new Date().toISOString(); const p={id:uid(), spaceId:space().id, name, color, order:DB.projects.length, archived:false, created:t, modified:t}; DB.projects.push(p); save(); return p; }
 
 /* ---------- Root render ---------- */
-const app=$('#app');
-function render(){
-  const root = UI.stack.length ? null : UI.tab;
-  const existing = app.querySelectorAll('.screen.root');
-  // Root screens: one per tab, kept alive so each keeps its scroll position
-  let scr = app.querySelector('.screen.root[data-root="'+UI.tab+'"]');
-  existing.forEach(s=>{ if(s.dataset.root!==UI.tab) s.classList.add('hidden-tab'); });
-  if(!scr){ scr=document.createElement('div'); scr.className='screen root'; scr.dataset.root=UI.tab; app.insertBefore(scr, app.firstChild); }
-  scr.classList.remove('hidden-tab');
+const app=$('#app'), tabbarEl=$('#tabbar');
+const TABS=['tareas','proyectos','ajustes'];
+// Root screens: one per tab, kept alive so each keeps its scroll position
+function rootScreen(tab){
+  let scr=app.querySelector('.screen.root[data-root="'+tab+'"]');
+  if(!scr){ scr=document.createElement('div'); scr.className='screen root hidden-tab'; scr.dataset.root=tab; app.insertBefore(scr, app.firstChild); renderRoot(scr); }
+  return scr;
+}
+function renderRoot(scr){
+  const tab=scr.dataset.root;
   const st = scr.querySelector('.scroll') ? scr.querySelector('.scroll').scrollTop : 0;
-  scr.innerHTML = (UI.tab==='tareas'?viewTareas():UI.tab==='proyectos'?viewProyectos():viewAjustes()) + tabbar();
+  scr.innerHTML = tab==='tareas'?viewTareas():tab==='proyectos'?viewProyectos():viewAjustes();
   const sc=scr.querySelector('.scroll'); if(sc){ sc.scrollTop=st; bindScroll(scr); }
   bindCommon(scr);
+}
+function render(){
+  const scr = rootScreen(UI.tab);
+  app.querySelectorAll('.screen.root').forEach(s=>{ if(s!==scr){ s.classList.add('hidden-tab'); s.style.transform=''; } });
+  scr.classList.remove('hidden-tab'); scr.style.transform='';
+  renderRoot(scr);
+  renderTabbar();
   if(UI.stack.length){ scr.classList.add('under'); } else { scr.classList.remove('under','dragging-under'); }
   // Pushed screens
   app.querySelectorAll('.screen.pushed-screen').forEach(s=>{ if(!UI.stack.find(x=>x.el===s)) s.remove(); });
   UI.stack.forEach((s,i)=>{ const st2 = s.el.querySelector('.scroll')?s.el.querySelector('.scroll').scrollTop:0; s.el.innerHTML = s.kind==='detail'?viewDetail(s.id):viewProject(s.id); const sc2=s.el.querySelector('.scroll'); if(sc2){ sc2.scrollTop=st2; bindScroll(s.el);} bindCommon(s.el); if(s.kind==='detail') bindDetail(s.el, s.id); if(i<UI.stack.length-1) s.el.classList.add('under'); else s.el.classList.remove('under'); });
 }
-function tabbar(){
+function renderTabbar(){
   const b=(id,ic,l)=>'<button data-tab="'+id+'" class="'+(UI.tab===id?'on':'')+'">'+ic+'<span>'+l+'</span></button>';
-  return '<nav class="tabbar">'+b('tareas',I.list,'Tareas')+b('proyectos',I.folder,'Proyectos')+b('ajustes',I.gear,'Ajustes')+'</nav>';
+  tabbarEl.innerHTML = b('tareas',I.list,'Tareas')+b('proyectos',I.folder,'Proyectos')+b('ajustes',I.gear,'Ajustes');
 }
+function switchTab(tab){ if(UI.tab===tab){ const sc=rootScreen(tab).querySelector('.scroll'); sc&&sc.scrollTo({top:0,behavior:'smooth'}); return; } UI.tab=tab; UI.query=''; render(); }
+tabbarEl.addEventListener('click', e=>{ const b=e.target.closest('[data-tab]'); if(b) switchTab(b.dataset.tab); });
+
+/* ---------- Swipe between tabs: the screen follows the finger, iOS style.
+   Task rows keep their own horizontal gestures, so a swipe that starts on one is theirs. ---------- */
+(function bindTabSwipe(){
+  let x0=0,y0=0,mode=null,cur=null,nb=null,dir=0,w=0,lastX=0,lastT=0,vx=0;
+  const neighbor=d=>{ const i=TABS.indexOf(UI.tab)+d; return i>=0&&i<TABS.length?TABS[i]:null; };
+  app.addEventListener('touchstart',e=>{ mode=null; if(UI.stack.length||e.touches.length>1) return; const t=e.touches[0]; const root=e.target.closest('.screen.root'); if(!root||root.dataset.root!==UI.tab) return;
+    const row=e.target.closest('.row'); if(row&&row.querySelector('.row-bg')) return;
+    x0=lastX=t.clientX; y0=t.clientY; lastT=e.timeStamp; mode='pending'; cur=root; nb=null; w=innerWidth; vx=0; },{passive:true});
+  app.addEventListener('touchmove',e=>{ if(!mode||mode==='off') return; const t=e.touches[0]; const dx=t.clientX-x0, dy=t.clientY-y0;
+    if(mode==='pending'){ if(Math.abs(dy)>8&&Math.abs(dy)>Math.abs(dx)){ mode='off'; return; } if(Math.abs(dx)<10) return; dir=dx<0?1:-1; const nt=neighbor(dir); if(!nt){ mode='off'; return; }
+      nb=rootScreen(nt); nb.style.transform='translate3d('+(dir*w)+'px,0,0)'; nb.classList.remove('hidden-tab'); cur.classList.add('dragging'); nb.classList.add('dragging'); mode='swipe'; if(openRow) closeRow(openRow); }
+    if(mode!=='swipe') return; if(e.cancelable) e.preventDefault();
+    const now=e.timeStamp; if(now>lastT){ vx=(t.clientX-lastX)/(now-lastT); lastX=t.clientX; lastT=now; }
+    const d = dir===1?Math.min(0,dx):Math.max(0,dx);
+    cur.style.transform='translate3d('+d+'px,0,0)'; nb.style.transform='translate3d('+(d+dir*w)+'px,0,0)';
+  },{passive:false});
+  const end=e=>{ if(mode!=='swipe'){ mode=null; return; } mode=null; const dx=e.changedTouches[0].clientX-x0; const d=dir===1?Math.min(0,dx):Math.max(0,dx);
+    const commit = Math.abs(d)>w/3 || (Math.abs(vx)>0.4 && Math.sign(vx)===-dir && Math.abs(d)>20);
+    const c=cur, n=nb; c.classList.remove('dragging'); n.classList.remove('dragging'); c.classList.add('tabanim'); n.classList.add('tabanim');
+    requestAnimationFrame(()=>{ if(commit){ c.style.transform='translate3d('+(-dir*w)+'px,0,0)'; n.style.transform='translate3d(0,0,0)'; } else { c.style.transform='translate3d(0,0,0)'; n.style.transform='translate3d('+(dir*w)+'px,0,0)'; } });
+    setTimeout(()=>{ c.classList.remove('tabanim'); n.classList.remove('tabanim'); if(commit){ haptic(6); UI.tab=n.dataset.root; UI.query=''; } render(); },320);
+  };
+  app.addEventListener('touchend',end); app.addEventListener('touchcancel',end);
+})();
 function bindScroll(scr){ const sc=scr.querySelector('.scroll'), nav=scr.querySelector('.nav'); if(!sc||!nav) return; const f=()=>nav.classList.toggle('compact', sc.scrollTop>36); sc.addEventListener('scroll',f,{passive:true}); f(); }
 
 /* ---------- Tasks view ---------- */
@@ -497,7 +535,6 @@ function bindCommon(scr){
 }
 function onClick(e){
   const scr=e.currentTarget;
-  const tabBtn=e.target.closest('[data-tab]'); if(tabBtn){ if(UI.tab!==tabBtn.dataset.tab){ UI.tab=tabBtn.dataset.tab; UI.query=''; render(); } else { const sc=scr.querySelector('.scroll'); sc&&sc.scrollTo({top:0,behavior:'smooth'}); } return; }
   const f=e.target.closest('[data-filter]'); if(f){ DB.settings.filter=f.dataset.filter; save(); render(); return; }
   const th=e.target.closest('[data-theme]'); if(th){ DB.settings.theme=th.dataset.theme; save(); applyTheme(); render(); return; }
   const op=e.target.closest('[data-open-project]'); if(op){ push('project', op.dataset.openProject); return; }

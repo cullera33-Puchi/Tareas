@@ -72,6 +72,15 @@ Si se migra a Vite: `src/` con `app`, `data`, `ui` y `sync`, y `public/` para ma
 Al migrar a Supabase, cada entidad conserva sus campos y añade `owner_id`; `spaceId`, `projectId` y `taskId` pasan a `space_id`, `project_id` y `task_id` en las tablas.
 
 
+## 8. Decisiones tomadas tras la v0.1
+
+Cambios acordados con Enric sobre el diseño de abajo. Mandan sobre el texto del diseño donde difieran.
+
+1. **Notas de voz (v0.2.1).** La Web Speech API no transcribe en Safari con la app instalada. El dictado del teclado de iOS es la vía principal: la hoja abre con el área de texto enfocada. El micrófono propio solo se ofrece en una pestaña normal de Safari.
+2. **Navegación entre pestañas (v0.3.0).** Además de tocar la tab bar, se cambia de pestaña deslizando lateralmente con seguimiento del dedo. Las filas de tareas conservan sus gestos y no participan en el deslizamiento de pestaña.
+3. **Foco en hojas.** Los campos de las hojas se enfocan de forma síncrona dentro del toque; con `setTimeout` iOS no abre el teclado.
+
+
 ---
 
 # Gestor de tareas personal. Diseño funcional v1

@@ -248,6 +248,22 @@ input,textarea,select{font-size:max(16px,1rem);} /* under 16px Safari zooms on f
 .sheet .hint{text-align:center;color:var(--ink2);font-size:0.765rem;margin:4px 0 10px;}
 .sheet textarea{width:100%;min-height:110px;background:var(--bg);border:0;border-radius:10px;padding:10px 12px;outline:0;resize:none;line-height:1.4;}
 .sheet input[type=date],.sheet input[type=datetime-local]{width:100%;height:44px;background:var(--bg);border:0;border-radius:10px;padding:0 12px;outline:0;color:var(--ink);}
+.cal{padding:6px 0 0;}
+.cal-head{display:flex;align-items:center;justify-content:space-between;padding:0 2px 6px;font-weight:600;font-size:1rem;}
+.cal-head button{width:40px;height:36px;display:flex;align-items:center;justify-content:center;color:var(--blue);}
+.cal-head svg{width:10px;height:16px;}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);row-gap:2px;}
+.cal-dow{text-align:center;font-size:0.706rem;color:var(--ink2);font-weight:600;padding:2px 0 6px;}
+.cal-d{position:relative;height:42px;display:flex;align-items:center;justify-content:center;}
+.cal-d span{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1rem;transition:background .15s;}
+.cal-d:active span{background:var(--fill);}
+.cal-d.other span,.cal-d.past span{color:var(--ink3);}
+.cal-d.today span{color:var(--blue);font-weight:600;}
+.cal-d.sel span{background:var(--blue);color:#fff;font-weight:600;}
+.cal-d i{position:absolute;bottom:3px;left:50%;margin-left:-2px;width:4px;height:4px;border-radius:50%;background:var(--ink3);}
+.cal-d.sel i{display:none;}
+.timerow{display:flex;align-items:center;justify-content:space-between;margin-top:8px;background:var(--bg);border-radius:10px;padding:0 12px;height:44px;}
+.timerow input[type=time]{background:none;border:0;outline:0;color:var(--ink);font-size:max(16px,1rem);text-align:right;}
 .colors{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0;}
 .colors button{width:36px;height:36px;border-radius:50%;border:3px solid transparent;}
 .colors button.on{border-color:var(--ink);}
@@ -295,7 +311,7 @@ input,textarea,select{font-size:max(16px,1rem);} /* under 16px Safari zooms on f
 
 <script>
 'use strict';
-const APP_VERSION = '0.9.0';
+const APP_VERSION = '0.10.0';
 let pendingSW = null; // service worker installed and waiting to take over
 
 /* ---------- Log: errors and app events, kept in localStorage for copy-and-paste debugging ---------- */
@@ -603,7 +619,11 @@ function listHTML(filter, projectId){
   else if(filter==='hoy' && root && list.some(x=>x.carried) && list.some(x=>!x.carried)){ const c=list.filter(x=>x.carried), d=list.filter(x=>!x.carried); h += '<div class="group-title">Aplazadas</div><div class="group">'+c.map(x=>rowHTML(x)).join('')+'</div><div class="group-title">Hoy</div><div class="group">'+d.map(x=>rowHTML(x)).join('')+'</div>'; }
   else h += '<div class="group">'+list.map(x=>rowHTML(x)).join('')+'</div>';
   if(root && filter==='hoy' && !UI.query && !UI.sumFilter){ const tm=pendingFor('todas').filter(x=>x.date===addDays(todayStr(),1)).length; if(tm) h += '<button class="preview" data-filter="todas"><span>Mañana: '+tm+(tm===1?' tarea':' tareas')+'</span>'+I.chev+'</button>'; }
-  if(done.length){ const dt=done.filter(x=>x.completed&&localDay(x.completed)===todayStr()).length; h += '<div class="group"><button class="done-toggle'+(DB.settings.doneOpen?' open':'')+'" data-act="toggleDone"><span>Completadas ('+done.length+')'+(dt?'<span style="color:var(--green)">, '+dt+' hoy</span>':'')+'</span>'+I.chev+'</button>'+(DB.settings.doneOpen?done.map(x=>rowHTML(x)).join(''):'')+'</div>'; }
+  if(done.length){ const dt=done.filter(x=>x.completed&&localDay(x.completed)===todayStr()).length;
+    if(!DB.settings.doneOpen){ h += '<div class="group"><button class="cell link" data-act="toggleDone" style="justify-content:center"><span>Mostrar completadas ('+done.length+(dt?', '+dt+' hoy':'')+')</span></button></div>'; }
+    else { const t=todayStr(), yd=addDays(t,-1); const by={}, order=[]; done.forEach(x=>{ const d=x.completed?localDay(x.completed):'0000'; if(!by[d]){ by[d]=[]; order.push(d); } by[d].push(x); });
+      h += '<div class="group"><button class="cell link" data-act="toggleDone" style="justify-content:center"><span>Ocultar completadas</span></button></div>';
+      order.forEach(d=>{ const label=d===t?'Hoy':d===yd?'Ayer':d==='0000'?'Sin fecha':fmtDate(d); h += '<div class="group-title">'+label+'</div><div class="group">'+by[d].map(x=>rowHTML(x)).join('')+'</div>'; }); } }
   return h;
 }
 function viewTareas(){
@@ -903,12 +923,35 @@ function spaceSheet(id){
     inp.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); s.querySelector('[data-x=ok]').click(); } });
   });
 }
+/* Month calendar, Monday first; days with pending tasks carry a dot */
+function calendarHTML(ym, sel){
+  const [y,m]=ym.split('-').map(Number); const t=todayStr(); const startDow=(new Date(y,m-1,1).getDay()+6)%7;
+  const days=new Date(y,m,0).getDate(), prevDays=new Date(y,m-1,0).getDate();
+  const busy=new Set(spaceTasks().filter(x=>x.status==='pending'&&x.date).map(x=>x.date));
+  let cells=''; const total=Math.ceil((startDow+days)/7)*7;
+  for(let i=0;i<total;i++){ const n=i-startDow+1; let yy=y,mm=m,dd=n,other=false; if(n<1){ other=true; mm=m-1; dd=prevDays+n; if(mm<1){ mm=12; yy--; } } else if(n>days){ other=true; mm=m+1; dd=n-days; if(mm>12){ mm=1; yy++; } }
+    const ds=yy+'-'+String(mm).padStart(2,'0')+'-'+String(dd).padStart(2,'0');
+    cells+='<button class="cal-d'+(other?' other':'')+(ds<t?' past':'')+(ds===t?' today':'')+(ds===sel?' sel':'')+'" data-d="'+ds+'"><span>'+dd+'</span>'+(busy.has(ds)?'<i></i>':'')+'</button>'; }
+  const name=MESES_FULL[m-1]; return '<div class="cal"><div class="cal-head"><button data-cal="-1" aria-label="Mes anterior">'+I.back+'</button><span>'+name[0].toUpperCase()+name.slice(1)+' '+y+'</span><button data-cal="1" aria-label="Mes siguiente">'+I.chev+'</button></div><div class="cal-grid">'+['L','M','X','J','V','S','D'].map(d=>'<div class="cal-dow">'+d+'</div>').join('')+cells+'</div></div>';
+}
+function shiftMonth(ym, d){ let [y,m]=ym.split('-').map(Number); m+=d; if(m<1){ m=12; y--; } if(m>12){ m=1; y++; } return y+'-'+String(m).padStart(2,'0'); }
 function pickProjectSheet(id){ const ps=activeProjects(); const x=task(id); actionSheet('Proyecto', [{label:'Ninguno'+(!x.projectId?'  ✓':''), fn:()=>moveToProject(id,null)}].concat(ps.map(p=>({label:p.name+(x.projectId===p.id?'  ✓':''), fn:()=>moveToProject(id,p.id)})))); }
-function dateSheet(id){ const x=task(id); const t=todayStr(); const dow=new Date(t+'T00:00:00').getDay(); const chips=[[t,'Hoy'],[addDays(t,1),'Mañana']]; if(dow>=1&&dow<=4) chips.push([nextWeekday(5,true),'Este viernes']); chips.push([nextWeekday(1,true),'Próxima semana'],[addDays(t,7),'En una semana'],['','Sin fecha']);
-  openSheet('<h2>Fecha</h2><div class="chips" style="margin-top:0">'+chips.map(c=>'<button class="chip'+(x.date===c[0]?' on':'')+'" data-d="'+c[0]+'">'+c[1]+'</button>').join('')+'</div><input type="date" value="'+(x.date||'')+'" style="margin-top:8px"><div class="sheet-actions"><button class="btn primary" data-x="ok">Guardar</button></div>', s=>{ const inp=$('input[type=date]',s); s.onclick=e=>{ const c=e.target.closest('[data-d]'); if(c){ updTask(id,{date:c.dataset.d||null}); closeSheet(); render(); return; } if(e.target.closest('[data-x=ok]')){ updTask(id,{date:inp.value||null}); closeSheet(); render(); } }; }); }
-function reminderSheet(id){ const x=task(id); const tm=new Date(); tm.setDate(tm.getDate()+1); tm.setHours(9,0,0,0); const local=d=>{ const p=n=>String(n).padStart(2,'0'); return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'T'+p(d.getHours())+':'+p(d.getMinutes()); };
-  const now=new Date(); const h1=new Date(Math.ceil((now.getTime()+36e5)/3e5)*3e5); const e18=new Date(); e18.setHours(18,0,0,0); const chips=[]; if(now.getHours()<17) chips.push([e18.toISOString(),'Hoy a las 18:00']); chips.push([tm.toISOString(),'Mañana a las 9:00'],[h1.toISOString(),'En una hora ('+fmtTime(h1.toISOString())+')'],['','Quitar']);
-  openSheet('<h2>Recordatorio</h2><div class="chips" style="margin-top:0">'+chips.map(c=>'<button class="chip" data-r="'+c[0]+'">'+c[1]+'</button>').join('')+'</div><input type="datetime-local" value="'+(x.reminder?local(new Date(x.reminder)):local(tm))+'" style="margin-top:8px"><div class="hint" style="margin-top:10px">La notificación en el iPhone se activa con la sincronización. Mientras tanto se muestra en el resumen del día.</div><div class="sheet-actions"><button class="btn primary" data-x="ok">Guardar</button></div>', s=>{ const inp=$('input[type=datetime-local]',s); s.onclick=e=>{ const c=e.target.closest('[data-r]'); if(c){ updTask(id,{reminder:c.dataset.r||null}); closeSheet(); render(); return; } if(e.target.closest('[data-x=ok]')){ updTask(id,{reminder:inp.value?new Date(inp.value).toISOString():null}); closeSheet(); render(); } }; }); }
+function dateSheet(id){ const x=task(id); const t=todayStr(); const dow=new Date(t+'T00:00:00').getDay(); const chips=[[t,'Hoy'],[addDays(t,1),'Mañana']]; if(dow>=1&&dow<=4) chips.push([nextWeekday(5,true),'Este viernes']); chips.push([nextWeekday(1,true),'Próxima semana'],['','Sin fecha']);
+  let ym=(x.date||t).slice(0,7);
+  openSheet('<h2>Fecha</h2><div class="chips" style="margin-top:0">'+chips.map(c=>'<button class="chip'+(x.date===c[0]?' on':'')+'" data-d="'+c[0]+'">'+c[1]+'</button>').join('')+'</div><div id="calwrap">'+calendarHTML(ym, x.date)+'</div>', s=>{
+    s.onclick=e=>{ const nav=e.target.closest('[data-cal]'); if(nav){ ym=shiftMonth(ym,+nav.dataset.cal); $('#calwrap',s).innerHTML=calendarHTML(ym, x.date); return; }
+      const c=e.target.closest('[data-d]'); if(c){ updTask(id,{date:c.dataset.d||null}); haptic(6); closeSheet(); render(); } }; }); }
+function reminderSheet(id){ const x=task(id); const t=todayStr(); const pad=n=>String(n).padStart(2,'0');
+  const tm=new Date(); tm.setDate(tm.getDate()+1); tm.setHours(9,0,0,0);
+  const now=new Date(); const h1=new Date(Math.ceil((now.getTime()+36e5)/3e5)*3e5); const e18=new Date(); e18.setHours(18,0,0,0);
+  const chips=[]; if(now.getHours()<17) chips.push([e18.toISOString(),'Hoy a las 18:00']); chips.push([tm.toISOString(),'Mañana a las 9:00'],[h1.toISOString(),'En una hora ('+fmtTime(h1.toISOString())+')']); if(x.reminder) chips.push(['','Quitar']);
+  const cur = x.reminder?new Date(x.reminder):tm; let day=localDay(cur.toISOString()), time=pad(cur.getHours())+':'+pad(cur.getMinutes()), ym=day.slice(0,7);
+  openSheet('<h2>Recordatorio</h2><div class="chips" style="margin-top:0">'+chips.map(c=>'<button class="chip" data-r="'+c[0]+'">'+c[1]+'</button>').join('')+'</div><div id="calwrap">'+calendarHTML(ym, day)+'</div><div class="timerow"><span>Hora</span><input type="time" value="'+time+'"></div><div class="sheet-actions"><button class="btn primary" data-x="ok">Guardar</button></div>', s=>{
+    const inp=$('input[type=time]',s);
+    s.onclick=e=>{ const nav=e.target.closest('[data-cal]'); if(nav){ ym=shiftMonth(ym,+nav.dataset.cal); $('#calwrap',s).innerHTML=calendarHTML(ym, day); return; }
+      const d=e.target.closest('[data-d]'); if(d){ day=d.dataset.d; ym=day.slice(0,7); $('#calwrap',s).innerHTML=calendarHTML(ym, day); haptic(4); return; }
+      const c=e.target.closest('[data-r]'); if(c){ updTask(id,{reminder:c.dataset.r||null}); closeSheet(); render(); return; }
+      if(e.target.closest('[data-x=ok]')){ const [hh,mi]=(inp.value||time).split(':').map(Number); const dt=new Date(day+'T00:00:00'); dt.setHours(hh||0, mi||0, 0, 0); updTask(id,{reminder:dt.toISOString()}); closeSheet(); render(); } }; }); }
 
 /* Voice note.
    Primary route: the iOS keyboard dictation, typing into a focused textarea.

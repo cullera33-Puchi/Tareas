@@ -1,5 +1,9 @@
 # Registro de cambios
 
+## v0.6.3 (31 de octubre de 2026)
+
+- El campo de búsqueda ya no se desborda sobre el botón Cancelar.
+
 ## v0.6.2 (31 de octubre de 2026)
 
 - Búsqueda: el botón Cancelar queda fuera del campo, como en iOS; antes se cortaba.

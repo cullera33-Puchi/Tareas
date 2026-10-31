@@ -102,7 +102,7 @@ input,textarea,select{font-size:max(16px,1rem);} /* under 16px Safari zooms on f
 .searchbar{display:flex;align-items:center;gap:10px;margin:4px 0 10px;}
 .search{flex:1;min-width:0;display:flex;align-items:center;gap:6px;background:var(--fill);border-radius:10px;height:36px;padding:0 8px;color:var(--ink2);}
 .search svg{width:16px;height:16px;flex:none;}
-.search input{flex:1;background:none;border:0;outline:0;height:36px;color:var(--ink);}
+.search input{flex:1;min-width:0;width:100%;background:none;border:0;outline:0;height:36px;color:var(--ink);}
 .search input::placeholder{color:var(--ink2);}
 .searchbar .cancel{color:var(--blue);font-size:1rem;flex:none;}
 .seg{display:flex;background:var(--fill);border-radius:9px;padding:2px;margin:0 0 12px;}
@@ -268,7 +268,7 @@ input,textarea,select{font-size:max(16px,1rem);} /* under 16px Safari zooms on f
 
 <script>
 'use strict';
-const APP_VERSION = '0.6.2';
+const APP_VERSION = '0.6.3';
 let pendingSW = null; // service worker installed and waiting to take over
 
 /* ---------- Log: errors and app events, kept in localStorage for copy-and-paste debugging ---------- */

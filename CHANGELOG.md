@@ -1,5 +1,9 @@
 # Registro de cambios
 
+## v0.13.1 (31 de octubre de 2026)
+
+- Escritorio: la vista Semana usa todo el ancho de la columna central; las tarjetas recortan el título a tres líneas y llevan la prioridad delante del texto; los nombres largos de proyecto no se parten en la barra lateral.
+
 ## v0.13.0. Versión de escritorio (31 de octubre de 2026)
 
 A partir de 900 px de ancho la misma app cambia de disposición; en el iPhone no cambia nada.

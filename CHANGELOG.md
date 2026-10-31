@@ -1,5 +1,11 @@
 # Registro de cambios
 
+## v0.3.4. Vencidas a hoy y tope del deslizamiento (31 de octubre de 2026)
+
+- Al abrir la app, y cada vez que vuelve a primer plano, toda tarea pendiente con fecha anterior a hoy pasa a hoy y queda marcada como aplazada (campo nuevo `carried`). Ya no hay tareas vencidas ni fechas en rojo. Cambiar la fecha a mano (Mañana, selector de fecha) quita la marca.
+- Resumen del día: las tres cifras pasan a ser "para hoy", "aplazadas" (en naranja si hay) y "prioritarias" (en rojo si hay).
+- Deslizar una fila a la izquierda se detiene en los botones Mañana y Eliminar, con un pequeño tope elástico. Desaparece el deslizamiento largo que ejecutaba Mañana, y el fondo verde ya no asoma por detrás.
+
 ## v0.3.3. Resumen del día más bajo (31 de octubre de 2026)
 
 - "Lo primero" muestra solo las tareas de prioridad alta de hoy (hasta tres). Si no hay ninguna, la sección desaparece y la tarjeta se queda en las tres cifras; el recordatorio próximo sigue apareciendo cuando lo hay.

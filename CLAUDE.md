@@ -80,7 +80,9 @@ Cambios acordados con Enric sobre el diseño de abajo. Mandan sobre el texto del
 2. **Navegación entre pestañas (v0.3.0).** Además de tocar la tab bar, se cambia de pestaña deslizando lateralmente con seguimiento del dedo. Las filas de tareas conservan sus gestos y no participan en el deslizamiento de pestaña.
 3. **Cabeceras (v0.3.2).** Sin título grande de 34 px. Una sola fila de 44 puntos con el título a 22 px a la izquierda en las pestañas; en las pantallas apiladas, Atrás y título centrado a 17 px.
 4. **Resumen del día (v0.3.3).** Tres cifras y, debajo, "Lo primero" solo con las tareas de prioridad alta de hoy (hasta tres). Sin prioritarias, la sección no se muestra.
-5. **Foco en hojas.** Los campos de las hojas se enfocan de forma síncrona dentro del toque; con `setTimeout` iOS no abre el teclado.
+5. **Vencidas (v0.3.4).** No existen tareas vencidas: al abrir la app, las pendientes con fecha pasada pasan a hoy con la marca `carried` (campo nuevo en Tarea, booleano; en Supabase, `carried`). La marca se quita al cambiar la fecha a mano. El resumen muestra "para hoy", "aplazadas" y "prioritarias".
+6. **Deslizar fila a la izquierda (v0.3.4).** Se detiene en los botones Mañana y Eliminar; no hay deslizamiento largo que ejecute una acción. A la derecha se mantiene: deslizamiento largo completa.
+7. **Foco en hojas.** Los campos de las hojas se enfocan de forma síncrona dentro del toque; con `setTimeout` iOS no abre el teclado.
 
 
 ---

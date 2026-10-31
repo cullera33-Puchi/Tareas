@@ -111,7 +111,7 @@ input,textarea,select{font-size:17px;}
 .row + .row .row-content{border-top:.5px solid var(--sep);}
 .row-bg{position:absolute;inset:0;display:flex;align-items:stretch;}
 .row-bg.left{justify-content:flex-start;background:var(--green);}
-.row-bg.right{justify-content:flex-end;}
+.row-bg.right{justify-content:flex-end;background:var(--red);}
 .row-bg.left span{display:flex;align-items:center;padding-left:20px;color:#fff;}
 .row-bg.left svg{width:22px;height:22px;}
 .row-bg.right button{width:80px;color:#fff;font-size:15px;font-weight:500;}
@@ -252,7 +252,7 @@ input,textarea,select{font-size:17px;}
 
 <script>
 'use strict';
-const APP_VERSION = '0.3.3';
+const APP_VERSION = '0.3.4';
 let pendingSW = null; // service worker installed and waiting to take over
 
 /* ---------- Utilities ---------- */
@@ -349,11 +349,14 @@ $('#toastBtn').addEventListener('click',()=>{ if(undoFn){ undoFn(); undoFn=null;
 /* ---------- Actions ---------- */
 function addTask(data){
   const t=new Date().toISOString();
-  const x = Object.assign({id:uid(), title:'', spaceId:space().id, projectId:null, date:null, reminder:null, priority:'none', status:'pending', notes:'', created:t, modified:t, completed:null}, data);
+  const x = Object.assign({id:uid(), title:'', spaceId:space().id, projectId:null, date:null, reminder:null, priority:'none', status:'pending', notes:'', carried:false, created:t, modified:t, completed:null}, data);
   if(x.projectId){ const p=proj(x.projectId); if(p) x.spaceId=p.spaceId; }
   DB.tasks.push(x); save(); return x;
 }
-function updTask(id, patch){ const x=task(id); if(!x) return; Object.assign(x, patch, {modified:new Date().toISOString()}); save(); }
+function updTask(id, patch){ const x=task(id); if(!x) return; if('date' in patch && !('carried' in patch)) patch.carried=false; Object.assign(x, patch, {modified:new Date().toISOString()}); save(); }
+/* Roll over: pending tasks dated before today move to today and are flagged as carried.
+   Runs at start and whenever the app comes back to the foreground (the day may have changed). */
+function rollOver(){ const t=todayStr(), now=new Date().toISOString(); let n=0; DB.tasks.forEach(x=>{ if(x.status==='pending'&&x.date&&x.date<t){ x.date=t; x.carried=true; x.modified=now; n++; } }); if(n) save(); return n; }
 function completeTask(id, silent){
   const x=task(id); if(!x) return;
   const was = x.status;
@@ -443,12 +446,12 @@ function rowHTML(x, opts={}){
 }
 function summaryHTML(){
   const t=todayStr(); const hoy=pendingFor('hoy');
-  const venc=hoy.filter(x=>x.date<t).length, deHoy=hoy.filter(x=>x.date===t).length, prio=hoy.filter(x=>x.priority==='high').length;
+  const carried=hoy.filter(x=>x.carried).length, deHoy=hoy.length, prio=hoy.filter(x=>x.priority==='high').length;
   // Only today's high-priority tasks; the list below already shows the rest.
   const first = hoy.filter(x=>x.priority==='high').slice(0,3);
   const soon = spaceTasks().filter(x=>x.status==='pending'&&x.reminder).map(x=>({x,d:new Date(x.reminder).getTime()-Date.now()})).filter(o=>o.d>-5*6e4&&o.d<2*36e5).sort((a,b)=>a.d-b.d)[0];
   return '<section class="summary'+(DB.settings.summaryCollapsed?' collapsed':'')+'"><div class="summary-head"><h3>Resumen del día</h3><button data-act="toggleSummary" aria-label="Plegar">'+I.chevD+'</button></div>'+
-   '<div class="summary-body"><div class="nums"><div class="num'+(venc?' red':'')+'"><b>'+venc+'</b><span>vencidas</span></div><div class="num"><b>'+deHoy+'</b><span>para hoy</span></div><div class="num'+(prio?' orange':'')+'"><b>'+prio+'</b><span>prioritarias</span></div></div>'+
+   '<div class="summary-body"><div class="nums"><div class="num"><b>'+deHoy+'</b><span>para hoy</span></div><div class="num'+(carried?' orange':'')+'"><b>'+carried+'</b><span>aplazadas</span></div><div class="num'+(prio?' red':'')+'"><b>'+prio+'</b><span>prioritarias</span></div></div>'+
    ((first.length||soon)?'<div class="first">'+(first.length?'<h4>Lo primero</h4>'+first.map(x=>rowHTML(x,{simple:true})).join(''):'')+
    (soon?'<div class="soon"'+(first.length?'':' style="border-top:0;padding-top:0"')+'>'+I.bell+'<span>Recordatorio a las '+fmtTime(soon.x.reminder)+': '+esc(soon.x.title)+'</span></div>':'')+'</div>':'')+'</div></section>';
 }
@@ -603,13 +606,14 @@ function bindRowGestures(row){
   row.addEventListener('touchmove',e=>{ const t=e.touches[0]; const mx=t.clientX-x0, my=t.clientY-y0;
     if(mode===null){ if(Math.abs(my)>8){ mode='scroll'; clearTimeout(lp); } else if(Math.abs(mx)>10){ mode='swipe'; clearTimeout(lp); c.classList.add('drag'); } }
     if(mode!=='swipe') return;
-    e.preventDefault(); const base=row.dataset.open==='1'?-160:0; dx=Math.max(-240,Math.min(140, base+mx));
+    e.preventDefault(); const base=row.dataset.open==='1'?-160:0; let raw=base+mx;
+    if(raw<-160) raw=-160+(raw+160)*0.15; // elastic stop at the buttons
+    dx=Math.max(-176,Math.min(140, raw));
     c.style.transform='translate3d('+dx+'px,0,0)';
-    const passed = dx>90 || dx<-220; if(passed&&!thr){thr=true;haptic(8);} if(!passed) thr=false;
+    const passed = dx>90; if(passed&&!thr){thr=true;haptic(8);} if(!passed) thr=false;
   },{passive:false});
   const end=e=>{ clearTimeout(lp); if(mode!=='swipe'){ mode=null; return; } c.classList.remove('drag'); mode=null;
     if(dx>90){ c.style.transform='translate3d(100%,0,0)'; setTimeout(()=>{ completeTask(row.dataset.id); render(); },180); }
-    else if(dx<-220){ c.style.transform='translate3d(-100%,0,0)'; setTimeout(()=>{ tomorrowTask(row.dataset.id); render(); },180); }
     else if(dx<-70){ c.style.transform='translate3d(-160px,0,0)'; row.dataset.open='1'; openRow=row; }
     else closeRow(row);
   };
@@ -729,7 +733,8 @@ document.addEventListener('touchmove',e=>{ if(e.touches.length>1) e.preventDefau
 function badge(){ try{ if(!navigator.setAppBadge) return; const t=todayStr(); const n=DB.tasks.filter(x=>x.status==='pending'&&x.date&&x.date<=t).length; n?navigator.setAppBadge(n):navigator.clearAppBadge(); }catch(e){} }
 const _render=render; render=function(){ _render(); badge(); };
 
-render();
+rollOver(); render();
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible' && rollOver()) render(); });
 
 /* ---------- Service worker: offline cache and update notice ---------- */
 function applyUpdate(){ if(!pendingSW) return; toast('Actualizando'); pendingSW.postMessage({type:'SKIP_WAITING'}); }

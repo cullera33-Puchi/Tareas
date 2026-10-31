@@ -1,5 +1,9 @@
 # Registro de cambios
 
+## v0.6.1 (31 de octubre de 2026)
+
+- La cifra "para hoy" del resumen ya no aparece resaltada cuando no hay filtro activo.
+
 ## v0.6.0. Lote de estética y usabilidad (31 de octubre de 2026)
 
 Estética

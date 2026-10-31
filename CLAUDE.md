@@ -78,7 +78,8 @@ Cambios acordados con Enric sobre el diseño de abajo. Mandan sobre el texto del
 
 1. **Notas de voz (v0.2.1).** La Web Speech API no transcribe en Safari con la app instalada. El dictado del teclado de iOS es la vía principal: la hoja abre con el área de texto enfocada. El micrófono propio solo se ofrece en una pestaña normal de Safari.
 2. **Navegación entre pestañas (v0.3.0).** Además de tocar la tab bar, se cambia de pestaña deslizando lateralmente con seguimiento del dedo. Las filas de tareas conservan sus gestos y no participan en el deslizamiento de pestaña.
-3. **Foco en hojas.** Los campos de las hojas se enfocan de forma síncrona dentro del toque; con `setTimeout` iOS no abre el teclado.
+3. **Cabeceras (v0.3.2).** Sin título grande de 34 px. Una sola fila de 44 puntos con el título a 22 px a la izquierda en las pestañas; en las pantallas apiladas, Atrás y título centrado a 17 px.
+4. **Foco en hojas.** Los campos de las hojas se enfocan de forma síncrona dentro del toque; con `setTimeout` iOS no abre el teclado.
 
 
 ---

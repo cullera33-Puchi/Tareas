@@ -1,5 +1,11 @@
 # Registro de cambios
 
+## v0.3.2. Cabeceras compactas (31 de octubre de 2026)
+
+- Las cabeceras pasan a una sola fila de 44 puntos: título a 22 px a la izquierda (en Tareas, el espacio con su chevron) y sin la fila superior vacía ni el botón duplicado a la derecha. Ahorra unos 50 puntos de alto en cada pestaña.
+- La pantalla de proyecto y la de detalle llevan la barra estándar: Atrás a la izquierda y el título centrado a 17 px, con el punto de color del proyecto.
+- Sustituye el título grande de 34 px que fijaba el diseño original; decisión apuntada en el CLAUDE.md.
+
 ## v0.3.1. Aviso de actualización insistente (31 de octubre de 2026)
 
 - El aviso "Nueva versión disponible" se vuelve a ofrecer cada vez que se vuelve a la app mientras la actualización siga pendiente, no solo una vez. En Ajustes aparece además una fila "Nueva versión disponible, Actualizar" mientras haya una esperando.

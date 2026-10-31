@@ -1,5 +1,9 @@
 # Registro de cambios
 
+## v0.12.1 (31 de octubre de 2026)
+
+- "Pasar lo pendiente a mañana" aparece a partir de las 19:00 en lugar de las 18:00.
+
 ## v0.12.0. Filtro por proyecto, cerrar el día, planificar sin fecha y CSV (31 de octubre de 2026)
 
 - Filtro por proyecto: fila de chips bajo el segmento con los proyectos del espacio y "Sin proyecto". Tocar uno filtra Hoy o Todas; volver a tocarlo quita el filtro. Se pierde al cambiar de espacio.

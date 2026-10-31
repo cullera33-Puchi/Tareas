@@ -99,11 +99,12 @@ input,textarea,select{font-size:max(16px,1rem);} /* under 16px Safari zooms on f
 .first .soon svg{width:15px;height:15px;color:var(--orange);}
 
 /* Search and segment */
-.search{display:flex;align-items:center;gap:6px;background:var(--fill);border-radius:10px;height:36px;padding:0 8px;margin:4px 0 10px;color:var(--ink2);}
+.searchbar{display:flex;align-items:center;gap:10px;margin:4px 0 10px;}
+.search{flex:1;min-width:0;display:flex;align-items:center;gap:6px;background:var(--fill);border-radius:10px;height:36px;padding:0 8px;color:var(--ink2);}
 .search svg{width:16px;height:16px;flex:none;}
 .search input{flex:1;background:none;border:0;outline:0;height:36px;color:var(--ink);}
 .search input::placeholder{color:var(--ink2);}
-.search .cancel{color:var(--blue);font-size:1rem;padding:0 4px;flex:none;}
+.searchbar .cancel{color:var(--blue);font-size:1rem;flex:none;}
 .seg{display:flex;background:var(--fill);border-radius:9px;padding:2px;margin:0 0 12px;}
 .seg button{flex:1;height:28px;border-radius:7px;font-size:0.765rem;font-weight:500;color:var(--ink);}
 .seg button.on{background:var(--card);box-shadow:0 1px 3px rgba(0,0,0,.12);font-weight:600;}
@@ -140,11 +141,12 @@ input,textarea,select{font-size:max(16px,1rem);} /* under 16px Safari zooms on f
 .row-text{flex:1;min-width:0;}
 .row-title{font-size:1rem;line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-word;}
 .row.done .row-title{color:var(--ink2);text-decoration:line-through;}
-.row-meta{display:flex;align-items:center;gap:8px;font-size:0.765rem;color:var(--ink2);margin-top:2px;white-space:nowrap;overflow:hidden;}
-.row-meta .dot{width:8px;height:8px;border-radius:50%;flex:none;}
+.row-meta{display:block;font-size:0.765rem;color:var(--ink2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.row-meta .dot{display:inline-block;width:8px;height:8px;border-radius:50%;vertical-align:middle;margin-right:5px;position:relative;top:-1px;}
+.row-meta .sep{color:var(--ink3);margin:0 6px;}
 .row-meta .over{color:var(--red);}
 .row-meta .bell{display:inline-flex;align-items:center;gap:3px;}
-.row-meta .bell svg{width:11px;height:11px;}
+.row-meta .bell svg{width:11px;height:11px;vertical-align:-1px;}
 .pri{flex:none;font-weight:700;font-size:1rem;min-width:14px;text-align:center;letter-spacing:-1px;}
 .pri.high{color:var(--red);}
 .pri.mid{color:var(--orange);}
@@ -232,7 +234,7 @@ input,textarea,select{font-size:max(16px,1rem);} /* under 16px Safari zooms on f
 .asheet button.it.cancel{font-weight:600;}
 
 /* Toast */
-.toast{position:fixed;left:16px;right:16px;bottom:calc(60px + env(safe-area-inset-bottom,0px));background:var(--card);color:var(--ink);border-radius:12px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 6px 24px rgba(0,0,0,.18);transform:translate3d(0,20px,0);opacity:0;transition:all .25s;z-index:30;pointer-events:none;font-size:0.882rem;}
+.toast{position:fixed;left:16px;right:92px;bottom:calc(60px + env(safe-area-inset-bottom,0px));background:var(--card);color:var(--ink);border-radius:12px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 6px 24px rgba(0,0,0,.18);transform:translate3d(0,20px,0);opacity:0;transition:all .25s;z-index:30;pointer-events:none;font-size:0.882rem;}
 .toast.on{transform:translate3d(0,0,0);opacity:1;pointer-events:auto;}
 .toast button{color:var(--blue);font-weight:600;}
 
@@ -266,7 +268,7 @@ input,textarea,select{font-size:max(16px,1rem);} /* under 16px Safari zooms on f
 
 <script>
 'use strict';
-const APP_VERSION = '0.6.1';
+const APP_VERSION = '0.6.2';
 let pendingSW = null; // service worker installed and waiting to take over
 
 /* ---------- Log: errors and app events, kept in localStorage for copy-and-paste debugging ---------- */
@@ -512,15 +514,15 @@ function bindScroll(scr){ const sc=scr.querySelector('.scroll'), nav=scr.querySe
 /* ---------- Tasks view ---------- */
 function rowHTML(x, opts={}){
   const p = x.projectId?proj(x.projectId):null; const t=todayStr();
+  const done=x.status==='done';
   const meta=[]; if(p) meta.push('<span class="dot" style="background:'+p.color+'"></span><span>'+esc(p.name)+'</span>');
-  if(x.date) meta.push('<span class="'+(x.status==='pending'&&x.date<t?'over':'')+'">'+fmtDate(x.date)+'</span>');
-  if(x.reminder && x.status==='pending') meta.push('<span class="bell">'+I.bell+fmtTime(x.reminder)+'</span>');
-  if(x.status==='done'&&x.completed) meta.push('<span>'+fmtDateTime(x.completed)+'</span>');
-  const pri = x.priority==='high'?'<span class="pri high">!!!</span>':x.priority==='mid'?'<span class="pri mid">!!</span>':'';
+  if(done){ if(x.completed) meta.push('<span>Hecha '+fmtDateTime(x.completed)+'</span>'); }
+  else { if(x.date) meta.push('<span class="'+(x.date<t?'over':'')+'">'+fmtDate(x.date)+'</span>'); if(x.reminder) meta.push('<span class="bell">'+I.bell+fmtTime(x.reminder)+'</span>'); }
+  const pri = done?'':x.priority==='high'?'<span class="pri high">!!!</span>':x.priority==='mid'?'<span class="pri mid">!!</span>':'';
   return '<div class="row'+(x.status==='done'?' done':'')+'" data-id="'+x.id+'">'+
     (opts.simple?'':'<div class="row-bg left"><span>'+I.check+'</span></div><div class="row-bg right"><button class="b-tomorrow" data-act="tomorrow">Mañana</button><button class="b-delete" data-act="delete">Eliminar</button></div>')+
     '<div class="row-content"><button class="check'+(x.status==='done'?' done':'')+'" data-act="check" aria-label="Completar">'+I.check+'</button>'+
-    '<div class="row-text"><div class="row-title">'+esc(x.title||'Sin título')+'</div>'+(meta.length?'<div class="row-meta">'+meta.join('<span style="color:var(--ink3)">·</span>')+'</div>':'')+'</div>'+pri+'</div></div>';
+    '<div class="row-text"><div class="row-title">'+esc(x.title||'Sin título')+'</div>'+(meta.length?'<div class="row-meta">'+meta.join('<span class="sep">·</span>')+'</div>':'')+'</div>'+pri+'</div></div>';
 }
 function summaryHTML(){
   const t=todayStr(); const hoy=pendingFor('hoy');
@@ -562,7 +564,7 @@ function viewTareas(){
   const f=DB.settings.filter; const nHoy=pendingFor('hoy').length, nTodas=pendingFor('todas').length;
   return '<header class="nav"><div class="nav-row"><button class="title" data-act="spaceMenu" aria-label="Cambiar espacio">'+esc(space().name)+I.chevD+'</button><span></span></div></header>'+
    '<div class="scroll">'+(f==='hoy'&&!UI.query?summaryHTML():'')+
-   '<div class="search">'+I.search+'<input type="search" placeholder="Buscar" value="'+esc(UI.query)+'" data-role="search" autocomplete="off">'+(UI.query?'<button class="cancel" data-act="clearSearch">Cancelar</button>':'')+'</div>'+
+   '<div class="searchbar"><div class="search">'+I.search+'<input type="search" placeholder="Buscar" value="'+esc(UI.query)+'" data-role="search" autocomplete="off"></div>'+(UI.query?'<button class="cancel" data-act="clearSearch">Cancelar</button>':'')+'</div>'+
    (UI.query?'':'<div class="seg"><button data-filter="hoy" class="'+(f==='hoy'?'on':'')+'">Hoy<span class="n">'+nHoy+'</span></button><button data-filter="todas" class="'+(f==='todas'?'on':'')+'">Todas<span class="n">'+nTodas+'</span></button></div>')+
    listHTML(UI.query?'todas':f)+'</div>'+
    '<button class="fab" data-act="add" aria-label="Añadir tarea">'+I.plus+'</button>';

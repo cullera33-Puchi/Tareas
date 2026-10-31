@@ -1,5 +1,11 @@
 # Registro de cambios
 
+## v0.6.2 (31 de octubre de 2026)
+
+- Búsqueda: el botón Cancelar queda fuera del campo, como en iOS; antes se cortaba.
+- Filas completadas: muestran proyecto y "Hecha" con fecha y hora, sin la fecha original ni la marca de prioridad tachada; la línea de datos se recorta con puntos suspensivos en lugar de desbordar.
+- El aviso inferior deja libre el botón +.
+
 ## v0.6.1 (31 de octubre de 2026)
 
 - La cifra "para hoy" del resumen ya no aparece resaltada cuando no hay filtro activo.

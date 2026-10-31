@@ -252,8 +252,29 @@ input,textarea,select{font-size:17px;}
 
 <script>
 'use strict';
-const APP_VERSION = '0.4.0';
+const APP_VERSION = '0.5.0';
 let pendingSW = null; // service worker installed and waiting to take over
+
+/* ---------- Log: errors and app events, kept in localStorage for copy-and-paste debugging ---------- */
+const LOGKEY = 'tareas-log';
+let LOG = []; try{ LOG = JSON.parse(localStorage.getItem(LOGKEY)||'[]'); if(!Array.isArray(LOG)) LOG=[]; }catch(e){ LOG=[]; }
+function log(level, msg, extra){
+  const e = { t:new Date().toISOString(), l:level, m:String(msg) };
+  if(extra!==undefined){ try{ e.x = typeof extra==='string' ? extra : JSON.stringify(extra); }catch(err){ e.x = String(extra); } }
+  LOG.push(e); if(LOG.length>400) LOG = LOG.slice(-400);
+  try{ localStorage.setItem(LOGKEY, JSON.stringify(LOG)); }catch(err){}
+}
+window.addEventListener('error', e => log('error', e.message||'Error', (e.filename||'').split('/').pop()+':'+e.lineno+':'+e.colno+(e.error&&e.error.stack?'\n'+e.error.stack:'')));
+window.addEventListener('unhandledrejection', e => log('error', 'Promesa rechazada: '+(e.reason&&e.reason.message||e.reason), e.reason&&e.reason.stack));
+const _consoleError = console.error.bind(console);
+console.error = (...a) => { log('error', a.map(x=>x&&x.message||String(x)).join(' ')); _consoleError(...a); };
+function logText(){
+  const d = (typeof DB!=='undefined'&&DB) ? ' | espacios '+DB.spaces.length+', proyectos '+DB.projects.length+', tareas '+DB.tasks.length+', notas de voz '+DB.voiceNotes.length : '';
+  let st='?'; try{ st = (navigator.standalone===true||matchMedia('(display-mode: standalone)').matches)?'instalada':'navegador'; }catch(e){}
+  const head = 'Tareas v'+APP_VERSION+' | '+st+' | '+navigator.userAgent+' | '+new Date().toString()+d;
+  const lines = LOG.map(e=>{ const t=e.t.replace('T',' ').slice(5,19); return t+' ['+e.l+'] '+e.m+(e.x?' | '+e.x:''); });
+  return head+'\n'+(lines.length?lines.join('\n'):'(sin entradas)');
+}
 
 /* ---------- Utilities ---------- */
 const $ = (s, el=document) => el.querySelector(s);
@@ -297,7 +318,7 @@ function blank(){
   return { spaces:[{id:'trabajo',name:'Trabajo',order:0,created:t},{id:'personal',name:'Personal',order:1,created:t}], projects:[], tasks:[], voiceNotes:[], settings:{activeSpace:'trabajo', summaryCollapsed:false, filter:'hoy', doneOpen:false, theme:'auto'} };
 }
 function load(){ try{ const raw=localStorage.getItem(KEY); if(raw){ const d=JSON.parse(raw); if(d&&d.spaces&&d.tasks) return Object.assign(blank(),d,{settings:Object.assign(blank().settings,d.settings||{})}); } }catch(e){} return blank(); }
-function save(){ try{ localStorage.setItem(KEY, JSON.stringify(DB)); }catch(e){} }
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(DB)); }catch(e){ log('error','No se pudo guardar: '+(e&&e.message||e)); toast('No se pudo guardar en el dispositivo'); } }
 DB = load();
 try{ navigator.storage && navigator.storage.persist && navigator.storage.persist(); }catch(e){}
 function applyTheme(){ const t=DB.settings.theme||'auto'; if(t==='auto') document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme',t); }
@@ -504,7 +525,12 @@ function viewAjustes(){
    '<div class="footnote">El inicio de sesión con Google y la sincronización llegan en el siguiente bloque. Mientras tanto, los datos viven en este iPhone.</div>'+
    '<div class="group-title">Espacios</div><div class="group">'+DB.spaces.slice().sort((a,b)=>a.order-b.order).map(sp=>'<button class="cell" data-edit-space="'+sp.id+'"><span class="lbl">'+esc(sp.name)+'</span>'+(sp.id===space().id?'<span class="val">Activo</span>':'')+I.chev.replace('<svg','<svg class="chev"')+'</button>').join('')+'<button class="cell link" data-act="newSpace">'+I.plus.replace('<svg','<svg style="width:18px;height:18px"')+'<span class="lbl">Nuevo espacio</span></button></div>'+
    '<div class="footnote">Cada espacio tiene sus propios proyectos y tareas. Un espacio solo se puede eliminar si está vacío.</div>'+
-   '<div class="group-title">Datos</div><div class="group"><button class="cell" data-act="export"><span class="lbl">Exportar JSON</span><span class="val">Copiar</span></button><button class="cell" data-act="import"><span class="lbl">Importar JSON</span><span class="val">Pegar</span></button></div>'+
+   '<div class="group-title">Datos</div><div class="group"><button class="cell" data-act="exportFile"><span class="lbl">Exportar a archivo</span><span class="val">JSON</span></button><button class="cell" data-act="importFile"><span class="lbl">Importar desde archivo</span><span class="val">JSON</span></button><button class="cell" data-act="import"><span class="lbl">Importar pegando texto</span></button></div>'+
+   '<div class="footnote">La exportación incluye espacios, proyectos, tareas y notas de voz. Al importar, lo nuevo se añade y lo ya existente se actualiza si la copia es más reciente.</div>'+
+   '<div class="group-title">Pruebas</div><div class="group"><button class="cell" data-act="demo"><span class="lbl">Generar datos de prueba</span><span class="val">150 tareas</span></button><button class="cell" data-act="demoClear"><span class="lbl" style="color:var(--red)">Eliminar datos de prueba</span><span class="val">'+demoCount()+'</span></button></div>'+
+   '<div class="footnote">Los datos de prueba se crean en el espacio activo, llevan su propia marca y se eliminan sin tocar tus datos.</div>'+
+   '<div class="group-title">Registro</div><div class="group"><button class="cell" data-act="log"><span class="lbl">Ver registro</span><span class="val">'+LOG.length+' entradas</span></button><button class="cell" data-act="logCopy"><span class="lbl">Copiar registro</span></button></div>'+
+   '<div class="footnote">Errores y eventos de la app. Cópialo y pégalo en el chat para depurar.</div>'+
    '<div class="group-title">Aspecto</div><div class="group"><div class="cell"><span class="lbl">Tema</span></div><div style="padding:0 16px 12px"><div class="seg" style="margin:0"><button data-theme="auto" class="'+(th==='auto'?'on':'')+'">Automático</button><button data-theme="light" class="'+(th==='light'?'on':'')+'">Claro</button><button data-theme="dark" class="'+(th==='dark'?'on':'')+'">Oscuro</button></div></div></div>'+
    '<div class="group-title">Proyectos archivados</div><div class="group">'+(DB.projects.filter(p=>p.archived&&p.spaceId===space().id).map(p=>'<button class="cell" data-unarchive="'+p.id+'"><span class="pdot" style="background:'+p.color+'"></span><span class="lbl">'+esc(p.name)+'</span><span class="val">Restaurar</span></button>').join('')||'<div class="cell"><span class="lbl" style="color:var(--ink2)">Ninguno en '+esc(space().name)+'</span></div>')+'</div>'+
    (pendingSW?'<div class="group-title">Actualización</div><div class="group"><button class="cell link" data-act="update"><span class="lbl">Nueva versión disponible</span><span class="val">Actualizar</span></button></div>':'')+
@@ -574,6 +600,12 @@ function onClick(e){
     case 'voice': voiceSheet(detailId); break;
     case 'export': exportJSON(); break;
     case 'import': importSheet(); break;
+    case 'exportFile': exportFile(); break;
+    case 'importFile': pickImportFile(); break;
+    case 'demo': generateDemo(); break;
+    case 'demoClear': clearDemo(); break;
+    case 'log': logSheet(); break;
+    case 'logCopy': copyText(logText(),'Registro copiado'); break;
     case 'update': applyUpdate(); break;
   }
 }
@@ -745,8 +777,76 @@ async function shareTask(id){ const t=shareText(id); if(!t) return; try{ if(navi
 async function copyText(t,msg){ try{ await navigator.clipboard.writeText(t); toast(msg||'Copiado'); }catch(e){ const ta=document.createElement('textarea'); ta.value=t; document.body.appendChild(ta); ta.select(); try{document.execCommand('copy'); toast(msg||'Copiado');}catch(e2){ toast('No se pudo copiar'); } ta.remove(); } }
 
 /* Export and import */
-function exportJSON(){ const t=JSON.stringify({exported:new Date().toISOString(), spaces:DB.spaces, projects:DB.projects, tasks:DB.tasks, voiceNotes:DB.voiceNotes},null,2); if(navigator.share){ navigator.share({title:'Tareas (copia)', text:t}).catch(()=>copyText(t,'Copia JSON en el portapapeles')); } else copyText(t,'Copia JSON en el portapapeles'); }
-function importSheet(){ openSheet('<h2>Importar JSON</h2><div class="hint">Pega aquí una copia exportada. Se añadirá a lo que ya tienes sin duplicar.</div><textarea placeholder="{ ... }"></textarea><div class="sheet-actions"><button class="btn" data-x="cancel">Cancelar</button><button class="btn primary" data-x="ok">Importar</button></div>', s=>{ const ta=$('textarea',s); setTimeout(()=>ta.focus(),150); s.onclick=e=>{ const b=e.target.closest('[data-x]'); if(!b) return; if(b.dataset.x==='cancel'){ closeSheet(); return; } try{ const d=JSON.parse(ta.value); let n=0; const merge=(arr,src)=>{ (src||[]).forEach(it=>{ if(!arr.find(a=>a.id===it.id)){ arr.push(it); n++; } }); }; merge(DB.projects,d.projects); merge(DB.tasks,d.tasks); merge(DB.voiceNotes,d.voiceNotes); save(); closeSheet(); render(); toast(n+' elementos importados'); }catch(err){ toast('El texto no es un JSON válido'); } }; }); }
+function exportData(){ return { app:'tareas', version:APP_VERSION, exported:new Date().toISOString(), spaces:DB.spaces, projects:DB.projects, tasks:DB.tasks, voiceNotes:DB.voiceNotes }; }
+function exportJSON(){ const t=JSON.stringify(exportData(),null,2); if(navigator.share){ navigator.share({title:'Tareas (copia)', text:t}).catch(()=>copyText(t,'Copia JSON en el portapapeles')); } else copyText(t,'Copia JSON en el portapapeles'); }
+async function exportFile(){
+  const name='tareas-'+todayStr()+'.json'; const text=JSON.stringify(exportData(),null,2); const blob=new Blob([text],{type:'application/json'});
+  try{ const file=new File([blob],name,{type:'application/json'}); if(navigator.canShare&&navigator.canShare({files:[file]})){ await navigator.share({files:[file],title:'Tareas'}); log('info','Exportado a archivo (compartir)',name); return; } }
+  catch(e){ if(e&&e.name==='AbortError') return; log('warn','Compartir archivo no disponible: '+(e&&e.message||e)); }
+  try{ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },1500); toast('Archivo '+name+' generado'); log('info','Exportado a archivo (descarga)',name); }
+  catch(e){ log('error','Exportar a archivo falló: '+(e&&e.message||e)); exportJSON(); }
+}
+// Merge an exported copy: unknown ids are added, known ids are replaced when the copy is newer.
+function importData(text){
+  const d=JSON.parse(text); if(!d||typeof d!=='object') throw new Error('Formato no reconocido');
+  let added=0, updated=0;
+  const merge=(arr,src)=>{ (Array.isArray(src)?src:[]).forEach(it=>{ if(!it||!it.id) return; const i=arr.findIndex(a=>a.id===it.id); if(i<0){ arr.push(it); added++; } else if((it.modified||'')>(arr[i].modified||'')){ arr[i]=it; updated++; } }); };
+  merge(DB.spaces,d.spaces); merge(DB.projects,d.projects); merge(DB.tasks,d.tasks); merge(DB.voiceNotes,d.voiceNotes);
+  DB.tasks.forEach(x=>{ if(x.carried===undefined) x.carried=false; });
+  save(); rollOver(); log('info','Importación', {added, updated, spaces:(d.spaces||[]).length, projects:(d.projects||[]).length, tasks:(d.tasks||[]).length});
+  return {added, updated};
+}
+function importSheet(){ openSheet('<h2>Importar pegando texto</h2><div class="hint">Pega aquí una copia exportada.</div><textarea placeholder="{ ... }"></textarea><div class="sheet-actions"><button class="btn" data-x="cancel">Cancelar</button><button class="btn primary" data-x="ok">Importar</button></div>', s=>{ const ta=$('textarea',s); ta.focus(); s.onclick=e=>{ const b=e.target.closest('[data-x]'); if(!b) return; if(b.dataset.x==='cancel'){ closeSheet(); return; } try{ const r=importData(ta.value); closeSheet(); render(); toast(r.added+' nuevos, '+r.updated+' actualizados'); }catch(err){ log('warn','Importar texto: '+err.message); toast('El texto no es un JSON válido'); } }; }); }
+function pickImportFile(){
+  let inp=$('#importFile'); if(!inp){ inp=document.createElement('input'); inp.type='file'; inp.id='importFile'; inp.accept='application/json,.json,text/plain'; inp.style.cssText='position:fixed;left:-100px;top:0;width:1px;height:1px;opacity:0'; document.body.appendChild(inp); }
+  inp.value=''; inp.onchange=()=>{ const f=inp.files&&inp.files[0]; if(!f) return; const rd=new FileReader(); rd.onload=()=>{ try{ const r=importData(rd.result); render(); toast(r.added+' nuevos, '+r.updated+' actualizados'); }catch(err){ log('warn','Importar archivo '+f.name+': '+err.message); toast('El archivo no es una copia válida'); } }; rd.onerror=()=>{ log('error','No se pudo leer '+f.name); toast('No se pudo leer el archivo'); }; rd.readAsText(f); };
+  inp.click();
+}
+
+/* Test data: about 150 tasks in invented projects, all ids prefixed "demo-" so they can be removed cleanly */
+const demoCount = () => DB.tasks.filter(x=>String(x.id).startsWith('demo-')).length;
+function generateDemo(){
+  let seed=20261031; const rnd=()=>{ seed=(seed*1103515245+12345)&0x7fffffff; return seed/0x7fffffff; }; const pick=a=>a[Math.floor(rnd()*a.length)];
+  const batch=Date.now().toString(36); const sp=space().id; const now=new Date(); const t=todayStr();
+  const projNames=[['Cliente FLC',0],['Verifactu',4],['Cash Application',3],['Propuesta Iberdrola',5],['Formación del equipo',6],['Administración',7]];
+  const projects=projNames.map((pn,i)=>({id:'demo-p-'+batch+'-'+i, spaceId:sp, name:pn[0], color:COLORS[pn[1]], order:DB.projects.length+i, archived:false, created:now.toISOString(), modified:now.toISOString()}));
+  const verbs=['Preparar','Revisar','Enviar','Cerrar','Actualizar','Llamar a','Validar','Redactar','Planificar','Documentar','Confirmar','Analizar'];
+  const objs=['comité de seguimiento','SOW con legal','acta del steering','plan de cutover','RAID log','Marta por el presupuesto','mapping de Verifactu','propuesta de fase 2','sesión de formación','backlog de defectos','escenarios de prueba UAT','calendario de go-live','informe de horas','presentación a dirección','integración con BTP','matriz de riesgos','contrato marco','facturas pendientes','ampliación del equipo','notas del taller'];
+  const noteTexts=['Pendiente de la respuesta del cliente.','Revisar con el equipo antes del jueves.','Incluye los cambios acordados en la última reunión.','Ver correo de ayer con el detalle.',''];
+  const tasks=[], vnotes=[];
+  for(let i=0;i<150;i++){
+    const r=rnd(); let date=null; if(r<0.2) date=addDays(t,-1-Math.floor(rnd()*10)); else if(r<0.5) date=t; else if(r<0.8) date=addDays(t,1+Math.floor(rnd()*30));
+    const pr=rnd(); const priority=pr<0.15?'high':pr<0.4?'mid':'none';
+    const done=rnd()<0.2; const created=new Date(now.getTime()-Math.floor(rnd()*40)*864e5).toISOString();
+    const completed=done?new Date(now.getTime()-Math.floor(rnd()*25)*864e5).toISOString():null;
+    const projectId=rnd()<0.85?pick(projects).id:null;
+    let reminder=null; if(!done&&rnd()<0.1){ const d=new Date(now.getTime()+Math.floor(rnd()*72)*36e5); d.setMinutes(0,0,0); reminder=d.toISOString(); }
+    const id='demo-t-'+batch+'-'+i;
+    tasks.push({id, title:pick(verbs)+' '+pick(objs), spaceId:sp, projectId, date, reminder, priority, status:done?'done':'pending', notes:pick(noteTexts), carried:false, created, modified:created, completed});
+    if(rnd()<0.06) vnotes.push({id:'demo-v-'+batch+'-'+i, taskId:id, text:'Nota dictada de prueba: '+pick(noteTexts.filter(Boolean)), created});
+  }
+  DB.projects.push(...projects); DB.tasks.push(...tasks); DB.voiceNotes.push(...vnotes); save(); const n=rollOver(); render(); haptic(8);
+  log('info','Datos de prueba generados', {projects:projects.length, tasks:tasks.length, voiceNotes:vnotes.length, rolledOver:n});
+  toast(tasks.length+' tareas de prueba en '+projects.length+' proyectos');
+}
+function clearDemo(){
+  const n=demoCount(); if(!n){ toast('No hay datos de prueba'); return; }
+  confirmSheet('Eliminar '+n+' tareas de prueba', 'Se eliminan solo los elementos marcados como prueba. Tus datos no se tocan.', ()=>{
+    const isDemo=x=>String(x.id).startsWith('demo-');
+    DB.tasks=DB.tasks.filter(x=>!isDemo(x)); DB.projects=DB.projects.filter(x=>!isDemo(x)); DB.voiceNotes=DB.voiceNotes.filter(x=>!isDemo(x)); save(); render(); haptic(10);
+    log('info','Datos de prueba eliminados', {tasks:n}); toast('Datos de prueba eliminados');
+  });
+}
+
+/* Log sheet */
+function logSheet(){
+  openSheet('<h2>Registro</h2><div class="hint">'+LOG.length+' entradas. Cópialo y pégalo en el chat.</div><textarea readonly style="min-height:260px;font-size:12px;line-height:1.35;font-family:ui-monospace,Menlo,monospace">'+esc(logText())+'</textarea><div class="sheet-actions"><button class="btn" data-x="clear">Borrar</button><button class="btn primary" data-x="copy">Copiar</button></div>'+(navigator.share?'<div class="sheet-actions" style="margin-top:10px"><button class="btn" data-x="share">Compartir</button></div>':''), s=>{
+    s.onclick=e=>{ const b=e.target.closest('[data-x]'); if(!b) return;
+      if(b.dataset.x==='copy'){ copyText(logText(),'Registro copiado'); return; }
+      if(b.dataset.x==='share'){ navigator.share({title:'Registro de Tareas', text:logText()}).catch(()=>{}); return; }
+      if(b.dataset.x==='clear'){ LOG=[]; try{ localStorage.removeItem(LOGKEY); }catch(err){} closeSheet(); render(); toast('Registro borrado'); } };
+  });
+}
 
 /* Keyboard: reposition sheets */
 if(window.visualViewport){ const vv=window.visualViewport; const f=()=>{ const kb=Math.max(0, innerHeight - vv.height - vv.offsetTop); document.documentElement.style.setProperty('--kb', kb+'px'); }; vv.addEventListener('resize',f); vv.addEventListener('scroll',f); }
@@ -757,20 +857,21 @@ document.addEventListener('touchmove',e=>{ if(e.touches.length>1) e.preventDefau
 function badge(){ try{ if(!navigator.setAppBadge) return; const t=todayStr(); const n=DB.tasks.filter(x=>x.status==='pending'&&x.date&&x.date<=t).length; n?navigator.setAppBadge(n):navigator.clearAppBadge(); }catch(e){} }
 const _render=render; render=function(){ _render(); badge(); };
 
-rollOver(); render();
-document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible' && rollOver()) render(); });
+(function(){ let st='?'; try{ st=(navigator.standalone===true||matchMedia('(display-mode: standalone)').matches)?'instalada':'navegador'; }catch(e){} log('info','Inicio v'+APP_VERSION+' ('+st+')', {spaces:DB.spaces.length, projects:DB.projects.length, tasks:DB.tasks.length}); })();
+{ const n=rollOver(); if(n) log('info','Tareas pasadas a hoy: '+n); } render();
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible'){ const n=rollOver(); if(n){ log('info','Tareas pasadas a hoy: '+n); render(); } } });
 
 /* ---------- Service worker: offline cache and update notice ---------- */
-function applyUpdate(){ if(!pendingSW) return; toast('Actualizando'); pendingSW.postMessage({type:'SKIP_WAITING'}); }
+function applyUpdate(){ if(!pendingSW) return; toast('Actualizando'); log('info','Actualización aplicada por el usuario'); pendingSW.postMessage({type:'SKIP_WAITING'}); }
 if('serviceWorker' in navigator){
   let reloading=false;
   // Offer the update until it is applied: on install, on every return to the app and from Settings.
-  const offerUpdate = sw => { pendingSW=sw; toast('Nueva versión disponible', applyUpdate, 'Actualizar'); if(UI.tab==='ajustes'&&!UI.stack.length) render(); };
+  const offerUpdate = sw => { if(pendingSW!==sw) log('info','Nueva versión descargada, pendiente de aplicar'); pendingSW=sw; toast('Nueva versión disponible', applyUpdate, 'Actualizar'); if(UI.tab==='ajustes'&&!UI.stack.length) render(); };
   navigator.serviceWorker.register('sw.js').then(reg=>{
     if(reg.waiting && navigator.serviceWorker.controller) offerUpdate(reg.waiting);
     reg.addEventListener('updatefound',()=>{ const nw=reg.installing; if(!nw) return; nw.addEventListener('statechange',()=>{ if(nw.state==='installed' && navigator.serviceWorker.controller) offerUpdate(nw); }); });
     document.addEventListener('visibilitychange',()=>{ if(document.visibilityState!=='visible') return; reg.update().catch(()=>{}).then(()=>{ if(reg.waiting && navigator.serviceWorker.controller) offerUpdate(reg.waiting); }); });
-  }).catch(()=>{});
+  }).catch(e=>log('error','Service worker no registrado: '+(e&&e.message||e)));
   navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(reloading) return; reloading=true; location.reload(); });
 }
 </script>

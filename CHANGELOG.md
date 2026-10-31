@@ -1,5 +1,11 @@
 # Registro de cambios
 
+## v0.5.0. Herramientas de prueba en Ajustes (31 de octubre de 2026)
+
+- Datos: "Exportar a archivo" genera `tareas-AAAA-MM-DD.json` con espacios, proyectos, tareas y notas de voz (por la hoja de compartir de iOS, para guardarlo en Archivos o enviarlo; descarga directa como respaldo). "Importar desde archivo" lee ese JSON; lo nuevo se añade y lo existente se actualiza si la copia es más reciente. Se mantiene "Importar pegando texto".
+- Pruebas: "Generar datos de prueba" crea 150 tareas en seis proyectos inventados dentro del espacio activo, con fechas pasadas, de hoy, futuras y sin fecha, prioridades, un 20 % completadas, notas, recordatorios y algunas notas de voz. "Eliminar datos de prueba" los quita sin tocar el resto (van marcados por el identificador `demo-`).
+- Registro: la app guarda errores (excepciones, promesas rechazadas, `console.error`, fallos al guardar) y eventos (inicio, versión, actualizaciones, traspaso de vencidas, importaciones, datos de prueba), con cabecera de versión, modo y dispositivo. "Ver registro" lo muestra con Copiar, Compartir y Borrar; "Copiar registro" lo copia directamente. Últimas 400 entradas.
+
 ## v0.4.0. Espacios editables (31 de octubre de 2026)
 
 - Los espacios dejan de ser fijos. En Ajustes, sección "Espacios": tocar uno permite renombrarlo; "Nuevo espacio" crea otro. El selector del título también ofrece "Nuevo espacio". El espacio recién creado queda activo.

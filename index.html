@@ -250,7 +250,8 @@ input,textarea,select{font-size:17px;}
 
 <script>
 'use strict';
-const APP_VERSION = '0.3.0';
+const APP_VERSION = '0.3.1';
+let pendingSW = null; // service worker installed and waiting to take over
 
 /* ---------- Utilities ---------- */
 const $ = (s, el=document) => el.querySelector(s);
@@ -496,6 +497,7 @@ function viewAjustes(){
    '<div class="group-title">Datos</div><div class="group"><button class="cell" data-act="export"><span class="lbl">Exportar JSON</span><span class="val">Copiar</span></button><button class="cell" data-act="import"><span class="lbl">Importar JSON</span><span class="val">Pegar</span></button></div>'+
    '<div class="group-title">Aspecto</div><div class="group"><div class="cell"><span class="lbl">Tema</span></div><div style="padding:0 16px 12px"><div class="seg" style="margin:0"><button data-theme="auto" class="'+(th==='auto'?'on':'')+'">Automático</button><button data-theme="light" class="'+(th==='light'?'on':'')+'">Claro</button><button data-theme="dark" class="'+(th==='dark'?'on':'')+'">Oscuro</button></div></div></div>'+
    '<div class="group-title">Proyectos archivados</div><div class="group">'+(DB.projects.filter(p=>p.archived&&p.spaceId===space().id).map(p=>'<button class="cell" data-unarchive="'+p.id+'"><span class="pdot" style="background:'+p.color+'"></span><span class="lbl">'+esc(p.name)+'</span><span class="val">Restaurar</span></button>').join('')||'<div class="cell"><span class="lbl" style="color:var(--ink2)">Ninguno en '+esc(space().name)+'</span></div>')+'</div>'+
+   (pendingSW?'<div class="group-title">Actualización</div><div class="group"><button class="cell link" data-act="update"><span class="lbl">Nueva versión disponible</span><span class="val">Actualizar</span></button></div>':'')+
    '<div class="footnote">Tareas v'+APP_VERSION+'. Datos guardados en el dispositivo.</div></div>';
 }
 
@@ -560,6 +562,7 @@ function onClick(e){
     case 'voice': voiceSheet(detailId); break;
     case 'export': exportJSON(); break;
     case 'import': importSheet(); break;
+    case 'update': applyUpdate(); break;
   }
 }
 function closeMenu(){ const m=$('#dmenu'); m&&m.classList.remove('on'); }
@@ -727,13 +730,15 @@ const _render=render; render=function(){ _render(); badge(); };
 render();
 
 /* ---------- Service worker: offline cache and update notice ---------- */
+function applyUpdate(){ if(!pendingSW) return; toast('Actualizando'); pendingSW.postMessage({type:'SKIP_WAITING'}); }
 if('serviceWorker' in navigator){
   let reloading=false;
-  const offerUpdate = sw => { toast('Nueva versión disponible', ()=>{ sw.postMessage({type:'SKIP_WAITING'}); }, 'Actualizar'); };
+  // Offer the update until it is applied: on install, on every return to the app and from Settings.
+  const offerUpdate = sw => { pendingSW=sw; toast('Nueva versión disponible', applyUpdate, 'Actualizar'); if(UI.tab==='ajustes'&&!UI.stack.length) render(); };
   navigator.serviceWorker.register('sw.js').then(reg=>{
     if(reg.waiting && navigator.serviceWorker.controller) offerUpdate(reg.waiting);
     reg.addEventListener('updatefound',()=>{ const nw=reg.installing; if(!nw) return; nw.addEventListener('statechange',()=>{ if(nw.state==='installed' && navigator.serviceWorker.controller) offerUpdate(nw); }); });
-    document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') reg.update().catch(()=>{}); });
+    document.addEventListener('visibilitychange',()=>{ if(document.visibilityState!=='visible') return; reg.update().catch(()=>{}).then(()=>{ if(reg.waiting && navigator.serviceWorker.controller) offerUpdate(reg.waiting); }); });
   }).catch(()=>{});
   navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(reloading) return; reloading=true; location.reload(); });
 }

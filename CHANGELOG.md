@@ -1,5 +1,11 @@
 # Registro de cambios
 
+## v0.3.1. Aviso de actualización insistente (31 de octubre de 2026)
+
+- El aviso "Nueva versión disponible" se vuelve a ofrecer cada vez que se vuelve a la app mientras la actualización siga pendiente, no solo una vez. En Ajustes aparece además una fila "Nueva versión disponible, Actualizar" mientras haya una esperando.
+- El service worker descarga los archivos nuevos saltándose la caché HTTP de GitHub Pages, para no instalar nunca una copia vieja.
+- Motivo: el iPhone seguía en la v0.2.x sin enterarse de la v0.3.0.
+
 ## v0.3.0. Deslizar entre pestañas (31 de octubre de 2026)
 
 - Deslizar lateralmente pasa de Tareas a Proyectos y a Ajustes, con la pantalla siguiendo el dedo y la curva de iOS al soltar. Si se suelta antes de un tercio del ancho (y sin impulso), vuelve a su sitio. Tocar la tab bar sigue siendo instantáneo.

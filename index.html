@@ -37,6 +37,13 @@
   --bar:rgba(22,22,24,.82); --mat:rgba(36,36,38,.9); --dim:rgba(0,0,0,.55); --press:#2C2C2E; --qhl:rgba(10,132,255,.34); --ghbg:rgba(0,0,0,.78);
   --pmmat:rgba(44,44,46,.76); --pmhl:rgba(255,255,255,.13); --pmgap:rgba(0,0,0,.42); --pmsep:rgba(84,84,88,.55); --pmdim:rgba(0,0,0,.18); --pmdimL:rgba(0,0,0,.4);
 }
+/* R11 and R17: macOS materials of the desktop layout (content, translucent sidebar, hairlines, menus) */
+:root{ --dmain:#FFFFFF; --dside:rgba(232,232,236,.8); --dgroup:#F5F5F7; --dline:rgba(0,0,0,.1); --dhov:rgba(0,0,0,.045); --dsel:rgba(0,0,0,.085); --dfield:rgba(0,0,0,.055); --dgh:rgba(255,255,255,.92);
+  --mmat:rgba(246,246,246,.88); --msep:rgba(0,0,0,.1); --mshadow:0 10px 32px rgba(0,0,0,.2),0 0 0 .5px rgba(0,0,0,.22); }
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){ --dmain:#1E1E1E; --dside:rgba(48,48,50,.8); --dgroup:#28282A; --dline:rgba(255,255,255,.1); --dhov:rgba(255,255,255,.055); --dsel:rgba(255,255,255,.11); --dfield:rgba(255,255,255,.08); --dgh:rgba(30,30,30,.92);
+  --mmat:rgba(42,42,44,.9); --msep:rgba(255,255,255,.12); --mshadow:0 10px 32px rgba(0,0,0,.55),0 0 0 .5px rgba(255,255,255,.16); }}
+:root[data-theme="dark"]{ --dmain:#1E1E1E; --dside:rgba(48,48,50,.8); --dgroup:#28282A; --dline:rgba(255,255,255,.1); --dhov:rgba(255,255,255,.055); --dsel:rgba(255,255,255,.11); --dfield:rgba(255,255,255,.08); --dgh:rgba(30,30,30,.92);
+  --mmat:rgba(42,42,44,.9); --msep:rgba(255,255,255,.12); --mshadow:0 10px 32px rgba(0,0,0,.55),0 0 0 .5px rgba(255,255,255,.16); }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
 html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px);font-size:17px;}
 html{font:-apple-system-body;} /* iOS: follow the system text size; other browsers ignore it */
@@ -567,6 +574,200 @@ body.desktop .toast{left:auto;right:28px;bottom:28px;width:360px;}
 .seg.pri-seg button{height:32px;}
 .seg.pri-seg button.on.high{color:var(--red);}
 .seg.pri-seg button.on.mid{color:var(--orange);}
+/* ---------- R11: desktop density, as on a Mac. Text at 14 px (html.wide sets the rem), single-line rows of 32 px with date,
+   reminder and priority in right-aligned columns, white content and a translucent grey sidebar. The iPhone layout is untouched. ---------- */
+html.wide{font-size:14px;}
+.app.desktop{--bg:var(--dmain);--card:var(--dmain);--ghbg:var(--dgh);--press:var(--dhov);--sep:var(--dline);}
+.app.desktop .desk{grid-template-columns:220px minmax(0,1fr);background:var(--dmain);position:relative;}
+.app.desktop.has-pane .desk{grid-template-columns:220px minmax(0,1fr) var(--panew,400px);}
+.app.desktop .side{background:var(--dside);-webkit-backdrop-filter:saturate(180%) blur(30px);backdrop-filter:saturate(180%) blur(30px);border-right:.5px solid var(--dline);padding:10px 10px 10px;}
+.app.desktop .side .sp{font-size:15px;padding:6px 8px 10px;}
+.app.desktop .side .sp:hover{color:var(--ink2);}
+.app.desktop .side .sec{font-size:11px;text-transform:none;letter-spacing:0;padding:12px 8px 4px;}
+.app.desktop .side .it{height:28px;gap:8px;padding:0 8px;border-radius:6px;font-size:13px;}
+.app.desktop .side .it svg{width:16px;height:16px;color:var(--blue);}
+.app.desktop .side .it:hover{background:var(--dhov);}
+.app.desktop .side .it.on{background:var(--dsel);color:var(--ink);}
+.app.desktop .side .it.on .n{color:var(--ink2);}
+.app.desktop .side .it .dot{width:9px;height:9px;margin:0 3.5px;}
+.app.desktop .side .it .n{font-size:11px;font-variant-numeric:tabular-nums;}
+/* The column head: title, project filter, search and view options, as wide as the list under it */
+.app.desktop .main .mhead{gap:8px;padding:12px 24px 8px;max-width:948px;min-height:52px;}
+.app.desktop .main .mhead.wide-head{max-width:none;}
+.app.desktop .main .mhead h1{font-size:20px;letter-spacing:-.2px;}
+.app.desktop .main .mhead .searchbar{width:auto;flex:none;gap:8px;}
+.app.desktop .main .mhead .search{width:190px;flex:none;height:28px;border-radius:7px;background:var(--dfield);padding:0 8px;}
+.app.desktop .main .mhead .search svg{width:13px;height:13px;}
+.app.desktop .main .mhead .search input{height:28px;font-size:13px;}
+.app.desktop .main .mhead .searchbar .cancel{font-size:13px;}
+.app.desktop .main .mhead .mopts{width:28px;height:28px;border-radius:6px;background:none;border:0;color:var(--ink2);}
+.app.desktop .main .mhead .mopts:hover,.app.desktop .main .mhead .mopts.open{background:var(--dhov);color:var(--ink);}
+.pfslot{display:flex;flex:none;min-width:0;}
+.pfdrop{display:flex;align-items:center;gap:6px;height:28px;max-width:230px;padding:0 8px 0 10px;border-radius:6px;font-size:13px;color:var(--ink);background:var(--dmain);border:.5px solid var(--dline);box-shadow:0 .5px 1.5px rgba(0,0,0,.08);}
+.pfdrop:hover{background:var(--dhov);}
+.pfdrop .l{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.pfdrop .l i{font-style:normal;color:var(--ink2);}
+.pfdrop .dot{width:9px;height:9px;border-radius:50%;flex:none;}
+.pfdrop svg{width:9px;height:9px;flex:none;color:var(--ink2);}
+.pfdrop.on{background:var(--qhl);border-color:transparent;box-shadow:none;}
+.app.desktop .main .mbody{padding:0 24px 40px;}
+.app.desktop .main .inner{max-width:900px;}
+.app.desktop .main .inner.week-inner{max-width:none;}
+.app.desktop .addbar{height:34px;gap:8px;padding:0 10px;margin:2px 0 10px;border-radius:8px;background:var(--dmain);border:.5px solid var(--dline);box-shadow:0 .5px 1.5px rgba(0,0,0,.06);}
+.app.desktop .addbar:focus-within{border-color:var(--blue);box-shadow:0 0 0 3px var(--qhl);}
+.app.desktop .addbar > svg{width:14px;height:14px;}
+.app.desktop .addbar input,.app.desktop .addbar .qhl{font-size:14px;}
+.app.desktop .addbar .kbd{font-size:11px;}
+.app.desktop .addhint{margin:-6px 4px 10px;font-size:12px;}
+/* The day summary as one line: the figures filter the list; "Lo primero" folds under it (the summary's own fold) */
+.app.desktop .summary{background:none;border-radius:0;padding:0;margin:0 0 8px;}
+.app.desktop .summary.collapsed{padding:0;}
+.app.desktop .dsum .summary-head{margin:0;gap:4px;min-height:28px;justify-content:flex-start;}
+.app.desktop .dsum .summary-head button{width:auto;height:26px;margin:0;color:var(--ink2);}
+.app.desktop .dsum .summary-head svg,.app.desktop .summary.collapsed .summary-head svg{transform:none;}
+.dsum .num{flex:none;display:flex;align-items:baseline;gap:5px;padding:0 10px;border-radius:13px;font-size:13px;text-align:left;}
+.dsum .num b{display:inline;font-size:14px;font-weight:600;letter-spacing:0;line-height:1;color:var(--ink);font-variant-numeric:tabular-nums;}
+.dsum .num span{font-size:13px;color:var(--ink2);}
+.dsum .num:hover{background:var(--dhov);}
+.dsum .num.on,.dsum .num.on:hover{background:var(--fill);}
+.dsum .soonl{flex:1;min-width:0;display:flex;align-items:center;gap:5px;padding:0 8px;font-size:12px;color:var(--ink2);white-space:nowrap;overflow:hidden;}
+.dsum .soonl span{overflow:hidden;text-overflow:ellipsis;}
+.dsum .soonl svg{width:13px;height:13px;flex:none;color:var(--orange);}
+.dsum .soonl.ok svg{color:var(--green);}
+.app.desktop .dsum .summary-head .sumclose{color:var(--blue);font-size:13px;font-weight:500;padding:0 8px;border-radius:6px;}
+.app.desktop .dsum .summary-head .sumfold{display:flex;align-items:center;gap:5px;padding:0 8px;border-radius:6px;font-size:13px;}
+.app.desktop .dsum .summary-head .sumclose:hover,.app.desktop .dsum .summary-head .sumfold:hover{background:var(--dhov);}
+.dsum .sumfold svg{width:9px;height:9px;transition:transform .2s;}
+.app.desktop .summary.collapsed .sumfold svg{transform:rotate(-90deg);}
+.app.desktop .dsum .first{margin:4px 0 0;}
+.app.desktop .dsum .first .row-content{padding:0 8px 0 12px;min-height:32px;}
+/* Rows: one line; the circle keeps a 32 px click area */
+.app.desktop .row-content{gap:10px;padding:0 8px 0 12px;min-height:32px;}
+.app.desktop .row-content:hover{background:var(--dhov);}
+.app.desktop .row + .row .row-content::before{left:38px;background:var(--dline);}
+.app.desktop .check{width:16px;height:16px;border-width:1.2px;}
+.app.desktop .check svg{width:9px;height:9px;}
+.app.desktop .check::after{width:32px;height:32px;margin:-16px 0 0 -16px;}
+.app.desktop .row-text{display:flex;align-items:center;gap:8px;}
+.app.desktop .row-title{display:block;flex:0 1 auto;min-width:0;font-size:14px;white-space:nowrap;text-overflow:ellipsis;}
+.app.desktop .row-text .tag{flex:none;max-width:42%;font-size:11px;line-height:16px;padding:0 6px;border-radius:5px;vertical-align:0;}
+.app.desktop .row-meta{flex:none;display:flex;margin:0;font-size:12px;font-variant-numeric:tabular-nums;}
+.rc{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right;}
+.rc-date{width:100px;}
+.rc-rem{width:62px;}
+.rc-rem svg{width:11px;height:11px;margin-right:3px;vertical-align:-1px;}
+.app.desktop .inds{width:34px;justify-content:flex-end;gap:4px;}
+.app.desktop .inds svg{width:12px;height:12px;}
+.app.desktop .pri{width:22px;font-size:13px;}
+.app.desktop .rowmore{width:24px;height:24px;border-radius:5px;}
+.app.desktop .rowmore svg{width:15px;height:15px;}
+.app.desktop .rowmore:hover{background:var(--dhov);}
+.app.desktop .row.held .row-meta{opacity:.4;transition:opacity .2s;}
+.app.desktop .row.cv{contain-intrinsic-size:auto 32px;}
+.app.desktop .rph{height:32px;}
+/* Groups: rows straight on the content, headers in small bold text, stuck to the top on a translucent white */
+.app.desktop .main .group{background:none;border-radius:0;margin-bottom:12px;}
+.app.desktop .group-title{font-size:12px;font-weight:600;padding:0 4px 4px;}
+.app.desktop .group-title.gh{min-height:26px;}
+.app.desktop .gh .gx{font-size:12px;height:26px;}
+.app.desktop .gh .gadd{width:26px;height:26px;}
+.app.desktop .gh .gadd svg{width:15px;height:15px;}
+.app.desktop .main .cell{min-height:32px;padding:6px 12px;}
+.app.desktop .main .cell + .cell{margin-left:12px;padding-left:0;width:calc(100% - 12px);}
+.app.desktop .main .done-toggle{padding:6px 12px;}
+.app.desktop .preview{padding:2px 12px 12px;font-size:13px;}
+.app.desktop .main .inner.settings .group{background:var(--dgroup);border-radius:10px;border:.5px solid var(--dline);}
+.app.desktop .main .inner.settings .cell{min-height:36px;}
+.app.desktop .empty{padding-top:40px;}
+/* Week: columns on a grey ground, white cards */
+.app.desktop .wday,.app.desktop .wundated{background:var(--dgroup);border-color:transparent;}
+.app.desktop .wday.today{border-color:var(--blue);}
+.app.desktop .wday.over,.app.desktop .wundated.over{background:var(--fill);border-color:var(--blue);}
+.app.desktop .wcard{background:var(--dmain);box-shadow:0 0 0 .5px var(--dline),0 .5px 1px rgba(0,0,0,.05);}
+.app.desktop .wcard:hover{background:var(--dmain);box-shadow:0 0 0 1px var(--blue);}
+.app.desktop .wcard.popped{box-shadow:0 0 0 2px var(--blue);}
+/* ---------- R17: the detail pane becomes an inspector: close button, a form of pop-up buttons, priority segment,
+   dates at the foot, and a left edge that resizes it (320 to 600 px). In Semana it opens as a popover next to the card. ---------- */
+.app.desktop .pane{background:var(--dmain);border-left:.5px solid var(--dline);position:relative;}
+.app.desktop .pane .screen{background:var(--dmain);}
+.ihead{flex:none;display:flex;align-items:center;gap:2px;height:40px;padding:0 8px;border-bottom:.5px solid var(--dline);}
+.ihead .grow{flex:1;}
+.ihead button{width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;color:var(--ink2);}
+.ihead button:hover{background:var(--dhov);color:var(--ink);}
+.ihead svg{width:15px;height:15px;}
+.ihead .ix svg{width:12px;height:12px;}
+.app.desktop .pane .scroll{padding:12px 16px 24px;}
+.app.desktop .pane .igroup{background:none;border-radius:0;margin:0;}
+.app.desktop .pane .igroup .cell{padding:0;min-height:0;width:100%;margin:0;}
+.app.desktop .pane .igroup .cell + .cell{margin:8px 0 0;padding-top:8px;border-top:.5px solid var(--dline);width:100%;}
+.app.desktop .pane .titlein{font-size:17px;font-weight:600;line-height:1.3;}
+.app.desktop .pane textarea[data-role=notes]{font-size:13px;line-height:1.45;}
+.app.desktop .pane .links{padding:4px 0 6px;}
+.app.desktop .pane .links a{font-size:12px;padding:3px 9px;}
+.app.desktop .pane .igroup .convert{padding:4px 0;min-height:28px;font-size:13px;}
+.iform{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:8px 12px;padding:12px 0;margin:10px 0 14px;border-top:.5px solid var(--dline);border-bottom:.5px solid var(--dline);}
+.iform .ilbl{font-size:13px;color:var(--ink2);text-align:right;}
+.ipop{justify-self:start;display:flex;align-items:center;gap:6px;height:26px;min-width:150px;max-width:100%;padding:0 6px 0 9px;border-radius:6px;font-size:13px;background:var(--dmain);border:.5px solid var(--dline);box-shadow:0 .5px 1.5px rgba(0,0,0,.08);}
+.ipop:hover,.ipop.open{background:var(--dhov);}
+.ipop .val{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;}
+.ipop .val.none{color:var(--ink2);}
+.ipop .dot{width:9px;height:9px;border-radius:50%;flex:none;}
+.ipop svg{width:12px;height:12px;flex:none;color:var(--ink2);}
+.seg.iseg{margin:0;padding:2px;max-width:260px;border-radius:7px;}
+.seg.iseg button{height:22px;font-size:12px;border-radius:5px;}
+.seg.iseg button.on.high{color:var(--red);}
+.seg.iseg button.on.mid{color:var(--orange);}
+.app.desktop .pane .group-title{padding:0 0 4px;}
+.app.desktop .pane .group:not(.igroup){background:var(--dgroup);border-radius:8px;margin-bottom:12px;}
+.app.desktop .pane .vn{font-size:13px;padding:8px 12px;}
+.app.desktop .pane .cell.link{min-height:32px;padding:6px 12px;font-size:13px;}
+.ifoot{font-size:11px;line-height:1.55;color:var(--ink2);margin-top:4px;padding-top:10px;border-top:.5px solid var(--dline);}
+.igrip{position:absolute;left:-4px;top:0;bottom:0;width:8px;cursor:col-resize;z-index:6;}
+.igrip::after{content:"";position:absolute;left:3px;top:0;bottom:0;width:2px;background:var(--blue);opacity:0;transition:opacity .15s;}
+.igrip:hover::after,body.resizing .igrip::after{opacity:1;}
+body.resizing,body.resizing *{cursor:col-resize !important;-webkit-user-select:none;user-select:none;}
+.app.desktop .pane.wpop{position:absolute;z-index:12;width:340px;height:auto;border:0;border-radius:12px;box-shadow:var(--mshadow);overflow:hidden;animation:wpopIn .16s ease-out;}
+.app.desktop .pane.wpop .screen{height:auto;max-height:inherit;min-height:0;}
+.app.desktop .pane.wpop .scroll{flex:1 1 auto;min-height:0;}
+@keyframes wpopIn{from{opacity:0;}}
+/* ---------- R17: macOS menus (popMenu on the desktop): at the pointer or under their control, 13 px, hover highlight,
+   submenus to the side, a check column and the shortcut on the right. Popovers (dates) use the same panel. ---------- */
+.pm.mac .pm-back{background:none;-webkit-backdrop-filter:none;backdrop-filter:none;}
+.pm.mac .pm-menu{width:auto;min-width:210px;max-width:320px;padding:5px;border-radius:9px;background:var(--mmat);-webkit-backdrop-filter:saturate(180%) blur(30px);backdrop-filter:saturate(180%) blur(30px);box-shadow:var(--mshadow);font-size:13px;opacity:0;transform:none;transition:opacity .12s;}
+.pm.mac.on .pm-menu{opacity:1;transform:none;transition:opacity .06s;}
+.pm.mac .pm-it{min-height:24px;padding:2px 10px 2px 4px;gap:4px;border-radius:5px;font-size:13px;}
+.pm.mac .pm-it + .pm-it{border-top:0;}
+.pm.mac .pm-grp + .pm-grp,.pm.mac .pm-title + .pm-grp{border-top:0;}
+.pm.mac .pm-grp + .pm-grp::before{content:"";display:block;height:1px;margin:5px 8px;background:var(--msep);}
+.pm.mac .pm-title{font-size:11px;font-weight:600;padding:3px 10px 4px 24px;border:0;color:var(--ink2);}
+.pm.mac .pm-it .pm-ck{width:18px;justify-content:center;}
+.pm.mac .pm-it .pm-ck svg{width:11px;height:11px;}
+.pm.mac .pm-it .pm-dot{width:9px;height:9px;margin:0 4px 0 0;flex:none;}
+.pm.mac .pm-it .pm-key{flex:none;margin-left:auto;padding-left:22px;color:var(--ink2);font-size:12px;}
+.pm.mac .pm-it .pm-sub{flex:none;width:6px;height:10px;margin-left:12px;color:var(--ink2);}
+.pm.mac .pm-it .pm-key + .pm-sub{margin-left:8px;}
+.pm.mac .pm-it.hl,.pm.mac .pm-it:active{background:var(--blue);color:#fff;}
+.pm.mac .pm-it.hl .pm-ck,.pm.mac .pm-it.hl .pm-key,.pm.mac .pm-it.hl .pm-sub,.pm.mac .pm-it.red.hl{color:#fff;}
+.pm.mac .pm-menu.pm-pop{width:300px;max-width:calc(100% - 16px);padding:12px;border-radius:12px;}
+.pm-pop .chips{margin:0 0 8px;gap:6px;}
+.pm-pop .chip{height:24px;padding:0 9px;border-radius:12px;font-size:12px;}
+.pm-pop .chip:hover{background:var(--fill2);}
+.pm-pop .chip.on:hover{background:var(--blue);}
+.pm-pop .cal{padding:0;}
+.pm-pop .cal-head{font-size:13px;padding:0 0 4px;}
+.pm-pop .cal-head button{width:28px;height:24px;border-radius:5px;}
+.pm-pop .cal-head button:hover{background:var(--dhov);}
+.pm-pop .cal-head svg{width:7px;height:12px;}
+.pm-pop .cal-dow{font-size:11px;padding:0 0 4px;}
+.pm-pop .cal-d{height:32px;}
+.pm-pop .cal-d span{width:28px;height:28px;font-size:13px;}
+.pm-pop .cal-d:not(.sel):not([disabled]):hover span{background:var(--fill);}
+.pm-pop .cal-d i{bottom:0;}
+.pm-pop .timerow{margin-top:8px;padding:0 10px;height:32px;font-size:13px;border-radius:7px;background:var(--fill);}
+.pm-pop .timerow input[type=time]{font-size:13px;}
+.pm-pop .sheet-actions{margin-top:10px;}
+.pm-pop .btn{height:28px;border-radius:7px;font-size:13px;}
+.pm-pop .hint.warn{color:var(--red);font-size:12px;text-align:center;margin:8px 0 0;}
 /* Reduce Motion (last, so it wins over the rules above): what slides or scales fades instead.
    Finger tracking stays; a row or sheet let go jumps to its place. Sheets keep their keyboard offset (.sheet.on). */
 @media (prefers-reduced-motion: reduce){
@@ -974,7 +1175,7 @@ window.addEventListener('touchstart',e=>{ if(e.touches.length===1) touchDrag=fal
 // Every row drawn is a full one (no content-visibility), so whatever ends up above the visible part has its real height
 // and a later render, which draws those rows again, restores the scroll exactly.
 let rowStash=null; // the markup of the rows the last lazyRows left out, for the armRows that follows it
-function lazyRows(html, top, height){ const from=Math.ceil((top+height*1.5)/52), far=Math.ceil((top+height*2.5)/52); rowStash=null;
+function lazyRows(html, top, height){ const rh=UI.wide?32:52, from=Math.ceil((top+height*1.5)/rh), far=Math.ceil((top+height*2.5)/rh); rowStash=null; // the desktop rows are one line of 32 px (R11)
   const re=/<div class="row(?=[ "])/g, starts=[]; let m; while((m=re.exec(html))) starts.push(m.index);
   if(starts.length<200){ let i=0; return html.replace(/<div class="row(?=[ "])/g, m=>i++<from?m:'<div class="row cv'); }
   const tag=/<\/?div[\s>]/g, out=[], stash=[]; let pos=0;
@@ -1159,11 +1360,26 @@ function rowHTML(x, opts={}){
   const pri = done?'':x.priority==='high'?'<span class="pri high">!!!</span>':x.priority==='mid'?'<span class="pri mid">!!</span>':'';
   const pc=p?p.color:null;
   const selecting = UI.select && !opts.simple; const selected = selecting && UI.select.ids.has(x.id);
+  if(UI.wide) return deskRowHTML(x, opts, {p, t, done, held, shownDone, ind, pri, pc, selecting, selected});
   return '<div class="row'+(done?' done':'')+(held?' held':'')+(opts.byDay?' byday':'')+(selected?' selected':'')+'" data-id="'+x.id+'"'+(pc?' style="'+tagVars(pc)+'"':'')+'>'+
     (opts.simple||selecting?'':'<div class="row-bg left"><span>'+I.check+'</span></div><div class="row-bg right"><button class="b-tomorrow" data-act="postpone">Aplazar</button><button class="b-delete" data-act="delete">Eliminar</button></div>')+
     '<div class="row-content">'+(selecting?'<span class="selbox">'+I.check+'</span>':'<button class="check'+(shownDone?' done':'')+'" data-act="check" aria-label="Completar">'+I.check+'</button>')+
     '<div class="row-text"><div class="row-title">'+esc(x.title||'Sin título')+'</div>'+(meta.length?'<div class="row-meta">'+meta.join('<span class="sep">·</span>')+'</div>':'')+'</div>'+(ind?'<span class="inds">'+ind+'</span>':'')+pri+(UI.wide&&!selecting&&!opts.simple?'<button class="rowmore" data-act="rowMenu" aria-label="Más">'+I.more+'</button>':'')+'</div></div>';
 }
+/* R11: a desktop row is one line of 32 px: circle, title and project capsule, then right-aligned columns for the notes and voice
+   indicators, the date (or "Aplazada", or when it was done), the reminder and the priority. The R3 rules decide what each column says */
+function deskRowHTML(x, opts, v){ const t=v.t; let date='', dcls='', rem='';
+  if(v.done){ if(x.completed) date=opts.byDay?fmtTime(x.completed):fmtDateTime(x.completed); }
+  else { if(x.date){ if(x.carried&&x.date<=t){ if(!opts.hideCarried){ date='Aplazada'; dcls=' carried'; } }
+      else if(!(opts.noToday&&x.date===t) && x.date!==opts.day){ date=fmtDate(x.date); if(x.date<t) dcls=' over'; } }
+    if(x.reminder) rem=I.bell+(x.date&&localDay(x.reminder)===x.date?fmtTime(x.reminder):fmtDateTime(x.reminder)); }
+  const tag=v.p&&!opts.noProj?'<span class="tag">'+esc(v.p.name)+'</span>':'';
+  return '<div class="row'+(v.done?' done':'')+(v.held?' held':'')+(opts.byDay?' byday':'')+(v.selected?' selected':'')+'" data-id="'+x.id+'"'+(v.pc?' style="'+tagVars(v.pc)+'"':'')+'>'+
+    '<div class="row-content">'+(v.selecting?'<span class="selbox">'+I.check+'</span>':'<button class="check'+(v.shownDone?' done':'')+'" data-act="check" aria-label="Completar">'+I.check+'</button>')+
+    '<div class="row-text"><div class="row-title">'+esc(x.title||'Sin título')+'</div>'+tag+'</div>'+
+    '<span class="inds">'+v.ind+'</span><span class="row-meta"><span class="rc rc-date'+dcls+'">'+date+'</span><span class="rc rc-rem">'+rem+'</span></span>'+
+    '<span class="pri'+(v.pri?(x.priority==='high'?' high':' mid'):'')+'">'+(v.pri?(x.priority==='high'?'!!!':'!!'):'')+'</span>'+
+    (v.selecting?'':opts.simple?'<span class="rowmore" aria-hidden="true"></span>':'<button class="rowmore" data-act="rowMenu" aria-label="Más" title="Más">'+I.more+'</button>')+'</div></div>'; } // "Lo primero" keeps the columns aligned with the list
 // The reminder line of the summary: the next one within two hours, kept until five minutes after its time
 function soonReminder(){ return spaceTasks().filter(x=>x.status==='pending'&&x.reminder).map(x=>({x,d:new Date(x.reminder).getTime()-Date.now()})).filter(o=>o.d>-5*6e4&&o.d<2*36e5).sort((a,b)=>a.d-b.d)[0]; }
 // What the summary shows that changes with the clock alone (that reminder line and the 19:00 button): the minute timer redraws when it differs
@@ -1175,6 +1391,15 @@ function summaryHTML(){
   // Only today's high-priority tasks; the list below already shows the rest.
   const first = hoy.filter(x=>x.priority==='high').slice(0,3);
   const soon = soonReminder(); const folded=summaryCollapsed(hoy.length), late=hoy.length&&new Date().getHours()>=19;
+  if(UI.wide){ // R11: one line. The three figures filter the list (para hoy clears it); the next reminder or the day done fill the middle;
+    // "Cerrar el día" from 19:00; the fold opens "Lo primero" under the line (the summary's own fold and setting)
+    const num=(k,n,l,c)=>'<button class="num'+(c&&n?' '+c:'')+((k==='all'?!UI.sumFilter:UI.sumFilter===k)?' on':'')+'" data-sum="'+k+'"><b>'+n+'</b><span>'+l+'</span></button>';
+    const mid = soon ? '<span class="soonl" title="Recordatorio a las '+fmtTime(soon.x.reminder)+'">'+I.bell+'<span>'+fmtTime(soon.x.reminder)+' '+esc(soon.x.title)+'</span></span>'
+      : !hoy.length&&doneToday ? '<span class="soonl ok">'+I.check+'<span>Todo hecho por hoy: '+doneToday+(doneToday===1?' tarea completada':' tareas completadas')+'</span></span>' : '<span class="soonl"></span>';
+    return '<section class="summary dsum'+(folded?' collapsed':'')+'"><div class="summary-head">'+num('all',deHoy,'para hoy')+num('carried',carried,carried===1?'aplazada':'aplazadas','orange')+num('high',prio,prio===1?'prioritaria':'prioritarias','red')+mid+
+      (late&&!UI.select?'<button class="sumclose" data-act="closeDay">Cerrar el día</button>':'')+
+      (first.length?'<button class="sumfold" data-act="toggleSummary" aria-expanded="'+!folded+'" title="'+(folded?'Mostrar':'Plegar')+' lo primero">Lo primero'+I.chevD+'</button>':'')+'</div>'+
+      (first.length?'<div class="summary-body"><div class="first">'+first.map(x=>rowHTML(x,{simple:true,noToday:true})).join('')+'</div></div>':'')+'</section>'; }
   // R8: from 19:00 "Cerrar el día" shows in the folded summary too, so a loaded day never hides it
   return '<section class="summary'+(folded?' collapsed':'')+'"><div class="summary-head"><h3>Resumen del día</h3>'+(folded&&late&&!UI.select?'<button class="sumclose" data-act="closeDay">Cerrar el día</button>':'')+'<button data-act="toggleSummary" aria-label="Plegar">'+I.chevD+'</button></div>'+
    '<div class="summary-body"><div class="nums"><button class="num" data-sum="all"><b>'+deHoy+'</b><span>para hoy</span></button><button class="num'+(carried?' orange':'')+(UI.sumFilter==='carried'?' on':'')+'" data-sum="carried"><b>'+carried+'</b><span>aplazadas</span></button><button class="num'+(prio?' red':'')+(UI.sumFilter==='high'?' on':'')+'" data-sum="high"><b>'+prio+'</b><span>prioritarias</span></button></div>'+
@@ -1313,6 +1538,7 @@ function viewDetail(id){
   const x=task(id); if(!x) return '';
   const p=x.projectId?proj(x.projectId):null; const vns=DB.voiceNotes.filter(v=>v.taskId===id).sort((a,b)=>a.created<b.created?1:-1);
   const pl={high:'Alta',mid:'Media',none:'Ninguna'}[x.priority]||'Ninguna'; const chev=I.chev.replace('<svg','<svg class="chev"'); const links=detailLinks(x.notes);
+  if(UI.wide) return inspectorHTML(x, p, vns, links);
   return '<header class="nav"><div class="nav-row"><button class="back" data-act="back">'+(UI.wide?'Cerrar':I.back+'Atrás')+'</button><div class="nav-title">Detalles</div><div class="actions"><button class="action" data-act="share" aria-label="Compartir">'+I.share+'</button><button class="action" data-act="menu" aria-label="Más">'+I.more+'</button></div></div></header>'+
    '<div class="scroll">'+
    '<div class="group"><div class="cell input"><textarea class="titlein" data-role="title" rows="1" placeholder="Título" enterkeyhint="done">'+esc(x.title)+'</textarea></div><div class="cell input"><textarea data-role="notes" placeholder="Notas">'+esc(x.notes)+'</textarea></div>'+(links.length?'<div class="links">'+linksHTML(links)+'</div>':'')+convertHTML(x)+'</div>'+
@@ -1322,6 +1548,25 @@ function viewDetail(id){
    '<button class="cell" data-act="pickPriority"><span class="lbl">Prioridad</span><span class="val '+(x.priority==='none'?'':x.priority)+'">'+pl+'</span>'+chev+'</button></div>'+
    '<div class="footnote">La notificación en el iPhone llega con la sincronización.</div>'+
    '<div class="group-title">Notas de voz</div><div class="group">'+vns.map(v=>'<div class="vn"><small>'+fmtDateTime(v.created)+'</small>'+linkify(v.text)+'</div>').join('')+'<button class="cell link" data-act="voice">'+I.mic.replace('<svg','<svg style="width:18px;height:18px"')+'<span class="lbl">Añadir nota de voz</span></button></div>'+
+   '</div>';
+}
+/* R17: the desktop detail as a Mac inspector. The title and notes (the same fields and roles as the iPhone, for bindDetail),
+   then a form: Proyecto a pop-up menu, Fecha and Recordatorio popovers with the calendar, Prioridad a three-position segment;
+   voice notes; and when it was created and last changed at the foot */
+const UPDOWN='<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 4.5L6 2l2.5 2.5M3.5 7.5L6 10l2.5-2.5"/></svg>';
+const XICON='<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M2 2l8 8M10 2l-8 8"/></svg>';
+function inspectorHTML(x, p, vns, links){
+  const pop=(act, val, none, ic, extra)=>'<button class="ipop" data-act="'+act+'" aria-haspopup="'+(act==='pickProject'?'menu':'dialog')+'">'+(extra||'')+'<span class="val'+(none?' none':'')+'">'+val+'</span>'+ic+'</button>';
+  const seg=[['none','Ninguna'],['mid','Media'],['high','Alta']].map(([k,l])=>'<button class="'+k+(x.priority===k?' on':'')+'" data-act="setPri" data-pr="'+k+'" role="radio" aria-checked="'+(x.priority===k)+'">'+l+'</button>').join('');
+  return '<header class="ihead"><button class="ix back" data-act="back" aria-label="Cerrar" title="Cerrar (Esc)">'+XICON+'</button><span class="grow"></span><button data-act="share" aria-label="Compartir" title="Compartir">'+I.share+'</button><button data-act="menu" aria-label="Más" title="Más">'+I.more+'</button></header>'+
+   '<div class="scroll">'+
+   '<div class="group igroup"><div class="cell input"><textarea class="titlein" data-role="title" rows="1" placeholder="Título" enterkeyhint="done">'+esc(x.title)+'</textarea></div><div class="cell input"><textarea data-role="notes" placeholder="Notas">'+esc(x.notes)+'</textarea></div>'+(links.length?'<div class="links">'+linksHTML(links)+'</div>':'')+convertHTML(x)+'</div>'+
+   '<div class="iform"><span class="ilbl">Proyecto</span>'+pop('pickProject', p?esc(p.name):'Ninguno', !p, UPDOWN, p?'<span class="dot" style="background:'+p.color+'"></span>':'')+
+   '<span class="ilbl">Fecha</span>'+pop('pickDate', x.date?(x.carried&&x.date<=todayStr()?'Hoy, aplazada':fmtDate(x.date)):'Sin fecha', !x.date, I.cal)+
+   '<span class="ilbl">Recordatorio</span>'+pop('pickReminder', x.reminder?fmtDateTime(x.reminder):'Ninguno', !x.reminder, I.bell)+
+   '<span class="ilbl">Prioridad</span><div class="seg iseg" role="radiogroup" aria-label="Prioridad">'+seg+'</div></div>'+
+   '<div class="group-title">Notas de voz</div><div class="group">'+vns.map(v=>'<div class="vn"><small>'+fmtDateTime(v.created)+'</small>'+linkify(v.text)+'</div>').join('')+'<button class="cell link" data-act="voice">'+I.mic.replace('<svg','<svg style="width:16px;height:16px"')+'<span class="lbl">Añadir nota de voz</span></button></div>'+
+   '<div class="ifoot">'+[['Creada',x.created],['Modificada',x.modified],['Completada',x.status==='done'&&x.completed]].filter(o=>o[1]).map(o=>{ const w=fmtDateTime(o[1]); return o[0]+' '+w[0].toLowerCase()+w.slice(1)+'<br>'; }).join('')+'La notificación en el iPhone llega con la sincronización.</div>'+
    '</div>';
 }
 const detailLinks = notes => extractLinks(notes).slice(0,6);
@@ -1440,17 +1685,19 @@ function onClick(e){
     case 'convertLines': { const id=detailTaskId(); if(id){ flushEdits(); convertNoteLines(id); } break; }
     case 'spaceMenu': spaceMenu(act); break;
     case 'back': pop(); break;
-    case 'rowMenu': if(row) rowMenu(row.dataset.id); break;
+    case 'rowMenu': if(row) rowMenu(row.dataset.id, {anchor:act}); break; // the desktop three dots: the menu hangs from them (R17)
+    case 'projFilterMenu': projFilterMenu(act); break;
+    case 'setPri': if(detailId) setPriority(detailId, act.dataset.pr); break;
     case 'wcheck': { const c=act.closest('.wcard'); if(c){ act.classList.toggle('done'); act.classList.add('just'); setTimeout(()=>{ completeTask(c.dataset.id); renderAnimated(); },220); } break; }
     case 'newProject': projectSheet(null); break;
     case 'newSpace': spaceSheet(null); break;
     case 'menu': detailMenu(detailId, act); break;
     case 'share': shareTask(detailId); break;
-    case 'pickProject': pickProjectSheet(detailId, act.querySelector('.val')||act); break; // R10: the menu hangs from the value, as an iOS pop-up button
+    case 'pickProject': pickProjectSheet(detailId, UI.wide?act:act.querySelector('.val')||act); break; // R10: the menu hangs from the value, as an iOS pop-up button
     case 'pickPriority': priorityMenu(detailId, act.querySelector('.val')||act); break;
     case 'postpone': closeRow(row); postponeSheet(row.dataset.id, row); break;
-    case 'pickDate': dateSheet(detailId); break;
-    case 'pickReminder': reminderSheet(detailId); break;
+    case 'pickDate': dateSheet(detailId, act); break; // on the desktop a popover anchored to the control (R17)
+    case 'pickReminder': reminderSheet(detailId, act); break;
     case 'voice': voiceSheet(detailId); break;
     case 'export': exportJSON(); break;
     case 'backupNow': dailyBackup(true); toast('Creando copia'); break;
@@ -1637,6 +1884,7 @@ function safeInsets(){ if(!pmProbe){ pmProbe=document.createElement('div'); pmPr
 function visibleRow(id){ const top=UI.stack.length?UI.stack[UI.stack.length-1].el:rootScreen(UI.tab); const r=top&&top.querySelector('.scroll .row[data-id="'+CSS.escape(id)+'"]:not(.first .row)'); if(!r) return null; const b=r.getBoundingClientRect(); return b.height&&b.bottom>0&&b.top<innerHeight?r:null; }
 function popMenu(spec){
   if(PM) closeMenu(true); if(pmFinish) pmFinish();
+  if(UI.wide) return macMenu(spec); // R17: the desktop draws the same spec as a macOS menu
   if(openRow) closeRow(openRow);
   const m=PM={spec, stack:[spec], hl:null, moved:false, x0:spec.x||0, y0:spec.y||0, subT:null, rect:null};
   const src=spec.lift&&spec.lift.isConnected?spec.lift:null;
@@ -1683,7 +1931,7 @@ function pmLayout(){ const m=PM, mn=pmEl.querySelector('.pm-menu'); const ins=sa
   mn.style.left=left+'px'; mn.style.top=top+'px'; mn.style.maxHeight=h+'px';
   mn.style.transformOrigin=Math.round(Math.max(0, Math.min(w, (a?(lift?ax:a.left+a.width/2):vw/2)-left)))+'px '+(fromTop?'0':h+'px'); }
 // pick: an option was chosen; the lifted copy fades where it is and the row shows again at once, for the action's own animation
-function closeMenu(instant, pick){ const m=PM; if(!m) return; PM=null; clearTimeout(m.subT);
+function closeMenu(instant, pick){ const m=PM; if(!m) return; PM=null; clearTimeout(m.subT); if(m.opener) m.opener.classList.remove('open');
   const finish=()=>{ if(pmFinish!==finish) return; pmFinish=null; pmEl.className='pm'; pmEl.innerHTML=''; pmHide.textContent=''; if(m.src) m.src.classList.remove('pm-src'); };
   pmFinish=finish; if(pick||RM.matches){ pmEl.classList.add('pick'); pmHide.textContent=''; if(m.src) m.src.classList.remove('pm-src'); }
   pmEl.classList.remove('on'); if(instant) finish(); else setTimeout(finish, 300);
@@ -1711,8 +1959,83 @@ pmEl.addEventListener('touchmove', e=>{ const m=PM; if(!m) return; const t=e.tou
 pmEl.addEventListener('touchend', e=>{ const m=PM; if(!m) return; if(e.cancelable) e.preventDefault(); if(m.scroll){ m.scroll=false; return; } const t=e.changedTouches[0];
   if(m.hl){ menuRelease(t.clientX, t.clientY); return; } const el=document.elementFromPoint(t.clientX, t.clientY); if(!(el&&el.closest('.pm-menu'))) closeMenu(); });
 pmEl.addEventListener('touchcancel', ()=>{ if(PM) pmHighlight(null); });
-pmEl.addEventListener('click', e=>{ if(!PM) return; const b=e.target.closest('.pm-menu [data-mi]'); if(b){ pmActivate(b.dataset.mi); return; } if(!e.target.closest('.pm-menu')) closeMenu(); }); // a mouse, or a tap that touchend let through
+pmEl.addEventListener('click', e=>{ if(!PM) return; const b=e.target.closest('.pm-menu [data-mi]'); if(b){ if(PM.mac) macActivate(b); else pmActivate(b.dataset.mi); return; } if(!e.target.closest('.pm-menu')) closeMenu(); }); // a mouse, or a tap that touchend let through
 addEventListener('resize', ()=>{ if(PM) closeMenu(true); });
+/* ---------- R17: macOS menus and popovers (desktop) ----------
+   popMenu's spec drawn as a Mac menu: at the pointer (x, y: a right click) or under its control (anchor), 13 px, no lift and no dimming.
+   Each level is its own panel; an item with a submenu (menu) opens it to the side on hover, a click or the right arrow.
+   A check column on the left marks the current value (on); key shows a keyboard shortcut on the right. Arrows move,
+   Enter or Space choose, Left and Escape go back a level. spec.html turns the panel into a popover (spec.bind wires it). */
+function macMenu(spec){ const m=PM={spec, mac:true, levels:[], subT:null};
+  pmEl.className='pm open mac'; pmEl.innerHTML='<div class="pm-back"></div>';
+  if(spec.anchor&&spec.anchor.classList){ m.opener=spec.anchor; spec.anchor.classList.add('open'); }
+  macLevel(0, spec, null); pmEl.offsetWidth; pmEl.classList.add('on');
+  const f=spec.html&&pmEl.querySelector('.pm-pop [autofocus]'); if(f) f.focus(); }
+function macLevel(lv, spec, parent){ const m=PM; macCloseFrom(lv);
+  const el=document.createElement('div'); el.className='pm-menu'+(spec.html?' pm-pop':''); el.setAttribute('role', spec.html?'dialog':'menu'); el.dataset.lv=lv;
+  const L={spec, el, items:[], hl:null, parent}; m.levels.push(L);
+  el.innerHTML=spec.html||macItemsHTML(L, lv); pmEl.appendChild(el); if(spec.html&&spec.bind) spec.bind(el);
+  macPlace(L); return L; }
+function macItemsHTML(L, lv){ const spec=L.spec; let gs=(spec.groups||[]).filter(g=>g&&g.length);
+  if(spec.prio) gs=[[['high','Alta','1'],['mid','Media','2'],['none','Ninguna','0']].map(([k,l,key])=>({label:l, key, on:spec.prio.cur===k, fn:()=>spec.prio.fn(k)}))].concat(gs);
+  let h=lv===0&&spec.title?'<div class="pm-title">'+esc(spec.title)+'</div>':'';
+  gs.forEach(g=>{ h+='<div class="pm-grp" role="group">'+g.map(it=>{ const i=L.items.push(it)-1, dot=it.icon&&it.icon.indexOf('pm-dot')>=0?it.icon:'', key=it.key||(it.sub&&!it.menu?it.sub:'');
+    return '<button class="pm-it'+(it.red?' red':'')+'" data-mi="'+lv+':'+i+'" role="'+(it.on!==undefined?'menuitemcheckbox" aria-checked="'+!!it.on:'menuitem')+'"'+(it.menu?' aria-haspopup="menu"':'')+'><span class="pm-ck">'+(it.on?MI.check:'')+'</span>'+dot+
+      '<span class="pm-l">'+esc(it.label)+'</span>'+(key?'<span class="pm-key">'+esc(key)+'</span>':'')+(it.menu?I.chev.replace('<svg','<svg class="pm-sub"'):'')+'</button>'; }).join('')+'</div>'; });
+  return h; }
+// Under its control (right-aligned with align:'right'), or with its top left corner at the pointer, flipping at the window edges
+// as macOS does; a submenu beside its item, on the left when the right has no room
+function macPlace(L){ const el=L.el, vw=innerWidth, vh=innerHeight, M=6; el.style.maxHeight=(vh-2*M)+'px';
+  const w=el.offsetWidth, h=Math.min(el.offsetHeight, vh-2*M); let x, y; const sp=L.spec;
+  if(L.parent){ const pr=L.parent.getBoundingClientRect(), mr=L.parent.closest('.pm-menu').getBoundingClientRect(); x=mr.right-3+w<=vw-M?mr.right-3:mr.left+3-w; y=pr.top-5; }
+  else { const a=sp.anchor&&sp.anchor.isConnected?sp.anchor.getBoundingClientRect():null;
+    if(a){ x=sp.align==='right'?a.right-w:a.left; y=a.bottom+4; if(y+h>vh-M&&a.top-4-h>=M) y=a.top-4-h; }
+    else if(sp.x!=null&&sp.y!=null){ x=sp.x; y=sp.y; if(x+w>vw-M) x-=w; if(y+h>vh-M) y=Math.max(M, y-h); }
+    else { x=(vw-w)/2; y=(vh-h)/2; } }
+  el.style.left=Math.round(Math.max(M, Math.min(vw-M-w, x)))+'px'; el.style.top=Math.round(Math.max(M, Math.min(vh-M-h, y)))+'px'; }
+function macCloseFrom(lv){ const m=PM; if(!m) return; m.levels.slice(lv).forEach(L=>L.el.remove()); m.levels.length=Math.min(m.levels.length, lv); }
+function macHl(L, b){ if(L.hl===b) return; if(L.hl) L.hl.classList.remove('hl'); L.hl=b||null; if(b) b.classList.add('hl'); }
+const macAt = b => { const [lv,i]=b.dataset.mi.split(':').map(Number); const L=PM&&PM.levels[lv]; return {lv, L, it:L&&L.items[i]}; };
+function macOpenSub(b, kb){ const m=PM, {lv, L, it}=macAt(b); if(!it||!it.menu) return; clearTimeout(m.subT); macHl(L, b);
+  if(m.levels[lv+1]&&m.levels[lv+1].parent===b){ if(kb) macHl(m.levels[lv+1], m.levels[lv+1].el.querySelector('[data-mi]')); return; }
+  const sub=it.menu(); if(!sub) return; const S=macLevel(lv+1, sub, b); if(kb) macHl(S, S.el.querySelector('[data-mi]')); }
+function macActivate(b){ const m=PM, {L, it}=macAt(b); if(!it) return; clearTimeout(m.subT);
+  if(it.menu){ macOpenSub(b, false); return; }
+  macHl(L, b); closeMenu(false, true); if(it.fn) it.fn(); }
+// Hover: the item lights up; resting on one with a submenu opens it, on another item closes the open one (a short wait lets the
+// pointer cross other items on its way into a submenu)
+pmEl.addEventListener('mouseover', e=>{ const m=PM; if(!m||!m.mac) return; const b=e.target.closest('.pm-menu [data-mi]'); if(!b) return; const {lv, L, it}=macAt(b); if(!L) return;
+  macHl(L, b); clearTimeout(m.subT); const open=m.levels[lv+1]; if(open&&open.parent===b) return;
+  if(it&&it.menu) m.subT=setTimeout(()=>{ if(PM===m&&L.hl===b) macOpenSub(b, false); }, 160);
+  else if(open) m.subT=setTimeout(()=>{ if(PM===m&&L.hl===b) macCloseFrom(lv+1); }, 220); });
+pmEl.addEventListener('mouseout', e=>{ const m=PM; if(!m||!m.mac) return; const from=e.target.closest('.pm-menu'); if(!from||(e.relatedTarget&&from.contains(e.relatedTarget))) return;
+  const lv=+from.dataset.lv, L=m.levels[lv]; if(L&&!(m.levels[lv+1]&&m.levels[lv+1].parent===L.hl)) macHl(L, null); });
+// A right click outside an open menu closes it and opens the menu of what is under the pointer, as on a Mac
+pmEl.addEventListener('contextmenu', e=>{ const m=PM; if(!m||!m.mac) return; e.preventDefault(); if(e.target.closest('.pm-menu')) return; const x=e.clientX, y=e.clientY; closeMenu(true);
+  const el=document.elementFromPoint(x, y); if(el&&el.closest('#desk')) el.dispatchEvent(new MouseEvent('contextmenu', {bubbles:true, cancelable:true, clientX:x, clientY:y, button:2})); });
+// Keys while a desktop menu is open; a popover leaves every key but Escape to its fields
+window.addEventListener('keydown', e=>{ const m=PM; if(!m||!m.mac) return; const k=e.key, L=m.levels[m.levels.length-1]; if(!L) return;
+  const stop=()=>{ e.preventDefault(); e.stopPropagation(); };
+  if(k==='Escape'){ stop(); if(m.levels.length>1) macCloseFrom(m.levels.length-1); else closeMenu(); return; }
+  if(L.spec.html) return;
+  if(k==='ArrowDown'||k==='ArrowUp'){ stop(); clearTimeout(m.subT); const bs=[...L.el.querySelectorAll('[data-mi]')]; if(!bs.length) return; let i=bs.indexOf(L.hl);
+    i=k==='ArrowDown'?(i+1)%bs.length:(i<=0?bs.length-1:i-1); macHl(L, bs[i]); bs[i].scrollIntoView({block:'nearest'}); return; }
+  if(k==='ArrowRight'){ stop(); if(L.hl) macOpenSub(L.hl, true); return; }
+  if(k==='ArrowLeft'){ stop(); if(m.levels.length>1) macCloseFrom(m.levels.length-1); return; }
+  if(k==='Enter'||k===' '){ stop(); if(L.hl){ const {it}=macAt(L.hl); if(it&&it.menu) macOpenSub(L.hl, true); else macActivate(L.hl); } return; }
+  if(!e.metaKey&&!e.ctrlKey) stop(); // nothing behind an open menu reacts to a key
+}, true);
+// The control a desktop picker for a task hangs from when none was given (a menu item, an old caller): the inspector's control,
+// else the date column of the task's row, else its week card
+function taskAnchor(id, act){ if(!UI.wide) return null; const q=CSS.escape(id);
+  const pc=document.querySelector('#desk .pane[data-task="'+q+'"] [data-act='+(act||'pickDate')+']'); if(pc) return {anchor:pc, align:'left'};
+  const r=document.querySelector('#desk .main .row[data-id="'+q+'"]:not(.first .row) .rc-date')||document.querySelector('#desk .wcard[data-id="'+q+'"]');
+  return r?{anchor:r, align:'right'}:{}; }
+// R17: on the desktop a date or a reminder is chosen in a popover under its control; on the iPhone in a bottom sheet.
+// bind(panel, done) wires the content; done closes whichever it is
+function pickerPanel(title, html, id, src, act, bind){
+  if(UI.wide){ const at=src&&src.isConnected?{anchor:src, align:src.closest('.pane')?'left':'right'}:taskAnchor(id, act); popMenu(Object.assign(at, {html, bind:el=>bind(el, ()=>closeMenu(false, true))})); return; }
+  openSheet('<h2>'+title+'</h2>'+html, s=>bind(s, closeSheet)); }
 function priorityMenu(id, src){ const x=task(id); if(!x) return;
   if(!UI.wide) return popMenu({anchor:src, align:'right', groups:[[['high','Alta',MI.p3],['mid','Media',MI.p2],['none','Ninguna',MI.p0]].map(([k,l,ic])=>({label:l, icon:ic, on:x.priority===k, fn:()=>setPriority(id,k)}))]});
   actionSheet(x.title, [
@@ -2022,18 +2345,19 @@ function calendarHTML(ym, sel){
 }
 function shiftMonth(ym, d){ let [y,m]=ym.split('-').map(Number); m+=d; if(m<1){ m=12; y--; } if(m>12){ m=1; y++; } return y+'-'+String(m).padStart(2,'0'); }
 function pickProjectSheet(id, src){ const ps=activeProjects(); const x=task(id); if(!x) return; if(!UI.wide){ const m=projectPickMenu(id); m.title=''; return popMenu(Object.assign(m, {anchor:src, align:'right'})); } actionSheet('Proyecto', [{label:'Ninguno'+(!x.projectId?'  ✓':''), fn:()=>moveToProject(id,null)}].concat(ps.map(p=>({label:p.name+(x.projectId===p.id?'  ✓':''), fn:()=>moveToProject(id,p.id)})))); }
-function dateSheet(id){ const x=task(id); if(!x) return; const t=todayStr(); const dow=new Date(t+'T00:00:00').getDay(); const chips=[[t,'Hoy'],[addDays(t,1),'Mañana']]; if(dow>=1&&dow<=4) chips.push([nextWeekday(5,true),'Este viernes']); chips.push([nextWeekday(1,true),'Próxima semana'],['','Sin fecha']);
+function dateSheet(id, src){ const x=task(id); if(!x) return; const t=todayStr(); const dow=new Date(t+'T00:00:00').getDay(); const chips=[[t,'Hoy'],[addDays(t,1),'Mañana']]; if(dow>=1&&dow<=4) chips.push([nextWeekday(5,true),'Este viernes']); chips.push([nextWeekday(1,true),'Próxima semana'],['','Sin fecha']);
   let ym=(x.date||t).slice(0,7);
-  openSheet('<h2>Fecha</h2><div class="chips" style="margin-top:0">'+uniqueBy(chips, c=>c[0]).map(c=>'<button class="chip'+(x.date===c[0]?' on':'')+'" data-d="'+c[0]+'">'+c[1]+'</button>').join('')+'</div><div id="calwrap">'+calendarHTML(ym, x.date)+'</div>', s=>{
+  pickerPanel('Fecha', '<div class="chips" style="margin-top:0">'+uniqueBy(chips, c=>c[0]).map(c=>'<button class="chip'+(x.date===c[0]?' on':'')+'" data-d="'+c[0]+'">'+c[1]+'</button>').join('')+'</div><div id="calwrap">'+calendarHTML(ym, x.date)+'</div>', id, src, 'pickDate', (s, done)=>{
     s.onclick=e=>{ const nav=e.target.closest('[data-cal]'); if(nav){ ym=shiftMonth(ym,+nav.dataset.cal); $('#calwrap',s).innerHTML=calendarHTML(ym, x.date); return; }
-      const c=e.target.closest('[data-d]'); if(c){ updTask(id,{date:c.dataset.d||null}); haptic(6); closeSheet(); render(); } }; }); }
-function reminderSheet(id){ const x=task(id); if(!x) return; const t=todayStr(); const pad=n=>String(n).padStart(2,'0');
+      const c=e.target.closest('[data-d]'); if(c){ releaseHold(id); updTask(id,{date:c.dataset.d||null}); haptic(6); done(); render(); } }; }); }
+function reminderSheet(id, src){ const x=task(id); if(!x) return; const t=todayStr(); const pad=n=>String(n).padStart(2,'0');
   const tm=new Date(); tm.setDate(tm.getDate()+1); tm.setHours(9,0,0,0);
   const now=new Date(); const h1=new Date(Math.ceil((now.getTime()+36e5)/3e5)*3e5); const e18=new Date(); e18.setHours(18,0,0,0);
   let chips=[]; if(now.getHours()<17) chips.push([e18.toISOString(),'Hoy a las 18:00']); chips.push([tm.toISOString(),'Mañana a las 9:00'],[h1.toISOString(),'En una hora ('+fmtTime(h1.toISOString())+')']); if(x.reminder) chips.push(['','Quitar']); chips=uniqueBy(chips, c=>c[0]); // from 16:55 'En una hora' is 18:00 too
   const cur = x.reminder?new Date(x.reminder):tm; let day=localDay(cur.toISOString()), time=pad(cur.getHours())+':'+pad(cur.getMinutes()), ym=day.slice(0,7);
-  openSheet('<h2>Recordatorio</h2><div class="chips" style="margin-top:0">'+chips.map(c=>'<button class="chip" data-r="'+c[0]+'">'+c[1]+'</button>').join('')+'</div><div id="calwrap">'+calendarHTML(ym, day)+'</div><div class="timerow"><span>Hora</span><input type="time" value="'+time+'"></div><div class="sheet-actions"><button class="btn primary" data-x="ok">Guardar</button></div>', s=>{
+  pickerPanel('Recordatorio', '<div class="chips" style="margin-top:0">'+chips.map(c=>'<button class="chip" data-r="'+c[0]+'">'+c[1]+'</button>').join('')+'</div><div id="calwrap">'+calendarHTML(ym, day)+'</div><div class="timerow"><span>Hora</span><input type="time" value="'+time+'"></div><div class="sheet-actions"><button class="btn primary" data-x="ok">Guardar</button></div>', id, src, 'pickReminder', (s, closeSheet)=>{ // closeSheet here closes the sheet or the popover that holds it
     const inp=$('input[type=time]',s); const unwarn=()=>{ const w=$('.hint.warn',s); if(w) w.remove(); }; inp.addEventListener('input',unwarn);
+    inp.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); $('[data-x=ok]',s).click(); } }); // Enter in the time saves
     s.onclick=e=>{ const nav=e.target.closest('[data-cal]'); if(nav){ ym=shiftMonth(ym,+nav.dataset.cal); $('#calwrap',s).innerHTML=calendarHTML(ym, day); return; }
       const d=e.target.closest('[data-d]'); if(d){ day=d.dataset.d; ym=day.slice(0,7); $('#calwrap',s).innerHTML=calendarHTML(ym, day); unwarn(); haptic(4); return; }
       const c=e.target.closest('[data-r]'); if(c){ updTask(id,{reminder:c.dataset.r||null}); closeSheet(); render(); return; }
@@ -2327,7 +2651,7 @@ window.addEventListener('pageshow', e=>{ if(e.persisted) reloadIfChanged(); });
 /* ---------- Desktop layout ---------- */
 function mondayOf(d){ const x=new Date(d+'T00:00:00'); return addDays(d, -((x.getDay()+6)%7)); }
 function setDeskView(v){ if(v==='project:none') v='project:none'; UI.deskView=v; UI.deskDetail=null; UI.query=''; UI.searchDone=false; UI.sumFilter=null; if(v==='hoy'||v==='todas'){ DB.settings.filter=v; save(); } render(); }
-function applyWide(){ const w=wideMQ.matches; if(w===UI.wide) return; closeMenu(true); UI.wide=w; document.body.classList.toggle('desktop', w); app.classList.toggle('desktop', w);
+function applyWide(){ const w=wideMQ.matches; if(w===UI.wide) return; closeMenu(true); UI.wide=w; document.documentElement.classList.toggle('wide', w); document.body.classList.toggle('desktop', w); app.classList.toggle('desktop', w);
   if(w){ // the pushed iPhone screens map onto the desktop: a project becomes the view and the last detail the pane
     let pr=null; UI.deskDetail=null; UI.stack.forEach(s=>{ if(s.kind==='project') pr=s.id; else UI.deskDetail=s.id; s.el.remove(); }); UI.stack=[];
     if(UI.select){ UI.select=null; app.classList.remove('selecting'); closeSheet(); } // an open bulk menu would act on nothing
@@ -2358,18 +2682,21 @@ function deskAddBase(projectId){ return {date:UI.deskView==='hoy'?todayStr():nul
 // R6: a list pasted into the desktop add bar waits under it until it is created or dropped
 function pasteBoxHTML(projectId){ const ls=UI.addPaste; if(!ls||!ls.length) return ''; const b=deskAddBase(projectId); const n=ls.length+' '+(ls.length===1?'tarea':'tareas');
   return '<div class="pastebox"><div class="plhead"><span>'+n+'</span></div><div class="plist">'+ls.map((l,i)=>{ const r=quickTask(l,b); return '<div class="pl"><span class="t">'+esc(r.title||l)+'</span><span class="m">'+esc(quickMeta(r))+'</span><button class="x" data-paste-rm="'+i+'" aria-label="Quitar">×</button></div>'; }).join('')+'</div><div class="sheet-actions"><button class="btn" data-paste="cancel">Cancelar</button><span style="flex:1"></span><button class="btn primary" data-paste="ok">Crear '+n+'</button></div></div>'; }
-// The project filter chips of the desktop lists and week (the same filter as the iPhone list)
-function pchipsHTML(){ return activeProjects().length?'<div class="pchips">'+activeProjects().map(p=>'<button class="chip'+(UI.projFilter===p.id?' on':'')+'" data-pf="'+p.id+'"'+(UI.projFilter===p.id?' style="background:'+p.color+'"':'')+'><span class="dot" style="background:'+(UI.projFilter===p.id?'#fff':p.color)+'"></span>'+esc(p.name)+'</button>').join('')+'<button class="chip'+(UI.projFilter==='none'?' on':'')+'" data-pf="none"><span class="dot" style="background:'+(UI.projFilter==='none'?'#fff':'var(--ink3)')+'"></span>Sin proyecto</button></div>':''; }
+// R11: the project filter of the desktop lists and week, a pop-up button in the column head (the iPhone keeps its chips).
+// Hidden during a search, which ignores the filter
+function pfDropHTML(){ if(UI.query||!activeProjects().length) return ''; const f=UI.projFilter, p=f&&f!=='none'?proj(f):null;
+  return '<button class="pfdrop'+(f!==null?' on':'')+'" data-act="projFilterMenu" aria-haspopup="menu" title="Filtrar por proyecto">'+(f!==null?'<span class="dot" style="background:'+(p?p.color:'var(--ink3)')+'"></span>':'')+'<span class="l"><i>Proyecto:</i> '+esc(f===null?'Todos':p?p.name:'Sin proyecto')+'</span>'+I.chevD+'</button>'; }
+function projFilterMenu(src){ const dot=c=>'<span class="pm-dot" style="background:'+c+'"></span>', set=v=>{ UI.projFilter=v; render(); };
+  popMenu({anchor:src, align:'right', groups:[[{label:'Todos', on:UI.projFilter===null, fn:()=>set(null)}], activeProjects().map(p=>({label:p.name, icon:dot(p.color), on:UI.projFilter===p.id, fn:()=>set(p.id)})), [{label:'Sin proyecto', icon:dot('var(--ink3)'), on:UI.projFilter==='none', fn:()=>set('none')}]]}); }
 function deskMain(){
-  const v=UI.deskView; let title='', body='', search=true;
-  if(v==='hoy'||v==='todas'){ const f=v; title=f==='hoy'?'Hoy':'Todas';
+  const v=UI.deskView; let title='', body='', search=true, pf=false;
+  if(v==='hoy'||v==='todas'){ const f=v; title=f==='hoy'?'Hoy':'Todas'; pf=true;
     body = addBarHTML(null)+(f==='hoy'&&!UI.query?summaryHTML():'')+
-      (!UI.query?pchipsHTML():'')+
       listHTML(UI.query?'todas':f); }
-  else if(v==='week'){ title='Semana'; body=(!UI.query?pchipsHTML():'')+weekHTML(); } // the project filter applies here too, so it stays visible and clearable
+  else if(v==='week'){ title='Semana'; pf=true; body=weekHTML(); } // the project filter applies here too, so it stays visible and clearable
   else if(v.startsWith('project:')){ const id=v.slice(8); const p=id==='none'?null:proj(id); if(id!=='none'&&(!p||p.archived||p.spaceId!==space().id)){ UI.deskView=DB.settings.filter||'hoy'; return deskMain(); } /* gone, archived or in another space */ title=p?p.name:'Sin proyecto'; body=addBarHTML(p?p.id:null)+listHTML('todas', p?p.id:null); }
   else if(v==='settings'){ title='Ajustes'; search=false; const h=viewAjustes(); body=h.slice(h.indexOf('<div class="scroll">')); }
-  return '<main class="main"><div class="mhead"><h1>'+esc(title)+'</h1>'+(search?'<div class="searchbar"><div class="search">'+I.search+'<input type="search" placeholder="Buscar" value="'+esc(UI.query)+'" data-role="search" autocomplete="off"></div>'+(UI.query?'<button class="cancel" data-act="clearSearch">Cancelar</button>':'')+'</div>':'')+(v==='hoy'||v==='todas'||v.startsWith('project:')?'<button class="mopts" data-act="viewMenu" aria-label="Opciones de vista" title="Opciones de vista">'+I.more+'</button>':'')+'</div><div class="mbody"><div class="inner'+(v==='week'?' week-inner':'')+'">'+body+'</div></div></main>';
+  return '<main class="main"><div class="mhead'+(v==='week'?' wide-head':'')+'"><h1>'+esc(title)+'</h1>'+(pf?'<span class="pfslot">'+pfDropHTML()+'</span>':'')+(search?'<div class="searchbar"><div class="search">'+I.search+'<input type="search" placeholder="Buscar" value="'+esc(UI.query)+'" data-role="search" autocomplete="off"></div>'+(UI.query?'<button class="cancel" data-act="clearSearch">Cancelar</button>':'')+'</div>':'')+(v==='hoy'||v==='todas'||v.startsWith('project:')?'<button class="mopts" data-act="viewMenu" aria-label="Opciones de vista" title="Opciones de vista">'+I.more+'</button>':'')+'</div><div class="mbody"><div class="inner'+(v==='week'?' week-inner':v==='settings'?' settings':'')+'">'+body+'</div></div></main>';
 }
 function weekHTML(){
   const t=todayStr(); const start=UI.weekStart||mondayOf(t); const days=[...Array(7)].map((_,i)=>addDays(start,i)); const end=days[6];
@@ -2382,33 +2709,49 @@ function weekHTML(){
     '<div class="wgrid">'+days.map(d=>{ const xs=orderTasks(all.filter(x=>x.date===d).filter(pf)); const dd=new Date(d+'T00:00:00'); return '<div class="wday'+(d===t?' today':'')+(d<t?' past':'')+'" data-day="'+d+'"><div class="dh"><b>'+DIAS_FULL[dd.getDay()].slice(0,3)+'<small>'+dd.getDate()+(dd.getDate()===1?' '+MESES[dd.getMonth()]:'')+'</small></b>'+(d<t?'':'<button data-add-date="'+d+'" aria-label="Añadir">'+I.plus+'</button>')+'</div>'+xs.map(card).join('')+'</div>'; }).join('')+'</div>'+
     '<div class="wundated" data-day=""><h3>'+(undated.length?'Sin fecha ('+undated.length+'): arrastra a un día':'Sin fecha: arrastra aquí para quitar la fecha')+'</h3>'+(undated.length?'<div class="cards">'+undated.slice(0,40).map(card).join('')+'</div>':'')+'</div></div>'; // always a drop target
 }
+// R17: the inspector's width, from the settings, kept between 320 and 600 px and never squeezing the list under 360 px
+function paneWidth(w){ const max=Math.max(320, Math.min(600, innerWidth-220-360)); return Math.round(Math.max(320, Math.min(max, +w||400))); }
 function renderDesktop(){
   let d=$('#desk'); if(!d){ d=document.createElement('div'); d.id='desk'; d.className='desk'; app.appendChild(d); d.addEventListener('click', onClick); bindDeskEvents(d); UI.deskScroll={}; UI.deskKey=null; }
   // Each view keeps its own scroll (per space), like the iPhone tabs; a view seen for the first time opens at the top
   const body=d.querySelector('.mbody'); if(body&&UI.deskKey) UI.deskScroll[UI.deskKey]=body.scrollTop; const side=d.querySelector('.side'); const sst=side?side.scrollTop:0;
-  const pcd=d.querySelector('.pchips'), pcl=pcd?pcd.scrollLeft:0; // the project chips keep their horizontal position, as on the iPhone
   const ps=d.querySelector('.pane .scroll'), pst=ps?ps.scrollTop:0, pid=ps?d.querySelector('.pane').dataset.task:null; // the pane keeps its scroll while it shows the same task
   // The add bar or the search keep focus and caret across the rebuild (a click elsewhere has already taken the focus)
   const ae=document.activeElement, fr=ae&&d.contains(ae)&&(ae.dataset.role==='addbar'||ae.dataset.role==='search') ? {role:ae.dataset.role, a:ae.selectionStart, b:ae.selectionEnd} : null;
   const dx = UI.deskDetail && task(UI.deskDetail); // only a task of the active space: the spaces never mix on screen
-  const pane = dx && dx.spaceId===space().id ? '<section class="pane" data-task="'+esc(UI.deskDetail)+'"><div class="screen detail">'+viewDetail(UI.deskDetail)+'</div></section>' : '';
-  if(!pane) UI.deskDetail=null; app.classList.toggle('has-pane', !!pane);
+  const pop = UI.deskView==='week'; // R17: in Semana the detail is a popover next to its card, so the seven columns keep their width
+  const pane = dx && dx.spaceId===space().id ? '<section class="pane'+(pop?' wpop':'')+'" data-task="'+esc(UI.deskDetail)+'">'+(pop?'':'<div class="igrip" title="Arrastra para cambiar el ancho"></div>')+'<div class="screen detail">'+viewDetail(UI.deskDetail)+'</div></section>' : '';
+  if(!pane) UI.deskDetail=null; app.classList.toggle('has-pane', !!pane&&!pop);
+  d.style.setProperty('--panew', paneWidth(DB.settings.paneWidth)+'px');
   const sideHTML=deskSide(), mainHTML=deskMain();
   const key=UI.deskView+'|'+DB.settings.activeSpace; // read after deskMain, which may fall back to another view
   d.innerHTML = sideHTML+lazyRows(mainHTML, UI.deskScroll[key]||0, innerHeight)+pane; armRows(d.querySelector('.mbody'));
   const b2=d.querySelector('.mbody'); if(b2) b2.scrollTop=UI.deskScroll[key]||0; UI.deskKey=key;
-  { const pc2=d.querySelector('.pchips'); if(pc2){ if(pcd) pc2.scrollLeft=pcl; else chipInView(pc2); } } const s2=d.querySelector('.side'); if(s2) s2.scrollTop=sst;
+  const s2=d.querySelector('.side'); if(s2) s2.scrollTop=sst;
   if(fr){ const n=$('#desk [data-role='+fr.role+']'); if(n){ n.focus({preventScroll:true}); try{ n.setSelectionRange(fr.a, fr.b); }catch(e){} } }
   if(UI.deskDetail){ bindDetail(d.querySelector('.pane'), UI.deskDetail); if(pid===UI.deskDetail){ const p2=d.querySelector('.pane .scroll'); if(p2) p2.scrollTop=pst; } } // restored after bindDetail has grown the text areas
+  if(pop&&UI.deskDetail){ placeWeekPop(d); if(b2) b2.addEventListener('scroll', ()=>placeWeekPop(d), {passive:true}); }
   const s=$('[data-role=search]',d); if(s) bindSearch(s, ()=>deskResults(d));
   bindAddBar(d);
   renderTabbar();
 }
-// Desktop search: the list under the head and the Cancelar button change; the field, the sidebar and the detail pane stay
+// R17: the week popover sits beside its card (right if it fits, else left), inside the window; it follows the card as the column scrolls.
+// A card no longer in view (moved to another week) leaves it where it was
+function placeWeekPop(d){ const pn=d.querySelector('.pane.wpop'); if(!pn) return; const dr=d.getBoundingClientRect();
+  d.querySelectorAll('.wcard.popped').forEach(c=>c.classList.remove('popped'));
+  const card=d.querySelector('.wcard[data-id="'+CSS.escape(pn.dataset.task)+'"]'); let a=null;
+  if(card){ const r=card.getBoundingClientRect(), mb=d.querySelector('.mbody').getBoundingClientRect(); card.classList.add('popped'); if(r.bottom>mb.top&&r.top<mb.bottom) a=UI.popRect={left:r.left, right:r.right, top:r.top, bottom:r.bottom}; else a=UI.popRect; }
+  else a=UI.popRect;
+  pn.style.maxHeight=(dr.height-16)+'px'; const W=pn.offsetWidth, H=Math.min(pn.offsetHeight, dr.height-16); let left, top;
+  if(!a){ left=dr.width-W-16; top=8; }
+  else { left = a.right+10+W<=dr.right-8 ? a.right+10-dr.left : a.left-10-W>=dr.left+8 ? a.left-10-W-dr.left : dr.width-W-8; top=a.top-dr.top-8; }
+  pn.style.left=Math.max(8, left)+'px'; pn.style.top=Math.max(8, Math.min(dr.height-H-8, top))+'px'; }
+// Desktop search: the list under the head, the project filter and the Cancelar button change; the field, the sidebar and the detail pane stay
 function deskResults(d){ const ob=d.querySelector('.main .mbody'), oi=ob&&ob.querySelector('.inner'), bar=d.querySelector('.main .mhead .searchbar'); if(!oi||!bar) return false;
   const t=document.createElement('div'); t.innerHTML=lazyRows(deskMain(), ob.scrollTop, innerHeight); const ni=t.querySelector('.mbody .inner'), nbar=t.querySelector('.mhead .searchbar'); if(!ni||!nbar) return false;
   oi.replaceWith(ni); armRows(ob); const sb=bar.querySelector('.search'); [...bar.children].forEach(c=>{ if(c!==sb) c.remove(); }); [...nbar.children].forEach(c=>{ if(!c.querySelector('[data-role=search]')) bar.appendChild(c); });
-  bindAddBar(d); const pc=ni.querySelector('.pchips'); if(pc) chipInView(pc); return true; }
+  const os=d.querySelector('.main .mhead .pfslot'), ns=t.querySelector('.mhead .pfslot'); if(os&&ns) os.replaceWith(ns);
+  bindAddBar(d); if(UI.deskView==='week'&&UI.deskDetail) placeWeekPop(d); return true; }
 function bindAddBar(d){
   const ab=$('[data-role=addbar]',d); if(!ab) return; const said=$('#deskSaid',d); const base=()=>deskAddBase(ab.dataset.project);
   const refocus=()=>{ const n=$('#desk [data-role=addbar]'); if(n){ n.focus(); const l=n.value.length; n.setSelectionRange(l,l); } };

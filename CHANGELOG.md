@@ -1,5 +1,16 @@
 # Registro de cambios
 
+## v0.14.5. Animaciones con el ritmo de iOS (1 de noviembre de 2026)
+
+- Las animaciones iban demasiado rápidas. Ahora usan las duraciones de iOS con la misma curva de frenado:
+  - Hojas inferiores, como Fecha, Recordatorio o Nota de voz, y entrar en una pantalla o volver atrás: medio segundo, antes 0,35.
+  - Menús inferiores: 0,45 segundos, antes 0,3.
+  - Oscurecido del fondo: 0,45 segundos.
+  - Cambio de pestaña al deslizar, filas que vuelven a su sitio y reordenación de la lista: 0,4 segundos.
+  - Aviso de Deshacer: 0,4 segundos.
+- La pantalla de detrás se encoge al mismo ritmo que sube la hoja.
+- Con «Reducir movimiento» activado siguen siendo fundidos cortos.
+
 ## v0.14.4. Editar y eliminar notas de voz (1 de noviembre de 2026)
 
 - En el detalle de una tarea, cada nota de voz se desliza como una fila. A la izquierda aparece Eliminar y se queda ahí; al tocarlo, la nota se borra con Deshacer durante 4 segundos.

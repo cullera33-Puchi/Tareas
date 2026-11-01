@@ -91,10 +91,10 @@ input,textarea,select{font-size:max(16px,1rem);} /* under 16px Safari zooms on f
 .desktop .check,.desktop .cell,.desktop .chip,.desktop button{cursor:pointer;}
 .desktop .row-title{-webkit-line-clamp:1;}
 /* Closed sheets sit invisible at the centre: hidden and without hit area, so they never take clicks */
-body.desktop .sheet{left:50%;right:auto;bottom:auto;top:50%;width:440px;max-height:80%;border-radius:16px;transform:translate(-50%,-50%) scale(.96);opacity:0;visibility:hidden;pointer-events:none;transition:transform .2s,opacity .2s,visibility 0s linear .2s;padding:10px 20px 20px;}
+body.desktop .sheet{left:50%;right:auto;bottom:auto;top:50%;width:440px;max-height:80%;border-radius:16px;transform:translate(-50%,-50%) scale(.96);opacity:0;visibility:hidden;pointer-events:none;transition:transform .28s cubic-bezier(.32,.72,0,1),opacity .22s,visibility 0s linear .28s;padding:10px 20px 20px;}
 body.desktop .sheet.on{transform:translate(-50%,-50%) scale(1);opacity:1;visibility:visible;pointer-events:auto;transition-delay:0s;}
 body.desktop .sheet .handle{display:none;}
-body.desktop .asheet{left:50%;right:auto;bottom:auto;top:50%;width:320px;transform:translate(-50%,-50%) scale(.96);opacity:0;visibility:hidden;pointer-events:none;transition:transform .2s,opacity .2s,visibility 0s linear .2s;}
+body.desktop .asheet{left:50%;right:auto;bottom:auto;top:50%;width:320px;transform:translate(-50%,-50%) scale(.96);opacity:0;visibility:hidden;pointer-events:none;transition:transform .28s cubic-bezier(.32,.72,0,1),opacity .22s,visibility 0s linear .28s;}
 body.desktop .asheet.on{transform:translate(-50%,-50%) scale(1);opacity:1;visibility:visible;pointer-events:auto;transition-delay:0s;}
 body.desktop .asheet button.it{height:46px;font-size:1rem;}
 body.desktop .app.sheet-open{transform:none;border-radius:0;}
@@ -136,20 +136,20 @@ body.desktop .toast{left:auto;right:28px;bottom:28px;width:360px;}
 .wundated .wcard{margin:0;width:220px;}
 
 /* Screens */
-.app{height:100%;position:relative;overflow:hidden;transition:transform .35s cubic-bezier(.32,.72,0,1);}
+.app{height:100%;position:relative;overflow:hidden;transition:transform .5s cubic-bezier(.32,.72,0,1),border-radius .5s cubic-bezier(.32,.72,0,1);} /* iOS timing: screens and sheets take half a second */
 .app.sheet-open{transform:scale(.96);border-radius:14px;}
 @media (prefers-reduced-motion: reduce){.app{transition:none;}.app.sheet-open{transform:none;}}
 .screen{position:absolute;inset:0;display:flex;flex-direction:column;background:var(--bg);transform:translate3d(0,0,0);will-change:transform;}
-.screen.pushed{transform:translate3d(100%,0,0);transition:transform .35s cubic-bezier(.32,.72,0,1);}
-.screen.shown{transform:translate3d(0,0,0);transition:transform .35s cubic-bezier(.32,.72,0,1);}
-.screen.under{transform:translate3d(-33%,0,0);transition:transform .35s cubic-bezier(.32,.72,0,1);}
+.screen.pushed{transform:translate3d(100%,0,0);transition:transform .5s cubic-bezier(.32,.72,0,1);}
+.screen.shown{transform:translate3d(0,0,0);transition:transform .5s cubic-bezier(.32,.72,0,1);}
+.screen.under{transform:translate3d(-33%,0,0);transition:transform .5s cubic-bezier(.32,.72,0,1);}
 .screen.dragging,.screen.dragging-under{transition:none;}
 .screen.hidden-tab{display:none;}
 .screen.root{touch-action:pan-y;}
 .screen.pushed-screen{z-index:8;}
 .screen.pushed-screen.pushed{pointer-events:none;} /* a screen sliding in or out (already popped) takes no taps */
 .app.navigating .screen{pointer-events:none;} /* during a push or pop transition a second tap acts on nothing */
-.screen.tabanim{transition:transform .3s cubic-bezier(.32,.72,0,1);}
+.screen.tabanim{transition:transform .4s cubic-bezier(.32,.72,0,1);}
 /* Reduce Motion: a pushed screen fades in and out where it stands; the screen below stays still */
 @media (prefers-reduced-motion: reduce){.screen.pushed{transform:none;opacity:0;transition:opacity .2s;}.screen.shown{transform:none;opacity:1;transition:opacity .2s;}.screen.under{transform:none;transition:none;}.screen.tabanim{transition:none;}}
 
@@ -235,11 +235,11 @@ body.desktop .toast{left:auto;right:28px;bottom:28px;width:360px;}
 .row-bg.right button{width:80px;color:#fff;font-size:0.882rem;font-weight:500;}
 .row-bg.right .b-tomorrow{background:var(--orange);}
 .row-bg.right .b-delete{background:var(--red);}
-.row-content{position:relative;background:var(--card);display:flex;align-items:center;gap:12px;padding:10px 16px 10px 16px;min-height:52px;transition:transform .3s cubic-bezier(.32,.72,0,1);}
+.row-content{position:relative;background:var(--card);display:flex;align-items:center;gap:12px;padding:10px 16px 10px 16px;min-height:52px;transition:transform .4s cubic-bezier(.32,.72,0,1);}
 .row-content.drag{transition:none;}
 .row.leaving .row-content{opacity:0;transform:translate3d(28px,0,0);transition:opacity .22s,transform .22s;}
 .row.leaving{pointer-events:none;} /* a second tap during the exit must not reopen the task or open its detail */
-.flip{transition:transform .3s cubic-bezier(.32,.72,0,1),opacity .3s;}
+.flip{transition:transform .4s cubic-bezier(.32,.72,0,1),opacity .4s;}
 .enter{opacity:0;}
 .row-content:active{background:var(--press);}
 .first .row-content{padding:8px 0;min-height:44px;}
@@ -339,12 +339,12 @@ body.desktop .toast{left:auto;right:28px;bottom:28px;width:360px;}
 .tabbar svg{width:24px;height:24px;}
 
 /* Sheets */
-.scrim{position:fixed;inset:0;background:var(--dim);opacity:0;transition:opacity .3s;z-index:20;pointer-events:none;}
+.scrim{position:fixed;inset:0;background:var(--dim);opacity:0;transition:opacity .45s ease;z-index:20;pointer-events:none;}
 .scrim.on{opacity:1;pointer-events:auto;}
-.sheet{position:fixed;left:0;right:0;bottom:0;background:var(--mat);-webkit-backdrop-filter:saturate(180%) blur(24px);backdrop-filter:saturate(180%) blur(24px);border-radius:14px 14px 0 0;transform:translate3d(0,110%,0);transition:transform .35s cubic-bezier(.32,.72,0,1);z-index:21;padding:6px max(16px,env(safe-area-inset-right,0px)) calc(16px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));max-height:85%;overflow-y:auto;}
+.sheet{position:fixed;left:0;right:0;bottom:0;background:var(--mat);-webkit-backdrop-filter:saturate(180%) blur(24px);backdrop-filter:saturate(180%) blur(24px);border-radius:14px 14px 0 0;transform:translate3d(0,110%,0);transition:transform .5s cubic-bezier(.32,.72,0,1);z-index:21;padding:6px max(16px,env(safe-area-inset-right,0px)) calc(16px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));max-height:85%;overflow-y:auto;}
 .sheet.on{transform:translate3d(0,calc(-1 * var(--kb)),0);}
 /* Keyboard not reported by the system (kbFallback): the sheet moves to the top of the screen, above where the keyboard is */
-.sheet.on.top{top:calc(env(safe-area-inset-top,0px) + 8px);bottom:auto;left:8px;right:8px;border-radius:14px;transform:none;max-height:46%;padding-bottom:14px;animation:sheetTop .25s ease-out;}
+.sheet.on.top{top:calc(env(safe-area-inset-top,0px) + 8px);bottom:auto;left:8px;right:8px;border-radius:14px;transform:none;max-height:46%;padding-bottom:14px;animation:sheetTop .4s cubic-bezier(.32,.72,0,1);}
 .sheet.on.top .handle{display:none;}
 @keyframes sheetTop{from{opacity:0;transform:translate3d(0,-12px,0)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion: reduce){.sheet.on.top{animation:none;}}
@@ -403,7 +403,7 @@ body.desktop .toast{left:auto;right:28px;bottom:28px;width:360px;}
 .colors button.on{border-color:var(--ink);}
 
 /* Action menu */
-.asheet{position:fixed;left:calc(8px + env(safe-area-inset-left,0px));right:calc(8px + env(safe-area-inset-right,0px));bottom:calc(8px + env(safe-area-inset-bottom,0px));z-index:21;max-height:calc(100% - 60px);overflow-y:auto;transform:translate3d(0,120%,0);transition:transform .3s cubic-bezier(.32,.72,0,1);}
+.asheet{position:fixed;left:calc(8px + env(safe-area-inset-left,0px));right:calc(8px + env(safe-area-inset-right,0px));bottom:calc(8px + env(safe-area-inset-bottom,0px));z-index:21;max-height:calc(100% - 60px);overflow-y:auto;transform:translate3d(0,120%,0);transition:transform .45s cubic-bezier(.32,.72,0,1);}
 .asheet.on{transform:translate3d(0,0,0);}
 .asheet .grp{background:var(--mat);-webkit-backdrop-filter:saturate(180%) blur(24px);backdrop-filter:saturate(180%) blur(24px);border-radius:14px;overflow:hidden;margin-bottom:8px;}
 .asheet .grp .t{text-align:center;font-size:0.765rem;color:var(--ink2);padding:12px;border-bottom:.5px solid var(--sep);}
@@ -414,7 +414,7 @@ body.desktop .toast{left:auto;right:28px;bottom:28px;width:360px;}
 .asheet button.it.cancel{font-weight:600;}
 
 /* Toast */
-.toast{position:fixed;left:calc(16px + env(safe-area-inset-left,0px));right:calc(92px + env(safe-area-inset-right,0px));bottom:calc(60px + env(safe-area-inset-bottom,0px));background:var(--mat);-webkit-backdrop-filter:saturate(180%) blur(24px);backdrop-filter:saturate(180%) blur(24px);color:var(--ink);border-radius:12px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 6px 24px rgba(0,0,0,.18);transform:translate3d(0,20px,0);opacity:0;transition:all .25s;z-index:30;pointer-events:none;font-size:0.882rem;}
+.toast{position:fixed;left:calc(16px + env(safe-area-inset-left,0px));right:calc(92px + env(safe-area-inset-right,0px));bottom:calc(60px + env(safe-area-inset-bottom,0px));background:var(--mat);-webkit-backdrop-filter:saturate(180%) blur(24px);backdrop-filter:saturate(180%) blur(24px);color:var(--ink);border-radius:12px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 6px 24px rgba(0,0,0,.18);transform:translate3d(0,20px,0);opacity:0;transition:transform .4s cubic-bezier(.32,.72,0,1),opacity .3s;z-index:30;pointer-events:none;font-size:0.882rem;}
 .toast.on{transform:translate3d(0,0,0);opacity:1;pointer-events:auto;}
 .toast button{color:var(--blue);font-weight:600;}
 
@@ -425,7 +425,7 @@ body.desktop .toast{left:auto;right:28px;bottom:28px;width:360px;}
 .detail textarea{width:100%;min-height:72px;background:none;border:0;outline:0;resize:none;padding:0;line-height:1.4;overflow:hidden;display:block;}
 .vn{position:relative;overflow:hidden;border-top:.5px solid var(--sep);}
 .vn:first-child{border-top:0;}
-.vn-c{position:relative;background:var(--card);padding:10px 16px;font-size:0.882rem;line-height:1.4;white-space:pre-wrap;transition:transform .3s cubic-bezier(.32,.72,0,1);}
+.vn-c{position:relative;background:var(--card);padding:10px 16px;font-size:0.882rem;line-height:1.4;white-space:pre-wrap;transition:transform .4s cubic-bezier(.32,.72,0,1);}
 .vn-c.drag{transition:none;}
 .vn-bg{position:absolute;top:0;bottom:0;display:none;}
 .vn-bg button{width:88px;height:100%;color:#fff;font-size:0.882rem;font-weight:500;}
@@ -466,7 +466,7 @@ body.desktop .toast{left:auto;right:28px;bottom:28px;width:360px;}
 
 <script>
 'use strict';
-const APP_VERSION = '0.14.4';
+const APP_VERSION = '0.14.5';
 let pendingSW = null; // service worker installed and waiting to take over
 let updateRequested = false; // the user asked for the waiting worker to take over
 
@@ -792,7 +792,7 @@ function swapHTML(scr, html){
     els.forEach((el,i)=>{ const k=key(el), nt=tops[i];
       if(!prev.has(k)){ if(near(nt)){ el.classList.add('enter'); moved.push(el); } return; }
       const d=prev.get(k)-nt; if(Math.abs(d)>0.5&&!RM.matches&&(near(nt)||near(prev.get(k)))){ el.style.transform='translate3d(0,'+d+'px,0)'; moved.push(el); } });
-    if(moved.length){ requestAnimationFrame(()=>requestAnimationFrame(()=>{ moved.forEach(el=>{ el.classList.add('flip'); el.style.transform=''; el.classList.remove('enter'); }); setTimeout(()=>moved.forEach(el=>el.classList.remove('flip')),350); })); }
+    if(moved.length){ requestAnimationFrame(()=>requestAnimationFrame(()=>{ moved.forEach(el=>{ el.classList.add('flip'); el.style.transform=''; el.classList.remove('enter'); }); setTimeout(()=>moved.forEach(el=>el.classList.remove('flip')),450); })); }
   }
   bindCommon(scr);
 }
@@ -855,7 +855,7 @@ $('#selbar').addEventListener('click', e=>{ const b=e.target.closest('[data-act]
 (function bindTabSwipe(){
   let x0=0,y0=0,mode=null,cur=null,nb=null,dir=0,w=0,lastX=0,lastT=0,vx=0;
   const neighbor=d=>{ const i=TABS.indexOf(UI.tab)+d; return i>=0&&i<TABS.length?TABS[i]:null; };
-  // The end of the last slide (its 320 ms timer). A touch that lands before it runs it at once, before any handler reads the screens:
+  // The end of the last slide (its 420 ms timer). A touch that lands before it runs it at once, before any handler reads the screens:
   // a gesture never starts on half-finished screens, and a stale timer never puts away a screen a newer swipe is dragging
   let settleFn=null, settleT=0;
   function settle(e){ const f=settleFn; if(!f) return; settleFn=null; clearTimeout(settleT); f(e); }
@@ -878,7 +878,7 @@ $('#selbar').addEventListener('click', e=>{ const b=e.target.closest('[data-act]
   },{passive:false});
   function finish(commit){ mode=null; settle(null);
     const c=cur, n=nb, dd=dir, ww=w, target=commit?n.dataset.root:c.dataset.root; c.classList.remove('dragging'); n.classList.remove('dragging'); c.classList.add('tabanim'); n.classList.add('tabanim');
-    if(commit){ haptic(6); UI.tab=target; UI.query=''; UI.sumFilter=null; renderTabbar(); renderRoot(n); } // the new tab is current, and drawn, from the release, so a tap or a push in the next 320 ms acts on it; the same reset as a tap on the tab bar
+    if(commit){ haptic(6); UI.tab=target; UI.query=''; UI.sumFilter=null; renderTabbar(); renderRoot(n); } // the new tab is current, and drawn, from the release, so a tap or a push in the next 420 ms acts on it; the same reset as a tap on the tab bar
     let placed=false; const place=()=>{ placed=true; if(commit){ c.style.transform='translate3d('+(-dd*ww)+'px,0,0)'; n.style.transform='translate3d(0,0,0)'; } else { c.style.transform='translate3d(0,0,0)'; n.style.transform='translate3d('+(dd*ww)+'px,0,0)'; } };
     const done=e=>{ c.classList.remove('tabanim'); n.classList.remove('tabanim'); if(!placed) place(); // a touch in the first frame: the screens go straight to their place
       if(!((UI.tab===target&&!UI.stack.length)||renderPending)) return; // a tab tap or a push in between has rendered already
@@ -890,12 +890,12 @@ $('#selbar').addEventListener('click', e=>{ const b=e.target.closest('[data-act]
         if(!e||!renderPending||typingIn(on)) return; } // data that changed during the slide is drawn now, or when the finger on the screen lifts
       if(held){ dragStart(); return; } // renderPending is set: the touch's end draws it
       render(); };
-    settleFn=done; requestAnimationFrame(()=>{ if(settleFn===done&&!placed) place(); }); settleT=setTimeout(()=>settle(null),320);
+    settleFn=done; requestAnimationFrame(()=>{ if(settleFn===done&&!placed) place(); }); settleT=setTimeout(()=>settle(null),420);
   }
   const end=e=>{ const was=mode; mode=null;
     if(was==='swipe'){ const ct=e.type==='touchend'&&e.changedTouches[0]; const dx=ct?ct.clientX-x0:0; const d=dir===1?Math.min(0,dx):Math.max(0,dx);
       finish(!!ct && (Math.abs(d)>w/3 || (Math.abs(vx)>0.4 && Math.sign(vx)===-dir && Math.abs(d)>20))); // a cancelled touch never switches tab
-      if(!e.touches.length) dragEnd(false); } // the 320 ms timer renders
+      if(!e.touches.length) dragEnd(false); } // the 420 ms timer renders
     if(!e.touches.length&&touchDrag) dragEnd(true); // the last finger is up: nothing may keep render() waiting
   };
   app.addEventListener('touchend',end); app.addEventListener('touchcancel',end);
@@ -1191,7 +1191,7 @@ function onClick(e){
 
 /* ---------- Stack navigation ---------- */
 // While a screen slides in or out, taps on the screens are ignored (as in UIKit): a double tap cannot hit the incoming detail or pop twice
-let navT=0; function navLock(){ app.classList.add('navigating'); clearTimeout(navT); navT=setTimeout(()=>app.classList.remove('navigating'),370); }
+let navT=0; function navLock(){ app.classList.add('navigating'); clearTimeout(navT); navT=setTimeout(()=>app.classList.remove('navigating'),520); }
 function push(kind,id){
   const el=document.createElement('div'); el.className='screen pushed-screen pushed '+kind; el.dataset.kind=kind;
   // Only the new screen is drawn: the one it covers has not changed, so the slide starts right after the tap
@@ -1209,7 +1209,7 @@ function pop(){
   // The screen below shows again: drawn now if a render was asked while it was covered; if only the data changed (typing in the detail), after the slide
   let under = underScreen(); if(!under){ under=rootScreen(UI.tab); under.classList.remove('hidden-tab'); restoreRootScroll(under); } // never a blank screen behind
   drawIfDirty(under); under.classList.remove('under','dragging-under','dragging'); under.style.transform='';
-  setTimeout(()=>{ s.el.remove(); const u=underScreen(); if(!UI.stack.length&&typingIn(u)){ renderTabbar(); return; } if(u&&(u.dataset.dirty||+u.dataset.ver!==dataVer)) render(); },RM.matches?220:360); // a search tapped meanwhile keeps its keyboard
+  setTimeout(()=>{ s.el.remove(); const u=underScreen(); if(!UI.stack.length&&typingIn(u)){ renderTabbar(); return; } if(u&&(u.dataset.dirty||+u.dataset.ver!==dataVer)) render(); },RM.matches?220:520); // a search tapped meanwhile keeps its keyboard
 }
 function underScreen(){ return UI.stack.length? UI.stack[UI.stack.length-1].el : app.querySelector('.screen.root:not(.hidden-tab)'); }
 function bindBackSwipe(scr){
@@ -1305,11 +1305,11 @@ let sheetOnClose=null; // one shot, set by the sheet's owner: runs however the s
 let sheetOpenedAt=0; const sheetFresh=()=>performance.now()-sheetOpenedAt<450;
 function noteEarlyClose(kind){ const ms=Math.round(performance.now()-sheetOpenedAt); if(sheetOpenedAt&&ms<800) log('warn','Hoja cerrada a los '+ms+' ms ('+kind+')', String((new Error()).stack||'').split('\n').slice(2,5).map(l=>l.trim().slice(0,90)).join(' | ')); }
 function openSheet(html, onOpen){ sheetOpenedAt=performance.now(); sheetOnClose=null; sheet.innerHTML='<div class="handle"></div>'+html; sheet.classList.add('on'); scrim.classList.add('on'); dimApp(true); bindSheetDrag(); onOpen&&onOpen(sheet); }
-function closeSheet(){ if(sheet.classList.contains('on')||asheet.classList.contains('on')) noteEarlyClose('cerrar'); sheet.classList.remove('on','drag','top'); sheet.style.transform=''; asheet.classList.remove('on'); asheet.onclick=null; scrim.classList.remove('on'); dimApp(false); try{ stopRec&&stopRec(); }catch(e){} setTimeout(()=>{ if(!sheet.classList.contains('on')) sheet.innerHTML=''; if(!asheet.classList.contains('on')) asheet.innerHTML=''; },350); const oc=sheetOnClose; sheetOnClose=null; if(oc) oc(); if(staleView) setTimeout(flushStale, 0); } // a closed menu keeps no buttons or handler that a stray click could fire; data reloaded meanwhile is drawn now, unless the caller already redrew
+function closeSheet(){ if(sheet.classList.contains('on')||asheet.classList.contains('on')) noteEarlyClose('cerrar'); sheet.classList.remove('on','drag','top'); sheet.style.transform=''; asheet.classList.remove('on'); asheet.onclick=null; scrim.classList.remove('on'); dimApp(false); try{ stopRec&&stopRec(); }catch(e){} setTimeout(()=>{ if(!sheet.classList.contains('on')) sheet.innerHTML=''; if(!asheet.classList.contains('on')) asheet.innerHTML=''; },520); const oc=sheetOnClose; sheetOnClose=null; if(oc) oc(); if(staleView) setTimeout(flushStale, 0); } // a closed menu keeps no buttons or handler that a stray click could fire; data reloaded meanwhile is drawn now, unless the caller already redrew
 /* An action menu opened over an open sheet (the Proyecto and Prioridad chips of Nueva tarea) is nested:
    Cancelar, a tap outside or Escape close only the menu and give the sheet back with what was typed */
 let asheetNested=false, asheetCancel=null;
-function closeAction(){ asheet.classList.remove('on'); asheet.onclick=null; setTimeout(()=>{ if(!asheet.classList.contains('on')) asheet.innerHTML=''; },350); }
+function closeAction(){ asheet.classList.remove('on'); asheet.onclick=null; setTimeout(()=>{ if(!asheet.classList.contains('on')) asheet.innerHTML=''; },480); }
 function cancelAction(){ if(asheetNested&&sheet.classList.contains('on')){ const f=asheetCancel; asheetCancel=null; closeAction(); f&&f(); } else closeSheet(); }
 scrim.addEventListener('click', ()=>{ if(sheetFresh()){ log('warn','Toque en el fondo ignorado justo al abrir una hoja'); return; } if(asheet.classList.contains('on')) cancelAction(); else closeSheet(); });
 function bindSheetDrag(){ const h=sheet; let y0=0,dy=0,drag=false,inner=null;

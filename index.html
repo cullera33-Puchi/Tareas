@@ -20,6 +20,7 @@
   --blue:#007AFF; --red:#FF3B30; --orange:#FF9500; --green:#34C759; --fill:#E5E5EA; --fill2:#D1D1D6;
   --bar:rgba(249,249,249,.82); --mat:rgba(255,255,255,.88); --dim:rgba(0,0,0,.35); --press:#D9D9DE;
   --kb:0px; --qhl:rgba(0,122,255,.16); --ghbg:rgba(242,242,247,.86);
+  --pmmat:rgba(246,246,248,.8); --pmhl:rgba(0,0,0,.1); --pmgap:rgba(0,0,0,.07); --pmsep:rgba(60,60,67,.24); --pmdim:rgba(0,0,0,.04); --pmdimL:rgba(0,0,0,.14);
   box-sizing:border-box; padding-top:env(safe-area-inset-top,0px);
 }
 @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
@@ -27,12 +28,14 @@
   --bg:#000000; --card:#1C1C1E; --sep:#38383A; --ink:#FFFFFF; --ink2:#8E8E93; --ink3:#636366;
   --blue:#0A84FF; --red:#FF453A; --orange:#FF9F0A; --green:#30D158; --fill:#2C2C2E; --fill2:#3A3A3C;
   --bar:rgba(22,22,24,.82); --mat:rgba(36,36,38,.9); --dim:rgba(0,0,0,.55); --press:#2C2C2E; --qhl:rgba(10,132,255,.34); --ghbg:rgba(0,0,0,.78);
+  --pmmat:rgba(44,44,46,.76); --pmhl:rgba(255,255,255,.13); --pmgap:rgba(0,0,0,.42); --pmsep:rgba(84,84,88,.55); --pmdim:rgba(0,0,0,.18); --pmdimL:rgba(0,0,0,.4);
 }}
 :root[data-theme="dark"]{
   color-scheme:dark;
   --bg:#000000; --card:#1C1C1E; --sep:#38383A; --ink:#FFFFFF; --ink2:#8E8E93; --ink3:#636366;
   --blue:#0A84FF; --red:#FF453A; --orange:#FF9F0A; --green:#30D158; --fill:#2C2C2E; --fill2:#3A3A3C;
   --bar:rgba(22,22,24,.82); --mat:rgba(36,36,38,.9); --dim:rgba(0,0,0,.55); --press:#2C2C2E; --qhl:rgba(10,132,255,.34); --ghbg:rgba(0,0,0,.78);
+  --pmmat:rgba(44,44,46,.76); --pmhl:rgba(255,255,255,.13); --pmgap:rgba(0,0,0,.42); --pmsep:rgba(84,84,88,.55); --pmdim:rgba(0,0,0,.18); --pmdimL:rgba(0,0,0,.4);
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
 html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px);font-size:17px;}
@@ -498,6 +501,51 @@ body.desktop .toast{left:auto;right:28px;bottom:28px;width:360px;}
 .asheet button.it.red{color:var(--red);}
 .asheet button.it.cancel{font-weight:600;}
 
+/* R10: anchored menus on the iPhone (popMenu). A long press lifts a copy of the row over a blurred screen; buttons anchor the menu to themselves */
+.pm{position:fixed;inset:0;z-index:30;display:none;touch-action:none;}
+.pm.open{display:block;}
+.pm.open:not(.on){pointer-events:none;} /* a closing menu takes no taps while it fades */
+.pm-back{position:absolute;inset:0;background:var(--pmdim);opacity:0;transition:opacity .25s;}
+.pm.lift .pm-back{background:var(--pmdimL);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);}
+.pm.on .pm-back{opacity:1;}
+.pm-lift{position:absolute;pointer-events:none;transform:translate3d(0,0,0);transition:transform .32s cubic-bezier(.32,.72,0,1),opacity .18s;}
+.pm.on .pm-lift{transform:translate3d(0,var(--sy,0px),0) scale(1.03);transition:transform .42s cubic-bezier(.34,1.32,.64,1),opacity .18s;}
+.pm.pick .pm-lift{opacity:0;}
+.pm-lift::before{content:"";position:absolute;inset:0;border-radius:12px;box-shadow:0 14px 36px rgba(0,0,0,.22),0 2px 8px rgba(0,0,0,.1);opacity:0;transition:opacity .3s;}
+.pm.on .pm-lift::before{opacity:1;}
+.pm-lift > .group{margin:0;height:100%;border-radius:12px;}
+.pm-lift .row-content{transform:none;}
+.pm-menu{position:absolute;width:254px;max-width:calc(100% - 16px);background:var(--pmmat);-webkit-backdrop-filter:saturate(180%) blur(30px);backdrop-filter:saturate(180%) blur(30px);border-radius:14px;box-shadow:0 10px 40px rgba(0,0,0,.2),0 0 0 .5px rgba(0,0,0,.04);overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;color:var(--ink);opacity:0;transform:scale(.4);transition:transform .2s ease-in,opacity .18s;}
+.pm.on .pm-menu{opacity:1;transform:none;transition:transform .42s cubic-bezier(.34,1.25,.64,1),opacity .2s;}
+.pm-list.swap{animation:pmSwap .24s cubic-bezier(.32,.72,0,1);}
+@keyframes pmSwap{from{opacity:0;transform:scale(.97);}}
+.pm-title{font-size:0.765rem;color:var(--ink2);padding:10px 16px 8px;line-height:1.25;border-bottom:.5px solid var(--pmsep);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.pm-grp + .pm-grp,.pm-prio + .pm-grp,.pm-head + .pm-grp{border-top:8px solid var(--pmgap);}
+.pm-it,.pm-head{display:flex;align-items:center;gap:10px;width:100%;min-height:44px;padding:10px 16px;text-align:left;font-size:1rem;line-height:1.2;color:var(--ink);}
+.pm-it + .pm-it{border-top:.5px solid var(--pmsep);}
+.pm-it.chk{padding-left:10px;}
+.pm-it .pm-ck{width:18px;flex:none;display:flex;color:var(--ink);}
+.pm-it .pm-ck svg{width:15px;height:15px;}
+.pm-it .pm-l{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;}
+.pm-it .pm-l small{display:block;font-size:0.765rem;color:var(--ink2);margin-top:1px;}
+.pm-it .pm-ic{flex:none;display:flex;align-items:center;gap:6px;color:var(--ink);}
+.pm-it .pm-ic svg{width:20px;height:20px;}
+.pm-it .pm-ic .pm-sub{width:7px;height:12px;color:var(--ink3);}
+.pm-it .pm-dot{width:14px;height:14px;border-radius:50%;margin:3px;}
+.pm-it.red,.pm-it.red .pm-ic{color:var(--red);}
+.pm-head{font-weight:600;gap:8px;}
+.pm-head svg{width:10px;height:17px;color:var(--blue);flex:none;}
+.pm-prio{display:flex;}
+.pm-prio button{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;height:64px;font-size:0.706rem;color:var(--ink);}
+.pm-prio button + button{border-left:.5px solid var(--pmsep);}
+.pm-prio button svg{width:22px;height:22px;}
+.pm-prio .high svg{color:var(--red);}
+.pm-prio .mid svg{color:var(--orange);}
+.pm-prio .none svg{color:var(--ink2);}
+.pm-prio button.on{background:var(--pmhl);font-weight:600;}
+.pm-it.hl,.pm-head.hl,.pm-prio button.hl,.pm-it:active,.pm-head:active,.pm-prio button:active{background:var(--pmhl);}
+.pm-src{visibility:hidden;}
+
 /* Toast */
 .toast{position:fixed;left:calc(16px + env(safe-area-inset-left,0px));right:calc(92px + env(safe-area-inset-right,0px));bottom:calc(60px + env(safe-area-inset-bottom,0px));background:var(--mat);-webkit-backdrop-filter:saturate(180%) blur(24px);backdrop-filter:saturate(180%) blur(24px);color:var(--ink);border-radius:12px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 6px 24px rgba(0,0,0,.18);transform:translate3d(0,20px,0);opacity:0;transition:all .25s;z-index:30;pointer-events:none;font-size:0.882rem;}
 .toast.on{transform:translate3d(0,0,0);opacity:1;pointer-events:auto;}
@@ -531,7 +579,11 @@ body.desktop .toast{left:auto;right:28px;bottom:28px;width:360px;}
  .sheet.drag{transition:none;}
  body.desktop .sheet,body.desktop .asheet,body.desktop .sheet.on,body.desktop .asheet.on{transform:translate(-50%,-50%);}
  .toast,.toast.on{transform:none;transition:opacity .25s;}
+ .pm-menu,.pm.on .pm-menu{transform:none;transition:opacity .2s;}
+ .pm-lift,.pm.on .pm-lift{transform:translate3d(0,var(--sy,0px),0);transition:opacity .18s;} /* the lifted row only moves out of the menu's way, without scaling or sliding */
+ .pm-list.swap{animation:pmFade .2s;}
 }
+@keyframes pmFade{from{opacity:0;}}
 </style>
 </head>
 <body>
@@ -539,6 +591,7 @@ body.desktop .toast{left:auto;right:28px;bottom:28px;width:360px;}
 <div class="scrim" id="scrim"></div>
 <div class="sheet" id="sheet"></div>
 <div class="asheet" id="asheet"></div>
+<div class="pm" id="pmenu" role="presentation"></div>
 <label style="position:fixed;left:-200px;top:0;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none" aria-hidden="true"><input type="checkbox" switch id="hap" tabindex="-1"></label>
 <div class="toast" id="toast"><span id="toastText"></span><button id="toastBtn">Deshacer</button></div>
 
@@ -1312,7 +1365,7 @@ function bindRows(box){
 function bindCommon(scr){
   scr.addEventListener('click', onClick);
   bindRows(scr);
-  scr.querySelectorAll('[data-open-project]').forEach(b=>bindLongPress(b, ()=>{ if(b.dataset.openProject!=='none') projectMenu(b.dataset.openProject); }));
+  scr.querySelectorAll('[data-open-project]').forEach(b=>bindLongPress(b, src=>{ if(b.dataset.openProject!=='none') projectMenu(b.dataset.openProject, src); }));
   const s=$('[data-role=search]',scr); if(s) bindSearch(s, ()=>searchAround(s));
   bindBackSwipe(scr);
 }
@@ -1373,31 +1426,29 @@ function onClick(e){
     case 'closeDay': closeDaySheet(); break;
     case 'plan': planStart(); break;
     case 'review': reviewStart('carried'); break;
-    case 'viewMenu': viewMenu(); break;
+    case 'viewMenu': viewMenu(act); break;
     case 'exportCSV': exportCSV(); break;
     case 'selAll': selectAllVisible(); break;
     case 'bulkComplete': bulkComplete(); break;
-    case 'bulkPostpone': bulkPostponeSheet(); break;
-    case 'bulkMove': bulkMoveSheet(); break;
+    case 'bulkPostpone': bulkPostponeSheet(act); break;
+    case 'bulkMove': bulkMoveSheet(act); break;
     case 'bulkDelete': bulkDelete(); break;
     case 'searchDone': UI.searchDone=true; render(); break;
     case 'toggleSummary': toggleSummary(); break;
     case 'toggleDone': DB.settings.doneOpen=!DB.settings.doneOpen; save(); render(); break;
     case 'add': addSheet(act.dataset.project||null); break;
     case 'convertLines': { const id=detailTaskId(); if(id){ flushEdits(); convertNoteLines(id); } break; }
-    case 'spaceMenu': actionSheet('Espacio', DB.spaces.slice().sort((a,b)=>a.order-b.order).map(s=>({label:s.name+(s.id===space().id?'  ✓':''), fn:()=>{ DB.settings.activeSpace=s.id; save(); resetListState();
-      if(UI.wide){ UI.deskDetail=null; if(UI.deskView.startsWith('project:')&&UI.deskView!=='project:none') UI.deskView=DB.settings.filter||'hoy'; } // the other space's project and task never stay on screen
-      render(); }})).concat([{label:'Nuevo espacio', fn:()=>spaceSheet(null)}])); break;
+    case 'spaceMenu': spaceMenu(act); break;
     case 'back': pop(); break;
     case 'rowMenu': if(row) rowMenu(row.dataset.id); break;
     case 'wcheck': { const c=act.closest('.wcard'); if(c){ act.classList.toggle('done'); act.classList.add('just'); setTimeout(()=>{ completeTask(c.dataset.id); renderAnimated(); },220); } break; }
     case 'newProject': projectSheet(null); break;
     case 'newSpace': spaceSheet(null); break;
-    case 'menu': detailMenu(detailId); break;
+    case 'menu': detailMenu(detailId, act); break;
     case 'share': shareTask(detailId); break;
-    case 'pickProject': pickProjectSheet(detailId); break;
-    case 'pickPriority': priorityMenu(detailId); break;
-    case 'postpone': closeRow(row); postponeSheet(row.dataset.id); break;
+    case 'pickProject': pickProjectSheet(detailId, act.querySelector('.val')||act); break; // R10: the menu hangs from the value, as an iOS pop-up button
+    case 'pickPriority': priorityMenu(detailId, act.querySelector('.val')||act); break;
+    case 'postpone': closeRow(row); postponeSheet(row.dataset.id, row); break;
     case 'pickDate': dateSheet(detailId); break;
     case 'pickReminder': reminderSheet(detailId); break;
     case 'voice': voiceSheet(detailId); break;
@@ -1473,8 +1524,9 @@ function bindRowGestures(row){
   row.addEventListener('touchstart',e=>{ const t=e.touches[0]; x0=lastX=t.clientX;y0=t.clientY;dx=0;thr=false;vx=0;lastT=e.timeStamp; if(row.closest('.hidden-tab')){ mode='off'; return; } mode=null; dragStart(); // a row on a screen just put away (a tab slide settled by this touch) acts on nothing unseen
     edge=x0<EDGE&&!!row.closest('.pushed-screen'); // the left edge of a pushed screen belongs to the back swipe
     if(openRow&&openRow!==row) closeRow(openRow);
-    lp=setTimeout(()=>{ if(mode===null){ mode='lp'; haptic(15); rowMenu(row.dataset.id); } },500); },{passive:true});
+    lp=setTimeout(()=>{ if(mode===null){ mode='lp'; haptic(15); rowMenu(row.dataset.id, {row, x:x0, y:y0}); } },500); },{passive:true});
   row.addEventListener('touchmove',e=>{ const t=e.touches[0]; const mx=t.clientX-x0, my=t.clientY-y0;
+    if(mode==='lp'){ e.preventDefault(); menuTrack(t.clientX, t.clientY); return; } // R10: the same finger slides over the menu's options
     if(mode===null){ if(Math.abs(my)>8){ mode='scroll'; clearTimeout(lp); } else if(Math.abs(mx)>10){ clearTimeout(lp); if(edge){ mode='edge'; return; } mode='swipe'; row.classList.add('swiping'); c.classList.add('drag'); } }
     if(mode!=='swipe') return;
     e.preventDefault(); const now=e.timeStamp; if(now>lastT){ vx=0.6*(t.clientX-lastX)/(now-lastT)+0.4*vx; lastX=t.clientX; lastT=now; }
@@ -1487,6 +1539,7 @@ function bindRowGestures(row){
     const passed = dx>90; if(passed&&!thr){thr=true;haptic(8);} if(!passed) thr=false; row.classList.toggle('armed', passed);
   },{passive:false});
   const end=e=>{ clearTimeout(lp); if(mode==='off'){ mode=null; return; } if(mode==='lp'&&e.cancelable) e.preventDefault(); // the menu is open: lifting the finger must not click it closed
+    if(mode==='lp'){ const t=e.changedTouches[0]; mode=null; dragEnd(true); if(t) menuRelease(t.clientX, t.clientY); return; } // R10: lifted on an option, it runs
     if(mode!=='swipe'){ mode=null; dragEnd(true); return; } c.classList.remove('drag'); mode=null;
     // R4: a quick flick counts like a long drag. A finger that stopped before lifting has no speed left
     const v=e.timeStamp-lastT>80?0:vx, open=row.dataset.open==='1';
@@ -1500,10 +1553,11 @@ function bindRowGestures(row){
   row.addEventListener('touchcancel',()=>{ clearTimeout(lp); const was=mode; mode=null; if(was==='off') return; if(was==='swipe') closeRow(row); dragEnd(true); }); // a cancelled touch never completes the task or opens the buttons
 }
 // Long press on a project: same 8 and 10 px tolerance as task rows; every touch starts with the flag clear, so a tap after a cancelled menu opens the project
+// R10: fn gets {row, x, y} to lift the element; once the menu is open the same finger slides over its options and lifts on one
 function bindLongPress(el, fn){ let t=null, x0=0, y0=0, fired=false;
-  el.addEventListener('touchstart',e=>{ const p=e.touches[0]; x0=p.clientX; y0=p.clientY; fired=false; el.dataset.lp='0'; clearTimeout(t); t=setTimeout(()=>{ if(el.closest('.hidden-tab')) return; /* its screen was put away meanwhile (a tab slide settled by this touch) */ fired=true; haptic(15); el.dataset.lp='1'; fn(); },500); },{passive:true});
-  el.addEventListener('touchmove',e=>{ const p=e.touches[0]; if(Math.abs(p.clientY-y0)>8||Math.abs(p.clientX-x0)>10) clearTimeout(t); },{passive:true});
-  el.addEventListener('touchend',e=>{ clearTimeout(t); if(fired&&e.cancelable) e.preventDefault(); }); // the menu is open: lifting the finger must not click
+  el.addEventListener('touchstart',e=>{ const p=e.touches[0]; x0=p.clientX; y0=p.clientY; fired=false; el.dataset.lp='0'; clearTimeout(t); t=setTimeout(()=>{ if(el.closest('.hidden-tab')) return; /* its screen was put away meanwhile (a tab slide settled by this touch) */ fired=true; haptic(15); el.dataset.lp='1'; fn({row:el, x:x0, y:y0}); },500); },{passive:true});
+  el.addEventListener('touchmove',e=>{ const p=e.touches[0]; if(fired&&menuOpen()){ if(e.cancelable) e.preventDefault(); menuTrack(p.clientX, p.clientY); return; } if(Math.abs(p.clientY-y0)>8||Math.abs(p.clientX-x0)>10) clearTimeout(t); },{passive:false});
+  el.addEventListener('touchend',e=>{ clearTimeout(t); if(fired&&e.cancelable) e.preventDefault(); const p=e.changedTouches[0]; if(fired&&menuOpen()&&p) menuRelease(p.clientX, p.clientY); }); // the menu is open: lifting the finger must not click
   el.addEventListener('touchcancel',()=>clearTimeout(t));
   el.addEventListener('click',e=>{ if(el.dataset.lp==='1'){ el.dataset.lp='0'; e.stopImmediatePropagation(); e.preventDefault(); } },true); }
 
@@ -1512,7 +1566,7 @@ const sheet=$('#sheet'), scrim=$('#scrim'), asheet=$('#asheet');
 const dimApp = on => app.classList.toggle('sheet-open', !!on);
 let sheetOnClose=null; // one shot, set by the sheet's owner: runs however the sheet closes (a button, the scrim, a drag down, Escape)
 function openSheet(html, onOpen){ sheetOnClose=null; sheet.classList.remove('addsheet'); sheet.innerHTML='<div class="handle"></div>'+html; sheet.classList.add('on'); scrim.classList.add('on'); dimApp(true); bindSheetDrag(); onOpen&&onOpen(sheet); }
-function closeSheet(){ sheet.classList.remove('on','drag'); sheet.style.transform=''; asheet.classList.remove('on'); asheet.onclick=null; scrim.classList.remove('on'); dimApp(false); try{ stopRec&&stopRec(); }catch(e){} setTimeout(()=>{ if(!sheet.classList.contains('on')) sheet.innerHTML=''; if(!asheet.classList.contains('on')) asheet.innerHTML=''; },350); const oc=sheetOnClose; sheetOnClose=null; if(oc) oc(); if(staleView) setTimeout(flushStale, 0); } // a closed menu keeps no buttons or handler that a stray click could fire; data reloaded meanwhile is drawn now, unless the caller already redrew
+function closeSheet(){ closeMenu(true); sheet.classList.remove('on','drag'); sheet.style.transform=''; asheet.classList.remove('on'); asheet.onclick=null; scrim.classList.remove('on'); dimApp(false); try{ stopRec&&stopRec(); }catch(e){} setTimeout(()=>{ if(!sheet.classList.contains('on')) sheet.innerHTML=''; if(!asheet.classList.contains('on')) asheet.innerHTML=''; },350); const oc=sheetOnClose; sheetOnClose=null; if(oc) oc(); if(staleView) setTimeout(flushStale, 0); } // a closed menu keeps no buttons or handler that a stray click could fire; data reloaded meanwhile is drawn now, unless the caller already redrew
 /* An action menu opened over an open sheet (the Proyecto and Prioridad chips of Nueva tarea) is nested:
    Cancelar, a tap outside or Escape close only the menu and give the sheet back with what was typed */
 let asheetNested=false, asheetCancel=null;
@@ -1538,24 +1592,162 @@ function bindSheetDrag(){ const h=sheet; let y0=0,dy=0,drag=false,inner=null,las
   h.ontouchcancel=()=>{ inner=null; if(!drag) return; drag=false; reset(); }; }
 function actionSheet(title, items, onCancel){ asheetNested=sheet.classList.contains('on'); asheetCancel=onCancel||null; asheet.innerHTML='<div class="grp">'+(title?'<div class="t">'+esc(title)+'</div>':'')+items.map((it,i)=>'<button class="it'+(it.red?' red':'')+'" data-i="'+i+'">'+esc(it.label)+'</button>').join('')+'</div><div class="grp"><button class="it cancel" data-i="-1">Cancelar</button></div>'; asheet.classList.add('on'); scrim.classList.add('on'); dimApp(true); asheet.onclick=e=>{ const b=e.target.closest('[data-i]'); if(!b) return; const i=+b.dataset.i; if(i<0){ cancelAction(); return; } if(asheetNested&&sheet.classList.contains('on')) closeAction(); else closeSheet(); items[i].fn(); }; }
 function confirmSheet(title, text, fn){ actionSheet(text, [{label:title, red:true, fn}]); }
-function priorityMenu(id){ const x=task(id); if(!x) return; actionSheet(x.title, [
+/* ---------- R10: anchored menus (iPhone) ----------
+   A long press lifts the row (a copy of it, over the blurred and dimmed screen; the row itself is hidden meanwhile) and opens a
+   compact menu next to it. A button (the space title, three dots, a detail cell, the select bar) opens the same menu anchored to it.
+   Options come in groups with a line icon each; a submenu replaces the menu in place, with its parent as a header that goes back.
+   The finger that opened the menu can slide over the options and lift on one to choose it (menuTrack, menuRelease).
+   spec: {anchor, lift, x, y, align, title, prio:{cur, fn}, groups:[[{label, sub, icon, red, on, fn, menu}]]}; menu returns a spec.
+   The bottom action sheet stays for confirmations (confirmSheet) and, for now, for every menu on the desktop. */
+const mi = p => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'+p+'</svg>';
+const MI = {
+  p3:mi('<path d="M6 4.5v9.5M12 4.5v9.5M18 4.5v9.5"/><g fill="currentColor" stroke="none"><circle cx="6" cy="19" r="1.5"/><circle cx="12" cy="19" r="1.5"/><circle cx="18" cy="19" r="1.5"/></g>'),
+  p2:mi('<path d="M9 4.5v9.5M15 4.5v9.5"/><g fill="currentColor" stroke="none"><circle cx="9" cy="19" r="1.5"/><circle cx="15" cy="19" r="1.5"/></g>'),
+  p0:mi('<circle cx="12" cy="12" r="8.5"/><path d="M6 6l12 12"/>'),
+  postpone:mi('<rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M3 10h18M8 3v4M16 3v4M8.5 15.5h6.5M12.5 13l2.5 2.5-2.5 2.5"/>'),
+  calPick:mi('<rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M3 10h18M8 3v4M16 3v4"/><g fill="currentColor" stroke="none"><circle cx="8" cy="14.5" r="1.1"/><circle cx="12" cy="14.5" r="1.1"/><circle cx="16" cy="14.5" r="1.1"/><circle cx="8" cy="18" r="1.1"/><circle cx="12" cy="18" r="1.1"/></g>'),
+  cal:mi('<rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M3 10h18M8 3v4M16 3v4"/>'),
+  sunrise:mi('<path d="M4 18h16M7 18a5 5 0 0110 0M12 6v3M5.5 10.5l1.6 1.6M18.5 10.5l-1.6 1.6M3 14.5h1.5M19.5 14.5H21"/>'),
+  weekend:mi('<path d="M5 11V8a2 2 0 012-2h10a2 2 0 012 2v3M3 13a2 2 0 014 0v1h10v-1a2 2 0 014 0v5H3zM5 18v2M19 18v2"/>'),
+  folder:mi('<path d="M3 7.5a2 2 0 012-2h4.2l2 2.3H19a2 2 0 012 2V18a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>'),
+  space:mi('<path d="M13 4H6a2 2 0 00-2 2v12a2 2 0 002 2h7M10 12h10.5M17 8.5l3.5 3.5-3.5 3.5"/>'),
+  dup:mi('<rect x="8" y="8" width="12" height="12" rx="2.2"/><path d="M16 8V6a2 2 0 00-2-2H6a2 2 0 00-2 2v8a2 2 0 002 2h2"/>'),
+  select:mi('<circle cx="12" cy="12" r="8.5"/><path d="M8.2 12.3l2.6 2.6 5-5.3"/>'),
+  done:mi('<path d="M5 12.5l4.5 4.5L19 7"/>'),
+  undo:mi('<path d="M9 14L4 9l5-5M4 9h10.5a5.5 5.5 0 010 11H11"/>'),
+  trash:mi('<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>'),
+  plus:mi('<path d="M12 5v14M5 12h14"/>'),
+  eye:mi('<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/>'),
+  eyeOff:mi('<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/><path d="M4 4l16 16"/>'),
+  summary:mi('<rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M7 9h10M7 13h6"/>'),
+  pencil:mi('<path d="M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4"/>'),
+  up:mi('<path d="M12 19V5M6 11l6-6 6 6"/>'),
+  down:mi('<path d="M12 5v14M6 13l6 6 6-6"/>'),
+  archive:mi('<rect x="3" y="4" width="18" height="5" rx="1.5"/><path d="M5 9v9a2 2 0 002 2h10a2 2 0 002-2V9M10 13h4"/>'),
+  check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5l5 5L19.5 6.5"/></svg>',
+};
+const pmEl=$('#pmenu');
+const pmHide=document.createElement('style'); document.head.appendChild(pmHide); // hides the lifted row while its copy is up, also once a render has replaced it
+let PM=null, pmFinish=null; // the open menu; the end of a closing one (a new menu finishes it at once)
+const menuOpen=()=>!!PM;
+let pmProbe=null;
+function safeInsets(){ if(!pmProbe){ pmProbe=document.createElement('div'); pmProbe.style.cssText='position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;pointer-events:none;padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)'; document.body.appendChild(pmProbe); }
+  const cs=getComputedStyle(pmProbe); return {t:parseFloat(cs.paddingTop)||0, r:parseFloat(cs.paddingRight)||0, b:parseFloat(cs.paddingBottom)||0, l:parseFloat(cs.paddingLeft)||0}; }
+// The row on screen for a task: the top screen's, else the active tab's (rowMenu called without the row, as the tests and old callers do)
+function visibleRow(id){ const top=UI.stack.length?UI.stack[UI.stack.length-1].el:rootScreen(UI.tab); const r=top&&top.querySelector('.scroll .row[data-id="'+CSS.escape(id)+'"]:not(.first .row)'); if(!r) return null; const b=r.getBoundingClientRect(); return b.height&&b.bottom>0&&b.top<innerHeight?r:null; }
+function popMenu(spec){
+  if(PM) closeMenu(true); if(pmFinish) pmFinish();
+  if(openRow) closeRow(openRow);
+  const m=PM={spec, stack:[spec], hl:null, moved:false, x0:spec.x||0, y0:spec.y||0, subT:null, rect:null};
+  const src=spec.lift&&spec.lift.isConnected?spec.lift:null;
+  pmEl.className='pm open'+(src?' lift':''); pmEl.innerHTML='<div class="pm-back"></div><div class="pm-menu" role="menu"><div class="pm-list"></div></div>';
+  if(src){ const r=m.rect=src.getBoundingClientRect(); const c=src.cloneNode(true);
+    c.classList.remove('swiping','dir-l','dir-r','armed','held','cv','leaving','selected'); c.removeAttribute('data-id'); c.removeAttribute('data-open'); c.removeAttribute('data-open-project');
+    c.querySelectorAll('.row-bg').forEach(b=>b.remove()); const cc=c.querySelector('.row-content'); if(cc){ cc.style.transform=''; cc.classList.remove('drag'); }
+    const box=document.createElement('div'); box.className='pm-lift'; box.style.cssText='left:'+r.left+'px;top:'+r.top+'px;width:'+r.width+'px;height:'+r.height+'px';
+    const g=document.createElement('div'); g.className='group'; g.appendChild(c); box.appendChild(g); pmEl.insertBefore(box, pmEl.querySelector('.pm-menu'));
+    const sel=src.dataset.id?'.app .row[data-id="'+CSS.escape(src.dataset.id)+'"]':src.dataset.openProject?'.app [data-open-project="'+CSS.escape(src.dataset.openProject)+'"]':null;
+    if(sel) pmHide.textContent=sel+'{visibility:hidden}'; else src.classList.add('pm-src'); m.src=src; }
+  pmRender(false); pmEl.offsetWidth; pmEl.classList.add('on');
+}
+function pmCur(){ return PM.stack[PM.stack.length-1]; }
+function pmItem(key){ const cur=pmCur(); return /^\d+$/.test(key)?cur.items[+key]:null; }
+function pmRender(swap){ const m=PM, cur=pmCur(), depth=m.stack.length-1; const items=cur.items=[]; const gs=(cur.groups||[]).filter(g=>g&&g.length);
+  const checks=gs.some(g=>g.some(it=>it.on!==undefined)); let h='';
+  if(depth) h+='<button class="pm-head" data-mi="back">'+I.back+'<span>'+esc(cur.title||'')+'</span></button>';
+  else if(cur.title) h+='<div class="pm-title">'+esc(cur.title)+'</div>';
+  if(cur.prio) h+='<div class="pm-prio">'+[['high','Alta',MI.p3],['mid','Media',MI.p2],['none','Ninguna',MI.p0]].map(([k,l,ic])=>'<button class="'+k+(cur.prio.cur===k?' on':'')+'" data-mi="p:'+k+'" role="menuitemradio" aria-checked="'+(cur.prio.cur===k)+'">'+ic+'<span>'+l+'</span></button>').join('')+'</div>';
+  gs.forEach(g=>{ h+='<div class="pm-grp">'+g.map(it=>{ const i=items.push(it)-1;
+    return '<button class="pm-it'+(it.red?' red':'')+(checks?' chk':'')+'" data-mi="'+i+'" role="menuitem">'+(checks?'<span class="pm-ck">'+(it.on?MI.check:'')+'</span>':'')+
+      '<span class="pm-l">'+esc(it.label)+(it.sub?'<small>'+esc(it.sub)+'</small>':'')+'</span>'+
+      '<span class="pm-ic">'+(it.menu?I.chev.replace('<svg','<svg class="pm-sub"'):'')+(it.icon||'')+'</span></button>'; }).join('')+'</div>'; });
+  const list=pmEl.querySelector('.pm-list'); list.innerHTML=h; list.classList.remove('swap'); if(swap){ list.offsetWidth; list.classList.add('swap'); }
+  m.hl=null; pmEl.querySelector('.pm-menu').scrollTop=0; pmLayout(); }
+// Places the menu next to its anchor or lifted row, inside the safe area: below if it fits, else above, else the lifted row moves
+// out of its way (as on iOS) or the menu covers the anchor; a menu taller than the screen scrolls inside
+function pmLayout(){ const m=PM, mn=pmEl.querySelector('.pm-menu'); const ins=safeInsets(); const vw=innerWidth, vv=window.visualViewport;
+  const T=Math.max(ins.t, vv?vv.offsetTop:0)+8, B=Math.min(innerHeight-ins.b, vv?vv.offsetTop+vv.height:innerHeight)-8, Lx=ins.l+8, Rx=vw-ins.r-8; // above the keyboard, if one is up mn.style.maxHeight=''; mn.style.maxWidth=(Rx-Lx)+'px';
+  const w=mn.offsetWidth; let h=Math.min(mn.offsetHeight, B-T); let top, sy=0, fromTop=true; const lift=pmEl.querySelector('.pm-lift');
+  const a=m.rect||(m.spec.anchor&&m.spec.anchor.isConnected?m.spec.anchor.getBoundingClientRect():null);
+  if(a&&lift){ const gap=10; if(h>B-T-a.height-gap) h=Math.max(120, B-T-a.height-gap);
+    const below=B-(a.bottom+gap), above=(a.top-gap)-T;
+    if(h<=below) top=a.bottom+gap; else if(h<=above){ top=a.top-gap-h; fromTop=false; }
+    else if(below>=above){ sy=below-h; top=a.bottom+sy+gap; } else { sy=h-above; top=a.top+sy-gap-h; fromTop=false; }
+    lift.style.setProperty('--sy', sy+'px'); }
+  else if(a&&a.width){ const gap=6, below=B-(a.bottom+gap), above=(a.top-gap)-T;
+    if(h<=below) top=a.bottom+gap; else if(h<=above){ top=a.top-gap-h; fromTop=false; } else top=Math.max(T, Math.min(B-h, a.top)); }
+  else top=(T+B-h)/2;
+  let left; const ax=m.spec.x||(a?a.left+a.width/2:vw/2);
+  if(!a||!a.width) left=(vw-w)/2; else if(m.spec.align==='right'||(m.spec.align!=='left'&&(lift?ax>vw/2:a.left+a.width/2>vw*0.55))) left=a.right-w; else left=a.left;
+  left=Math.max(Lx, Math.min(Rx-w, left)); top=Math.max(T, Math.min(B-h, top));
+  mn.style.left=left+'px'; mn.style.top=top+'px'; mn.style.maxHeight=h+'px';
+  mn.style.transformOrigin=Math.round(Math.max(0, Math.min(w, (a?(lift?ax:a.left+a.width/2):vw/2)-left)))+'px '+(fromTop?'0':h+'px'); }
+// pick: an option was chosen; the lifted copy fades where it is and the row shows again at once, for the action's own animation
+function closeMenu(instant, pick){ const m=PM; if(!m) return; PM=null; clearTimeout(m.subT);
+  const finish=()=>{ if(pmFinish!==finish) return; pmFinish=null; pmEl.className='pm'; pmEl.innerHTML=''; pmHide.textContent=''; if(m.src) m.src.classList.remove('pm-src'); };
+  pmFinish=finish; if(pick||RM.matches){ pmEl.classList.add('pick'); pmHide.textContent=''; if(m.src) m.src.classList.remove('pm-src'); }
+  pmEl.classList.remove('on'); if(instant) finish(); else setTimeout(finish, 300);
+  if(staleView&&!pick) setTimeout(flushStale, 0); }
+function pmActivate(key){ const m=PM; if(!m) return; const cur=pmCur(); clearTimeout(m.subT);
+  if(key==='back'){ if(m.stack.length>1){ m.stack.pop(); pmRender(true); } return; }
+  if(key.startsWith('p:')){ const pr=key.slice(2); closeMenu(false, true); cur.prio.fn(pr); return; }
+  const it=pmItem(key); if(!it) return;
+  if(it.menu){ const sub=it.menu(); if(!sub) return; sub.title=sub.title||it.label; m.stack.push(sub); haptic(4); pmRender(true); return; }
+  closeMenu(false, true); if(it.fn) it.fn(); }
+function pmHighlight(b, buzz){ const m=PM; if(!m||b===m.hl) return; if(m.hl) m.hl.classList.remove('hl'); clearTimeout(m.subT); m.hl=b||null; if(!b) return;
+  b.classList.add('hl'); if(buzz) haptic(4);
+  const it=pmItem(b.dataset.mi); if(buzz&&it&&it.menu) m.subT=setTimeout(()=>{ if(PM===m&&m.hl===b){ b.classList.remove('hl'); m.hl=null; pmActivate(b.dataset.mi); } }, 600); } // resting on a submenu while sliding opens it
+// The finger that opened the menu (or any finger on it) slides: the option under it lights up
+function menuTrack(x, y){ const m=PM; if(!m) return; if(!m.moved&&Math.hypot(x-m.x0, y-m.y0)>10) m.moved=true; if(!m.moved) return;
+  const el=document.elementFromPoint(x, y); pmHighlight(el&&el.closest('#pmenu .pm-menu [data-mi]'), true); }
+// It lifts: on an option, that option runs; after sliding away from where it started, outside the menu, the menu closes
+function menuRelease(x, y){ const m=PM; if(!m) return; clearTimeout(m.subT); const b=m.hl; if(b){ b.classList.remove('hl'); m.hl=null; pmActivate(b.dataset.mi); return; }
+  if(m.moved){ const el=document.elementFromPoint(x, y); if(!(el&&el.closest('#pmenu .pm-menu'))) closeMenu(); } m.moved=false; }
+pmEl.addEventListener('touchstart', e=>{ const m=PM; if(!m) return; const t=e.touches[0]; m.x0=t.clientX; m.y0=t.clientY; m.moved=false; m.scroll=false; m.inMenu=!!e.target.closest('.pm-menu');
+  pmHighlight(e.target.closest('.pm-menu [data-mi]'), false); },{passive:true});
+pmEl.addEventListener('touchmove', e=>{ const m=PM; if(!m) return; const t=e.touches[0], mn=pmEl.querySelector('.pm-menu');
+  if(m.inMenu&&mn.scrollHeight>mn.clientHeight+1){ if(m.scroll||Math.abs(t.clientY-m.y0)>8){ m.scroll=true; pmHighlight(null); } return; } // a menu taller than the screen scrolls instead
+  e.preventDefault(); menuTrack(t.clientX, t.clientY); },{passive:false});
+pmEl.addEventListener('touchend', e=>{ const m=PM; if(!m) return; if(e.cancelable) e.preventDefault(); if(m.scroll){ m.scroll=false; return; } const t=e.changedTouches[0];
+  if(m.hl){ menuRelease(t.clientX, t.clientY); return; } const el=document.elementFromPoint(t.clientX, t.clientY); if(!(el&&el.closest('.pm-menu'))) closeMenu(); });
+pmEl.addEventListener('touchcancel', ()=>{ if(PM) pmHighlight(null); });
+pmEl.addEventListener('click', e=>{ if(!PM) return; const b=e.target.closest('.pm-menu [data-mi]'); if(b){ pmActivate(b.dataset.mi); return; } if(!e.target.closest('.pm-menu')) closeMenu(); }); // a mouse, or a tap that touchend let through
+addEventListener('resize', ()=>{ if(PM) closeMenu(true); });
+function priorityMenu(id, src){ const x=task(id); if(!x) return;
+  if(!UI.wide) return popMenu({anchor:src, align:'right', groups:[[['high','Alta',MI.p3],['mid','Media',MI.p2],['none','Ninguna',MI.p0]].map(([k,l,ic])=>({label:l, icon:ic, on:x.priority===k, fn:()=>setPriority(id,k)}))]});
+  actionSheet(x.title, [
   {label:'Prioridad alta'+(x.priority==='high'?'  ✓':''), fn:()=>setPriority(id,'high')},
   {label:'Prioridad media'+(x.priority==='mid'?'  ✓':''), fn:()=>setPriority(id,'mid')},
   {label:'Sin prioridad'+(x.priority==='none'?'  ✓':''), fn:()=>setPriority(id,'none')} ]); }
 function setPriority(id, pr){ const x=task(id); if(!x||x.priority===pr) return; const old=x.priority; updTask(id,{priority:pr}); haptic(8); renderAnimated(); toast({high:'Prioridad alta',mid:'Prioridad media',none:'Sin prioridad'}[pr], ()=>updTask(id,{priority:old})); }
 function moveToProject(id, projectId){ const x=task(id); if(!x||x.projectId===projectId) return; const old=x.projectId; updTask(id,{projectId}); const p=projectId?proj(projectId):null; renderAnimated(); toast(p?'Movida a '+p.name:'Sin proyecto', ()=>updTask(id,{projectId:old})); }
-function moveToSpaceSheet(id){ const x=task(id); if(!x) return; const others=DB.spaces.filter(sp=>sp.id!==x.spaceId).sort((a,b)=>a.order-b.order); if(!others.length) return;
-  actionSheet('Mover a espacio', others.map(sp=>({label:sp.name, fn:()=>{ const old={spaceId:x.spaceId, projectId:x.projectId}; leaveRows(id); setTimeout(()=>{ updTask(id,{spaceId:sp.id, projectId:null}); if(detailTaskId()===id) pop(); else renderAnimated(); toast('Movida a '+sp.name, ()=>updTask(id,old)); },200); }}))); }
+function moveToSpace(id, sp){ const x=task(id); if(!x) return; const old={spaceId:x.spaceId, projectId:x.projectId}; leaveRows(id); setTimeout(()=>{ updTask(id,{spaceId:sp.id, projectId:null}); if(detailTaskId()===id) pop(); else renderAnimated(); toast('Movida a '+sp.name, ()=>updTask(id,old)); },200); }
+const otherSpaces = x => DB.spaces.filter(sp=>sp.id!==x.spaceId).sort((a,b)=>a.order-b.order);
+function moveToSpaceSheet(id){ const x=task(id); if(!x) return; const others=otherSpaces(x); if(!others.length) return;
+  actionSheet('Mover a espacio', others.map(sp=>({label:sp.name, fn:()=>moveToSpace(id, sp)}))); }
+// R10 submenus of a task (row menu and detail menu, iPhone)
+function spaceMoveMenu(id){ const x=task(id); if(!x) return null; return {title:'Mover a otro espacio', groups:[otherSpaces(x).map(sp=>({label:sp.name, icon:MI.space, fn:()=>moveToSpace(id, sp)}))]}; }
+function projectPickMenu(id){ const x=task(id); if(!x) return null; const dot=c=>'<span class="pm-dot" style="background:'+c+'"></span>';
+  return {title:'Mover a proyecto', groups:[[{label:'Ninguno', icon:dot('var(--ink3)'), on:!x.projectId, fn:()=>moveToProject(id,null)}].concat(activeProjects().map(p=>({label:p.name, icon:dot(p.color), on:x.projectId===p.id, fn:()=>moveToProject(id,p.id)})))]}; }
+const DATE_ICON={'Mañana':MI.sunrise, 'Fin de semana':MI.weekend, 'Próxima semana':MI.postpone, 'En una semana':MI.cal, 'Sin fecha':MI.p0};
+const dateItem = (l, d, fn) => ({label:l, sub:l==='Mañana'||!d?'':fmtDate(d), icon:DATE_ICON[l]||MI.cal, fn});
+function postponeMenu(id){ const t=todayStr(); const opts=uniqueBy([['Mañana',addDays(t,1)],['Fin de semana',weekendDay()],['Próxima semana',nextWeekday(1,true)]], o=>o[1]);
+  return {title:'Aplazar', groups:[opts.map(([l,d])=>dateItem(l, d, ()=>{ leaveRows(id); setTimeout(()=>{ rescheduleTask(id,d,l.toLowerCase()); renderAnimated(); },200); })), [{label:'Elegir fecha', icon:MI.calPick, fn:()=>dateSheet(id)}]]}; }
 function duplicateTask(id){ const x=task(id); if(!x) return; const n=addTask({title:x.title, projectId:x.projectId, priority:x.priority, notes:x.notes, spaceId:x.spaceId}); haptic(8); renderAnimated(); toast('Tarea duplicada'); openDetail(n.id); }
 function leaveRows(id){ document.querySelectorAll('.row[data-id="'+id+'"]').forEach(r=>r.classList.add('leaving')); }
 function confirmDelete(id, after){ const x=task(id); if(!x) return; releaseHold(id); confirmSheet('Eliminar tarea', '"'+x.title+'" se eliminará. Podrás deshacerlo durante unos segundos.', ()=>{ leaveRows(id); setTimeout(()=>{ deleteTask(id); after?after():renderAnimated(); },200); }); }
-function detailMenu(id){ const x=task(id); if(!x) return; actionSheet(x.title, [
+function detailMenu(id, src){ const x=task(id); if(!x) return;
+  if(!UI.wide) return popMenu({anchor:src, groups:[
+    [{label:x.status==='done'?'Marcar pendiente':'Marcar completada', icon:x.status==='done'?MI.undo:MI.done, fn:()=>{ completeTask(id,true); render(); }}],
+    (DB.spaces.length>1?[{label:'Mover a otro espacio', icon:MI.space, menu:()=>spaceMoveMenu(id)}]:[]).concat([{label:'Duplicar', icon:MI.dup, fn:()=>duplicateTask(id)}]),
+    [{label:'Eliminar tarea', icon:MI.trash, red:true, fn:()=>confirmDelete(id, closeDetailOf(id))}] ]});
+  actionSheet(x.title, [
   {label:x.status==='done'?'Marcar pendiente':'Marcar completada', fn:()=>{ completeTask(id,true); render(); }}].concat(DB.spaces.length>1?[{label:'Mover a otro espacio', fn:()=>moveToSpaceSheet(id)}]:[], [
   {label:'Duplicar', fn:()=>duplicateTask(id)},
   {label:'Eliminar tarea', red:true, fn:()=>confirmDelete(id, closeDetailOf(id))} ])); }
 // After a delete from the detail, close that task's detail only if it is still the one showing: Atrás may have been tapped meanwhile
 const closeDetailOf = id => ()=>{ if(detailTaskId()===id) pop(); else renderAnimated(); };
-function postponeSheet(id){ releaseHold(id); const t=todayStr(); const opts=uniqueBy([['Mañana',addDays(t,1)],['Fin de semana',weekendDay()],['Próxima semana',nextWeekday(1,true)]], o=>o[1]);
+function postponeSheet(id, src){ releaseHold(id); if(!UI.wide){ const m=postponeMenu(id); if(m) popMenu(Object.assign(m, {anchor:src, align:'right'})); return; } const t=todayStr(); const opts=uniqueBy([['Mañana',addDays(t,1)],['Fin de semana',weekendDay()],['Próxima semana',nextWeekday(1,true)]], o=>o[1]);
   actionSheet('Aplazar', opts.map(([l,d])=>({label:l+(l==='Mañana'?'':'  ('+fmtDate(d)+')'), fn:()=>{ leaveRows(id); setTimeout(()=>{ rescheduleTask(id,d,l.toLowerCase()); renderAnimated(); },200); }})).concat([{label:'Elegir fecha', fn:()=>dateSheet(id)}])); }
 /* Multi-select: entered from the long-press menu; a bottom bar replaces the tab bar */
 function renderSelbar(){ const n=UI.select?UI.select.ids.size:0; const b=(act,ic,l,red)=>'<button data-act="'+act+'"'+(n?'':' disabled')+(red?' class="red"':'')+'>'+ic+'<span>'+l+'</span></button>'; $('#selbar').innerHTML=b('bulkComplete',I.check,'Completar')+b('bulkPostpone',I.cal,'Aplazar')+b('bulkMove',I.folder,'Mover')+b('bulkDelete',I.trash,'Eliminar',true); }
@@ -1569,9 +1761,11 @@ function selectedTasks(){ return UI.select ? [...UI.select.ids].map(task).filter
 function bulkComplete(){ const xs=selectedTasks(); if(!xs.length) return; const prev=xs.map(x=>({id:x.id, status:x.status, completed:x.completed})); const now=new Date().toISOString(); batch(()=>xs.forEach(x=>{ if(x.status==='pending') updTask(x.id,{status:'done', completed:now}); })); const n=prev.filter(p=>p.status==='pending').length; log('info','Completadas en bloque: '+n); endSelect(); toast(n+(n===1?' tarea completada':' tareas completadas'), ()=>batch(()=>prev.forEach(p=>updTask(p.id,{status:p.status, completed:p.completed})))); }
 function bulkDelete(){ const xs=selectedTasks(); if(!xs.length) return; confirmSheet('Eliminar '+xs.length+(xs.length===1?' tarea':' tareas'), 'Podrás deshacerlo durante unos segundos.', ()=>{ const ids=new Set(xs.map(x=>x.id)); const removedT=DB.tasks.filter(x=>ids.has(x.id)), removedV=DB.voiceNotes.filter(v=>ids.has(v.taskId)); DB.tasks=DB.tasks.filter(x=>!ids.has(x.id)); DB.voiceNotes=DB.voiceNotes.filter(v=>!ids.has(v.taskId)); save(); log('info','Eliminadas en bloque: '+removedT.length); endSelect(); haptic(14); toast(removedT.length+(removedT.length===1?' tarea eliminada':' tareas eliminadas'), ()=>{ DB.tasks.push(...removedT); DB.voiceNotes.push(...removedV); save(); }); }); }
 function bulkReschedule(date, label){ const xs=selectedTasks(); if(!xs.length) return; const prev=xs.map(x=>({id:x.id, date:x.date, carried:x.carried})); batch(()=>xs.forEach(x=>updTask(x.id,{date}))); endSelect(); toast(xs.length+(xs.length===1?' tarea aplazada a ':' tareas aplazadas a ')+label, ()=>batch(()=>prev.forEach(p=>updTask(p.id,{date:p.date, carried:p.carried})))); }
-function bulkPostponeSheet(){ if(!UI.select||!UI.select.ids.size) return; const t=todayStr(); const opts=uniqueBy([['Mañana',addDays(t,1)],['Fin de semana',weekendDay()],['Próxima semana',nextWeekday(1,true)],['En una semana',addDays(t,7)]], o=>o[1]);
+function bulkPostponeSheet(src){ if(!UI.select||!UI.select.ids.size) return; const t=todayStr(); const opts=uniqueBy([['Mañana',addDays(t,1)],['Fin de semana',weekendDay()],['Próxima semana',nextWeekday(1,true)],['En una semana',addDays(t,7)]], o=>o[1]);
+  if(!UI.wide) return popMenu({anchor:src, title:'Aplazar '+UI.select.ids.size+(UI.select.ids.size===1?' tarea':' tareas'), groups:[opts.map(([l,d])=>dateItem(l, d, ()=>bulkReschedule(d,l.toLowerCase()))), [dateItem('Sin fecha', null, ()=>bulkReschedule(null,'sin fecha'))]]});
   actionSheet('Aplazar '+UI.select.ids.size+(UI.select.ids.size===1?' tarea':' tareas'), opts.map(([l,d])=>({label:l+(l==='Mañana'?'':'  ('+fmtDate(d)+')'), fn:()=>bulkReschedule(d,l.toLowerCase())})).concat([{label:'Sin fecha', fn:()=>bulkReschedule(null,'sin fecha')}])); }
-function bulkMoveSheet(){ if(!UI.select||!UI.select.ids.size) return; const ps=activeProjects(); const n=UI.select.ids.size;
+function bulkMoveSheet(src){ if(!UI.select||!UI.select.ids.size) return; const ps=activeProjects(); const n=UI.select.ids.size;
+  if(!UI.wide){ const dot=c=>'<span class="pm-dot" style="background:'+c+'"></span>'; return popMenu({anchor:src, title:'Mover '+n+(n===1?' tarea':' tareas'), groups:[[{label:'Sin proyecto', icon:dot('var(--ink3)'), fn:()=>bulkMove(null)}].concat(ps.map(p=>({label:p.name, icon:dot(p.color), fn:()=>bulkMove(p.id)})))]}); }
   actionSheet('Mover '+n+(n===1?' tarea':' tareas'), [{label:'Sin proyecto', fn:()=>bulkMove(null)}].concat(ps.map(p=>({label:p.name, fn:()=>bulkMove(p.id)})))); }
 function bulkMove(projectId){ const xs=selectedTasks(); if(!xs.length) return; const prev=xs.map(x=>({id:x.id, projectId:x.projectId})); batch(()=>xs.forEach(x=>updTask(x.id,{projectId}))); const p=projectId?proj(projectId):null; endSelect(); toast(xs.length+(xs.length===1?' tarea movida a ':' tareas movidas a ')+(p?p.name:'Sin proyecto'), ()=>batch(()=>prev.forEach(q=>updTask(q.id,{projectId:q.projectId})))); }
 function rescheduleMany(xs, date, label){ if(!xs.length) return; const prev=xs.map(x=>({id:x.id, date:x.date, carried:x.carried})); batch(()=>xs.forEach(x=>updTask(x.id,{date}))); renderAnimated(); haptic(8); log('info','Aplazadas en bloque: '+xs.length+' a '+date); toast(xs.length+(xs.length===1?' tarea ':' tareas ')+(date?(xs.length===1?'pasada a ':'pasadas a ')+label:'sin fecha'), ()=>batch(()=>prev.forEach(p=>updTask(p.id,{date:p.date, carried:p.carried})))); }
@@ -1635,25 +1829,46 @@ function reviewEnd(st, asSheet){ const T=st.tally, decided=Object.keys(T).some(k
 /* R13: the view options, from the three dots of the Tareas bar (and of a project) on the iPhone and of the column head on the desktop */
 function toggleSummary(){ const fold=!summaryCollapsed(pendingFor('hoy').length); DB.settings.summaryState = fold?'closed':'open'; if(fold) UI.sumFilter=null; UI.summaryFirst=false; save(); render(); } // a folded summary hides its figures, so their filter goes too
 function setGrouping(key, g){ if(DB.settings[key]===g) return; DB.settings[key]=g; save(); haptic(4); renderAnimated(); }
-function viewMenu(){ const top=UI.stack[UI.stack.length-1]; const inProject=UI.wide?UI.deskView.startsWith('project:'):!!(top&&top.kind==='project');
+function spaceMenu(src){ const pickSpace=s=>{ DB.settings.activeSpace=s.id; save(); resetListState();
+    if(UI.wide){ UI.deskDetail=null; if(UI.deskView.startsWith('project:')&&UI.deskView!=='project:none') UI.deskView=DB.settings.filter||'hoy'; } // the other space's project and task never stay on screen
+    render(); };
+  const sps=DB.spaces.slice().sort((a,b)=>a.order-b.order);
+  if(!UI.wide) return popMenu({anchor:src, align:'left', groups:[sps.map(s=>({label:s.name, on:s.id===space().id, fn:()=>pickSpace(s)})), [{label:'Nuevo espacio', icon:MI.plus, fn:()=>spaceSheet(null)}]]});
+  actionSheet('Espacio', sps.map(s=>({label:s.name+(s.id===space().id?'  ✓':''), fn:()=>pickSpace(s)})).concat([{label:'Nuevo espacio', fn:()=>spaceSheet(null)}])); }
+function viewMenu(src){ const top=UI.stack[UI.stack.length-1]; const inProject=UI.wide?UI.deskView.startsWith('project:'):!!(top&&top.kind==='project');
   const f=inProject?null:UI.wide?UI.deskView:DB.settings.filter; const items=[]; const on=b=>b?'  ✓':'';
   if(!UI.wide) items.push({label:'Seleccionar tareas', fn:()=>startSelect(null)}); // the desktop has no multiple selection yet
   items.push({label:DB.settings.doneOpen?'Ocultar completadas':'Mostrar completadas', fn:()=>{ DB.settings.doneOpen=!DB.settings.doneOpen; save(); render(); }});
   if(f==='hoy'||f==='todas'){ const k=f==='hoy'?'hoyGroup':'allGroup', g=DB.settings[k]==='project'?'project':'date';
     items.push({label:'Agrupar por fecha'+on(g==='date'), fn:()=>setGrouping(k,'date')}, {label:'Agrupar por proyecto'+on(g==='project'), fn:()=>setGrouping(k,'project')}); }
   if(f==='hoy') items.push({label:summaryCollapsed(pendingFor('hoy').length)?'Mostrar resumen del día':'Plegar resumen del día', fn:toggleSummary});
+  if(!UI.wide){ // R10: the same options in an anchored menu, the grouping as a checked pair
+    const k=f==='hoy'?'hoyGroup':'allGroup', g=DB.settings[k]==='project'?'project':'date';
+    return popMenu({anchor:src, groups:[
+      [{label:'Seleccionar tareas', icon:MI.select, fn:()=>startSelect(null)}, {label:items[1].label, icon:DB.settings.doneOpen?MI.eyeOff:MI.eye, fn:items[1].fn}],
+      f==='hoy'||f==='todas'?[{label:'Agrupar por fecha', icon:MI.cal, on:g==='date', fn:()=>setGrouping(k,'date')}, {label:'Agrupar por proyecto', icon:MI.folder, on:g==='project', fn:()=>setGrouping(k,'project')}]:[],
+      f==='hoy'?[{label:items[items.length-1].label, icon:MI.summary, fn:toggleSummary}]:[] ]}); }
   actionSheet(null, items); }
 /* R14: a day header of Todas. A long press (iPhone) or a right click (desktop) offers to move its tasks to another day */
 function dayHeadMenu(head){ const sec=head.closest('.gsec'), day=head.dataset.dayHead; if(!sec||UI.select) return;
   const xs=[...sec.querySelectorAll('.group [data-id]')].map(r=>task(r.dataset.id)).filter(x=>x&&x.status==='pending'); if(!xs.length) return;
-  actionSheet(dayTitle(day), [{label:xs.length===1?'Mover esta tarea':'Mover estas '+xs.length, fn:()=>moveDaySheet(xs, day)}]); }
+  const label=xs.length===1?'Mover esta tarea':'Mover estas '+xs.length;
+  if(!UI.wide) return popMenu({anchor:head, title:dayTitle(day), groups:[[{label, icon:MI.postpone, fn:()=>moveDaySheet(xs, day)}]]});
+  actionSheet(dayTitle(day), [{label, fn:()=>moveDaySheet(xs, day)}]); }
 function moveDaySheet(xs, from){ const t=todayStr(); const chips=uniqueBy([[t,'Hoy'],[addDays(t,1),'Mañana'],[nextWeekday(5,true),'Viernes'],[nextWeekday(1,true),'Próxima semana']], c=>c[0]).filter(c=>c[0]!==from).concat([['','Sin fecha']]);
   let ym=(from>t?from:t).slice(0,7); const n=xs.length;
   openSheet('<h2>'+(n===1?'Mover 1 tarea':'Mover '+n+' tareas')+'</h2><div class="hint" style="margin-top:-6px">Desde '+esc(dayTitle(from).toLowerCase())+'</div><div class="chips" style="margin-top:6px">'+chips.map(c=>'<button class="chip" data-d="'+c[0]+'">'+c[1]+'</button>').join('')+'</div><div id="calwrap">'+calendarHTML(ym, from)+'</div>', s=>{
     s.onclick=e=>{ const nav=e.target.closest('[data-cal]'); if(nav){ ym=shiftMonth(ym,+nav.dataset.cal); $('#calwrap',s).innerHTML=calendarHTML(ym, from); return; }
       const c=e.target.closest('[data-d]'); if(!c) return; const d=c.dataset.d||null; closeSheet(); if(d===from) return;
       xs.forEach(x=>releaseHold(x.id)); rescheduleMany(xs.filter(x=>task(x.id)&&x.date!==d), d, d?fmtDate(d).toLowerCase():''); }; }); }
-function rowMenu(id){ const x=task(id); if(!x) return; releaseHold(id); const pl={high:'alta',mid:'media',none:'ninguna'}[x.priority];
+function rowMenu(id, src){ const x=task(id); if(!x) return; releaseHold(id); const pl={high:'alta',mid:'media',none:'ninguna'}[x.priority];
+  if(!UI.wide){ // R10: the row lifts and the menu opens next to it
+    const row=src&&src.row||visibleRow(id), b=row&&row.getBoundingClientRect();
+    return popMenu({lift:row, x:src&&src.x||(b?b.left+b.width/2:0), y:src&&src.y||0, prio:{cur:x.priority, fn:pr=>setPriority(id,pr)}, groups:[
+      [{label:'Aplazar', icon:MI.postpone, menu:()=>postponeMenu(id)}, {label:'Mover a proyecto', icon:MI.folder, menu:()=>projectPickMenu(id)}].concat(DB.spaces.length>1?[{label:'Mover a otro espacio', icon:MI.space, menu:()=>spaceMoveMenu(id)}]:[]),
+      [{label:x.status==='done'?'Marcar pendiente':'Completar', icon:x.status==='done'?MI.undo:MI.done, fn:()=>{ leaveRows(id); setTimeout(()=>{ completeTask(id); renderAnimated(); },200); }},
+       {label:'Duplicar', icon:MI.dup, fn:()=>duplicateTask(id)}, {label:'Seleccionar', icon:MI.select, fn:()=>startSelect(id)}],
+      [{label:'Eliminar', icon:MI.trash, red:true, fn:()=>confirmDelete(id)}] ]}); }
   actionSheet(x.title, [
     {label:'Prioridad: '+pl, fn:()=>priorityMenu(id)},
     {label:'Aplazar', fn:()=>postponeSheet(id)},
@@ -1663,7 +1878,12 @@ function rowMenu(id){ const x=task(id); if(!x) return; releaseHold(id); const pl
     {label:x.status==='done'?'Marcar pendiente':'Completar', fn:()=>{ leaveRows(id); setTimeout(()=>{ completeTask(id); renderAnimated(); },200); }},
     {label:'Eliminar', red:true, fn:()=>confirmDelete(id)} ])); }
 function moveProject(id, dir){ const ps=activeProjects(); ps.forEach((p,i)=>p.order=i); const i=ps.findIndex(p=>p.id===id), j=i+dir; if(i<0||j<0||j>=ps.length) return; ps[i].order=j; ps[j].order=i; ps[i].modified=ps[j].modified=new Date().toISOString(); save(); haptic(6); renderAnimated(); }
-function projectMenu(id){ const p=proj(id); if(!p) return; const ps=activeProjects(); const i=ps.findIndex(x=>x.id===id); actionSheet(p.name, [
+function projectMenu(id, src){ const p=proj(id); if(!p) return; const ps=activeProjects(); const i=ps.findIndex(x=>x.id===id);
+  const archive=()=>{ p.archived=true; p.modified=new Date().toISOString(); save(); render(); toast('Proyecto archivado', ()=>{p.archived=false; p.modified=new Date().toISOString(); save();}); };
+  if(!UI.wide) return popMenu({lift:src&&src.row, x:src&&src.x, y:src&&src.y, groups:[[{label:'Renombrar o cambiar color', icon:MI.pencil, fn:()=>projectSheet(id)}],
+    (i>0?[{label:'Subir', icon:MI.up, fn:()=>moveProject(id,-1)}]:[]).concat(i<ps.length-1?[{label:'Bajar', icon:MI.down, fn:()=>moveProject(id,1)}]:[]),
+    [{label:'Archivar', icon:MI.archive, red:true, fn:archive}] ]});
+  actionSheet(p.name, [
   {label:'Renombrar o cambiar color', fn:()=>projectSheet(id)}].concat(
   i>0?[{label:'Subir', fn:()=>moveProject(id,-1)}]:[], i<ps.length-1?[{label:'Bajar', fn:()=>moveProject(id,1)}]:[], [
   {label:'Archivar', red:true, fn:()=>{ p.archived=true; p.modified=new Date().toISOString(); save(); render(); toast('Proyecto archivado', ()=>{p.archived=false; p.modified=new Date().toISOString(); save();}); }} ])); }
@@ -1801,7 +2021,7 @@ function calendarHTML(ym, sel){
   const name=MESES_FULL[m-1]; return '<div class="cal"><div class="cal-head"><button data-cal="-1" aria-label="Mes anterior">'+I.back+'</button><span>'+name[0].toUpperCase()+name.slice(1)+' '+y+'</span><button data-cal="1" aria-label="Mes siguiente">'+I.chev+'</button></div><div class="cal-grid">'+['L','M','X','J','V','S','D'].map(d=>'<div class="cal-dow">'+d+'</div>').join('')+cells+'</div></div>';
 }
 function shiftMonth(ym, d){ let [y,m]=ym.split('-').map(Number); m+=d; if(m<1){ m=12; y--; } if(m>12){ m=1; y++; } return y+'-'+String(m).padStart(2,'0'); }
-function pickProjectSheet(id){ const ps=activeProjects(); const x=task(id); if(!x) return; actionSheet('Proyecto', [{label:'Ninguno'+(!x.projectId?'  ✓':''), fn:()=>moveToProject(id,null)}].concat(ps.map(p=>({label:p.name+(x.projectId===p.id?'  ✓':''), fn:()=>moveToProject(id,p.id)})))); }
+function pickProjectSheet(id, src){ const ps=activeProjects(); const x=task(id); if(!x) return; if(!UI.wide){ const m=projectPickMenu(id); m.title=''; return popMenu(Object.assign(m, {anchor:src, align:'right'})); } actionSheet('Proyecto', [{label:'Ninguno'+(!x.projectId?'  ✓':''), fn:()=>moveToProject(id,null)}].concat(ps.map(p=>({label:p.name+(x.projectId===p.id?'  ✓':''), fn:()=>moveToProject(id,p.id)})))); }
 function dateSheet(id){ const x=task(id); if(!x) return; const t=todayStr(); const dow=new Date(t+'T00:00:00').getDay(); const chips=[[t,'Hoy'],[addDays(t,1),'Mañana']]; if(dow>=1&&dow<=4) chips.push([nextWeekday(5,true),'Este viernes']); chips.push([nextWeekday(1,true),'Próxima semana'],['','Sin fecha']);
   let ym=(x.date||t).slice(0,7);
   openSheet('<h2>Fecha</h2><div class="chips" style="margin-top:0">'+uniqueBy(chips, c=>c[0]).map(c=>'<button class="chip'+(x.date===c[0]?' on':'')+'" data-d="'+c[0]+'">'+c[1]+'</button>').join('')+'</div><div id="calwrap">'+calendarHTML(ym, x.date)+'</div>', s=>{
@@ -2028,7 +2248,7 @@ function queueDailyBackup(){ backupChain=backupChain.then(()=>dailyBackup(false)
 function checkDay(){ if(DB.settings.summaryDay===todayStr()) return false; const n=rollOver(); if(n) log('info','Tareas pasadas a hoy: '+n); queueDailyBackup(); return true; }
 const _render=render; render=function(){ staleView=false; checkDay(); _render(); badge(); renderedDay=todayStr(); renderedClock=clockKey(); };
 // A redraw while something is being typed or picked would close the keyboard or the sheet
-const busyEditing=()=>sheet.classList.contains('on')||asheet.classList.contains('on')||!!UI.select||/^(INPUT|TEXTAREA)$/.test((document.activeElement||{}).tagName||'');
+const busyEditing=()=>sheet.classList.contains('on')||asheet.classList.contains('on')||menuOpen()||!!UI.select||/^(INPUT|TEXTAREA)$/.test((document.activeElement||{}).tagName||'');
 // Checked every minute rather than with one timer at midnight, which a computer asleep at that hour would delay
 // A summary line that went stale with the clock is redrawn too, unless something is being typed, picked or swiped
 const clockStale=()=>(clockKey()!==renderedClock||staleView) && !busyEditing() && !openRow;
@@ -2058,7 +2278,7 @@ function returnHome(){
   if(UI.wide){ closeSheet(); setDeskView('hoy'); log('info','Vuelta a Hoy tras más de dos horas fuera'); return; } // the desktop returns through its own view; it has no iPhone stack
   UI.stack.forEach(s=>s.el.remove()); UI.stack=[]; UI.tab='tareas'; UI.query=''; UI.sumFilter=null; DB.settings.filter='hoy'; save(); closeSheet(); render(); const sc=rootScreen('tareas').querySelector('.scroll'); if(sc) sc.scrollTop=0; log('info','Vuelta a Hoy tras más de dos horas fuera'); }
 window.addEventListener('pagehide', ()=>{ flushHeld(true); flushEdits(); });
-document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='hidden'){ hiddenAt=Date.now(); flushHeld(true); flushEdits(); return; } reloadIfChanged(); const n=rollOver(); if(n) log('info','Tareas pasadas a hoy: '+n); queueDailyBackup();
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='hidden'){ hiddenAt=Date.now(); closeMenu(true); flushHeld(true); flushEdits(); return; } reloadIfChanged(); const n=rollOver(); if(n) log('info','Tareas pasadas a hoy: '+n); queueDailyBackup();
   const away=hiddenAt && Date.now()-hiddenAt>2*36e5;
   if(away && !sheetBusy()) returnHome();
   else { if(away) log('info','Vuelta a Hoy omitida: hoja con texto sin guardar'); if(n || todayStr()!==renderedDay || clockStale()) render(); } });
@@ -2073,7 +2293,7 @@ function adoptList(cur, next){ const m=new Map(); cur.forEach(o=>{ if(o&&o.id!=n
   const out=next.map(n=>{ const o=n&&n.id!=null?m.get(n.id):null; if(!o) return n; m.delete(n.id); Object.keys(o).forEach(k=>{ if(!(k in n)) delete o[k]; }); return Object.assign(o,n); });
   cur.length=0; out.forEach(o=>cur.push(o)); }
 // The desktop add bar and search keep their focus and caret across a redraw (renderDesktop); any other field or open sheet would lose it
-const holdRedraw=()=>{ const ae=document.activeElement||{}; return sheet.classList.contains('on')||asheet.classList.contains('on')||(/^(INPUT|TEXTAREA)$/.test(ae.tagName||'') && !(UI.wide && /^(addbar|search)$/.test((ae.dataset&&ae.dataset.role)||''))); };
+const holdRedraw=()=>{ const ae=document.activeElement||{}; return sheet.classList.contains('on')||asheet.classList.contains('on')||menuOpen()||(/^(INPUT|TEXTAREA)$/.test(ae.tagName||'') && !(UI.wide && /^(addbar|search)$/.test((ae.dataset&&ae.dataset.role)||''))); };
 function flushStale(){ if(!staleView || holdRedraw()) return; if(app.classList.contains('navigating')){ setTimeout(flushStale, 400); return; } render(); } // a screen sliding in is drawn after its slide
 function reloadFromStorage(){
   const keep={activeSpace:DB.settings.activeSpace, filter:DB.settings.filter}; // what this window is showing stays put
@@ -2107,7 +2327,7 @@ window.addEventListener('pageshow', e=>{ if(e.persisted) reloadIfChanged(); });
 /* ---------- Desktop layout ---------- */
 function mondayOf(d){ const x=new Date(d+'T00:00:00'); return addDays(d, -((x.getDay()+6)%7)); }
 function setDeskView(v){ if(v==='project:none') v='project:none'; UI.deskView=v; UI.deskDetail=null; UI.query=''; UI.searchDone=false; UI.sumFilter=null; if(v==='hoy'||v==='todas'){ DB.settings.filter=v; save(); } render(); }
-function applyWide(){ const w=wideMQ.matches; if(w===UI.wide) return; UI.wide=w; document.body.classList.toggle('desktop', w); app.classList.toggle('desktop', w);
+function applyWide(){ const w=wideMQ.matches; if(w===UI.wide) return; closeMenu(true); UI.wide=w; document.body.classList.toggle('desktop', w); app.classList.toggle('desktop', w);
   if(w){ // the pushed iPhone screens map onto the desktop: a project becomes the view and the last detail the pane
     let pr=null; UI.deskDetail=null; UI.stack.forEach(s=>{ if(s.kind==='project') pr=s.id; else UI.deskDetail=s.id; s.el.remove(); }); UI.stack=[];
     if(UI.select){ UI.select=null; app.classList.remove('selecting'); closeSheet(); } // an open bulk menu would act on nothing

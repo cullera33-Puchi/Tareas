@@ -19,20 +19,20 @@
   --bg:#F2F2F7; --card:#FFFFFF; --sep:#C6C6C8; --ink:#000000; --ink2:#8E8E93; --ink3:#AEAEB2;
   --blue:#007AFF; --red:#FF3B30; --orange:#FF9500; --green:#34C759; --fill:#E5E5EA; --fill2:#D1D1D6;
   --bar:rgba(249,249,249,.82); --mat:rgba(255,255,255,.88); --dim:rgba(0,0,0,.35); --press:#D9D9DE;
-  --kb:0px; --qhl:rgba(0,122,255,.16);
+  --kb:0px; --qhl:rgba(0,122,255,.16); --ghbg:rgba(242,242,247,.86);
   box-sizing:border-box; padding-top:env(safe-area-inset-top,0px);
 }
 @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
   color-scheme:dark;
   --bg:#000000; --card:#1C1C1E; --sep:#38383A; --ink:#FFFFFF; --ink2:#8E8E93; --ink3:#636366;
   --blue:#0A84FF; --red:#FF453A; --orange:#FF9F0A; --green:#30D158; --fill:#2C2C2E; --fill2:#3A3A3C;
-  --bar:rgba(22,22,24,.82); --mat:rgba(36,36,38,.9); --dim:rgba(0,0,0,.55); --press:#2C2C2E; --qhl:rgba(10,132,255,.34);
+  --bar:rgba(22,22,24,.82); --mat:rgba(36,36,38,.9); --dim:rgba(0,0,0,.55); --press:#2C2C2E; --qhl:rgba(10,132,255,.34); --ghbg:rgba(0,0,0,.78);
 }}
 :root[data-theme="dark"]{
   color-scheme:dark;
   --bg:#000000; --card:#1C1C1E; --sep:#38383A; --ink:#FFFFFF; --ink2:#8E8E93; --ink3:#636366;
   --blue:#0A84FF; --red:#FF453A; --orange:#FF9F0A; --green:#30D158; --fill:#2C2C2E; --fill2:#3A3A3C;
-  --bar:rgba(22,22,24,.82); --mat:rgba(36,36,38,.9); --dim:rgba(0,0,0,.55); --press:#2C2C2E; --qhl:rgba(10,132,255,.34);
+  --bar:rgba(22,22,24,.82); --mat:rgba(36,36,38,.9); --dim:rgba(0,0,0,.55); --press:#2C2C2E; --qhl:rgba(10,132,255,.34); --ghbg:rgba(0,0,0,.78);
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
 html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px);font-size:17px;}
@@ -68,6 +68,8 @@ input,textarea,select{font-size:max(16px,1rem);} /* under 16px Safari zooms on f
 .main .mhead{display:flex;align-items:center;gap:14px;padding:16px 28px 8px;}
 .main .mhead h1{margin:0;font-size:1.647rem;font-weight:700;letter-spacing:-.4px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .main .mhead .searchbar{margin:0;width:260px;}
+.main .mhead .mopts{flex:none;width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--blue);background:var(--card);border:.5px solid var(--sep);} /* R13 */
+.main .mhead .mopts svg{width:18px;height:18px;}
 .main .mbody{flex:1;overflow-y:auto;padding:0 28px 40px;}
 .main .mbody .scroll{padding:0;overflow:visible;flex:none;}
 .main .inner{max-width:760px;}
@@ -167,6 +169,8 @@ body.desktop .toast{left:auto;right:28px;bottom:28px;width:360px;}
 .nav .actions{display:flex;gap:4px;margin-right:-8px;}
 .nav .actions .action{width:40px;justify-content:center;}
 .nav .actions svg{width:22px;height:22px;}
+.nav .vopts{width:44px;justify-content:flex-end;flex:none;} /* R13: view options, on the right of the bar */
+.nav .vopts svg{width:22px;height:22px;}
 .cell.input{display:block;}
 .cell .val.high{color:var(--red);}
 .cell .val.mid{color:var(--orange);}
@@ -216,6 +220,22 @@ body.desktop .toast{left:auto;right:28px;bottom:28px;width:360px;}
 /* Lists */
 .group{background:var(--card);border-radius:12px;overflow:hidden;margin-bottom:16px;}
 .group-title{font-size:0.765rem;color:var(--ink2);padding:0 4px 6px;margin-top:4px;}
+/* Group headers with a count, and a link or a + on the right (R8, R9, R13, R14) */
+.group-title.gh{display:flex;align-items:center;gap:8px;min-height:30px;padding:0 4px 4px;}
+.gh .gl{flex:1;min-width:0;display:flex;align-items:center;gap:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.gh .gn{color:var(--ink3);font-variant-numeric:tabular-nums;}
+.gh .gdot{flex:none;width:8px;height:8px;border-radius:50%;}
+.gh .gx{flex:none;position:relative;color:var(--blue);font-weight:600;font-size:0.765rem;height:30px;}
+.gh .gadd{flex:none;position:relative;width:30px;height:30px;margin-right:-6px;display:flex;align-items:center;justify-content:center;color:var(--blue);}
+.gh .gadd svg{width:18px;height:18px;}
+.gh .gx::after,.gh .gadd::after{content:"";position:absolute;left:-7px;right:-7px;top:-7px;bottom:-7px;} /* 44 pt to the finger */
+.group-title.gtap{cursor:pointer;}
+.group-title.gtap:active .gl{opacity:.6;}
+.gtap .gchev{flex:none;width:7px;height:12px;color:var(--ink3);}
+/* R14: in a .gsec the header stays at the top of the list while its rows scroll under it, and the next header pushes it away */
+.gsec{display:flow-root;} /* the group's bottom margin stays inside: the header is pushed away only by the next one */
+.gsec > .group-title{position:sticky;top:0;z-index:3;margin:0 calc(-1 * max(16px,env(safe-area-inset-right,0px))) 2px calc(-1 * max(16px,env(safe-area-inset-left,0px)));padding:4px calc(4px + max(16px,env(safe-area-inset-right,0px))) 4px calc(4px + max(16px,env(safe-area-inset-left,0px)));background:var(--ghbg);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);}
+.app.desktop .gsec > .group-title{margin-left:-12px;margin-right:-12px;padding-left:16px;padding-right:16px;}
 .row{position:relative;overflow:hidden;background:var(--card);}
 .row.cv{content-visibility:auto;contain-intrinsic-size:auto 62px;} /* far below the visible part when drawn: see lazyRows */
 .rph{height:62px;} /* a row of a long list not drawn yet: see lazyRows */
@@ -318,6 +338,20 @@ body.desktop .toast{left:auto;right:28px;bottom:28px;width:360px;}
 .plan-title{font-size:1.06rem;font-weight:600;text-align:center;margin:2px 0 10px;line-height:1.3;}
 .closeday{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:10px;padding:10px 0 2px;border-top:.5px solid var(--sep);color:var(--blue);font-weight:600;font-size:0.882rem;}
 .closeday svg{width:16px;height:16px;}
+/* R8: Cerrar el día in the folded summary, at the end of Hoy and its sheet */
+.summary-head .sumclose{width:auto;height:44px;margin:-8px 10px -8px auto;color:var(--blue);font-size:0.824rem;font-weight:600;}
+.cell.closecell svg{width:20px;height:20px;flex:none;}
+.cdnums{display:flex;gap:8px;margin:0 0 4px;}
+.cdnums div{flex:1;text-align:center;background:var(--bg);border-radius:10px;padding:8px 4px;}
+.cdnums b{display:block;font-size:1.412rem;font-weight:700;line-height:1.15;font-variant-numeric:tabular-nums;}
+.cdnums span{font-size:0.706rem;color:var(--ink2);}
+.cdnums .red b{color:var(--red);}
+.plist.cdlist{max-height:140px;margin-top:6px;}
+.cdlist .pl{padding:4px 16px;}
+.cdlist.done .t{color:var(--ink2);}
+.cdacts{margin-top:14px;}
+.sheet .cdfoot{margin:10px 0 0;font-size:0.824rem;}
+.rvchips{justify-content:center;margin:4px 0 6px;}
 .seg.mini button{height:24px;font-size:0.706rem;}
 .selbox{flex:none;position:relative;width:22px;height:22px;border-radius:50%;border:1.5px solid var(--ink3);display:flex;align-items:center;justify-content:center;transition:background .15s,border-color .15s;}
 .selbox svg{width:12px;height:12px;color:#fff;opacity:0;}
@@ -418,6 +452,7 @@ body.desktop .toast{left:auto;right:28px;bottom:28px;width:360px;}
 .btn{flex:1;height:48px;border-radius:12px;font-size:1rem;font-weight:600;background:var(--fill);display:flex;align-items:center;justify-content:center;gap:8px;}
 .btn.primary{background:var(--blue);color:#fff;}
 .btn.red{background:var(--red);color:#fff;}
+.btn.redtext{color:var(--red);}
 .btn:disabled{opacity:.4;}
 .btn svg{width:20px;height:20px;}
 .sheet .list{background:var(--bg);border-radius:12px;overflow:hidden;margin-top:4px;}
@@ -443,7 +478,8 @@ body.desktop .toast{left:auto;right:28px;bottom:28px;width:360px;}
 .cal-d.other span,.cal-d.past span{color:var(--ink3);}
 .cal-d.today span{color:var(--blue);font-weight:600;}
 .cal-d.sel span{background:var(--blue);color:#fff;font-weight:600;}
-.cal-d i{position:absolute;bottom:3px;left:50%;margin-left:-2px;width:4px;height:4px;border-radius:50%;background:var(--ink3);}
+.cal-d i{position:absolute;bottom:2px;left:0;right:0;display:flex;justify-content:center;gap:2px;} /* R14: one to three dots for the day's load */
+.cal-d i b{width:4px;height:4px;border-radius:50%;background:var(--ink3);}
 .cal-d.sel i{display:none;}
 .timerow{display:flex;align-items:center;justify-content:space-between;margin-top:8px;background:var(--bg);border-radius:10px;padding:0 12px;height:44px;}
 .timerow input[type=time]{background:none;border:0;outline:0;color:var(--ink);font-size:max(16px,1rem);text-align:right;}
@@ -689,7 +725,7 @@ const KEY = 'tareas-v1';
 let DB = null;
 function blank(){
   const t=new Date().toISOString();
-  return { spaces:[{id:'trabajo',name:'Trabajo',order:0,created:t},{id:'personal',name:'Personal',order:1,created:t}], projects:[], tasks:[], voiceNotes:[], settings:{activeSpace:'trabajo', summaryState:'auto', filter:'hoy', doneOpen:false, theme:'auto', tipsSeen:false, shakeUndo:false, allGroup:'date'} };
+  return { spaces:[{id:'trabajo',name:'Trabajo',order:0,created:t},{id:'personal',name:'Personal',order:1,created:t}], projects:[], tasks:[], voiceNotes:[], settings:{activeSpace:'trabajo', summaryState:'auto', filter:'hoy', doneOpen:false, theme:'auto', tipsSeen:false, shakeUndo:false, allGroup:'date', hoyGroup:'date'} };
 }
 let lastRaw = null; // the stored text this window last read or wrote; another window may have changed it since
 function load(){
@@ -1055,6 +1091,7 @@ function tagVars(c){ let v=tagCache.get(c); if(v) return v;
 /* A row. R3: it leaves out what the screen around it already says. opts:
    noProj (inside a project, grouped by project or with a project filter: no capsule), noToday (a Hoy list or group: no "Hoy"),
    hideCarried (the Aplazadas group: no "Aplazada"), byDay (Completadas grouped by day: the time alone, not struck through),
+   day (R14: a day group of Todas; a row dated that day says no date),
    simple ("Lo primero": no swipe). A carried task says "Aplazada" in orange where it would say "Hoy". */
 function rowHTML(x, opts={}){
   const p = x.projectId?proj(x.projectId):null; const t=todayStr();
@@ -1063,7 +1100,7 @@ function rowHTML(x, opts={}){
   const meta=[]; if(p&&!opts.noProj) meta.push('<span class="tag">'+esc(p.name)+'</span>');
   if(done){ if(x.completed) meta.push('<span>'+(opts.byDay?fmtTime(x.completed):'Hecha '+fmtDateTime(x.completed))+'</span>'); }
   else { if(x.date){ if(x.carried&&x.date<=t){ if(!opts.hideCarried) meta.push('<span class="carried">Aplazada</span>'); }
-      else if(!(opts.noToday&&x.date===t)) meta.push('<span class="'+(x.date<t?'over':'')+'">'+fmtDate(x.date)+'</span>'); }
+      else if(!(opts.noToday&&x.date===t) && x.date!==opts.day) meta.push('<span class="'+(x.date<t?'over':'')+'">'+fmtDate(x.date)+'</span>'); }
     if(x.reminder) meta.push('<span class="bell">'+I.bell+(x.date&&localDay(x.reminder)===x.date?fmtTime(x.reminder):fmtDateTime(x.reminder))+'</span>'); } // the reminder's own day when it is not the task's date (moved task, no date)
   const ind=(x.notes&&x.notes.trim()?I.note:'')+(DB.voiceNotes.some(v=>v.taskId===x.id)?I.mic:'');
   const pri = done?'':x.priority==='high'?'<span class="pri high">!!!</span>':x.priority==='mid'?'<span class="pri mid">!!</span>':'';
@@ -1084,17 +1121,42 @@ function summaryHTML(){
   const carried=hoy.filter(x=>x.carried).length, deHoy=hoy.length, prio=hoy.filter(x=>x.priority==='high').length; const doneToday=spaceTasks().filter(x=>x.status==='done'&&x.completed&&localDay(x.completed)===t).length;
   // Only today's high-priority tasks; the list below already shows the rest.
   const first = hoy.filter(x=>x.priority==='high').slice(0,3);
-  const soon = soonReminder();
-  return '<section class="summary'+(summaryCollapsed(hoy.length)?' collapsed':'')+'"><div class="summary-head"><h3>Resumen del día</h3><button data-act="toggleSummary" aria-label="Plegar">'+I.chevD+'</button></div>'+
+  const soon = soonReminder(); const folded=summaryCollapsed(hoy.length), late=hoy.length&&new Date().getHours()>=19;
+  // R8: from 19:00 "Cerrar el día" shows in the folded summary too, so a loaded day never hides it
+  return '<section class="summary'+(folded?' collapsed':'')+'"><div class="summary-head"><h3>Resumen del día</h3>'+(folded&&late&&!UI.select?'<button class="sumclose" data-act="closeDay">Cerrar el día</button>':'')+'<button data-act="toggleSummary" aria-label="Plegar">'+I.chevD+'</button></div>'+
    '<div class="summary-body"><div class="nums"><button class="num" data-sum="all"><b>'+deHoy+'</b><span>para hoy</span></button><button class="num'+(carried?' orange':'')+(UI.sumFilter==='carried'?' on':'')+'" data-sum="carried"><b>'+carried+'</b><span>aplazadas</span></button><button class="num'+(prio?' red':'')+(UI.sumFilter==='high'?' on':'')+'" data-sum="high"><b>'+prio+'</b><span>prioritarias</span></button></div>'+
-   (hoy.length&&new Date().getHours()>=19?'<button class="closeday" data-act="closeDay">'+I.cal+'<span>Pasar lo pendiente a mañana ('+hoy.length+')</span></button>':'')+
+   (late?'<button class="closeday" data-act="closeDay">'+I.cal+'<span>Cerrar el día ('+hoy.length+(hoy.length===1?' pendiente':' pendientes')+')</span></button>':'')+
    (!hoy.length&&doneToday?'<div class="alldone">'+I.check+'<span>Todo hecho por hoy: '+doneToday+(doneToday===1?' tarea completada':' tareas completadas')+'</span></div>':'')+
    ((first.length||soon)?'<div class="first">'+(first.length?'<h4>Lo primero</h4>'+first.map(x=>rowHTML(x,{simple:true,noToday:true})).join(''):'')+
    (soon?'<div class="soon"'+(first.length?'':' style="border-top:0;padding-top:0"')+'>'+I.bell+'<span>Recordatorio a las '+fmtTime(soon.x.reminder)+': '+esc(soon.x.title)+'</span></div>':'')+'</div>':'')+'</div></section>';
 }
-// Date buckets for the "Todas" list
-function dateBucket(x, t){ if(!x.date) return 'none'; if(x.date<=t) return 'today'; if(x.date===addDays(t,1)) return 'tomorrow'; const d=new Date(t+'T00:00:00'); const eow=addDays(t, 6-((d.getDay()+6)%7)); if(x.date<=eow) return 'week'; return 'later'; }
-const BUCKETS=[['today','Hoy'],['tomorrow','Mañana'],['week','Esta semana'],['later','Más adelante'],['none','Sin fecha']];
+/* Group headers. R14: in Todas, a project, Hoy by project and Completadas each header sits in a .gsec with its group,
+   so it stays at the top of the list (sticky, translucent) while its own rows scroll under it and the next one pushes it away */
+function gtitle(label, n, right, attrs){ return '<div class="group-title gh"'+(attrs||'')+'><span class="gl">'+label+(n!=null?'<span class="gn">'+n+'</span>':'')+'</span>'+(right||'')+'</div>'; }
+const gsec = (head, rows) => '<div class="gsec">'+head+'<div class="group">'+rows+'</div></div>';
+// R14: a day of Todas, "Martes 3 nov"; a month, "Diciembre" (and the year when it is not this one)
+function dayTitle(d){ const t=todayStr(); if(d===t) return 'Hoy'; if(d===addDays(t,1)) return 'Mañana'; const x=new Date(d+'T00:00:00'); return DIAS_FULL[x.getDay()]+' '+x.getDate()+' '+MESES[x.getMonth()]; }
+function monthTitle(ym){ const [y,m]=ym.split('-').map(Number), n=MESES_FULL[m-1]; return n[0].toUpperCase()+n.slice(1)+(y!==new Date().getFullYear()?' '+y:''); }
+/* R14: Todas by date. Today first (with the carried tasks), then one group per day for the next 14 days that have tasks,
+   then one per month, then Sin fecha. A day header adds with its date (+) and, on a long press or a right click, moves its tasks.
+   Keys sort as text: a day 'YYYY-MM-DD', a month 'YYYY-MM-~' (after its days), no date '~' (last) */
+function dayGroupsHTML(list, R, root, projectId){ const t=todayStr(), lim=addDays(t,14), by=new Map(); let h='';
+  list.forEach(x=>{ const k=!x.date?'~':x.date<=t?t:x.date<=lim?x.date:x.date.slice(0,7)+'-~'; if(!by.has(k)) by.set(k,[]); by.get(k).push(x); });
+  [...by.keys()].sort().forEach(k=>{ const xs=by.get(k); let head;
+    if(k==='~') head=root&&!UI.select ? gtitle('Sin fecha', null, '<button class="gx" data-act="plan">Planificar ('+xs.length+')</button>') : gtitle('Sin fecha', xs.length);
+    else if(k.length===10) head=gtitle(dayTitle(k), xs.length, UI.select?'':'<button class="gadd" data-add-date="'+k+'"'+(projectId!==undefined?' data-project="'+(projectId||'')+'"':'')+' aria-label="Añadir con esta fecha">'+I.plus+'</button>', ' data-day-head="'+k+'"');
+    else head=gtitle(monthTitle(k.slice(0,7)), xs.length);
+    h+=gsec(head, xs.map(x=>R(x, k.length===10?{day:k, noToday:true}:{})).join('')); });
+  return h; }
+/* Grouped by project (Todas and, R13, Hoy): one group per project in the order of the Proyectos tab, with its colour and count.
+   Tapping a header filters the list by that project (a second tap clears it). In Hoy the rows say "Aplazada" where it applies */
+function projectGroupsHTML(list, R, filter){ const ps=activeProjects(), by={}; let h=''; const o={noProj:true, noToday:filter==='hoy'};
+  list.forEach(x=>{ const k=!x.projectId||!proj(x.projectId)?'none':ps.some(p=>p.id===x.projectId)?x.projectId:'archived'; (by[k]=by[k]||[]).push(x); });
+  const head=(pf, dot, label, n)=>'<div class="group-title gh gtap" role="button" tabindex="0" data-pf="'+pf+'"><span class="gl"><span class="gdot" style="background:'+dot+'"></span>'+label+'<span class="gn">'+n+'</span></span>'+I.chev.replace('<svg','<svg class="gchev"')+'</div>'; // a div: a button would not stretch to the full width once stuck
+  ps.forEach(p=>{ if(by[p.id]) h+=gsec(head(p.id, p.color, esc(p.name), by[p.id].length), by[p.id].map(x=>R(x,o)).join('')); });
+  if(by.archived) h+=gsec(gtitle('Proyectos archivados', by.archived.length), by.archived.map(x=>R(x,{noToday:o.noToday})).join(''));
+  if(by.none) h+=gsec(head('none', 'var(--ink3)', 'Sin proyecto', by.none.length), by.none.map(x=>R(x,o)).join(''));
+  return h; }
 function listHTML(filter, projectId){
   let list = pendingFor(filter, projectId, UI.query);
   const root = projectId===undefined;
@@ -1105,6 +1167,7 @@ function listHTML(filter, projectId){
   const noProj = projectId!==undefined || (root && !UI.query && UI.projFilter!==null);
   const R = (x,o)=>rowHTML(x, Object.assign({noProj}, o));
   const addBtn = '<button class="btn-link" data-act="add"'+(projectId!==undefined?' data-project="'+(projectId||'')+'"':'')+'>Añadir tarea</button>';
+  const byProject = root && DB.settings[filter==='hoy'?'hoyGroup':'allGroup']==='project'; // R13: each view keeps its own grouping
   let h='';
   if(!list.length){ if(!(UI.query && UI.searchDone && dm.length)){ // the completed matches are listed below: no "Sin resultados" above them
     let title, sub, acts;
@@ -1117,32 +1180,33 @@ function listHTML(filter, projectId){
   } }
   else if(UI.query){ h += '<div class="group-title">'+list.length+(list.length===1?' resultado':' resultados')+'</div><div class="group">'+list.map(x=>R(x)).join('')+'</div>'; }
   if(UI.query){ if(dm.length){ h += UI.searchDone ? '<div class="group-title">Completadas</div><div class="group">'+dm.map(x=>R(x)).join('')+'</div>' : '<div class="empty" style="padding:8px 0 16px"><div class="acts"><button class="btn-link" data-act="searchDone">Incluir '+dm.length+(dm.length===1?' completada':' completadas')+'</button></div></div>'; } return h; }
-  else if(filter==='todas' && root && DB.settings.allGroup==='project'){ const ps=activeProjects(); const by={}; list.forEach(x=>{ const k=!x.projectId||!proj(x.projectId)?'none':ps.some(p=>p.id===x.projectId)?x.projectId:'archived'; (by[k]=by[k]||[]).push(x); });
-    ps.forEach(p=>{ if(by[p.id]) h += '<div class="group-title"><span class="dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+p.color+';margin-right:6px;vertical-align:1px"></span>'+esc(p.name)+' <span style="color:var(--ink3)">'+by[p.id].length+'</span></div><div class="group">'+by[p.id].map(x=>R(x,{noProj:true})).join('')+'</div>'; });
-    if(by.archived) h += '<div class="group-title">Proyectos archivados <span style="color:var(--ink3)">'+by.archived.length+'</span></div><div class="group">'+by.archived.map(x=>R(x)).join('')+'</div>';
-    if(by.none) h += '<div class="group-title">Sin proyecto <span style="color:var(--ink3)">'+by.none.length+'</span></div><div class="group">'+by.none.map(x=>R(x)).join('')+'</div>'; }
-  else if(filter==='todas'){ const t=todayStr(); const by={}; list.forEach(x=>{ (by[dateBucket(x,t)]=by[dateBucket(x,t)]||[]).push(x); });
-    BUCKETS.forEach(([k,label])=>{ if(by[k]) h += '<div class="group-title" style="display:flex;justify-content:space-between;align-items:center"><span>'+label+'</span>'+(k==='none'&&root&&!UI.select?'<button class="btn-link" data-act="plan" style="font-size:0.765rem;font-weight:600">Planificar ('+by[k].length+')</button>':'')+'</div><div class="group">'+by[k].map(x=>R(x,{noToday:k==='today'})).join('')+'</div>'; }); }
-  else if(filter==='hoy' && root && list.some(x=>x.carried) && list.some(x=>!x.carried)){ const c=list.filter(x=>x.carried), d=list.filter(x=>!x.carried); h += '<div class="group-title">Aplazadas</div><div class="group">'+c.map(x=>R(x,{noToday:true,hideCarried:true})).join('')+'</div><div class="group-title">Hoy</div><div class="group">'+d.map(x=>R(x,{noToday:true})).join('')+'</div>'; }
-  else h += '<div class="group">'+list.map(x=>R(x,{noToday:filter==='hoy', hideCarried:root&&filter==='hoy'&&UI.sumFilter==='carried'})).join('')+'</div>'; // the aplazadas filter already says it
-  if(root && filter==='hoy' && !UI.query && !UI.sumFilter){ const tm=pendingFor('todas').filter(x=>x.date===addDays(todayStr(),1)).length; if(tm) h += '<button class="preview" data-filter="todas"><span>Mañana: '+tm+(tm===1?' tarea':' tareas')+'</span>'+I.chev+'</button>'; }
+  else if(!list.length){}
+  else if(byProject) h += projectGroupsHTML(list, R, filter);
+  else if(filter==='todas') h += dayGroupsHTML(list, R, root, projectId);
+  // Hoy: the carried tasks first, under Aplazadas with "Repasar (N)" (R9); the aplazadas filter already says it, so it keeps a plain list
+  else if(filter==='hoy' && root && UI.sumFilter!=='carried' && list.some(x=>x.carried)){ const c=list.filter(x=>x.carried), d=list.filter(x=>!x.carried);
+    h += gtitle('Aplazadas', null, UI.select?'':'<button class="gx" data-act="review">Repasar ('+c.length+')</button>')+'<div class="group">'+c.map(x=>R(x,{noToday:true,hideCarried:true})).join('')+'</div>'+
+      (d.length?'<div class="group-title">Hoy</div><div class="group">'+d.map(x=>R(x,{noToday:true})).join('')+'</div>':''); }
+  else h += '<div class="group">'+list.map(x=>R(x,{noToday:filter==='hoy', hideCarried:root&&filter==='hoy'&&UI.sumFilter==='carried'})).join('')+'</div>';
+  // R8: from 19:00 the day can be closed from the end of Hoy too, whatever the summary shows
+  if(root && filter==='hoy' && !UI.select && new Date().getHours()>=19){ const n=pendingFor('hoy').length; if(n) h += '<div class="group"><button class="cell link closecell" data-act="closeDay">'+I.cal+'<span class="lbl">Cerrar el día</span><span class="val">'+n+(n===1?' pendiente':' pendientes')+'</span></button></div>'; }
+  if(root && filter==='hoy' && !UI.sumFilter){ const tm=pendingFor('todas').filter(x=>x.date===addDays(todayStr(),1)).length; if(tm) h += '<button class="preview" data-filter="todas"><span>Mañana: '+tm+(tm===1?' tarea':' tareas')+'</span>'+I.chev+'</button>'; }
   if(done.length){ const dt=done.filter(x=>x.completed&&localDay(x.completed)===todayStr()).length;
     if(!DB.settings.doneOpen){ h += '<div class="group"><button class="cell link" data-act="toggleDone" style="justify-content:center"><span>Mostrar completadas ('+done.length+(dt?', '+dt+' hoy':'')+')</span></button></div>'; }
     else { const t=todayStr(), yd=addDays(t,-1); const by={}, order=[]; done.forEach(x=>{ const d=x.completed?localDay(x.completed):'0000'; if(!by[d]){ by[d]=[]; order.push(d); } by[d].push(x); });
       h += '<div class="group"><button class="cell link" data-act="toggleDone" style="justify-content:center"><span>Ocultar completadas</span></button></div>';
-      order.forEach(d=>{ const label=d===t?'Hoy':d===yd?'Ayer':d==='0000'?'Sin fecha':fmtDate(d); h += '<div class="group-title">'+label+'</div><div class="group">'+by[d].map(x=>R(x,{byDay:true})).join('')+'</div>'; }); } }
+      order.forEach(d=>{ const label=d===t?'Hoy':d===yd?'Ayer':d==='0000'?'Sin fecha':fmtDate(d); h += gsec(gtitle(label, by[d].length), by[d].map(x=>R(x,{byDay:true})).join('')); }); } }
   return h;
 }
 function selectNav(){ const n=UI.select.ids.size; return '<header class="nav"><div class="nav-row"><button class="action" data-act="selAll">'+(UI.select.all?'Ninguna':'Todas')+'</button><div class="nav-title" id="selTitle">'+(n?n+(n===1?' seleccionada':' seleccionadas'):'Seleccionar')+'</div><button class="action strong" data-act="selDone">OK</button></div></header>'; }
 function viewTareas(){
   const f=DB.settings.filter; const nHoy=UI.query?0:pendingFor('hoy').length, nTodas=UI.query?0:pendingFor('todas').length; // a search hides the segment that shows them
   if(UI.select && UI.select.scope==='root') return selectNav()+'<div class="scroll">'+listHTML(UI.query?'todas':f)+'</div>';
-  return '<header class="nav"><div class="nav-row"><button class="title" data-act="spaceMenu" aria-label="Cambiar espacio">'+esc(space().name)+I.chevD+'</button><span></span></div></header>'+
+  return '<header class="nav"><div class="nav-row"><button class="title" data-act="spaceMenu" aria-label="Cambiar espacio">'+esc(space().name)+I.chevD+'</button>'+'<button class="action vopts" data-act="viewMenu" aria-label="Opciones de vista">'+I.more+'</button>'+'</div></header>'+
    '<div class="scroll">'+(f==='hoy'&&!UI.query?summaryHTML():'')+
    '<div class="searchbar"><div class="search">'+I.search+'<input type="search" placeholder="Buscar" value="'+esc(UI.query)+'" data-role="search" autocomplete="off"></div>'+(UI.query?'<button class="cancel" data-act="clearSearch">Cancelar</button>':'')+'</div>'+
    (UI.query?'':'<div class="seg"><button data-filter="hoy" class="'+(f==='hoy'?'on':'')+'">Hoy<span class="n">'+nHoy+'</span></button><button data-filter="todas" class="'+(f==='todas'?'on':'')+'">Todas<span class="n">'+nTodas+'</span></button></div>')+
    (!UI.query&&activeProjects().length?'<div class="pchips">'+activeProjects().map(p=>'<button class="chip'+(UI.projFilter===p.id?' on':'')+'" data-pf="'+p.id+'"'+(UI.projFilter===p.id?' style="background:'+p.color+'"':'')+'><span class="dot" style="background:'+(UI.projFilter===p.id?'#fff':p.color)+'"></span>'+esc(p.name)+'</button>').join('')+'<button class="chip'+(UI.projFilter==='none'?' on':'')+'" data-pf="none"><span class="dot" style="background:'+(UI.projFilter==='none'?'#fff':'var(--ink3)')+'"></span>Sin proyecto</button></div>':'')+
-   (!UI.query&&f==='todas'&&nTodas?'<div class="seg mini"><button data-group="date" class="'+(DB.settings.allGroup!=='project'?'on':'')+'">Por fecha</button><button data-group="project" class="'+(DB.settings.allGroup==='project'?'on':'')+'">Por proyecto</button></div>':'')+
    listHTML(UI.query?'todas':f)+'</div>'+
    '<button class="fab" data-act="add" aria-label="Añadir tarea">'+I.plus+'</button>';
 }
@@ -1161,7 +1225,7 @@ function viewProyectos(){
 function viewProject(id){
   const p = id==='none'?null:proj(id); const title=p?p.name:'Sin proyecto';
   if(UI.select && UI.select.scope==='project') return selectNav()+'<div class="scroll">'+listHTML('todas', p?p.id:null)+'</div>';
-  return '<header class="nav"><div class="nav-row"><button class="back" data-act="back">'+I.back+'Atrás</button><div class="nav-title">'+(p?'<span class="pdot" style="width:10px;height:10px;border-radius:50%;background:'+p.color+';display:inline-block;margin-right:6px;vertical-align:1px"></span>':'')+esc(title)+'</div><span></span></div></header>'+
+  return '<header class="nav"><div class="nav-row"><button class="back" data-act="back">'+I.back+'Atrás</button><div class="nav-title">'+(p?'<span class="pdot" style="width:10px;height:10px;border-radius:50%;background:'+p.color+';display:inline-block;margin-right:6px;vertical-align:1px"></span>':'')+esc(title)+'</div>'+'<button class="action vopts" data-act="viewMenu" aria-label="Opciones de vista">'+I.more+'</button>'+'</div></header>'+
    '<div class="scroll">'+listHTML('todas', p?p.id:null)+'</div>'+
    '<button class="fab" data-act="add" data-project="'+(p?p.id:'')+'" aria-label="Añadir tarea">'+I.plus+'</button>';
 }
@@ -1243,6 +1307,7 @@ function bindDetail(el, id){
 /* ---------- Shared events ---------- */
 function bindRows(box){
   if(!UI.select) box.querySelectorAll('.row:not(.first .row)').forEach(bindRowGestures);
+  box.querySelectorAll('[data-day-head]').forEach(h=>bindLongPress(h, ()=>dayHeadMenu(h))); // R14: a long press on a day header moves its tasks
   box.querySelectorAll('.first .row').forEach(r=>{ r.addEventListener('click',e=>{ if(e.target.closest('[data-act=check]')) return; if(HELD.has(r.dataset.id)) toggleHold(r.dataset.id); else openDetail(r.dataset.id); }); }); }
 function bindCommon(scr){
   scr.addEventListener('click', onClick);
@@ -1288,11 +1353,10 @@ function onClick(e){
   const op=e.target.closest('[data-open-project]'); if(op){ if(UI.wide){ setDeskView('project:'+op.dataset.openProject); } else push('project', op.dataset.openProject); return; }
   const dv=e.target.closest('[data-view]'); if(dv){ setDeskView(dv.dataset.view); return; }
   const wk=e.target.closest('[data-week]'); if(wk){ const d=wk.dataset.week; UI.weekStart = d==='today' ? mondayOf(todayStr()) : addDays(UI.weekStart||mondayOf(todayStr()), +d*7); render(); return; }
-  const wa=e.target.closest('[data-add-date]'); if(wa){ addSheet(null,'',{date:wa.dataset.addDate}); return; }
+  const wa=e.target.closest('[data-add-date]'); if(wa){ addSheet(wa.dataset.project||null,'',{date:wa.dataset.addDate}); return; } // R14: a day header in a project adds to that project
   const es=e.target.closest('[data-edit-space]'); if(es){ spaceSheet(es.dataset.editSpace); return; }
   const rb=e.target.closest('[data-restore]'); if(rb){ restoreBackup(rb.dataset.restore); return; }
   const ua=e.target.closest('[data-unarchive]'); if(ua){ const p=proj(ua.dataset.unarchive); p.archived=false; p.modified=new Date().toISOString(); save(); render(); return; }
-  const gb=e.target.closest('[data-group]'); if(gb){ DB.settings.allGroup=gb.dataset.group; save(); render(); return; }
   const pf=e.target.closest('[data-pf]'); if(pf){ const v=pf.dataset.pf; UI.projFilter=(v===''||UI.projFilter===v)?null:v; haptic(4); render(); return; }
   if(UI.select){ const row=e.target.closest('.row'); if(row && !row.closest('.first')){ toggleSelected(row); return; } }
   const act=e.target.closest('[data-act]'); if(!act) { const row=e.target.closest('.row');
@@ -1308,6 +1372,8 @@ function onClick(e){
     case 'selDone': endSelect(); break;
     case 'closeDay': closeDaySheet(); break;
     case 'plan': planStart(); break;
+    case 'review': reviewStart('carried'); break;
+    case 'viewMenu': viewMenu(); break;
     case 'exportCSV': exportCSV(); break;
     case 'selAll': selectAllVisible(); break;
     case 'bulkComplete': bulkComplete(); break;
@@ -1315,7 +1381,7 @@ function onClick(e){
     case 'bulkMove': bulkMoveSheet(); break;
     case 'bulkDelete': bulkDelete(); break;
     case 'searchDone': UI.searchDone=true; render(); break;
-    case 'toggleSummary': { const fold=!summaryCollapsed(pendingFor('hoy').length); DB.settings.summaryState = fold?'closed':'open'; if(fold) UI.sumFilter=null; UI.summaryFirst=false; save(); render(); break; } // a folded summary hides its figures, so their filter goes too
+    case 'toggleSummary': toggleSummary(); break;
     case 'toggleDone': DB.settings.doneOpen=!DB.settings.doneOpen; save(); render(); break;
     case 'add': addSheet(act.dataset.project||null); break;
     case 'convertLines': { const id=detailTaskId(); if(id){ flushEdits(); convertNoteLines(id); } break; }
@@ -1508,10 +1574,85 @@ function bulkPostponeSheet(){ if(!UI.select||!UI.select.ids.size) return; const 
 function bulkMoveSheet(){ if(!UI.select||!UI.select.ids.size) return; const ps=activeProjects(); const n=UI.select.ids.size;
   actionSheet('Mover '+n+(n===1?' tarea':' tareas'), [{label:'Sin proyecto', fn:()=>bulkMove(null)}].concat(ps.map(p=>({label:p.name, fn:()=>bulkMove(p.id)})))); }
 function bulkMove(projectId){ const xs=selectedTasks(); if(!xs.length) return; const prev=xs.map(x=>({id:x.id, projectId:x.projectId})); batch(()=>xs.forEach(x=>updTask(x.id,{projectId}))); const p=projectId?proj(projectId):null; endSelect(); toast(xs.length+(xs.length===1?' tarea movida a ':' tareas movidas a ')+(p?p.name:'Sin proyecto'), ()=>batch(()=>prev.forEach(q=>updTask(q.id,{projectId:q.projectId})))); }
-function rescheduleMany(xs, date, label){ if(!xs.length) return; const prev=xs.map(x=>({id:x.id, date:x.date, carried:x.carried})); batch(()=>xs.forEach(x=>updTask(x.id,{date}))); renderAnimated(); haptic(8); log('info','Aplazadas en bloque: '+xs.length+' a '+date); toast(xs.length+(xs.length===1?' tarea pasada a ':' tareas pasadas a ')+label, ()=>batch(()=>prev.forEach(p=>updTask(p.id,{date:p.date, carried:p.carried})))); }
-function closeDaySheet(){ const hoy=pendingFor('hoy'); if(!hoy.length) return; const high=hoy.filter(x=>x.priority==='high'), rest=hoy.filter(x=>x.priority!=='high'); const tm=addDays(todayStr(),1);
-  const items=[{label:'Todas ('+hoy.length+')', fn:()=>rescheduleMany(hoy, tm, 'mañana')}]; if(high.length&&rest.length) items.push({label:'Solo las no prioritarias ('+rest.length+')', fn:()=>rescheduleMany(rest, tm, 'mañana')});
-  actionSheet('Pasar lo pendiente a mañana', items); }
+function rescheduleMany(xs, date, label){ if(!xs.length) return; const prev=xs.map(x=>({id:x.id, date:x.date, carried:x.carried})); batch(()=>xs.forEach(x=>updTask(x.id,{date}))); renderAnimated(); haptic(8); log('info','Aplazadas en bloque: '+xs.length+' a '+date); toast(xs.length+(xs.length===1?' tarea ':' tareas ')+(date?(xs.length===1?'pasada a ':'pasadas a ')+label:'sin fecha'), ()=>batch(()=>prev.forEach(p=>updTask(p.id,{date:p.date, carried:p.carried})))); }
+// What tomorrow starts with, in the active space: "Mañana empieza con 6 tareas, 2 prioritarias"
+function tomorrowLine(){ const tm=addDays(todayStr(),1), xs=spaceTasks().filter(x=>x.status==='pending'&&x.date===tm), p=xs.filter(x=>x.priority==='high').length;
+  return xs.length ? 'Mañana empieza con '+xs.length+(xs.length===1?' tarea':' tareas')+(p?', '+p+(p===1?' prioritaria':' prioritarias'):'')+'.' : 'Mañana empieza sin tareas.'; }
+/* R8: close the day. What was done today, what is left and three ways out: all to tomorrow, only the non-priority ones,
+   or one by one (the review walk). Each bulk move has its Deshacer (rescheduleMany); the foot says what tomorrow starts with */
+function closeDaySheet(){ flushHeld(true); const t=todayStr(), tm=addDays(t,1); const hoy=pendingFor('hoy'); if(!hoy.length) return;
+  const high=hoy.filter(x=>x.priority==='high'), rest=hoy.filter(x=>x.priority!=='high');
+  const done=spaceTasks().filter(x=>x.status==='done'&&x.completed&&localDay(x.completed)===t).sort((a,b)=>a.completed<b.completed?-1:1);
+  const li=(x,d)=>'<div class="pl"><span class="t">'+esc(x.title||'Sin título')+'</span>'+(d?'':x.priority==='high'?'<span class="pri high">!!!</span>':x.priority==='mid'?'<span class="pri mid">!!</span>':'')+'</div>';
+  const n=k=>k+(k===1?' tarea':' tareas');
+  openSheet('<h2>Cerrar el día</h2><div class="cdnums"><div><b>'+done.length+'</b><span>'+(done.length===1?'hecha':'hechas')+' hoy</span></div><div><b>'+hoy.length+'</b><span>'+(hoy.length===1?'queda':'quedan')+'</span></div><div class="'+(high.length?'red':'')+'"><b>'+high.length+'</b><span>prioritarias</span></div></div>'+
+    '<div class="plhead"><span>Queda</span></div><div class="plist cdlist">'+hoy.map(x=>li(x)).join('')+'</div>'+
+    (done.length?'<div class="plhead"><span>Hecho hoy</span></div><div class="plist cdlist done">'+done.map(x=>li(x,true)).join('')+'</div>':'')+
+    '<div class="list cdacts"><button class="cell" data-cd="all"><span class="lbl">Todo a mañana</span><span class="val">'+n(hoy.length)+'</span></button>'+
+    (high.length&&rest.length?'<button class="cell" data-cd="rest"><span class="lbl">Solo las no prioritarias</span><span class="val">'+n(rest.length)+'</span></button>':'')+
+    '<button class="cell" data-cd="one"><span class="lbl">Decidir una a una</span>'+I.chev.replace('<svg','<svg class="chev"')+'</button></div>'+
+    '<div class="hint cdfoot">'+tomorrowLine()+'</div>', s=>{
+    s.onclick=e=>{ const b=e.target.closest('[data-cd]'); if(!b) return; const k=b.dataset.cd;
+      if(k==='one'){ reviewStart('close'); return; }
+      closeSheet(); rescheduleMany(k==='all'?hoy:rest, tm, 'mañana'); }; }); }
+/* R9 and R8: review tasks one by one. 'carried': the Aplazadas of Hoy (under the project filter, as the list shows them);
+   'close': all of Hoy, from Cerrar el día. Each decision applies at once, so the list behind stays current;
+   the balance at the end has one Deshacer for all of them. No field is added: "aplazada desde" was not approved */
+function reviewStart(kind){ flushHeld(true); let xs=kind==='carried'?pendingFor('hoy').filter(x=>x.carried):pendingFor('hoy');
+  if(kind==='carried'&&UI.projFilter!==null) xs=xs.filter(x=> UI.projFilter==='none' ? !x.projectId : x.projectId===UI.projFilter);
+  if(!xs.length) return; log('info', kind==='carried'?'Repasar aplazadas':'Cerrar el día una a una', {n:xs.length});
+  reviewStep(xs.map(x=>x.id), 0, {kind, prev:new Map(), removed:[], tally:{}}); }
+const REVIEW_OUT=[['hoy','para hoy','para hoy'],['man','a mañana','a mañana'],['vie','al viernes','al viernes'],['nsem','a la próxima semana','a la próxima semana'],['none','sin fecha','sin fecha'],['done','completada','completadas'],['del','eliminada','eliminadas'],['skip','saltada','saltadas']];
+function reviewStep(ids, i, st){
+  if(i>=ids.length){ sheetOnClose=null; reviewEnd(st, true); return; }
+  const x=task(ids[i]); if(!x||x.status!=='pending'){ reviewStep(ids, i+1, st); return; } // completed or removed meanwhile
+  const t=todayStr(); const opts=uniqueBy([['hoy',t,'Hoy'],['man',addDays(t,1),'Mañana'],['vie',nextWeekday(5,true),'Viernes'],['nsem',nextWeekday(1,true),'Próxima semana']], o=>o[1]).concat([['none',null,'Sin fecha']]);
+  const p=x.projectId?proj(x.projectId):null; const tally=k=>{ st.tally[k]=(st.tally[k]||0)+1; };
+  const keep=()=>{ if(!st.prev.has(x.id)) st.prev.set(x.id, {date:x.date, carried:x.carried, status:x.status, completed:x.completed}); };
+  const next=()=>{ haptic(6); render(); reviewStep(ids, i+1, st); };
+  openSheet('<h2>'+(st.kind==='close'?'Cerrar el día':'Repasar aplazadas')+'</h2><div class="hint" style="margin-top:-6px">'+(i+1)+' de '+ids.length+(p?' · '+esc(p.name):'')+'</div><div class="plan-title">'+esc(x.title||'Sin título')+'</div>'+
+    '<div class="chips rvchips">'+opts.map(o=>'<button class="chip" data-rv="'+o[0]+'">'+o[2]+'</button>').join('')+'</div>'+
+    '<div class="sheet-actions"><button class="btn" data-x="done">'+I.check+'Completar</button><button class="btn redtext" data-x="del">'+I.trash+'Eliminar</button></div>'+
+    '<div class="sheet-actions" style="margin-top:10px"><button class="btn" data-x="skip">Saltar</button><button class="btn" data-x="end">Terminar</button></div>', s=>{
+    sheetOnClose=()=>{ st.tally.skip=(st.tally.skip||0)+ids.length-i; reviewEnd(st, false); }; // closed with a tap outside or a drag: as Terminar, the balance as a toast
+    s.onclick=e=>{ const c=e.target.closest('[data-rv]'); if(c){ const o=opts.find(q=>q[0]===c.dataset.rv); keep(); updTask(x.id,{date:o[1], carried:false}); tally(o[0]); next(); return; } // Hoy confirms the task and clears its Aplazada mark
+      const b=e.target.closest('[data-x]'); if(!b) return; const k=b.dataset.x;
+      if(k==='done'){ keep(); applyDone(x.id, true); tally('done'); next(); }
+      else if(k==='del'){ const j=DB.tasks.indexOf(x); if(j>=0){ DB.tasks.splice(j,1); const vn=DB.voiceNotes.filter(v=>v.taskId===x.id); DB.voiceNotes=DB.voiceNotes.filter(v=>v.taskId!==x.id); st.removed.push({x, vn}); save(); } tally('del'); haptic(10); next(); }
+      else if(k==='skip'){ tally('skip'); reviewStep(ids, i+1, st); }
+      else { st.tally.skip=(st.tally.skip||0)+ids.length-i; sheetOnClose=null; reviewEnd(st, true); } }; });
+}
+function reviewEnd(st, asSheet){ const T=st.tally, decided=Object.keys(T).some(k=>k!=='skip'&&T[k]);
+  const undo=()=>batch(()=>{ st.prev.forEach((o,id)=>{ if(task(id)) updTask(id, o); }); st.removed.forEach(r=>{ if(!task(r.x.id)){ DB.tasks.push(r.x); DB.voiceNotes.push(...r.vn); } }); save(); });
+  const parts=REVIEW_OUT.filter(o=>T[o[0]]).map(o=>T[o[0]]+' '+(T[o[0]]===1?o[1]:o[2]));
+  log('info', st.kind==='carried'?'Repaso de aplazadas':'Día cerrado una a una', T);
+  if(!decided){ if(asSheet) closeSheet(); renderAnimated(); return; }
+  renderAnimated();
+  if(!asSheet){ toast(parts.join(', '), undo); return; }
+  openSheet('<h2>'+(st.kind==='close'?'Día cerrado':'Repaso terminado')+'</h2><div class="list">'+REVIEW_OUT.filter(o=>T[o[0]]).map(o=>'<div class="cell"><span class="lbl">'+(o[0]==='done'||o[0]==='del'||o[0]==='skip'?o[2][0].toUpperCase()+o[2].slice(1):o[1][0].toUpperCase()+o[1].slice(1))+'</span><span class="val">'+T[o[0]]+'</span></div>').join('')+'</div>'+
+    '<div class="hint cdfoot">'+tomorrowLine()+'</div><div class="sheet-actions"><button class="btn" data-x="undo">Deshacer</button><button class="btn primary" data-x="ok">Listo</button></div>', s=>{
+    s.onclick=e=>{ const b=e.target.closest('[data-x]'); if(!b) return; closeSheet(); if(b.dataset.x==='undo'){ undo(); renderAnimated(); toast(st.kind==='close'?'Cierre deshecho':'Repaso deshecho'); } }; }); }
+/* R13: the view options, from the three dots of the Tareas bar (and of a project) on the iPhone and of the column head on the desktop */
+function toggleSummary(){ const fold=!summaryCollapsed(pendingFor('hoy').length); DB.settings.summaryState = fold?'closed':'open'; if(fold) UI.sumFilter=null; UI.summaryFirst=false; save(); render(); } // a folded summary hides its figures, so their filter goes too
+function setGrouping(key, g){ if(DB.settings[key]===g) return; DB.settings[key]=g; save(); haptic(4); renderAnimated(); }
+function viewMenu(){ const top=UI.stack[UI.stack.length-1]; const inProject=UI.wide?UI.deskView.startsWith('project:'):!!(top&&top.kind==='project');
+  const f=inProject?null:UI.wide?UI.deskView:DB.settings.filter; const items=[]; const on=b=>b?'  ✓':'';
+  if(!UI.wide) items.push({label:'Seleccionar tareas', fn:()=>startSelect(null)}); // the desktop has no multiple selection yet
+  items.push({label:DB.settings.doneOpen?'Ocultar completadas':'Mostrar completadas', fn:()=>{ DB.settings.doneOpen=!DB.settings.doneOpen; save(); render(); }});
+  if(f==='hoy'||f==='todas'){ const k=f==='hoy'?'hoyGroup':'allGroup', g=DB.settings[k]==='project'?'project':'date';
+    items.push({label:'Agrupar por fecha'+on(g==='date'), fn:()=>setGrouping(k,'date')}, {label:'Agrupar por proyecto'+on(g==='project'), fn:()=>setGrouping(k,'project')}); }
+  if(f==='hoy') items.push({label:summaryCollapsed(pendingFor('hoy').length)?'Mostrar resumen del día':'Plegar resumen del día', fn:toggleSummary});
+  actionSheet(null, items); }
+/* R14: a day header of Todas. A long press (iPhone) or a right click (desktop) offers to move its tasks to another day */
+function dayHeadMenu(head){ const sec=head.closest('.gsec'), day=head.dataset.dayHead; if(!sec||UI.select) return;
+  const xs=[...sec.querySelectorAll('.group [data-id]')].map(r=>task(r.dataset.id)).filter(x=>x&&x.status==='pending'); if(!xs.length) return;
+  actionSheet(dayTitle(day), [{label:xs.length===1?'Mover esta tarea':'Mover estas '+xs.length, fn:()=>moveDaySheet(xs, day)}]); }
+function moveDaySheet(xs, from){ const t=todayStr(); const chips=uniqueBy([[t,'Hoy'],[addDays(t,1),'Mañana'],[nextWeekday(5,true),'Viernes'],[nextWeekday(1,true),'Próxima semana']], c=>c[0]).filter(c=>c[0]!==from).concat([['','Sin fecha']]);
+  let ym=(from>t?from:t).slice(0,7); const n=xs.length;
+  openSheet('<h2>'+(n===1?'Mover 1 tarea':'Mover '+n+' tareas')+'</h2><div class="hint" style="margin-top:-6px">Desde '+esc(dayTitle(from).toLowerCase())+'</div><div class="chips" style="margin-top:6px">'+chips.map(c=>'<button class="chip" data-d="'+c[0]+'">'+c[1]+'</button>').join('')+'</div><div id="calwrap">'+calendarHTML(ym, from)+'</div>', s=>{
+    s.onclick=e=>{ const nav=e.target.closest('[data-cal]'); if(nav){ ym=shiftMonth(ym,+nav.dataset.cal); $('#calwrap',s).innerHTML=calendarHTML(ym, from); return; }
+      const c=e.target.closest('[data-d]'); if(!c) return; const d=c.dataset.d||null; closeSheet(); if(d===from) return;
+      xs.forEach(x=>releaseHold(x.id)); rescheduleMany(xs.filter(x=>task(x.id)&&x.date!==d), d, d?fmtDate(d).toLowerCase():''); }; }); }
 function rowMenu(id){ const x=task(id); if(!x) return; releaseHold(id); const pl={high:'alta',mid:'media',none:'ninguna'}[x.priority];
   actionSheet(x.title, [
     {label:'Prioridad: '+pl, fn:()=>priorityMenu(id)},
@@ -1647,15 +1788,16 @@ function spaceSheet(id){
     inp.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); s.querySelector('[data-x=ok]').click(); } });
   });
 }
-/* Month calendar, Monday first; days with pending tasks carry a dot */
+/* Month calendar, Monday first. R14: a day's load of pending tasks shows as one, two or three dots (1 or 2, 3 to 5, 6 or more) */
 function calendarHTML(ym, sel){
   const [y,m]=ym.split('-').map(Number); const t=todayStr(); const startDow=(new Date(y,m-1,1).getDay()+6)%7;
   const days=new Date(y,m,0).getDate(), prevDays=new Date(y,m-1,0).getDate();
-  const busy=new Set(spaceTasks().filter(x=>x.status==='pending'&&x.date).map(x=>x.date));
+  const load=new Map(); spaceTasks().forEach(x=>{ if(x.status==='pending'&&x.date) load.set(x.date, (load.get(x.date)||0)+1); });
+  const dots=ds=>{ const n=load.get(ds)||0; return n?'<i class="ld">'+'<b></b>'.repeat(n<3?1:n<6?2:3)+'</i>':''; };
   let cells=''; const total=Math.ceil((startDow+days)/7)*7;
   for(let i=0;i<total;i++){ const n=i-startDow+1; let yy=y,mm=m,dd=n,other=false; if(n<1){ other=true; mm=m-1; dd=prevDays+n; if(mm<1){ mm=12; yy--; } } else if(n>days){ other=true; mm=m+1; dd=n-days; if(mm>12){ mm=1; yy++; } }
     const ds=yy+'-'+String(mm).padStart(2,'0')+'-'+String(dd).padStart(2,'0');
-    cells+='<button class="cal-d'+(other?' other':'')+(ds<t?' past':'')+(ds===t?' today':'')+(ds===sel?' sel':'')+'"'+(ds<t?' disabled':' data-d="'+ds+'"')+'><span>'+dd+'</span>'+(busy.has(ds)?'<i></i>':'')+'</button>'; } // a past day cannot be picked: no task is ever overdue (decision 8.5)
+    cells+='<button class="cal-d'+(other?' other':'')+(ds<t?' past':'')+(ds===t?' today':'')+(ds===sel?' sel':'')+'"'+(ds<t?' disabled':' data-d="'+ds+'"')+'><span>'+dd+'</span>'+dots(ds)+'</button>'; } // a past day cannot be picked: no task is ever overdue (decision 8.5)
   const name=MESES_FULL[m-1]; return '<div class="cal"><div class="cal-head"><button data-cal="-1" aria-label="Mes anterior">'+I.back+'</button><span>'+name[0].toUpperCase()+name.slice(1)+' '+y+'</span><button data-cal="1" aria-label="Mes siguiente">'+I.chev+'</button></div><div class="cal-grid">'+['L','M','X','J','V','S','D'].map(d=>'<div class="cal-dow">'+d+'</div>').join('')+cells+'</div></div>';
 }
 function shiftMonth(ym, d){ let [y,m]=ym.split('-').map(Number); m+=d; if(m<1){ m=12; y--; } if(m>12){ m=1; y++; } return y+'-'+String(m).padStart(2,'0'); }
@@ -2000,15 +2142,14 @@ function pasteBoxHTML(projectId){ const ls=UI.addPaste; if(!ls||!ls.length) retu
 function pchipsHTML(){ return activeProjects().length?'<div class="pchips">'+activeProjects().map(p=>'<button class="chip'+(UI.projFilter===p.id?' on':'')+'" data-pf="'+p.id+'"'+(UI.projFilter===p.id?' style="background:'+p.color+'"':'')+'><span class="dot" style="background:'+(UI.projFilter===p.id?'#fff':p.color)+'"></span>'+esc(p.name)+'</button>').join('')+'<button class="chip'+(UI.projFilter==='none'?' on':'')+'" data-pf="none"><span class="dot" style="background:'+(UI.projFilter==='none'?'#fff':'var(--ink3)')+'"></span>Sin proyecto</button></div>':''; }
 function deskMain(){
   const v=UI.deskView; let title='', body='', search=true;
-  if(v==='hoy'||v==='todas'){ const f=v; const nTodas=pendingFor('todas').length; title=f==='hoy'?'Hoy':'Todas';
+  if(v==='hoy'||v==='todas'){ const f=v; title=f==='hoy'?'Hoy':'Todas';
     body = addBarHTML(null)+(f==='hoy'&&!UI.query?summaryHTML():'')+
       (!UI.query?pchipsHTML():'')+
-      (!UI.query&&f==='todas'&&nTodas?'<div class="seg mini" style="max-width:260px"><button data-group="date" class="'+(DB.settings.allGroup!=='project'?'on':'')+'">Por fecha</button><button data-group="project" class="'+(DB.settings.allGroup==='project'?'on':'')+'">Por proyecto</button></div>':'')+
       listHTML(UI.query?'todas':f); }
   else if(v==='week'){ title='Semana'; body=(!UI.query?pchipsHTML():'')+weekHTML(); } // the project filter applies here too, so it stays visible and clearable
   else if(v.startsWith('project:')){ const id=v.slice(8); const p=id==='none'?null:proj(id); if(id!=='none'&&(!p||p.archived||p.spaceId!==space().id)){ UI.deskView=DB.settings.filter||'hoy'; return deskMain(); } /* gone, archived or in another space */ title=p?p.name:'Sin proyecto'; body=addBarHTML(p?p.id:null)+listHTML('todas', p?p.id:null); }
   else if(v==='settings'){ title='Ajustes'; search=false; const h=viewAjustes(); body=h.slice(h.indexOf('<div class="scroll">')); }
-  return '<main class="main"><div class="mhead"><h1>'+esc(title)+'</h1>'+(search?'<div class="searchbar"><div class="search">'+I.search+'<input type="search" placeholder="Buscar" value="'+esc(UI.query)+'" data-role="search" autocomplete="off"></div>'+(UI.query?'<button class="cancel" data-act="clearSearch">Cancelar</button>':'')+'</div>':'')+'</div><div class="mbody"><div class="inner'+(v==='week'?' week-inner':'')+'">'+body+'</div></div></main>';
+  return '<main class="main"><div class="mhead"><h1>'+esc(title)+'</h1>'+(search?'<div class="searchbar"><div class="search">'+I.search+'<input type="search" placeholder="Buscar" value="'+esc(UI.query)+'" data-role="search" autocomplete="off"></div>'+(UI.query?'<button class="cancel" data-act="clearSearch">Cancelar</button>':'')+'</div>':'')+(v==='hoy'||v==='todas'||v.startsWith('project:')?'<button class="mopts" data-act="viewMenu" aria-label="Opciones de vista" title="Opciones de vista">'+I.more+'</button>':'')+'</div><div class="mbody"><div class="inner'+(v==='week'?' week-inner':'')+'">'+body+'</div></div></main>';
 }
 function weekHTML(){
   const t=todayStr(); const start=UI.weekStart||mondayOf(t); const days=[...Array(7)].map((_,i)=>addDays(start,i)); const end=days[6];
@@ -2071,6 +2212,7 @@ function bindAddBar(d){
 function bindDeskEvents(d){
   // Right click opens the row menu, and on a sidebar project the project menu (the iPhone long press)
   d.addEventListener('contextmenu', e=>{ const pj=e.target.closest('.side [data-view^="project:"]'); if(pj){ e.preventDefault(); if(pj.dataset.view!=='project:none') projectMenu(pj.dataset.view.slice(8)); return; }
+    const dh=e.target.closest('[data-day-head]'); if(dh){ e.preventDefault(); dayHeadMenu(dh); return; } // R14: a day header of Todas
     const row=e.target.closest('.row[data-id], .wcard[data-id]'); if(!row) return; e.preventDefault(); rowMenu(row.dataset.id); });
   // Week view: drag a card onto a day (or onto "Sin fecha") to reschedule it
   // Only a card drag moves a task: any other drag (a link, a file) clears dragId, so a cancelled card drag never carries over
@@ -2091,6 +2233,8 @@ document.addEventListener('keydown', e=>{ if(!UI.wide) return; const tag=(e.targ
   if(modal) return; // N and / never reach the page behind a menu or a sheet
   if(!typing && (e.key==='n'||e.key==='N')){ const ab=$('#desk [data-role=addbar]'); if(ab){ e.preventDefault(); ab.focus(); } return; }
   if(!typing && e.key==='/' ){ const s=$('#desk [data-role=search]'); if(s){ e.preventDefault(); s.focus(); } } });
+// A project group header (R13) is a div with the button role: Enter and Space act on it as on a button
+document.addEventListener('keydown', e=>{ if((e.key==='Enter'||e.key===' ')&&e.target.classList&&e.target.classList.contains('gtap')){ e.preventDefault(); e.target.click(); } });
 wideMQ.addEventListener('change', applyWide); // first applied at start, before the first render
 
 /* ---------- Service worker: offline cache and update notice ---------- */

@@ -1,5 +1,10 @@
 # Registro de cambios
 
+## v0.14.1. Hojas que se cerraban solas en el iPhone (1 de noviembre de 2026)
+
+- En el detalle de una tarea, la hoja de Fecha podía abrirse y cerrarse al instante y el menú de Proyecto aparecía de golpe. Durante el primer medio segundo tras abrir una hoja o un menú, un toque en el fondo, en un día del calendario o en una opción del menú ya no cuenta: así un toque repetido no cierra la hoja ni elige algo por error.
+- Diagnóstico: si una hoja se cierra en menos de 0,8 segundos, el registro de Ajustes anota desde dónde se cerró.
+
 ## v0.14.0. Revisión completa de móvil y escritorio (1 de noviembre de 2026)
 
 Revisión con 107 hallazgos: 83 confirmados por dos verificadores independientes y 24 confirmados al corregirlos. Corregidos 98, dos ya quedaban resueltos por otra corrección, tres son parciales y cuatro esperan decisión de Enric (al final). Cada corrección se reprodujo antes y después, y la batería de 18 pruebas pasa entera.

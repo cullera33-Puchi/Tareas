@@ -445,7 +445,7 @@ body.desktop .toast{left:auto;right:28px;bottom:28px;width:360px;}
 
 <script>
 'use strict';
-const APP_VERSION = '0.14.0';
+const APP_VERSION = '0.14.1';
 let pendingSW = null; // service worker installed and waiting to take over
 let updateRequested = false; // the user asked for the waiting worker to take over
 
@@ -1252,14 +1252,17 @@ function bindLongPress(el, fn){ let t=null, x0=0, y0=0, fired=false;
 const sheet=$('#sheet'), scrim=$('#scrim'), asheet=$('#asheet');
 const dimApp = on => app.classList.toggle('sheet-open', !!on);
 let sheetOnClose=null; // one shot, set by the sheet's owner: runs however the sheet closes (a button, the scrim, a drag down, Escape)
-function openSheet(html, onOpen){ sheetOnClose=null; sheet.innerHTML='<div class="handle"></div>'+html; sheet.classList.add('on'); scrim.classList.add('on'); dimApp(true); bindSheetDrag(); onOpen&&onOpen(sheet); }
-function closeSheet(){ sheet.classList.remove('on','drag'); sheet.style.transform=''; asheet.classList.remove('on'); asheet.onclick=null; scrim.classList.remove('on'); dimApp(false); try{ stopRec&&stopRec(); }catch(e){} setTimeout(()=>{ if(!sheet.classList.contains('on')) sheet.innerHTML=''; if(!asheet.classList.contains('on')) asheet.innerHTML=''; },350); const oc=sheetOnClose; sheetOnClose=null; if(oc) oc(); if(staleView) setTimeout(flushStale, 0); } // a closed menu keeps no buttons or handler that a stray click could fire; data reloaded meanwhile is drawn now, unless the caller already redrew
+// A sheet just opened ignores a stray tap on the backdrop (a repeated or ghost tap from the same touch on iOS), and an early close is logged with its caller
+let sheetOpenedAt=0; const sheetFresh=()=>performance.now()-sheetOpenedAt<450;
+function noteEarlyClose(kind){ const ms=Math.round(performance.now()-sheetOpenedAt); if(sheetOpenedAt&&ms<800) log('warn','Hoja cerrada a los '+ms+' ms ('+kind+')', String((new Error()).stack||'').split('\n').slice(2,5).map(l=>l.trim().slice(0,90)).join(' | ')); }
+function openSheet(html, onOpen){ sheetOpenedAt=performance.now(); sheetOnClose=null; sheet.innerHTML='<div class="handle"></div>'+html; sheet.classList.add('on'); scrim.classList.add('on'); dimApp(true); bindSheetDrag(); onOpen&&onOpen(sheet); }
+function closeSheet(){ if(sheet.classList.contains('on')||asheet.classList.contains('on')) noteEarlyClose('cerrar'); sheet.classList.remove('on','drag'); sheet.style.transform=''; asheet.classList.remove('on'); asheet.onclick=null; scrim.classList.remove('on'); dimApp(false); try{ stopRec&&stopRec(); }catch(e){} setTimeout(()=>{ if(!sheet.classList.contains('on')) sheet.innerHTML=''; if(!asheet.classList.contains('on')) asheet.innerHTML=''; },350); const oc=sheetOnClose; sheetOnClose=null; if(oc) oc(); if(staleView) setTimeout(flushStale, 0); } // a closed menu keeps no buttons or handler that a stray click could fire; data reloaded meanwhile is drawn now, unless the caller already redrew
 /* An action menu opened over an open sheet (the Proyecto and Prioridad chips of Nueva tarea) is nested:
    Cancelar, a tap outside or Escape close only the menu and give the sheet back with what was typed */
 let asheetNested=false, asheetCancel=null;
 function closeAction(){ asheet.classList.remove('on'); asheet.onclick=null; setTimeout(()=>{ if(!asheet.classList.contains('on')) asheet.innerHTML=''; },350); }
 function cancelAction(){ if(asheetNested&&sheet.classList.contains('on')){ const f=asheetCancel; asheetCancel=null; closeAction(); f&&f(); } else closeSheet(); }
-scrim.addEventListener('click', ()=>{ if(asheet.classList.contains('on')) cancelAction(); else closeSheet(); });
+scrim.addEventListener('click', ()=>{ if(sheetFresh()){ log('warn','Toque en el fondo ignorado justo al abrir una hoja'); return; } if(asheet.classList.contains('on')) cancelAction(); else closeSheet(); });
 function bindSheetDrag(){ const h=sheet; let y0=0,dy=0,drag=false,inner=null;
   // A scrolled inner box (a long textarea, the log) keeps the finger until it is back at its top; only then does the sheet follow it down
   const scroller=t=>{ for(let el=t; el&&el!==h; el=el.parentElement){ if(el.scrollHeight>el.clientHeight+1){ const o=getComputedStyle(el).overflowY; if(el.tagName==='TEXTAREA'||o==='auto'||o==='scroll') return el; } } return null; };
@@ -1271,7 +1274,7 @@ function bindSheetDrag(){ const h=sheet; let y0=0,dy=0,drag=false,inner=null;
     dy=Math.max(0,y-y0); if(dy>0){ h.classList.add('drag'); h.style.transform='translate3d(0,calc('+dy+'px - var(--kb)),0)'; } }; // keeps the keyboard offset of .sheet.on
   h.ontouchend=()=>{ inner=null; if(!drag) return; drag=false; h.classList.remove('drag'); if(dy>110) closeSheet(); else h.style.transform=''; };
   h.ontouchcancel=()=>{ inner=null; if(!drag) return; drag=false; reset(); }; }
-function actionSheet(title, items, onCancel){ asheetNested=sheet.classList.contains('on'); asheetCancel=onCancel||null; asheet.innerHTML='<div class="grp">'+(title?'<div class="t">'+esc(title)+'</div>':'')+items.map((it,i)=>'<button class="it'+(it.red?' red':'')+'" data-i="'+i+'">'+esc(it.label)+'</button>').join('')+'</div><div class="grp"><button class="it cancel" data-i="-1">Cancelar</button></div>'; asheet.classList.add('on'); scrim.classList.add('on'); dimApp(true); asheet.onclick=e=>{ const b=e.target.closest('[data-i]'); if(!b) return; const i=+b.dataset.i; if(i<0){ cancelAction(); return; } if(asheetNested&&sheet.classList.contains('on')) closeAction(); else closeSheet(); items[i].fn(); }; }
+function actionSheet(title, items, onCancel){ sheetOpenedAt=performance.now(); asheetNested=sheet.classList.contains('on'); asheetCancel=onCancel||null; asheet.innerHTML='<div class="grp">'+(title?'<div class="t">'+esc(title)+'</div>':'')+items.map((it,i)=>'<button class="it'+(it.red?' red':'')+'" data-i="'+i+'">'+esc(it.label)+'</button>').join('')+'</div><div class="grp"><button class="it cancel" data-i="-1">Cancelar</button></div>'; asheet.classList.add('on'); scrim.classList.add('on'); dimApp(true); asheet.onclick=e=>{ const b=e.target.closest('[data-i]'); if(!b) return; if(sheetFresh()){ log('warn','Toque en el menú ignorado justo al abrir'); return; } const i=+b.dataset.i; if(i<0){ cancelAction(); return; } if(asheetNested&&sheet.classList.contains('on')) closeAction(); else closeSheet(); items[i].fn(); }; }
 function confirmSheet(title, text, fn){ actionSheet(text, [{label:title, red:true, fn}]); }
 function priorityMenu(id){ const x=task(id); if(!x) return; actionSheet(x.title, [
   {label:'Prioridad alta'+(x.priority==='high'?'  ✓':''), fn:()=>setPriority(id,'high')},
@@ -1416,7 +1419,7 @@ function dateSheet(id){ const x=task(id); if(!x) return; const t=todayStr(); con
   let ym=(x.date||t).slice(0,7);
   openSheet('<h2>Fecha</h2><div class="chips" style="margin-top:0">'+uniqueBy(chips, c=>c[0]).map(c=>'<button class="chip'+(x.date===c[0]?' on':'')+'" data-d="'+c[0]+'">'+c[1]+'</button>').join('')+'</div><div id="calwrap">'+calendarHTML(ym, x.date)+'</div>', s=>{
     s.onclick=e=>{ const nav=e.target.closest('[data-cal]'); if(nav){ ym=shiftMonth(ym,+nav.dataset.cal); $('#calwrap',s).innerHTML=calendarHTML(ym, x.date); return; }
-      const c=e.target.closest('[data-d]'); if(c){ updTask(id,{date:c.dataset.d||null}); haptic(6); closeSheet(); render(); } }; }); }
+      const c=e.target.closest('[data-d]'); if(c){ if(sheetFresh()){ log('warn','Toque en el calendario ignorado justo al abrir'); return; } updTask(id,{date:c.dataset.d||null}); haptic(6); closeSheet(); render(); } }; }); }
 function reminderSheet(id){ const x=task(id); if(!x) return; const t=todayStr(); const pad=n=>String(n).padStart(2,'0');
   const tm=new Date(); tm.setDate(tm.getDate()+1); tm.setHours(9,0,0,0);
   const now=new Date(); const h1=new Date(Math.ceil((now.getTime()+36e5)/3e5)*3e5); const e18=new Date(); e18.setHours(18,0,0,0);

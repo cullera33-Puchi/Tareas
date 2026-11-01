@@ -111,41 +111,6 @@ body.desktop .asheet.on{transform:translate(-50%,-50%) scale(1);opacity:1;visibi
 body.desktop .asheet button.it{height:46px;font-size:1rem;}
 body.desktop .app.sheet-open{transform:none;border-radius:0;}
 body.desktop .toast{left:auto;right:28px;bottom:28px;width:360px;}
-/* Week view */
-.week{display:flex;flex-direction:column;height:100%;min-height:0;}
-.week .whead{display:flex;align-items:center;gap:8px;padding:0 0 12px;}
-.week .whead h2{margin:0 8px 0 0;font-size:1.06rem;font-weight:600;}
-.week .whead button.nav-b{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--blue);background:var(--card);border:.5px solid var(--sep);}
-.week .whead button.nav-b svg{width:9px;height:14px;}
-.week .whead button.today-b{height:32px;padding:0 12px;border-radius:8px;background:var(--card);border:.5px solid var(--sep);color:var(--blue);font-weight:600;font-size:0.882rem;}
-.wgrid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:10px;align-items:start;}
-.wday{background:var(--card);border-radius:12px;min-height:220px;padding:8px;border:1.5px solid transparent;transition:border-color .15s,background .15s;}
-.wday.today{border-color:var(--blue);}
-.wday.over{background:var(--fill);border-color:var(--blue);}
-.wday.past{opacity:.75;}
-.wday .dh{display:flex;align-items:baseline;justify-content:space-between;padding:2px 4px 8px;}
-.wday .dh b{font-size:0.882rem;font-weight:600;}
-.wday .dh b small{font-weight:400;color:var(--ink2);margin-left:4px;}
-.wday.today .dh b{color:var(--blue);}
-.wday .dh button{width:24px;height:24px;border-radius:6px;color:var(--ink2);display:flex;align-items:center;justify-content:center;}
-.wday .dh button:hover{background:var(--fill);color:var(--blue);}
-.wday .dh button svg{width:14px;height:14px;}
-.wcard{display:flex;align-items:flex-start;gap:7px;padding:7px 8px;border-radius:8px;background:var(--bg);margin-bottom:6px;cursor:grab;border-left:3px solid var(--pc,var(--ink3));}
-.wcard:hover{background:var(--fill);}
-.wcard.dragging{opacity:.4;}
-.wcard .check{width:18px;height:18px;margin-top:1px;}
-.wcard .check svg{width:10px;height:10px;}
-.wcard .t{flex:1;min-width:0;font-size:0.824rem;line-height:1.3;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word;}
-.wcard .t .pri{display:inline;margin-right:4px;letter-spacing:-1px;}
-.wcard .t .m{display:block;color:var(--ink2);font-size:0.706rem;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.wcard .pri{font-size:0.765rem;min-width:0;}
-.wcard.done .t{text-decoration:line-through;color:var(--ink2);}
-.wundated{margin-top:14px;background:var(--card);border-radius:12px;padding:10px 12px;border:1.5px solid transparent;}
-.wundated.over{background:var(--fill);border-color:var(--blue);}
-.wundated h3{margin:0 0 8px;font-size:0.824rem;color:var(--ink2);font-weight:600;}
-.wundated h3:last-child{margin-bottom:0;}
-.wundated .cards{display:flex;flex-wrap:wrap;gap:8px;}
-.wundated .wcard{margin:0;width:220px;}
 
 /* Screens */
 .app{height:100%;position:relative;overflow:hidden;transition:transform .35s cubic-bezier(.32,.72,0,1);}
@@ -679,13 +644,145 @@ html.wide{font-size:14px;}
 .app.desktop .main .inner.settings .group{background:var(--dgroup);border-radius:10px;border:.5px solid var(--dline);}
 .app.desktop .main .inner.settings .cell{min-height:36px;}
 .app.desktop .empty{padding-top:40px;}
-/* Week: columns on a grey ground, white cards */
-.app.desktop .wday,.app.desktop .wundated{background:var(--dgroup);border-color:transparent;}
-.app.desktop .wday.today{border-color:var(--blue);}
-.app.desktop .wday.over,.app.desktop .wundated.over{background:var(--fill);border-color:var(--blue);}
-.app.desktop .wcard{background:var(--dmain);box-shadow:0 0 0 .5px var(--dline),0 .5px 1px rgba(0,0,0,.05);}
-.app.desktop .wcard:hover{background:var(--dmain);box-shadow:0 0 0 1px var(--blue);}
-.app.desktop .wcard.popped{box-shadow:0 0 0 2px var(--blue);}
+/* ---------- R12, R19, R20: the desktop calendar (Día, Semana, Mes; Lista or Horas). It fills the column: each day column,
+   the tray and the hours grid scroll on their own under fixed headers ---------- */
+.app.desktop .main .mbody.calbody{overflow:hidden;display:flex;flex-direction:column;padding-bottom:14px;}
+.main .mbody.calbody .inner{flex:1;min-height:0;display:flex;flex-direction:column;}
+.week{display:flex;flex-direction:column;flex:1;min-height:0;}
+.week .whead{flex:none;display:flex;align-items:center;gap:6px;padding:0 0 10px;min-width:0;}
+.week .whead h2{margin:0 8px 0 0;font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
+.week .whead .grow{flex:1;}
+.week .whead button.nav-b{flex:none;width:28px;height:26px;border-radius:6px;display:flex;align-items:center;justify-content:center;color:var(--ink2);background:var(--dmain);border:.5px solid var(--dline);box-shadow:0 .5px 1.5px rgba(0,0,0,.08);}
+.week .whead button.nav-b svg{width:7px;height:12px;}
+.week .whead button.today-b{flex:none;height:26px;padding:0 10px;border-radius:6px;background:var(--dmain);border:.5px solid var(--dline);box-shadow:0 .5px 1.5px rgba(0,0,0,.08);color:var(--ink);font-size:13px;}
+.week .whead button.nav-b:hover,.week .whead button.today-b:hover{background:var(--dhov);}
+.week .whead .pfdrop{flex:none;}
+.seg.cseg{flex:none;margin:0;padding:2px;border-radius:7px;background:var(--dfield);}
+.seg.cseg button{flex:none;height:22px;padding:0 10px;font-size:12px;border-radius:5px;}
+.seg.cseg button.on{background:var(--dmain);}
+.wbody{flex:1;min-height:0;display:flex;gap:10px;}
+.wgrid{flex:1;min-width:0;display:grid;gap:8px;grid-template-rows:minmax(0,1fr);}
+.wday{display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--dgroup);border-radius:10px;border:1.5px solid transparent;transition:border-color .15s,background .15s;}
+.wday.today{border-color:var(--blue);}
+.wday.over,.wtray.over,.hallday.over,.mday.over,.hs.over{background:var(--fill);border-color:var(--blue);}
+.wday .wl,.wtray .wl{flex:1;min-height:0;overflow-y:auto;padding:0 6px 6px;overscroll-behavior:contain;}
+/* A day's header: name and date, counts and the load bar */
+.dh{flex:none;padding:6px 8px 6px;}
+.dh .dt{display:flex;align-items:center;justify-content:space-between;gap:4px;height:22px;}
+.dh b{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;}
+.dh b small{font-weight:400;color:var(--ink2);margin-left:4px;font-size:13px;}
+.today .dh b{color:var(--blue);}
+.dh button{flex:none;width:22px;height:22px;border-radius:5px;color:var(--ink2);display:flex;align-items:center;justify-content:center;}
+.dh button:hover{background:var(--dhov);color:var(--blue);}
+.dh button svg{width:13px;height:13px;}
+.dh .dm{display:flex;justify-content:space-between;gap:4px;font-size:11px;color:var(--ink2);white-space:nowrap;overflow:hidden;font-variant-numeric:tabular-nums;}
+.dh .dm .wc{overflow:hidden;text-overflow:ellipsis;}
+.dh .dm .wp{color:var(--red);font-weight:600;}
+.dh .ld{height:3px;border-radius:2px;background:var(--dline);margin-top:5px;overflow:hidden;}
+.dh .ld i{display:block;height:100%;background:var(--ink3);transform-origin:left;}
+.dh .ld.orange i{background:var(--orange);}
+.dh .ld.red i{background:var(--red);}
+/* One-line cards: priority, title, time at the right; project colour at the left edge; carried ones with an orange edge */
+.wcard{display:flex;align-items:center;gap:6px;height:28px;padding:0 7px 0 6px;border-radius:6px;background:var(--dmain);margin-bottom:4px;cursor:grab;border-left:3px solid var(--pc,var(--ink3));box-shadow:0 0 0 .5px var(--dline),0 .5px 1px rgba(0,0,0,.05);}
+.wcard:hover{box-shadow:0 0 0 1px var(--blue);}
+.wcard.popped{box-shadow:0 0 0 2px var(--blue);}
+.wcard.carried{box-shadow:0 0 0 1px var(--orange);}
+.wcard.carried:hover{box-shadow:0 0 0 1px var(--blue);}
+.wcard.dragging{opacity:.4;}
+.app.desktop .wcard .check{width:14px;height:14px;border-width:1.2px;}
+.app.desktop .wcard .check svg{width:8px;height:8px;}
+.wcard .t{flex:1;min-width:0;font-size:12px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.wcard .t .pri{display:inline;width:auto;min-width:0;margin-right:4px;letter-spacing:-1px;font-size:11px;}
+.wcard .tm{flex:none;font-size:11px;color:var(--ink2);font-variant-numeric:tabular-nums;}
+.wcard.done .t{text-decoration:line-through;color:var(--ink2);}
+/* The undated tray: a column at the right that folds into a narrow strip */
+.wtray{flex:none;width:210px;display:flex;flex-direction:column;min-height:0;background:var(--dgroup);border-radius:10px;border:1.5px solid transparent;transition:border-color .15s,background .15s;}
+.wtray .trh{flex:none;display:flex;align-items:center;gap:6px;height:36px;padding:0 10px;font-size:13px;font-weight:600;color:var(--ink);text-align:left;}
+.wtray .trh svg{width:9px;height:9px;color:var(--ink2);flex:none;}
+.wtray .trh .l{flex:1;min-width:0;white-space:nowrap;}
+.wtray .trh .n{font-size:11px;font-weight:400;color:var(--ink2);font-variant-numeric:tabular-nums;}
+.wtray .trhint{margin:8px 4px;font-size:11px;color:var(--ink2);text-align:center;}
+.wtray.shut{width:36px;}
+.wtray.shut .trh{flex-direction:column;height:auto;padding:10px 0;gap:8px;}
+.wtray.shut .trh svg{transform:rotate(90deg);}
+.wtray.shut .trh .l{writing-mode:vertical-rl;flex:none;}
+/* Horas: the "Todo el día" strip and the half-hour grid; blocks are always half an hour */
+.hours{flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;background:var(--dgroup);border-radius:10px;overflow:hidden;}
+.hrow{display:grid;column-gap:0;}
+.hhead{flex:none;border-bottom:.5px solid var(--dline);}
+.hdh{min-width:0;border-left:.5px solid var(--dline);}
+.hall{flex:none;border-bottom:.5px solid var(--dline);}
+.hgut{font-size:10px;color:var(--ink2);padding:6px 4px 0 0;text-align:right;line-height:1.2;}
+.hallday{min-width:0;min-height:30px;border-left:.5px solid var(--dline);border:1.5px solid transparent;border-left-color:var(--dline);}
+.hallday .wl{max-height:96px;overflow-y:auto;padding:3px 4px 0;}
+.hallday .hcount{display:block;padding:7px 8px;font-size:12px;color:var(--ink2);}
+.hscroll{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;}
+.hgrid{position:relative;}
+.hlab{position:relative;padding:0;}
+.hlab span{position:absolute;right:6px;transform:translateY(-50%);font-size:10px;color:var(--ink2);font-variant-numeric:tabular-nums;}
+.hlab span:first-child{transform:none;}
+.hcol{position:relative;min-width:0;border-left:.5px solid var(--dline);}
+.hs{height:22px;border-top:.5px solid var(--dline);border-bottom:0;}
+.hs.half{border-top-style:dotted;}
+.hs.past{background:var(--dhov);}
+.hs.over{border:0;box-shadow:inset 0 0 0 1.5px var(--blue);}
+.hcol.today .hs:not(.past){background:rgba(0,122,255,.035);}
+.wcard.hb{position:absolute;margin:0;height:20px;padding:0 5px 0 4px;gap:4px;z-index:1;}
+.wcard.hb .tm{font-size:10px;font-weight:600;color:var(--ink);}
+.hnow{position:absolute;left:0;right:0;top:0;height:0;border-top:1.5px solid var(--red);z-index:2;pointer-events:none;}
+.hnow::before{content:"";position:absolute;left:-4px;top:-4.5px;width:7px;height:7px;border-radius:50%;background:var(--red);}
+/* Mes: six weeks filling the column; up to four chips a day and "N más" */
+.month{flex:1;min-height:0;display:flex;flex-direction:column;}
+.mdow{flex:none;display:grid;grid-template-columns:repeat(7,minmax(0,1fr));font-size:11px;color:var(--ink2);font-weight:600;padding:0 0 4px;}
+.mdow span{padding:0 8px;text-align:right;}
+.mgrid{flex:1;min-height:0;display:grid;grid-template-columns:repeat(7,minmax(0,1fr));grid-template-rows:repeat(6,minmax(0,1fr));border-top:.5px solid var(--dline);border-left:.5px solid var(--dline);}
+.mday{min-width:0;min-height:0;overflow:hidden;display:flex;flex-direction:column;gap:2px;padding:3px 4px 4px;border-right:.5px solid var(--dline);border-bottom:.5px solid var(--dline);outline:1.5px solid transparent;outline-offset:-1.5px;}
+.mday.over{outline-color:var(--blue);}
+.mday.other{background:var(--dgroup);}
+.mday.other .mnum{color:var(--ink3);}
+.mday .mh{flex:none;display:flex;align-items:center;justify-content:flex-end;gap:4px;}
+.mnum{height:20px;min-width:20px;padding:0 6px;border-radius:10px;font-size:12px;color:var(--ink);font-variant-numeric:tabular-nums;}
+.mnum:hover{background:var(--dhov);}
+.mday.today .mnum{background:var(--red);color:#fff;font-weight:600;}
+.wcard.mc{flex:none;height:18px;margin:0;padding:0 4px;gap:4px;border-left:0;box-shadow:none;background:none;border-radius:4px;}
+.wcard.mc:hover{background:var(--dhov);box-shadow:none;}
+.wcard.mc.carried{box-shadow:inset 0 0 0 1px var(--orange);}
+.wcard.mc.popped{box-shadow:inset 0 0 0 1.5px var(--blue);}
+.wcard.mc .mdot{flex:none;width:7px;height:7px;border-radius:50%;background:var(--pc,var(--ink3));}
+.wcard.mc .t{font-size:11px;}
+.wcard.mc .tm{font-size:10px;}
+.mmore{flex:none;margin-right:auto;height:18px;padding:0 5px;border-radius:4px;font-size:11px;color:var(--ink2);font-weight:600;}
+.mmore:hover{background:var(--dhov);color:var(--ink);}
+/* R19: the sidebar's mini month */
+.minical{padding:4px 2px 2px;}
+.minical .cal{padding:0;}
+.minical .cal-head{font-size:12px;padding:0 0 2px 6px;}
+.minical .cal-head button{width:24px;height:22px;border-radius:5px;color:var(--ink2);}
+.minical .cal-head button:hover{background:var(--dhov);}
+.minical .cal-head svg{width:6px;height:10px;}
+.minical .cal-dow{font-size:10px;padding:0 0 2px;}
+.minical .cal-grid{row-gap:0;}
+.minical .cal-d{height:24px;border-radius:5px;}
+.minical .cal-d span{width:22px;height:22px;font-size:11px;font-variant-numeric:tabular-nums;}
+.minical .cal-d.past span{color:var(--ink2);}
+.minical .cal-d.other span{color:var(--ink3);}
+.minical .cal-d.inr{background:var(--dsel);border-radius:0;}
+.minical .cal-d:hover span{background:var(--dhov);}
+.minical .cal-d.today span{background:var(--red);color:#fff;}
+.minical .cal-d i{bottom:0;}
+.minical .cal-d i b{width:3px;height:3px;}
+.minical .cal-d.over{box-shadow:inset 0 0 0 1.5px var(--blue);}
+/* R20: the agenda of Hoy, on screens wider than 1400 px */
+.hagenda{display:none;}
+@media (min-width:1401px){
+  .app.desktop:not(.has-pane) .main.with-agenda{display:grid;grid-template-columns:minmax(0,1fr) 300px;grid-template-rows:auto minmax(0,1fr);}
+  .app.desktop:not(.has-pane) .main.with-agenda .mhead{grid-column:1;grid-row:1;}
+  .app.desktop:not(.has-pane) .main.with-agenda .mbody{grid-column:1;grid-row:2;}
+  .app.desktop:not(.has-pane) .hagenda{grid-column:2;grid-row:1 / 3;display:flex;flex-direction:column;min-height:0;padding:12px 16px 14px 0;}
+}
+.hagenda .ahead{flex:none;display:flex;align-items:baseline;gap:8px;height:28px;margin:0 0 8px;}
+.hagenda .ahead b{font-size:15px;font-weight:600;}
+.hagenda .ahead span{font-size:13px;color:var(--ink2);}
 /* ---------- R17: the detail pane becomes an inspector: close button, a form of pop-up buttons, priority segment,
    dates at the foot, and a left edge that resizes it (320 to 600 px). In Semana it opens as a popover next to the card. ---------- */
 .app.desktop .pane{background:var(--dmain);border-left:.5px solid var(--dline);position:relative;}
@@ -1073,7 +1170,8 @@ function doneList(projectId){
 }
 
 /* ---------- UI state ---------- */
-const UI = { tab:'tareas', query:'', stack:[], scroll:{}, sumFilter:null, summaryFirst:false, searchDone:false, select:null, projFilter:null, wide:false, deskView:'hoy', deskDetail:null, weekStart:null, addDraft:'', addPaste:null, convertedNotes:{}, deskScroll:{}, deskKey:null };
+const CAL_VIEWS=['day','week','month'], H0=7*60, H1=21*60, SLOT=30, SH=22; // R12, R19, R20: the calendar views; the hours grid's first and last minute, its slot and the slot's height in px
+const UI = { tab:'tareas', query:'', stack:[], scroll:{}, sumFilter:null, summaryFirst:false, searchDone:false, select:null, projFilter:null, wide:false, deskView:'hoy', deskDetail:null, weekStart:null, calDay:null, calMonth:null, miniYM:null, addDraft:'', addPaste:null, convertedNotes:{}, deskScroll:{}, deskKey:null };
 
 /* ---------- Toast with undo ---------- */
 let toastTimer=null, undoFn=null;
@@ -1649,7 +1747,13 @@ function onClick(e){
   const th=e.target.closest('button[data-theme]'); if(th){ DB.settings.theme=th.dataset.theme; save(); applyTheme(); render(); return; } // only the Tema buttons: <html> carries data-theme too
   const op=e.target.closest('[data-open-project]'); if(op){ if(UI.wide){ setDeskView('project:'+op.dataset.openProject); } else push('project', op.dataset.openProject); return; }
   const dv=e.target.closest('[data-view]'); if(dv){ setDeskView(dv.dataset.view); return; }
-  const wk=e.target.closest('[data-week]'); if(wk){ const d=wk.dataset.week; UI.weekStart = d==='today' ? mondayOf(todayStr()) : addDays(UI.weekStart||mondayOf(todayStr()), +d*7); render(); return; }
+  const wk=e.target.closest('[data-week]'); if(wk){ calNav(wk.dataset.week); return; }
+  const cv=e.target.closest('[data-cal-view]'); if(cv){ if(UI.deskView!==cv.dataset.calView) setDeskView(cv.dataset.calView); return; } // R19, R20: Día, Semana, Mes
+  const cm=e.target.closest('[data-cal-mode]'); if(cm){ if(calMode()!==cm.dataset.calMode){ DB.settings.calMode=cm.dataset.calMode; save(); render(); } return; } // Lista or Horas
+  const ow=e.target.closest('[data-open-week]'); if(ow){ openCalWeek(ow.dataset.openWeek); return; }
+  const od=e.target.closest('[data-open-day]'); if(od){ openCalDay(od.dataset.openDay); return; }
+  const mn=e.target.closest('[data-mini]'); if(mn){ openCalWeek(mn.dataset.mini); return; } // the sidebar's mini month
+  const mc=e.target.closest('.minical [data-cal]'); if(mc){ UI.miniYM=shiftMonth(UI.miniYM||calAnchor().slice(0,7), +mc.dataset.cal); render(); return; }
   const wa=e.target.closest('[data-add-date]'); if(wa){ addSheet(wa.dataset.project||null,'',{date:wa.dataset.addDate}); return; } // R14: a day header in a project adds to that project
   const es=e.target.closest('[data-edit-space]'); if(es){ spaceSheet(es.dataset.editSpace); return; }
   const rb=e.target.closest('[data-restore]'); if(rb){ restoreBackup(rb.dataset.restore); return; }
@@ -1686,6 +1790,8 @@ function onClick(e){
     case 'back': pop(); break;
     case 'rowMenu': if(row) rowMenu(row.dataset.id, {anchor:act}); break; // the desktop three dots: the menu hangs from them (R17)
     case 'projFilterMenu': projFilterMenu(act); break;
+    case 'weekModeMenu': weekModeMenu(act); break;
+    case 'toggleTray': DB.settings.weekTray=DB.settings.weekTray===false; save(); render(); break;
     case 'setPri': if(detailId) setPriority(detailId, act.dataset.pr); break;
     case 'wcheck': { const c=act.closest('.wcard'); if(c){ act.classList.toggle('done'); act.classList.add('just'); setTimeout(()=>{ completeTask(c.dataset.id); renderAnimated(); },220); } break; }
     case 'newProject': projectSheet(null); break;
@@ -2318,7 +2424,8 @@ function spaceSheet(id){
   });
 }
 /* Month calendar, Monday first. R14: a day's load of pending tasks shows as one, two or three dots (1 or 2, 3 to 5, 6 or more) */
-function calendarHTML(ym, sel){
+// opts.mini (R19, the sidebar): every day can be clicked (data-mini) and takes a dropped task (data-day); opts.range marks the days the calendar shows
+function calendarHTML(ym, sel, opts){ const mini=!!(opts&&opts.mini), rg=opts&&opts.range;
   const [y,m]=ym.split('-').map(Number); const t=todayStr(); const startDow=(new Date(y,m-1,1).getDay()+6)%7;
   const days=new Date(y,m,0).getDate(), prevDays=new Date(y,m-1,0).getDate();
   const load=new Map(); spaceTasks().forEach(x=>{ if(x.status==='pending'&&x.date) load.set(x.date, (load.get(x.date)||0)+1); });
@@ -2326,8 +2433,8 @@ function calendarHTML(ym, sel){
   let cells=''; const total=Math.ceil((startDow+days)/7)*7;
   for(let i=0;i<total;i++){ const n=i-startDow+1; let yy=y,mm=m,dd=n,other=false; if(n<1){ other=true; mm=m-1; dd=prevDays+n; if(mm<1){ mm=12; yy--; } } else if(n>days){ other=true; mm=m+1; dd=n-days; if(mm>12){ mm=1; yy++; } }
     const ds=yy+'-'+String(mm).padStart(2,'0')+'-'+String(dd).padStart(2,'0');
-    cells+='<button class="cal-d'+(other?' other':'')+(ds<t?' past':'')+(ds===t?' today':'')+(ds===sel?' sel':'')+'"'+(ds<t?' disabled':' data-d="'+ds+'"')+'><span>'+dd+'</span>'+dots(ds)+'</button>'; } // a past day cannot be picked: no task is ever overdue (decision 8.5)
-  const name=MESES_FULL[m-1]; return '<div class="cal"><div class="cal-head"><button data-cal="-1" aria-label="Mes anterior">'+I.back+'</button><span>'+name[0].toUpperCase()+name.slice(1)+' '+y+'</span><button data-cal="1" aria-label="Mes siguiente">'+I.chev+'</button></div><div class="cal-grid">'+['L','M','X','J','V','S','D'].map(d=>'<div class="cal-dow">'+d+'</div>').join('')+cells+'</div></div>';
+    cells+='<button class="cal-d'+(other?' other':'')+(ds<t?' past':'')+(ds===t?' today':'')+(ds===sel?' sel':'')+(rg&&ds>=rg[0]&&ds<=rg[1]?' inr':'')+'"'+(mini?' data-mini="'+ds+'" data-day="'+ds+'"':ds<t?' disabled':' data-d="'+ds+'"')+'><span>'+dd+'</span>'+dots(ds)+'</button>'; } // a past day cannot be picked: no task is ever overdue (decision 8.5)
+  const name=MESES_FULL[m-1]; return '<div class="cal'+(mini?' mini':'')+'"><div class="cal-head"><button data-cal="-1" aria-label="Mes anterior">'+I.back+'</button><span>'+name[0].toUpperCase()+name.slice(1)+' '+y+'</span><button data-cal="1" aria-label="Mes siguiente">'+I.chev+'</button></div><div class="cal-grid">'+['L','M','X','J','V','S','D'].map(d=>'<div class="cal-dow">'+d+'</div>').join('')+cells+'</div></div>';
 }
 function shiftMonth(ym, d){ let [y,m]=ym.split('-').map(Number); m+=d; if(m<1){ m=12; y--; } if(m>12){ m=1; y++; } return y+'-'+String(m).padStart(2,'0'); }
 // The project of a task: an anchored menu, from the detail's value on the iPhone and as the inspector's pop-up button on the desktop
@@ -2643,7 +2750,7 @@ function applyWide(){ const w=wideMQ.matches; if(w===UI.wide) return; closeMenu(
     let pr=null; UI.deskDetail=null; UI.stack.forEach(s=>{ if(s.kind==='project') pr=s.id; else UI.deskDetail=s.id; s.el.remove(); }); UI.stack=[];
     if(UI.select){ UI.select=null; app.classList.remove('selecting'); closeSheet(); } // an open bulk menu would act on nothing
     if(pr) UI.deskView='project:'+pr; else if(UI.tab==='ajustes') UI.deskView='settings';
-    else if(UI.deskView!=='week') UI.deskView=DB.settings.filter; // the list the iPhone showed; Semana has no iPhone screen, so it is kept
+    else if(!isCalView(UI.deskView)) UI.deskView=DB.settings.filter; // the list the iPhone showed; the calendar has no iPhone screen, so it is kept
     app.querySelectorAll('.screen.root').forEach(s=>s.remove()); } // hidden on the desktop; render() rebuilds them on the way back
   else { const d=$('#desk'); if(d) d.remove(); app.classList.remove('has-pane');
     const v=UI.deskView; UI.tab = v==='settings'?'ajustes' : v.startsWith('project:')?'proyectos' : 'tareas';
@@ -2657,7 +2764,7 @@ function deskSide(){
   const ps=activeProjects(); const pend=spaceTasks().filter(x=>x.status==='pending'); const cnt=id=>pend.filter(x=> id===null?!x.projectId:x.projectId===id).length; const v=UI.deskView;
   const it=(view,ic,label,n,on)=>'<button class="it'+(on?' on':'')+'" data-view="'+view+'">'+ic+'<span>'+label+'</span>'+(n!==undefined?'<span class="n">'+n+'</span>':'')+'</button>';
   return '<aside class="side"><button class="sp" data-act="spaceMenu">'+esc(space().name)+I.chevD+'</button>'+
-    it('hoy',I.list,'Hoy',pendingFor('hoy').length,v==='hoy')+it('todas',I.inbox.replace('viewBox="0 0 48 48"','viewBox="0 0 48 48" stroke-width="3"'),'Todas',pendingFor('todas').length,v==='todas')+it('week',I.cal,'Semana',undefined,v==='week')+
+    it('hoy',I.list,'Hoy',pendingFor('hoy').length,v==='hoy')+it('todas',I.inbox.replace('viewBox="0 0 48 48"','viewBox="0 0 48 48" stroke-width="3"'),'Todas',pendingFor('todas').length,v==='todas')+it('week',I.cal,'Semana',undefined,isCalView(v))+miniMonthHTML()+
     '<div class="sec">Proyectos</div>'+ps.map(p=>'<button class="it'+(v==='project:'+p.id?' on':'')+'" data-view="project:'+p.id+'"><span class="dot" style="background:'+p.color+'"></span><span>'+esc(p.name)+'</span><span class="n">'+cnt(p.id)+'</span></button>').join('')+
     '<button class="it'+(v==='project:none'?' on':'')+'" data-view="project:none"><span class="dot" style="background:var(--ink3)"></span><span>Sin proyecto</span><span class="n">'+cnt(null)+'</span></button>'+
     '<button class="it add" data-act="newProject">'+I.plus+'<span>Nuevo proyecto</span></button>'+
@@ -2680,22 +2787,108 @@ function deskMain(){
   if(v==='hoy'||v==='todas'){ const f=v; title=f==='hoy'?'Hoy':'Todas'; pf=true;
     body = addBarHTML(null)+(f==='hoy'&&!UI.query?summaryHTML():'')+
       listHTML(UI.query?'todas':f); }
-  else if(v==='week'){ title='Semana'; pf=true; body=weekHTML(); } // the project filter applies here too, so it stays visible and clearable
+  else if(isCalView(v)){ title={day:'Día',week:'Semana',month:'Mes'}[v]; pf=true; body=weekHTML(); } // the project filter applies here too, so it stays visible and clearable
   else if(v.startsWith('project:')){ const id=v.slice(8); const p=id==='none'?null:proj(id); if(id!=='none'&&(!p||p.archived||p.spaceId!==space().id)){ UI.deskView=DB.settings.filter||'hoy'; return deskMain(); } /* gone, archived or in another space */ title=p?p.name:'Sin proyecto'; body=addBarHTML(p?p.id:null)+listHTML('todas', p?p.id:null); }
   else if(v==='settings'){ title='Ajustes'; search=false; const h=viewAjustes(); body=h.slice(h.indexOf('<div class="scroll">')); }
-  return '<main class="main"><div class="mhead'+(v==='week'?' wide-head':'')+'"><h1>'+esc(title)+'</h1>'+(pf?'<span class="pfslot">'+pfDropHTML()+'</span>':'')+(search?'<div class="searchbar"><div class="search">'+I.search+'<input type="search" placeholder="Buscar" value="'+esc(UI.query)+'" data-role="search" autocomplete="off"></div>'+(UI.query?'<button class="cancel" data-act="clearSearch">Cancelar</button>':'')+'</div>':'')+(v==='hoy'||v==='todas'||v.startsWith('project:')?'<button class="mopts" data-act="viewMenu" aria-label="Opciones de vista" title="Opciones de vista">'+I.more+'</button>':'')+'</div><div class="mbody"><div class="inner'+(v==='week'?' week-inner':v==='settings'?' settings':'')+'">'+body+'</div></div></main>';
+  const cal=isCalView(v);
+  return '<main class="main'+(v==='hoy'?' with-agenda':'')+'"><div class="mhead'+(cal?' wide-head':'')+'"><h1>'+esc(title)+'</h1>'+(pf?'<span class="pfslot">'+pfDropHTML()+'</span>':'')+(search?'<div class="searchbar"><div class="search">'+I.search+'<input type="search" placeholder="Buscar" value="'+esc(UI.query)+'" data-role="search" autocomplete="off"></div>'+(UI.query?'<button class="cancel" data-act="clearSearch">Cancelar</button>':'')+'</div>':'')+(v==='hoy'||v==='todas'||v.startsWith('project:')?'<button class="mopts" data-act="viewMenu" aria-label="Opciones de vista" title="Opciones de vista">'+I.more+'</button>':'')+'</div><div class="mbody'+(cal?' calbody':'')+'"><div class="inner'+(cal?' week-inner':v==='settings'?' settings':'')+'">'+body+'</div></div>'+(v==='hoy'?agendaHTML():'')+'</main>';
 }
-function weekHTML(){
-  const t=todayStr(); const start=UI.weekStart||mondayOf(t); const days=[...Array(7)].map((_,i)=>addDays(start,i)); const end=days[6];
-  const all=spaceTasks().filter(x=>x.date&&x.date>=start&&x.date<=end&&(x.status==='pending'||(x.completed&&localDay(x.completed)>=start)));
-  let pf=x=>true; if(UI.query) pf=queryMatcher(UI.query); else if(UI.projFilter!==null) pf=x=> UI.projFilter==='none' ? !x.projectId : x.projectId===UI.projFilter; // as in the lists, a search ignores the project filter
-  const card=x=>{ const p=x.projectId?proj(x.projectId):null; return '<div class="wcard'+(x.status==='done'?' done':'')+'" draggable="true" data-id="'+x.id+'"'+(p?' style="--pc:'+p.color+'"':'')+'><button class="check'+(x.status==='done'?' done':'')+'" data-act="wcheck" aria-label="Completar">'+I.check+'</button><div class="t">'+(x.priority==='high'?'<span class="pri high">!!!</span>':x.priority==='mid'?'<span class="pri mid">!!</span>':'')+esc(x.title)+(p?'<span class="m">'+esc(p.name)+'</span>':'')+'</div></div>'; };
-  const sm=new Date(start+'T00:00:00'), em=new Date(end+'T00:00:00'); const label=sm.getMonth()===em.getMonth()? sm.getDate()+' al '+em.getDate()+' de '+MESES_FULL[em.getMonth()] : sm.getDate()+' de '+MESES_FULL[sm.getMonth()]+' al '+em.getDate()+' de '+MESES_FULL[em.getMonth()];
-  const undated=orderTasks(spaceTasks().filter(x=>x.status==='pending'&&!x.date).filter(pf));
-  return '<div class="week"><div class="whead"><h2>Semana del '+label+'</h2><button class="nav-b" data-week="-1" aria-label="Semana anterior">'+I.back+'</button><button class="today-b" data-week="today">Hoy</button><button class="nav-b" data-week="1" aria-label="Semana siguiente">'+I.chev+'</button></div>'+
-    '<div class="wgrid">'+days.map(d=>{ const xs=orderTasks(all.filter(x=>x.date===d).filter(pf)); const dd=new Date(d+'T00:00:00'); return '<div class="wday'+(d===t?' today':'')+(d<t?' past':'')+'" data-day="'+d+'"><div class="dh"><b>'+DIAS_FULL[dd.getDay()].slice(0,3)+'<small>'+dd.getDate()+(dd.getDate()===1?' '+MESES[dd.getMonth()]:'')+'</small></b>'+(d<t?'':'<button data-add-date="'+d+'" aria-label="Añadir">'+I.plus+'</button>')+'</div>'+xs.map(card).join('')+'</div>'; }).join('')+'</div>'+
-    '<div class="wundated" data-day=""><h3>'+(undated.length?'Sin fecha ('+undated.length+'): arrastra a un día':'Sin fecha: arrastra aquí para quitar la fecha')+'</h3>'+(undated.length?'<div class="cards">'+undated.slice(0,40).map(card).join('')+'</div>':'')+'</div></div>'; // always a drop target
-}
+/* ---------- R12, R19, R20: the desktop calendar. Día, Semana and Mes share the cards, the drops and the day headers; Día and Semana show
+   as Lista (a column of cards per day) or Horas (a 7:00 to 21:00 grid where a reminder on the task's own date is a half-hour block).
+   Blocks always last half an hour: a task has no duration. The mini month of the sidebar and the agenda of Hoy reuse the same pieces. ---------- */
+// Function declarations: the first render runs before this part of the script (the constants are with UI)
+function isCalView(v){ return CAL_VIEWS.includes(v); }
+function calMode(){ return DB.settings.calMode==='hours'?'hours':'list'; } // view preferences, as hoyGroup
+function weekMode(){ return DB.settings.weekMode==='monday'?'monday':'next7'; }
+// The first day of the week that holds d: its Monday, or in "Siete días desde hoy" a multiple of seven days from today
+function weekStartFor(d){ const t=todayStr(); if(weekMode()==='monday') return mondayOf(d); const k=Math.floor(Math.round((new Date(d+'T00:00:00')-new Date(t+'T00:00:00'))/864e5)/7); return addDays(t, 7*k); }
+function calStart(){ return UI.weekStart||weekStartFor(todayStr()); } // null follows today, also when the day changes with the app open
+function calDays(){ const v=UI.deskView; if(v==='day') return [UI.calDay||todayStr()]; const s=calStart(); return [...Array(7)].map((_,i)=>addDays(s,i)); }
+// The day the sidebar's mini month starts from: the one the calendar shows, or today
+function calAnchor(){ const v=UI.deskView; return v==='week'?calStart() : v==='day'?(UI.calDay||todayStr()) : v==='month'?(UI.calMonth||todayStr().slice(0,7))+'-01' : todayStr(); }
+function calNav(dir){ const v=UI.deskView, today=dir==='today';
+  if(v==='month') UI.calMonth=today?null:shiftMonth(UI.calMonth||todayStr().slice(0,7), +dir);
+  else if(v==='day'){ const d=today?null:addDays(UI.calDay||todayStr(), +dir); UI.calDay=d===todayStr()?null:d; }
+  else { const s=today?null:addDays(calStart(), 7*dir); UI.weekStart=s===weekStartFor(todayStr())?null:s; }
+  UI.miniYM=null; render(); }
+function openCalWeek(d){ const s=weekStartFor(d); UI.weekStart=s===weekStartFor(todayStr())?null:s; UI.miniYM=null; setDeskView('week'); }
+function openCalDay(d){ UI.calDay=d===todayStr()?null:d; UI.miniYM=null; setDeskView('day'); }
+function setWeekMode(m){ if(weekMode()===m) return; const a=UI.weekStart; DB.settings.weekMode=m; save(); UI.weekStart=a?weekStartFor(a):null; if(UI.weekStart===weekStartFor(todayStr())) UI.weekStart=null; log('info','Semana: '+(m==='monday'?'de lunes a domingo':'siete días desde hoy')); render(); }
+function weekModeMenu(src){ popMenu({anchor:src, align:'right', groups:[[{label:'Siete días desde hoy', on:weekMode()==='next7', fn:()=>setWeekMode('next7')}, {label:'De lunes a domingo', on:weekMode()==='monday', fn:()=>setWeekMode('monday')}]]}); }
+// As in the lists, a search ignores the project filter
+function calFilter(){ if(UI.query) return queryMatcher(UI.query); if(UI.projFilter!==null) return x=> UI.projFilter==='none' ? !x.projectId : x.projectId===UI.projFilter; return ()=>true; }
+// The tasks dated from start to end: pending ones, and done ones completed in that span
+function calTasks(start, end){ const pf=calFilter(); return spaceTasks().filter(x=>x.date&&x.date>=start&&x.date<=end&&(x.status==='pending'||(x.completed&&localDay(x.completed)>=start))&&pf(x)); }
+// The minute of the day of a reminder set on the task's own date; any other reminder gives the task no time in the calendar
+function remMin(x){ if(!x.reminder||!x.date||localDay(x.reminder)!==x.date) return null; const d=new Date(x.reminder); return d.getHours()*60+d.getMinutes(); }
+function inGrid(x){ const m=remMin(x); return m!==null&&m>=H0&&m<H1; }
+// Tasks with a time first, by time; the rest in the lists' fixed order
+function calSort(xs){ const tm=xs.map(x=>[x,remMin(x)]); return tm.filter(a=>a[1]!==null).sort((a,b)=>a[1]-b[1]).map(a=>a[0]).concat(orderTasks(tm.filter(a=>a[1]===null).map(a=>a[0]))); }
+// A one-line card (kind ''), a month chip ('mc') or an hour block ('hb'); the full title shows on hover. Carried tasks have an orange edge
+function calCardHTML(x, kind, style){ const p=x.projectId?proj(x.projectId):null, m=remMin(x), done=x.status==='done', tm=m!==null?fmtTime(x.reminder):'';
+  const tip=x.title+(p?'\n'+p.name:'')+(tm?'\n'+tm:'')+(x.carried&&!done?'\nAplazada':'');
+  return '<div class="wcard'+(kind?' '+kind:'')+(done?' done':'')+(x.carried&&!done?' carried':'')+'" draggable="true" data-id="'+x.id+'" title="'+esc(tip)+'" style="'+(p?'--pc:'+p.color+';':'')+(style||'')+'">'+
+    (kind==='mc'?'<span class="mdot"></span>':'<button class="check'+(done?' done':'')+'" data-act="wcheck" aria-label="Completar">'+I.check+'</button>')+
+    (kind==='hb'?'<span class="tm">'+tm+'</span>':'')+'<div class="t">'+(x.priority==='high'?'<span class="pri high">!!!</span>':x.priority==='mid'?'<span class="pri mid">!!</span>':'')+esc(x.title)+'</div>'+(tm&&kind!=='hb'?'<span class="tm">'+tm+'</span>':'')+'</div>'; }
+// R12: a day's header: name and date, pending count, high-priority count and a load bar, orange above 8 tasks and red above 12
+function dayHeadHTML(d, xs){ const t=todayStr(), dd=new Date(d+'T00:00:00'), pend=xs.filter(x=>x.status==='pending'), n=pend.length, hi=pend.filter(x=>x.priority==='high').length, dn=xs.length-n;
+  const what=n?n+(n===1?' tarea':' tareas'):dn?dn+(dn===1?' hecha':' hechas'):'Sin tareas'; // a past day only has done tasks
+  return '<div class="dh" title="'+what+(hi?', '+hi+(hi===1?' prioritaria':' prioritarias'):'')+'"><div class="dt"><b>'+DIAS_FULL[dd.getDay()].slice(0,3)+'<small>'+dd.getDate()+(dd.getDate()===1?' '+MESES[dd.getMonth()]:'')+'</small></b>'+(d<t?'':'<button data-add-date="'+d+'" aria-label="Añadir" title="Añadir">'+I.plus+'</button>')+'</div>'+
+    '<div class="dm"><span class="wc">'+what+'</span>'+(hi?'<span class="wp">'+hi+' !!!</span>':'')+'</div><div class="ld'+(n>12?' red':n>8?' orange':'')+'"><i style="transform:scaleX('+Math.min(1,n/12).toFixed(3)+')"></i></div></div>'; }
+// Past days are narrower (only their done tasks show); one day alone takes the width
+function calCols(days){ const t=todayStr(); return days.map(d=>days.length>1&&d<t?'minmax(0,.55fr)':'minmax(0,1fr)').join(' '); }
+function dayCls(d){ const t=todayStr(); return (d===t?' today':'')+(d<t?' past':''); }
+function weekListHTML(days){ const xs=calTasks(days[0], days[days.length-1]);
+  return '<div class="wgrid" style="grid-template-columns:'+calCols(days)+'">'+days.map(d=>{ const l=calSort(xs.filter(x=>x.date===d));
+    return '<div class="wday'+dayCls(d)+'" data-day="'+d+'">'+dayHeadHTML(d,l)+'<div class="wl" data-keep="wl'+d+'">'+l.map(x=>calCardHTML(x,'')).join('')+'</div></div>'; }).join('')+'</div>'; }
+// Half-hour blocks side by side when they overlap
+function layoutBlocks(list){ const out=[]; let cl=[], ends=[], end=-1;
+  const flush=()=>{ const k=ends.length; cl.forEach(c=>{ c.k=k; out.push(c); }); cl=[]; ends=[]; };
+  list.forEach(x=>{ const m=remMin(x); if(cl.length&&m>=end) flush(); let col=ends.findIndex(e=>e<=m); if(col<0){ col=ends.length; ends.push(0); } ends[col]=m+SLOT; end=cl.length?Math.max(end,m+SLOT):m+SLOT; cl.push({x,m,col}); });
+  if(cl.length) flush(); return out; }
+function nowY(){ const n=new Date(), m=n.getHours()*60+n.getMinutes()+n.getSeconds()/60; return m>=H0&&m<H1?(m-H0)/SLOT*SH:null; }
+function hhmm(m){ return Math.floor(m/60)+':'+String(m%60).padStart(2,'0'); }
+// R20: Horas. A "Todo el día" strip (tasks with a date and no time in the grid) over a grid of half-hour slots, with a red line at the time.
+// The agenda of Hoy (agenda) shows only how many tasks have no time: the list next to it already shows them
+function hoursHTML(days, agenda){ const t=todayStr(), xs=calTasks(days[0], days[days.length-1]), cols='44px '+calCols(days), now=Date.now();
+  const per=d=>xs.filter(x=>x.date===d);
+  const head=agenda?'':'<div class="hrow hhead" style="grid-template-columns:'+cols+'"><div class="hgut"></div>'+days.map(d=>'<div class="hdh'+dayCls(d)+'">'+dayHeadHTML(d, per(d))+'</div>').join('')+'</div>';
+  const all='<div class="hrow hall" style="grid-template-columns:'+cols+'"><div class="hgut">Todo el día</div>'+days.map(d=>{ const a=calSort(per(d).filter(x=>!inGrid(x)));
+    return '<div class="hallday'+dayCls(d)+'" data-day="'+d+'" data-allday="1">'+(agenda?'<span class="hcount">'+(a.length?a.length+(a.length===1?' tarea sin hora':' tareas sin hora'):'Ninguna tarea sin hora')+'</span>':'<div class="wl" data-keep="all'+d+'">'+a.map(x=>calCardHTML(x,'')).join('')+'</div>')+'</div>'; }).join('')+'</div>';
+  let labels=''; for(let m=H0;m<H1;m+=60) labels+='<span style="top:'+((m-H0)/SLOT*SH)+'px">'+hhmm(m)+'</span>';
+  const col=d=>{ let s=''; for(let m=H0;m<H1;m+=SLOT){ const dt=new Date(d+'T00:00:00'); dt.setHours(0,m,0,0); s+='<div class="hs'+(m%60?' half':'')+(dt.getTime()<=now?' past':'')+'" data-slot="'+d+'T'+String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0')+'"></div>'; }
+    const b=layoutBlocks(calSort(per(d).filter(inGrid))).map(c=>calCardHTML(c.x,'hb','top:'+((c.m-H0)/SLOT*SH)+'px;height:'+(SH-2)+'px;left:calc('+c.col+' * 100% / '+c.k+' + 2px);width:calc(100% / '+c.k+' - 4px);')).join('');
+    const y=d===t?nowY():null; return '<div class="hcol'+dayCls(d)+'" data-hday="'+d+'">'+s+b+(d===t?'<div class="hnow" style="transform:translateY('+(y===null?0:y)+'px)'+(y===null?';display:none':'')+'"></div>':'')+'</div>'; };
+  return '<div class="hours'+(agenda?' agenda':'')+'">'+head+all+'<div class="hscroll" data-keep="hours"><div class="hrow hgrid" style="grid-template-columns:'+cols+';height:'+((H1-H0)/SLOT*SH)+'px"><div class="hgut hlab">'+labels+'</div>'+days.map(col).join('')+'</div></div></div>'; }
+// The red line moves with the clock without a redraw
+function placeNow(){ const y=nowY(); document.querySelectorAll('#desk .hnow').forEach(e=>{ if(y===null){ e.style.display='none'; return; } e.style.display=''; e.style.transform='translateY('+y+'px)'; }); }
+setInterval(placeNow, 3e4);
+// A grid shown for the first time scrolls to an hour before now (or to 8:00)
+function scrollHours(sc){ const y=nowY(); sc.scrollTop=Math.max(0, (y===null?SH*2:y-SH*2)); }
+// R12: the undated tasks in a tray beside the days, folding to a narrow strip; open or folded it takes a drop to clear the date
+function trayHTML(){ const pf=calFilter(), u=orderTasks(spaceTasks().filter(x=>x.status==='pending'&&!x.date).filter(pf)), open=DB.settings.weekTray!==false;
+  return '<aside class="wundated wtray'+(open?'':' shut')+'" data-day=""><button class="trh" data-act="toggleTray" aria-expanded="'+open+'" title="'+(open?'Plegar':'Desplegar')+' Sin fecha">'+I.chevD+'<span class="l">Sin fecha</span><span class="n">'+u.length+'</span></button>'+
+    (open?'<div class="wl" data-keep="tray">'+(u.length?u.map(x=>calCardHTML(x,'')).join(''):'')+'<p class="trhint">Arrastra aquí para quitar la fecha</p></div>':'')+'</aside>'; }
+// R19: Mes. Six weeks from the Monday before the 1st; up to four tasks a day and, in the day's head, "N más", which opens the day
+function monthHTML(){ const t=todayStr(), ym=UI.calMonth||t.slice(0,7), start=mondayOf(ym+'-01'), days=[...Array(42)].map((_,i)=>addDays(start,i)), xs=calTasks(days[0], days[41]);
+  return '<div class="month"><div class="mdow">'+['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'].map(d=>'<span>'+d+'</span>').join('')+'</div><div class="mgrid">'+days.map(d=>{ const l=calSort(xs.filter(x=>x.date===d)), more=l.length-4, dd=new Date(d+'T00:00:00');
+    return '<div class="mday'+(d.slice(0,7)!==ym?' other':'')+dayCls(d)+'" data-day="'+d+'"><div class="mh">'+(more>0?'<button class="mmore" data-open-day="'+d+'" title="Abrir el día">'+more+' más</button>':'')+'<button class="mnum" data-open-week="'+d+'" title="Abrir la semana">'+dd.getDate()+(dd.getDate()===1?' '+MESES[dd.getMonth()]:'')+'</button></div>'+l.slice(0,4).map(x=>calCardHTML(x,'mc')).join('')+'</div>'; }).join('')+'</div></div>'; }
+// The calendar column: its head (period, navigation, week option, Lista or Horas, Día, Semana or Mes) and the chosen view
+function weekHTML(){ const v=UI.deskView, days=calDays(), start=days[0], end=days[days.length-1], mode=calMode(); let label, body;
+  if(v==='month'){ const ym=UI.calMonth||todayStr().slice(0,7), n=MESES_FULL[+ym.slice(5,7)-1]; label=n[0].toUpperCase()+n.slice(1)+' de '+ym.slice(0,4); body=monthHTML(); }
+  else { if(v==='day'){ const dd=new Date(start+'T00:00:00'); label=DIAS_FULL[dd.getDay()]+', '+dd.getDate()+' de '+MESES_FULL[dd.getMonth()]; }
+    else { const sm=new Date(start+'T00:00:00'), em=new Date(end+'T00:00:00'); label='Semana del '+(sm.getMonth()===em.getMonth()? sm.getDate()+' al '+em.getDate()+' de '+MESES_FULL[em.getMonth()] : sm.getDate()+' de '+MESES_FULL[sm.getMonth()]+' al '+em.getDate()+' de '+MESES_FULL[em.getMonth()]); }
+    body='<div class="wbody">'+(mode==='hours'?hoursHTML(days):weekListHTML(days))+trayHTML()+'</div>'; }
+  const seg=(attr, opts, cur)=>'<div class="seg cseg" role="group">'+opts.map(([k,l])=>'<button data-'+attr+'="'+k+'"'+(k===cur?' class="on" aria-pressed="true"':' aria-pressed="false"')+'>'+l+'</button>').join('')+'</div>';
+  const nav=v==='month'?['Mes anterior','Mes siguiente']:v==='day'?['Día anterior','Día siguiente']:['Semana anterior','Semana siguiente'];
+  return '<div class="week cal-'+v+(v!=='month'?' mode-'+mode:'')+'"><div class="whead"><h2>'+label+'</h2><button class="nav-b" data-week="-1" aria-label="'+nav[0]+'" title="'+nav[0]+'">'+I.back+'</button><button class="today-b" data-week="today">Hoy</button><button class="nav-b" data-week="1" aria-label="'+nav[1]+'" title="'+nav[1]+'">'+I.chev+'</button><span class="grow"></span>'+
+    (v==='week'?'<button class="pfdrop wmode" data-act="weekModeMenu" aria-haspopup="menu"><span class="l">'+(weekMode()==='monday'?'De lunes a domingo':'Siete días desde hoy')+'</span>'+I.chevD+'</button>':'')+
+    (v!=='month'?seg('cal-mode', [['list','Lista'],['hours','Horas']], mode):'')+seg('cal-view', [['day','Día'],['week','Semana'],['month','Mes']], v)+'</div>'+body+'</div>'; }
+// R19: the sidebar's mini month under Semana: dots on days with pending tasks, a click opens that day's week, a dropped task takes that date
+function miniMonthHTML(){ const ym=UI.miniYM||calAnchor().slice(0,7), v=UI.deskView, s=v==='week'?calStart():v==='day'?calAnchor():null;
+  return '<div class="minical">'+calendarHTML(ym, null, {mini:true, range:s?[s, v==='week'?addDays(s,6):s]:null})+'</div>'; }
+// R20: next to Hoy, on screens wider than 1400 px, the day's agenda with the same hours grid
+function agendaHTML(){ return '<aside class="hagenda"><div class="ahead"><b>Agenda</b><span>'+(()=>{ const d=new Date(); return DIAS_FULL[d.getDay()]+' '+d.getDate(); })()+'</span></div>'+hoursHTML([todayStr()], true)+'</aside>'; }
 // R17: the inspector's width, from the settings, kept between 320 and 600 px and never squeezing the list under 360 px
 function paneWidth(w){ const max=Math.max(320, Math.min(600, innerWidth-220-360)); return Math.round(Math.max(320, Math.min(max, +w||400))); }
 function renderDesktop(){
@@ -2706,18 +2899,20 @@ function renderDesktop(){
   // The add bar or the search keep focus and caret across the rebuild (a click elsewhere has already taken the focus)
   const ae=document.activeElement, fr=ae&&d.contains(ae)&&(ae.dataset.role==='addbar'||ae.dataset.role==='search') ? {role:ae.dataset.role, a:ae.selectionStart, b:ae.selectionEnd} : null;
   const dx = UI.deskDetail && task(UI.deskDetail); // only a task of the active space: the spaces never mix on screen
-  const pop = UI.deskView==='week'; // R17: in Semana the detail is a popover next to its card, so the seven columns keep their width
+  const pop = isCalView(UI.deskView); // R17: in Semana the detail is a popover next to its card, so the seven columns keep their width
   const pane = dx && dx.spaceId===space().id ? '<section class="pane'+(pop?' wpop':'')+'" data-task="'+esc(UI.deskDetail)+'">'+(pop?'':'<div class="igrip" title="Arrastra para cambiar el ancho"></div>')+'<div class="screen detail">'+viewDetail(UI.deskDetail)+'</div></section>' : '';
   if(!pane) UI.deskDetail=null; app.classList.toggle('has-pane', !!pane&&!pop);
   d.style.setProperty('--panew', paneWidth(DB.settings.paneWidth)+'px');
   const sideHTML=deskSide(), mainHTML=deskMain();
   const key=UI.deskView+'|'+DB.settings.activeSpace; // read after deskMain, which may fall back to another view
+  const keep={}; d.querySelectorAll('[data-keep]').forEach(e=>{ keep[e.dataset.keep]=e.scrollTop; }); // the calendar's own scroll boxes (columns, tray, hours)
   d.innerHTML = sideHTML+lazyRows(mainHTML, UI.deskScroll[key]||0, innerHeight)+pane; armRows(d.querySelector('.mbody'));
+  d.querySelectorAll('[data-keep]').forEach(e=>{ const k=e.dataset.keep; if(k in keep) e.scrollTop=keep[k]; else if(k==='hours') scrollHours(e); });
   const b2=d.querySelector('.mbody'); if(b2) b2.scrollTop=UI.deskScroll[key]||0; UI.deskKey=key;
   const s2=d.querySelector('.side'); if(s2) s2.scrollTop=sst;
   if(fr){ const n=$('#desk [data-role='+fr.role+']'); if(n){ n.focus({preventScroll:true}); try{ n.setSelectionRange(fr.a, fr.b); }catch(e){} } }
   if(UI.deskDetail){ bindDetail(d.querySelector('.pane'), UI.deskDetail); if(pid===UI.deskDetail){ const p2=d.querySelector('.pane .scroll'); if(p2) p2.scrollTop=pst; } } // restored after bindDetail has grown the text areas
-  if(pop&&UI.deskDetail){ placeWeekPop(d); if(b2) b2.addEventListener('scroll', ()=>placeWeekPop(d), {passive:true}); }
+  if(pop&&UI.deskDetail){ placeWeekPop(d); const wk=d.querySelector('.week'); if(wk) wk.addEventListener('scroll', ()=>placeWeekPop(d), {passive:true, capture:true}); } // each column scrolls on its own
   const s=$('[data-role=search]',d); if(s) bindSearch(s, ()=>deskResults(d));
   bindAddBar(d);
   renderTabbar();
@@ -2738,7 +2933,7 @@ function deskResults(d){ const ob=d.querySelector('.main .mbody'), oi=ob&&ob.que
   const t=document.createElement('div'); t.innerHTML=lazyRows(deskMain(), ob.scrollTop, innerHeight); const ni=t.querySelector('.mbody .inner'), nbar=t.querySelector('.mhead .searchbar'); if(!ni||!nbar) return false;
   oi.replaceWith(ni); armRows(ob); const sb=bar.querySelector('.search'); [...bar.children].forEach(c=>{ if(c!==sb) c.remove(); }); [...nbar.children].forEach(c=>{ if(!c.querySelector('[data-role=search]')) bar.appendChild(c); });
   const os=d.querySelector('.main .mhead .pfslot'), ns=t.querySelector('.mhead .pfslot'); if(os&&ns) os.replaceWith(ns);
-  bindAddBar(d); if(UI.deskView==='week'&&UI.deskDetail) placeWeekPop(d); return true; }
+  bindAddBar(d); if(isCalView(UI.deskView)&&UI.deskDetail) placeWeekPop(d); return true; }
 function bindAddBar(d){
   const ab=$('[data-role=addbar]',d); if(!ab) return; const said=$('#deskSaid',d); const base=()=>deskAddBase(ab.dataset.project);
   const refocus=()=>{ const n=$('#desk [data-role=addbar]'); if(n){ n.focus(); const l=n.value.length; n.setSelectionRange(l,l); } };
@@ -2759,6 +2954,17 @@ function bindAddBar(d){
     const b=e.target.closest('[data-paste]'); if(!b) return; if(b.dataset.paste==='cancel'){ UI.addPaste=null; render(); refocus(); return; }
     const ls=UI.addPaste.slice(); UI.addPaste=null; const ids=addMany(ls, base()); renderAnimated(); log('info','Tareas creadas desde una lista', {n:ids.length}); toast(ids.length===1?'1 tarea creada':ids.length+' tareas creadas', ()=>removeTasks(ids)); refocus(); });
 }
+// A dropped card: a slot sets the date and a reminder at that time; "Todo el día" keeps the date and drops the time; a day or the mini month
+// set only the date (a reminder stays as it was); "Sin fecha" clears the date. All with Deshacer
+function dropTask(id, z){ const x=task(id); if(!x) return; const old={date:x.date, carried:x.carried, reminder:x.reminder}; let patch, msg;
+  if(z.dataset.slot){ const [day,hm]=z.dataset.slot.split('T'); const dt=new Date(day+'T'+hm+':00'), iso=dt.toISOString();
+    if(x.date===day&&x.reminder&&new Date(x.reminder).getTime()===dt.getTime()){ render(); return; }
+    patch={date:day, reminder:iso}; msg=(x.date===day?'A las ':'Movida a '+fmtDate(day).toLowerCase()+' a las ')+fmtTime(iso); }
+  else if(z.dataset.allday){ const day=z.dataset.day, timed=remMin(x)!==null; if(x.date===day&&!timed){ render(); return; }
+    patch={date:day}; if(timed) patch.reminder=null; msg=x.date===day?'Sin hora':'Movida a '+fmtDate(day).toLowerCase()+(timed?', sin hora':''); }
+  else { const day=z.dataset.day||null; if(x.date===day){ render(); return; } patch={date:day}; msg=day?'Movida a '+fmtDate(day).toLowerCase():'Sin fecha'; }
+  releaseHold(id); updTask(id, patch); haptic(6); renderAnimated(); log('info','Tarea movida en el calendario', {date:patch.date, time:!!patch.reminder});
+  toast(msg, ()=>updTask(id, old)); }
 function bindDeskEvents(d){
   // Right click opens the row menu, and on a sidebar project the project menu (the iPhone long press)
   // R17: each one opens at the pointer, as a Mac context menu; text fields keep the browser's own
@@ -2777,14 +2983,23 @@ function bindDeskEvents(d){
       if(w!==w0){ DB.settings.paneWidth=w; save(); log('info','Ancho del panel de detalle', {w}); } };
     g.addEventListener('pointermove', mv); g.addEventListener('pointerup', up); g.addEventListener('pointercancel', up); });
   d.addEventListener('dblclick', e=>{ if(!e.target.closest('.igrip')) return; DB.settings.paneWidth=400; save(); d.style.setProperty('--panew', paneWidth(400)+'px'); }); // back to the usual width
-  // Week view: drag a card onto a day (or onto "Sin fecha") to reschedule it
+  // Calendar (Día, Semana, Mes, the mini month, the agenda of Hoy): drag a card onto a day, a half-hour slot, "Todo el día" or "Sin fecha"
   // Only a card drag moves a task: any other drag (a link, a file) clears dragId, so a cancelled card drag never carries over
-  let dragId=null;
-  d.addEventListener('dragstart', e=>{ const c=e.target.closest('.wcard'); dragId=c?c.dataset.id:null; if(!c) return; c.classList.add('dragging'); try{ e.dataTransfer.setData('text/plain', dragId); e.dataTransfer.effectAllowed='move'; }catch(err){} });
-  d.addEventListener('dragend', e=>{ dragId=null; const c=e.target.closest('.wcard'); if(c) c.classList.remove('dragging'); d.querySelectorAll('.over').forEach(x=>x.classList.remove('over')); });
-  d.addEventListener('dragover', e=>{ const z=e.target.closest('[data-day]'); if(!z||!dragId||(z.dataset.day&&z.dataset.day<todayStr())) return; e.preventDefault(); e.dataTransfer.dropEffect='move'; d.querySelectorAll('.over').forEach(x=>{ if(x!==z) x.classList.remove('over'); }); z.classList.add('over'); });
-  d.addEventListener('dragleave', e=>{ const z=e.target.closest('[data-day]'); if(z && !z.contains(e.relatedTarget)) z.classList.remove('over'); });
-  d.addEventListener('drop', e=>{ const z=e.target.closest('[data-day]'); if(!z||!dragId||e.dataTransfer.getData('text/plain')!==dragId||(z.dataset.day&&z.dataset.day<todayStr())) return; /* a past day takes no drop: no task is ever overdue */ e.preventDefault(); const id=dragId; dragId=null; const x=task(id); if(!x) return; const day=z.dataset.day||null; if(x.date===day) { render(); return; } const old=x.date, oldC=x.carried; updTask(id,{date:day}); haptic(6); renderAnimated(); toast(day?'Movida a '+fmtDate(day):'Sin fecha', ()=>updTask(id,{date:old, carried:oldC})); });
+  let dragId=null, dropped=false, refusal=null;
+  const zoneOf=t=>t.closest('[data-slot],[data-day]');
+  // Why a zone takes no drop: a past day (no task is ever overdue) or a past half hour (a reminder must be ahead, as in Recordatorio)
+  const refuse=z=>{ if(z.dataset.slot){ const [dy,hm]=z.dataset.slot.split('T'), dt=new Date(dy+'T'+hm+':00'); return dt.getTime()<=Date.now()?(dy<todayStr()?'No se puede mover a un día pasado':'Esa hora ya ha pasado'):null; }
+    return z.dataset.day&&z.dataset.day<todayStr()?'No se puede mover a un día pasado':null; };
+  d.addEventListener('dragstart', e=>{ const c=e.target.closest&&e.target.closest('[draggable="true"][data-id]'); dragId=c?c.dataset.id:null; dropped=false; refusal=null; if(!c) return; c.classList.add('dragging'); try{ e.dataTransfer.setData('text/plain', dragId); e.dataTransfer.effectAllowed='move'; }catch(err){} });
+  d.addEventListener('dragend', e=>{ const id=dragId; dragId=null; const c=e.target.closest&&e.target.closest('[data-id]'); if(c) c.classList.remove('dragging'); d.querySelectorAll('.over').forEach(x=>x.classList.remove('over'));
+    if(id&&!dropped&&refusal){ toast(refusal); haptic(10); } refusal=null; }); // let go over a past day: said, not silently ignored
+  d.addEventListener('dragover', e=>{ if(!dragId) return; const z=zoneOf(e.target); refusal=z?refuse(z):null; if(!z||refusal){ d.querySelectorAll('.over').forEach(x=>x.classList.remove('over')); return; }
+    e.preventDefault(); e.dataTransfer.dropEffect='move'; d.querySelectorAll('.over').forEach(x=>{ if(x!==z) x.classList.remove('over'); }); z.classList.add('over'); });
+  d.addEventListener('dragleave', e=>{ const z=zoneOf(e.target); if(z && !z.contains(e.relatedTarget)) z.classList.remove('over'); });
+  d.addEventListener('drop', e=>{ const z=zoneOf(e.target); if(!z||!dragId||e.dataTransfer.getData('text/plain')!==dragId||refuse(z)) return; e.preventDefault(); dropped=true; const id=dragId; dragId=null; dropTask(id, z); });
+  // Double click on an empty part of a month day adds a task with that date (a past day cannot take one)
+  d.addEventListener('dblclick', e=>{ const md=e.target.closest('.mday'); if(!md||e.target.closest('.wcard,button')) return; const day=md.dataset.day;
+    if(day<todayStr()){ toast('No se puede añadir a un día pasado'); return; } addSheet(null,'',{date:day}); });
   // Week cards open the detail on click
   // R17: in a popover beside the card; a click on the card whose popover that same press closed leaves it closed (a toggle)
   d.addEventListener('click', e=>{ const sh=d._popShut; d._popShut=null; const c=e.target.closest('.wcard'); if(!c||e.target.closest('[data-act]')) return;

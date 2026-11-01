@@ -625,7 +625,7 @@ html.wide{font-size:14px;}
 .app.desktop .dsum .summary-head{margin:0;gap:4px;min-height:28px;justify-content:flex-start;}
 .app.desktop .dsum .summary-head button{width:auto;height:26px;margin:0;color:var(--ink2);}
 .app.desktop .dsum .summary-head svg,.app.desktop .summary.collapsed .summary-head svg{transform:none;}
-.dsum .num{flex:none;display:flex;align-items:baseline;gap:5px;padding:0 10px;border-radius:13px;font-size:13px;text-align:left;}
+.dsum .num{flex:none;display:flex;align-items:center;gap:5px;padding:0 10px;border-radius:13px;font-size:13px;text-align:left;}
 .dsum .num b{display:inline;font-size:14px;font-weight:600;letter-spacing:0;line-height:1;color:var(--ink);font-variant-numeric:tabular-nums;}
 .dsum .num span{font-size:13px;color:var(--ink2);}
 .dsum .num:hover{background:var(--dhov);}
@@ -650,11 +650,11 @@ html.wide{font-size:14px;}
 .app.desktop .check::after{width:32px;height:32px;margin:-16px 0 0 -16px;}
 .app.desktop .row-text{display:flex;align-items:center;gap:8px;}
 .app.desktop .row-title{display:block;flex:0 1 auto;min-width:0;font-size:14px;white-space:nowrap;text-overflow:ellipsis;}
-.app.desktop .row-text .tag{flex:none;max-width:42%;font-size:11px;line-height:16px;padding:0 6px;border-radius:5px;vertical-align:0;}
+.app.desktop .row-text .tag{flex:0 4 auto;min-width:48px;max-width:45%;font-size:11px;line-height:16px;padding:0 6px;border-radius:5px;vertical-align:0;}
 .app.desktop .row-meta{flex:none;display:flex;margin:0;font-size:12px;font-variant-numeric:tabular-nums;}
 .rc{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right;}
-.rc-date{width:100px;}
-.rc-rem{width:62px;}
+.rc-date{width:88px;}
+.rc-rem{width:60px;}
 .rc-rem svg{width:11px;height:11px;margin-right:3px;vertical-align:-1px;}
 .app.desktop .inds{width:34px;justify-content:flex-end;gap:4px;}
 .app.desktop .inds svg{width:12px;height:12px;}
@@ -715,8 +715,7 @@ html.wide{font-size:14px;}
 .ipop svg{width:12px;height:12px;flex:none;color:var(--ink2);}
 .seg.iseg{margin:0;padding:2px;max-width:260px;border-radius:7px;}
 .seg.iseg button{height:22px;font-size:12px;border-radius:5px;}
-.seg.iseg button.on.high{color:var(--red);}
-.seg.iseg button.on.mid{color:var(--orange);}
+.seg.iseg button .pri{display:inline;width:auto;min-width:0;margin-right:4px;font-size:12px;}
 .app.desktop .pane .group-title{padding:0 0 4px;}
 .app.desktop .pane .group:not(.igroup){background:var(--dgroup);border-radius:8px;margin-bottom:12px;}
 .app.desktop .pane .vn{font-size:13px;padding:8px 12px;}
@@ -1557,7 +1556,7 @@ const UPDOWN='<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-
 const XICON='<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M2 2l8 8M10 2l-8 8"/></svg>';
 function inspectorHTML(x, p, vns, links){
   const pop=(act, val, none, ic, extra)=>'<button class="ipop" data-act="'+act+'" aria-haspopup="'+(act==='pickProject'?'menu':'dialog')+'">'+(extra||'')+'<span class="val'+(none?' none':'')+'">'+val+'</span>'+ic+'</button>';
-  const seg=[['none','Ninguna'],['mid','Media'],['high','Alta']].map(([k,l])=>'<button class="'+k+(x.priority===k?' on':'')+'" data-act="setPri" data-pr="'+k+'" role="radio" aria-checked="'+(x.priority===k)+'">'+l+'</button>').join('');
+  const seg=[['none','Ninguna',''],['mid','Media','!!'],['high','Alta','!!!']].map(([k,l,mk])=>'<button class="'+k+(x.priority===k?' on':'')+'" data-act="setPri" data-pr="'+k+'" role="radio" aria-checked="'+(x.priority===k)+'">'+(mk?'<span class="pri '+k+'">'+mk+'</span>':'')+l+'</button>').join('');
   return '<header class="ihead"><button class="ix back" data-act="back" aria-label="Cerrar" title="Cerrar (Esc)">'+XICON+'</button><span class="grow"></span><button data-act="share" aria-label="Compartir" title="Compartir">'+I.share+'</button><button data-act="menu" aria-label="Más" title="Más">'+I.more+'</button></header>'+
    '<div class="scroll">'+
    '<div class="group igroup"><div class="cell input"><textarea class="titlein" data-role="title" rows="1" placeholder="Título" enterkeyhint="done">'+esc(x.title)+'</textarea></div><div class="cell input"><textarea data-role="notes" placeholder="Notas">'+esc(x.notes)+'</textarea></div>'+(links.length?'<div class="links">'+linksHTML(links)+'</div>':'')+convertHTML(x)+'</div>'+
@@ -1845,7 +1844,7 @@ function confirmSheet(title, text, fn){ actionSheet(text, [{label:title, red:tru
    Options come in groups with a line icon each; a submenu replaces the menu in place, with its parent as a header that goes back.
    The finger that opened the menu can slide over the options and lift on one to choose it (menuTrack, menuRelease).
    spec: {anchor, lift, x, y, align, title, prio:{cur, fn}, groups:[[{label, sub, icon, red, on, fn, menu}]]}; menu returns a spec.
-   The bottom action sheet stays for confirmations (confirmSheet) and, for now, for every menu on the desktop. */
+   The bottom action sheet stays for confirmations (confirmSheet), a centred dialog on the desktop, which draws every menu as a macOS menu (macMenu, R17). */
 const mi = p => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'+p+'</svg>';
 const MI = {
   p3:mi('<path d="M6 4.5v9.5M12 4.5v9.5M18 4.5v9.5"/><g fill="currentColor" stroke="none"><circle cx="6" cy="19" r="1.5"/><circle cx="12" cy="19" r="1.5"/><circle cx="18" cy="19" r="1.5"/></g>'),
@@ -2036,18 +2035,15 @@ function taskAnchor(id, act){ if(!UI.wide) return null; const q=CSS.escape(id);
 function pickerPanel(title, html, id, src, act, bind){
   if(UI.wide){ const at=src&&src.isConnected?{anchor:src, align:src.closest('.pane')?'left':'right'}:taskAnchor(id, act); popMenu(Object.assign(at, {html, bind:el=>bind(el, ()=>closeMenu(false, true))})); return; }
   openSheet('<h2>'+title+'</h2>'+html, s=>bind(s, closeSheet)); }
-function priorityMenu(id, src){ const x=task(id); if(!x) return;
-  if(!UI.wide) return popMenu({anchor:src, align:'right', groups:[[['high','Alta',MI.p3],['mid','Media',MI.p2],['none','Ninguna',MI.p0]].map(([k,l,ic])=>({label:l, icon:ic, on:x.priority===k, fn:()=>setPriority(id,k)}))]});
-  actionSheet(x.title, [
-  {label:'Prioridad alta'+(x.priority==='high'?'  ✓':''), fn:()=>setPriority(id,'high')},
-  {label:'Prioridad media'+(x.priority==='mid'?'  ✓':''), fn:()=>setPriority(id,'mid')},
-  {label:'Sin prioridad'+(x.priority==='none'?'  ✓':''), fn:()=>setPriority(id,'none')} ]); }
+// The priority options (R10 on the iPhone, a submenu of the desktop menus with their keys, R17)
+const prioItems = (x, id) => [['high','Alta',MI.p3,'1'],['mid','Media',MI.p2,'2'],['none','Ninguna',MI.p0,'0']].map(([k,l,ic,key])=>({label:l, icon:ic, key, on:x.priority===k, fn:()=>setPriority(id,k)}));
+function priorityMenu(id, src){ const x=task(id); if(!x) return; const at=src?{anchor:src, align:'right'}:taskAnchor(id, 'pickPriority')||{};
+  popMenu(Object.assign(at, {groups:[prioItems(x, id)]})); }
 function setPriority(id, pr){ const x=task(id); if(!x||x.priority===pr) return; const old=x.priority; updTask(id,{priority:pr}); haptic(8); renderAnimated(); toast({high:'Prioridad alta',mid:'Prioridad media',none:'Sin prioridad'}[pr], ()=>updTask(id,{priority:old})); }
 function moveToProject(id, projectId){ const x=task(id); if(!x||x.projectId===projectId) return; const old=x.projectId; updTask(id,{projectId}); const p=projectId?proj(projectId):null; renderAnimated(); toast(p?'Movida a '+p.name:'Sin proyecto', ()=>updTask(id,{projectId:old})); }
 function moveToSpace(id, sp){ const x=task(id); if(!x) return; const old={spaceId:x.spaceId, projectId:x.projectId}; leaveRows(id); setTimeout(()=>{ updTask(id,{spaceId:sp.id, projectId:null}); if(detailTaskId()===id) pop(); else renderAnimated(); toast('Movida a '+sp.name, ()=>updTask(id,old)); },200); }
 const otherSpaces = x => DB.spaces.filter(sp=>sp.id!==x.spaceId).sort((a,b)=>a.order-b.order);
-function moveToSpaceSheet(id){ const x=task(id); if(!x) return; const others=otherSpaces(x); if(!others.length) return;
-  actionSheet('Mover a espacio', others.map(sp=>({label:sp.name, fn:()=>moveToSpace(id, sp)}))); }
+function moveToSpaceSheet(id, src){ const x=task(id); if(!x||!otherSpaces(x).length) return; const m=spaceMoveMenu(id); m.title=''; popMenu(Object.assign(src?{anchor:src}:taskAnchor(id)||{}, m)); }
 // R10 submenus of a task (row menu and detail menu, iPhone)
 function spaceMoveMenu(id){ const x=task(id); if(!x) return null; return {title:'Mover a otro espacio', groups:[otherSpaces(x).map(sp=>({label:sp.name, icon:MI.space, fn:()=>moveToSpace(id, sp)}))]}; }
 function projectPickMenu(id){ const x=task(id); if(!x) return null; const dot=c=>'<span class="pm-dot" style="background:'+c+'"></span>';
@@ -2055,23 +2051,33 @@ function projectPickMenu(id){ const x=task(id); if(!x) return null; const dot=c=
 const DATE_ICON={'Mañana':MI.sunrise, 'Fin de semana':MI.weekend, 'Próxima semana':MI.postpone, 'En una semana':MI.cal, 'Sin fecha':MI.p0};
 const dateItem = (l, d, fn) => ({label:l, sub:l==='Mañana'||!d?'':fmtDate(d), icon:DATE_ICON[l]||MI.cal, fn});
 function postponeMenu(id){ const t=todayStr(); const opts=uniqueBy([['Mañana',addDays(t,1)],['Fin de semana',weekendDay()],['Próxima semana',nextWeekday(1,true)]], o=>o[1]);
-  return {title:'Aplazar', groups:[opts.map(([l,d])=>dateItem(l, d, ()=>{ leaveRows(id); setTimeout(()=>{ rescheduleTask(id,d,l.toLowerCase()); renderAnimated(); },200); })), [{label:'Elegir fecha', icon:MI.calPick, fn:()=>dateSheet(id)}]]}; }
+  return {title:'Aplazar', groups:[opts.map(([l,d])=>dateItem(l, d, ()=>{ leaveRows(id); setTimeout(()=>{ rescheduleTask(id,d,l.toLowerCase()); renderAnimated(); },200); })), [{label:'Elegir fecha', icon:MI.calPick, key:'F', fn:()=>dateSheet(id)}]]}; }
+// R17: a date chosen from a desktop menu, with Deshacer; choosing the date it already has confirms a carried task for today
+function setTaskDate(id, d){ const x=task(id); if(!x||(x.date===d&&!x.carried)) return; releaseHold(id); const old=x.date, oldC=x.carried; updTask(id,{date:d}); haptic(8); renderAnimated();
+  toast(d?'Movida a '+fmtDate(d).toLowerCase():'Sin fecha', ()=>updTask(id,{date:old, carried:oldC})); }
+// R17: the Fecha submenu of the desktop: the quick dates with their keys (H, M, V, S), Sin fecha and the calendar popover (F)
+function dateMenu(id){ const x=task(id); if(!x) return null; const t=todayStr();
+  const ds=uniqueBy([['Hoy',t,'H'],['Mañana',addDays(t,1),'M'],['Viernes',nextWeekday(5,true),'V'],['Próxima semana',nextWeekday(1,true),'S']], o=>o[1]);
+  return {title:'Fecha', groups:[ds.map(([l,d,k])=>({label:l, key:k, on:x.date===d, fn:()=>setTaskDate(id,d)})), [{label:'Sin fecha', on:!x.date, fn:()=>setTaskDate(id,null)}], [{label:'Elegir fecha…', key:'F', fn:()=>dateSheet(id)}]]}; }
+/* R17: the desktop menu of a task (right click, its three dots): Completar, then Fecha, Prioridad and Proyecto as submenus with a check
+   on the current value, Mover a otro espacio, Duplicar and Eliminar, each with the key batch G gives it */
+function deskTaskMenu(id){ const x=task(id); if(!x) return null; const done=x.status==='done';
+  return {groups:[
+    [{label:done?'Marcar pendiente':'Completar', key:'C', fn:()=>{ releaseHold(id); leaveRows(id); setTimeout(()=>{ completeTask(id); renderAnimated(); },200); }}],
+    [{label:'Fecha', menu:()=>dateMenu(id)}, {label:'Prioridad', menu:()=>({title:'Prioridad', groups:[prioItems(x, id)]})}, {label:'Proyecto', key:'P', menu:()=>projectPickMenu(id)}].concat(DB.spaces.length>1?[{label:'Mover a otro espacio', menu:()=>spaceMoveMenu(id)}]:[]),
+    [{label:'Duplicar', fn:()=>duplicateTask(id)}],
+    [{label:'Eliminar', key:'Supr', red:true, fn:()=>confirmDelete(id)}] ]}; }
 function duplicateTask(id){ const x=task(id); if(!x) return; const n=addTask({title:x.title, projectId:x.projectId, priority:x.priority, notes:x.notes, spaceId:x.spaceId}); haptic(8); renderAnimated(); toast('Tarea duplicada'); openDetail(n.id); }
 function leaveRows(id){ document.querySelectorAll('.row[data-id="'+id+'"]').forEach(r=>r.classList.add('leaving')); }
 function confirmDelete(id, after){ const x=task(id); if(!x) return; releaseHold(id); confirmSheet('Eliminar tarea', '"'+x.title+'" se eliminará. Podrás deshacerlo durante unos segundos.', ()=>{ leaveRows(id); setTimeout(()=>{ deleteTask(id); after?after():renderAnimated(); },200); }); }
 function detailMenu(id, src){ const x=task(id); if(!x) return;
-  if(!UI.wide) return popMenu({anchor:src, groups:[
-    [{label:x.status==='done'?'Marcar pendiente':'Marcar completada', icon:x.status==='done'?MI.undo:MI.done, fn:()=>{ completeTask(id,true); render(); }}],
+  popMenu({anchor:src, align:'right', groups:[
+    [{label:x.status==='done'?'Marcar pendiente':'Marcar completada', icon:x.status==='done'?MI.undo:MI.done, key:'C', fn:()=>{ completeTask(id,true); render(); }}],
     (DB.spaces.length>1?[{label:'Mover a otro espacio', icon:MI.space, menu:()=>spaceMoveMenu(id)}]:[]).concat([{label:'Duplicar', icon:MI.dup, fn:()=>duplicateTask(id)}]),
-    [{label:'Eliminar tarea', icon:MI.trash, red:true, fn:()=>confirmDelete(id, closeDetailOf(id))}] ]});
-  actionSheet(x.title, [
-  {label:x.status==='done'?'Marcar pendiente':'Marcar completada', fn:()=>{ completeTask(id,true); render(); }}].concat(DB.spaces.length>1?[{label:'Mover a otro espacio', fn:()=>moveToSpaceSheet(id)}]:[], [
-  {label:'Duplicar', fn:()=>duplicateTask(id)},
-  {label:'Eliminar tarea', red:true, fn:()=>confirmDelete(id, closeDetailOf(id))} ])); }
+    [{label:'Eliminar tarea', icon:MI.trash, red:true, key:'Supr', fn:()=>confirmDelete(id, closeDetailOf(id))}] ]}); }
 // After a delete from the detail, close that task's detail only if it is still the one showing: Atrás may have been tapped meanwhile
 const closeDetailOf = id => ()=>{ if(detailTaskId()===id) pop(); else renderAnimated(); };
-function postponeSheet(id, src){ releaseHold(id); if(!UI.wide){ const m=postponeMenu(id); if(m) popMenu(Object.assign(m, {anchor:src, align:'right'})); return; } const t=todayStr(); const opts=uniqueBy([['Mañana',addDays(t,1)],['Fin de semana',weekendDay()],['Próxima semana',nextWeekday(1,true)]], o=>o[1]);
-  actionSheet('Aplazar', opts.map(([l,d])=>({label:l+(l==='Mañana'?'':'  ('+fmtDate(d)+')'), fn:()=>{ leaveRows(id); setTimeout(()=>{ rescheduleTask(id,d,l.toLowerCase()); renderAnimated(); },200); }})).concat([{label:'Elegir fecha', fn:()=>dateSheet(id)}])); }
+function postponeSheet(id, src){ releaseHold(id); const m=postponeMenu(id); if(m) popMenu(Object.assign(m, src?{anchor:src, align:'right'}:taskAnchor(id)||{})); }
 /* Multi-select: entered from the long-press menu; a bottom bar replaces the tab bar */
 function renderSelbar(){ const n=UI.select?UI.select.ids.size:0; const b=(act,ic,l,red)=>'<button data-act="'+act+'"'+(n?'':' disabled')+(red?' class="red"':'')+'>'+ic+'<span>'+l+'</span></button>'; $('#selbar').innerHTML=b('bulkComplete',I.check,'Completar')+b('bulkPostpone',I.cal,'Aplazar')+b('bulkMove',I.folder,'Mover')+b('bulkDelete',I.trash,'Eliminar',true); }
 function startSelect(id){ flushHeld(true); const top=UI.stack[UI.stack.length-1]; UI.select={scope: top&&top.kind==='project'?'project':'root', ids:new Set(id?[id]:[]), all:false}; if(openRow) closeRow(openRow); app.classList.add('selecting'); render(); renderSelbar(); haptic(6); }
@@ -2085,11 +2091,9 @@ function bulkComplete(){ const xs=selectedTasks(); if(!xs.length) return; const 
 function bulkDelete(){ const xs=selectedTasks(); if(!xs.length) return; confirmSheet('Eliminar '+xs.length+(xs.length===1?' tarea':' tareas'), 'Podrás deshacerlo durante unos segundos.', ()=>{ const ids=new Set(xs.map(x=>x.id)); const removedT=DB.tasks.filter(x=>ids.has(x.id)), removedV=DB.voiceNotes.filter(v=>ids.has(v.taskId)); DB.tasks=DB.tasks.filter(x=>!ids.has(x.id)); DB.voiceNotes=DB.voiceNotes.filter(v=>!ids.has(v.taskId)); save(); log('info','Eliminadas en bloque: '+removedT.length); endSelect(); haptic(14); toast(removedT.length+(removedT.length===1?' tarea eliminada':' tareas eliminadas'), ()=>{ DB.tasks.push(...removedT); DB.voiceNotes.push(...removedV); save(); }); }); }
 function bulkReschedule(date, label){ const xs=selectedTasks(); if(!xs.length) return; const prev=xs.map(x=>({id:x.id, date:x.date, carried:x.carried})); batch(()=>xs.forEach(x=>updTask(x.id,{date}))); endSelect(); toast(xs.length+(xs.length===1?' tarea aplazada a ':' tareas aplazadas a ')+label, ()=>batch(()=>prev.forEach(p=>updTask(p.id,{date:p.date, carried:p.carried})))); }
 function bulkPostponeSheet(src){ if(!UI.select||!UI.select.ids.size) return; const t=todayStr(); const opts=uniqueBy([['Mañana',addDays(t,1)],['Fin de semana',weekendDay()],['Próxima semana',nextWeekday(1,true)],['En una semana',addDays(t,7)]], o=>o[1]);
-  if(!UI.wide) return popMenu({anchor:src, title:'Aplazar '+UI.select.ids.size+(UI.select.ids.size===1?' tarea':' tareas'), groups:[opts.map(([l,d])=>dateItem(l, d, ()=>bulkReschedule(d,l.toLowerCase()))), [dateItem('Sin fecha', null, ()=>bulkReschedule(null,'sin fecha'))]]});
-  actionSheet('Aplazar '+UI.select.ids.size+(UI.select.ids.size===1?' tarea':' tareas'), opts.map(([l,d])=>({label:l+(l==='Mañana'?'':'  ('+fmtDate(d)+')'), fn:()=>bulkReschedule(d,l.toLowerCase())})).concat([{label:'Sin fecha', fn:()=>bulkReschedule(null,'sin fecha')}])); }
+  popMenu({anchor:src, title:'Aplazar '+UI.select.ids.size+(UI.select.ids.size===1?' tarea':' tareas'), groups:[opts.map(([l,d])=>dateItem(l, d, ()=>bulkReschedule(d,l.toLowerCase()))), [dateItem('Sin fecha', null, ()=>bulkReschedule(null,'sin fecha'))]]}); }
 function bulkMoveSheet(src){ if(!UI.select||!UI.select.ids.size) return; const ps=activeProjects(); const n=UI.select.ids.size;
-  if(!UI.wide){ const dot=c=>'<span class="pm-dot" style="background:'+c+'"></span>'; return popMenu({anchor:src, title:'Mover '+n+(n===1?' tarea':' tareas'), groups:[[{label:'Sin proyecto', icon:dot('var(--ink3)'), fn:()=>bulkMove(null)}].concat(ps.map(p=>({label:p.name, icon:dot(p.color), fn:()=>bulkMove(p.id)})))]}); }
-  actionSheet('Mover '+n+(n===1?' tarea':' tareas'), [{label:'Sin proyecto', fn:()=>bulkMove(null)}].concat(ps.map(p=>({label:p.name, fn:()=>bulkMove(p.id)})))); }
+  const dot=c=>'<span class="pm-dot" style="background:'+c+'"></span>'; popMenu({anchor:src, title:'Mover '+n+(n===1?' tarea':' tareas'), groups:[[{label:'Sin proyecto', icon:dot('var(--ink3)'), fn:()=>bulkMove(null)}].concat(ps.map(p=>({label:p.name, icon:dot(p.color), fn:()=>bulkMove(p.id)})))]}); }
 function bulkMove(projectId){ const xs=selectedTasks(); if(!xs.length) return; const prev=xs.map(x=>({id:x.id, projectId:x.projectId})); batch(()=>xs.forEach(x=>updTask(x.id,{projectId}))); const p=projectId?proj(projectId):null; endSelect(); toast(xs.length+(xs.length===1?' tarea movida a ':' tareas movidas a ')+(p?p.name:'Sin proyecto'), ()=>batch(()=>prev.forEach(q=>updTask(q.id,{projectId:q.projectId})))); }
 function rescheduleMany(xs, date, label){ if(!xs.length) return; const prev=xs.map(x=>({id:x.id, date:x.date, carried:x.carried})); batch(()=>xs.forEach(x=>updTask(x.id,{date}))); renderAnimated(); haptic(8); log('info','Aplazadas en bloque: '+xs.length+' a '+date); toast(xs.length+(xs.length===1?' tarea ':' tareas ')+(date?(xs.length===1?'pasada a ':'pasadas a ')+label:'sin fecha'), ()=>batch(()=>prev.forEach(p=>updTask(p.id,{date:p.date, carried:p.carried})))); }
 // What tomorrow starts with, in the active space: "Mañana empieza con 6 tareas, 2 prioritarias"
@@ -2156,60 +2160,42 @@ function spaceMenu(src){ const pickSpace=s=>{ DB.settings.activeSpace=s.id; save
     if(UI.wide){ UI.deskDetail=null; if(UI.deskView.startsWith('project:')&&UI.deskView!=='project:none') UI.deskView=DB.settings.filter||'hoy'; } // the other space's project and task never stay on screen
     render(); };
   const sps=DB.spaces.slice().sort((a,b)=>a.order-b.order);
-  if(!UI.wide) return popMenu({anchor:src, align:'left', groups:[sps.map(s=>({label:s.name, on:s.id===space().id, fn:()=>pickSpace(s)})), [{label:'Nuevo espacio', icon:MI.plus, fn:()=>spaceSheet(null)}]]});
-  actionSheet('Espacio', sps.map(s=>({label:s.name+(s.id===space().id?'  ✓':''), fn:()=>pickSpace(s)})).concat([{label:'Nuevo espacio', fn:()=>spaceSheet(null)}])); }
+  popMenu({anchor:src, align:'left', groups:[sps.map(s=>({label:s.name, on:s.id===space().id, fn:()=>pickSpace(s)})), [{label:'Nuevo espacio', icon:MI.plus, fn:()=>spaceSheet(null)}]]}); }
 function viewMenu(src){ const top=UI.stack[UI.stack.length-1]; const inProject=UI.wide?UI.deskView.startsWith('project:'):!!(top&&top.kind==='project');
-  const f=inProject?null:UI.wide?UI.deskView:DB.settings.filter; const items=[]; const on=b=>b?'  ✓':'';
-  if(!UI.wide) items.push({label:'Seleccionar tareas', fn:()=>startSelect(null)}); // the desktop has no multiple selection yet
-  items.push({label:DB.settings.doneOpen?'Ocultar completadas':'Mostrar completadas', fn:()=>{ DB.settings.doneOpen=!DB.settings.doneOpen; save(); render(); }});
-  if(f==='hoy'||f==='todas'){ const k=f==='hoy'?'hoyGroup':'allGroup', g=DB.settings[k]==='project'?'project':'date';
-    items.push({label:'Agrupar por fecha'+on(g==='date'), fn:()=>setGrouping(k,'date')}, {label:'Agrupar por proyecto'+on(g==='project'), fn:()=>setGrouping(k,'project')}); }
-  if(f==='hoy') items.push({label:summaryCollapsed(pendingFor('hoy').length)?'Mostrar resumen del día':'Plegar resumen del día', fn:toggleSummary});
-  if(!UI.wide){ // R10: the same options in an anchored menu, the grouping as a checked pair
-    const k=f==='hoy'?'hoyGroup':'allGroup', g=DB.settings[k]==='project'?'project':'date';
-    return popMenu({anchor:src, groups:[
-      [{label:'Seleccionar tareas', icon:MI.select, fn:()=>startSelect(null)}, {label:items[1].label, icon:DB.settings.doneOpen?MI.eyeOff:MI.eye, fn:items[1].fn}],
-      f==='hoy'||f==='todas'?[{label:'Agrupar por fecha', icon:MI.cal, on:g==='date', fn:()=>setGrouping(k,'date')}, {label:'Agrupar por proyecto', icon:MI.folder, on:g==='project', fn:()=>setGrouping(k,'project')}]:[],
-      f==='hoy'?[{label:items[items.length-1].label, icon:MI.summary, fn:toggleSummary}]:[] ]}); }
-  actionSheet(null, items); }
-/* R14: a day header of Todas. A long press (iPhone) or a right click (desktop) offers to move its tasks to another day */
-function dayHeadMenu(head){ const sec=head.closest('.gsec'), day=head.dataset.dayHead; if(!sec||UI.select) return;
+  const f=inProject?null:UI.wide?UI.deskView:DB.settings.filter; const k=f==='hoy'?'hoyGroup':'allGroup', g=DB.settings[k]==='project'?'project':'date';
+  // R10 and R17: an anchored menu, the grouping as a checked pair. The desktop has no multiple selection yet (R16)
+  popMenu({anchor:src, align:UI.wide?'right':undefined, groups:[
+    (UI.wide?[]:[{label:'Seleccionar tareas', icon:MI.select, fn:()=>startSelect(null)}]).concat([{label:DB.settings.doneOpen?'Ocultar completadas':'Mostrar completadas', icon:DB.settings.doneOpen?MI.eyeOff:MI.eye, fn:()=>{ DB.settings.doneOpen=!DB.settings.doneOpen; save(); render(); }}]),
+    f==='hoy'||f==='todas'?[{label:'Agrupar por fecha', icon:MI.cal, on:g==='date', fn:()=>setGrouping(k,'date')}, {label:'Agrupar por proyecto', icon:MI.folder, on:g==='project', fn:()=>setGrouping(k,'project')}]:[],
+    f==='hoy'?[{label:summaryCollapsed(pendingFor('hoy').length)?'Mostrar resumen del día':'Plegar resumen del día', icon:MI.summary, fn:toggleSummary}]:[] ]}); }
+/* R14: a day header of Todas. A long press (iPhone) or a right click (desktop, at the pointer: pt) offers to move its tasks to another day */
+function dayHeadMenu(head, pt){ const sec=head.closest('.gsec'), day=head.dataset.dayHead; if(!sec||UI.select) return;
   const xs=[...sec.querySelectorAll('.group [data-id]')].map(r=>task(r.dataset.id)).filter(x=>x&&x.status==='pending'); if(!xs.length) return;
   const label=xs.length===1?'Mover esta tarea':'Mover estas '+xs.length;
-  if(!UI.wide) return popMenu({anchor:head, title:dayTitle(day), groups:[[{label, icon:MI.postpone, fn:()=>moveDaySheet(xs, day)}]]});
-  actionSheet(dayTitle(day), [{label, fn:()=>moveDaySheet(xs, day)}]); }
+  popMenu(Object.assign(pt&&UI.wide?{x:pt.x, y:pt.y}:{anchor:head}, {title:dayTitle(day), groups:[[{label, icon:MI.postpone, fn:()=>moveDaySheet(xs, day)}]]})); }
 function moveDaySheet(xs, from){ const t=todayStr(); const chips=uniqueBy([[t,'Hoy'],[addDays(t,1),'Mañana'],[nextWeekday(5,true),'Viernes'],[nextWeekday(1,true),'Próxima semana']], c=>c[0]).filter(c=>c[0]!==from).concat([['','Sin fecha']]);
   let ym=(from>t?from:t).slice(0,7); const n=xs.length;
   openSheet('<h2>'+(n===1?'Mover 1 tarea':'Mover '+n+' tareas')+'</h2><div class="hint" style="margin-top:-6px">Desde '+esc(dayTitle(from).toLowerCase())+'</div><div class="chips" style="margin-top:6px">'+chips.map(c=>'<button class="chip" data-d="'+c[0]+'">'+c[1]+'</button>').join('')+'</div><div id="calwrap">'+calendarHTML(ym, from)+'</div>', s=>{
     s.onclick=e=>{ const nav=e.target.closest('[data-cal]'); if(nav){ ym=shiftMonth(ym,+nav.dataset.cal); $('#calwrap',s).innerHTML=calendarHTML(ym, from); return; }
       const c=e.target.closest('[data-d]'); if(!c) return; const d=c.dataset.d||null; closeSheet(); if(d===from) return;
       xs.forEach(x=>releaseHold(x.id)); rescheduleMany(xs.filter(x=>task(x.id)&&x.date!==d), d, d?fmtDate(d).toLowerCase():''); }; }); }
-function rowMenu(id, src){ const x=task(id); if(!x) return; releaseHold(id); const pl={high:'alta',mid:'media',none:'ninguna'}[x.priority];
-  if(!UI.wide){ // R10: the row lifts and the menu opens next to it
+function rowMenu(id, src){ const x=task(id); if(!x) return; releaseHold(id);
+  if(UI.wide){ // R17: at the pointer (right click), under the three dots (anchor), or under the row when called without either
+    const at=src&&src.anchor?{anchor:src.anchor, align:'right'}:src&&src.x!=null?{x:src.x, y:src.y}:taskAnchor(id)||{}; return popMenu(Object.assign(at, deskTaskMenu(id))); }
+  { // R10: the row lifts and the menu opens next to it
     const row=src&&src.row||visibleRow(id), b=row&&row.getBoundingClientRect();
     return popMenu({lift:row, x:src&&src.x||(b?b.left+b.width/2:0), y:src&&src.y||0, prio:{cur:x.priority, fn:pr=>setPriority(id,pr)}, groups:[
       [{label:'Aplazar', icon:MI.postpone, menu:()=>postponeMenu(id)}, {label:'Mover a proyecto', icon:MI.folder, menu:()=>projectPickMenu(id)}].concat(DB.spaces.length>1?[{label:'Mover a otro espacio', icon:MI.space, menu:()=>spaceMoveMenu(id)}]:[]),
       [{label:x.status==='done'?'Marcar pendiente':'Completar', icon:x.status==='done'?MI.undo:MI.done, fn:()=>{ leaveRows(id); setTimeout(()=>{ completeTask(id); renderAnimated(); },200); }},
        {label:'Duplicar', icon:MI.dup, fn:()=>duplicateTask(id)}, {label:'Seleccionar', icon:MI.select, fn:()=>startSelect(id)}],
-      [{label:'Eliminar', icon:MI.trash, red:true, fn:()=>confirmDelete(id)}] ]}); }
-  actionSheet(x.title, [
-    {label:'Prioridad: '+pl, fn:()=>priorityMenu(id)},
-    {label:'Aplazar', fn:()=>postponeSheet(id)},
-    {label:'Mover a proyecto', fn:()=>pickProjectSheet(id)}].concat(DB.spaces.length>1?[{label:'Mover a otro espacio', fn:()=>moveToSpaceSheet(id)}]:[], [
-    {label:'Duplicar', fn:()=>duplicateTask(id)},
-    ...(UI.wide?[]:[{label:'Seleccionar varias', fn:()=>startSelect(id)}]),
-    {label:x.status==='done'?'Marcar pendiente':'Completar', fn:()=>{ leaveRows(id); setTimeout(()=>{ completeTask(id); renderAnimated(); },200); }},
-    {label:'Eliminar', red:true, fn:()=>confirmDelete(id)} ])); }
+      [{label:'Eliminar', icon:MI.trash, red:true, fn:()=>confirmDelete(id)}] ]}); } }
 function moveProject(id, dir){ const ps=activeProjects(); ps.forEach((p,i)=>p.order=i); const i=ps.findIndex(p=>p.id===id), j=i+dir; if(i<0||j<0||j>=ps.length) return; ps[i].order=j; ps[j].order=i; ps[i].modified=ps[j].modified=new Date().toISOString(); save(); haptic(6); renderAnimated(); }
 function projectMenu(id, src){ const p=proj(id); if(!p) return; const ps=activeProjects(); const i=ps.findIndex(x=>x.id===id);
   const archive=()=>{ p.archived=true; p.modified=new Date().toISOString(); save(); render(); toast('Proyecto archivado', ()=>{p.archived=false; p.modified=new Date().toISOString(); save();}); };
-  if(!UI.wide) return popMenu({lift:src&&src.row, x:src&&src.x, y:src&&src.y, groups:[[{label:'Renombrar o cambiar color', icon:MI.pencil, fn:()=>projectSheet(id)}],
+  // the iPhone lifts the project's row; the desktop opens at the pointer (a right click on the sidebar)
+  popMenu({lift:UI.wide?null:src&&src.row, x:src&&src.x, y:src&&src.y, groups:[[{label:UI.wide?'Renombrar o cambiar color…':'Renombrar o cambiar color', icon:MI.pencil, fn:()=>projectSheet(id)}],
     (i>0?[{label:'Subir', icon:MI.up, fn:()=>moveProject(id,-1)}]:[]).concat(i<ps.length-1?[{label:'Bajar', icon:MI.down, fn:()=>moveProject(id,1)}]:[]),
-    [{label:'Archivar', icon:MI.archive, red:true, fn:archive}] ]});
-  actionSheet(p.name, [
-  {label:'Renombrar o cambiar color', fn:()=>projectSheet(id)}].concat(
-  i>0?[{label:'Subir', fn:()=>moveProject(id,-1)}]:[], i<ps.length-1?[{label:'Bajar', fn:()=>moveProject(id,1)}]:[], [
-  {label:'Archivar', red:true, fn:()=>{ p.archived=true; p.modified=new Date().toISOString(); save(); render(); toast('Proyecto archivado', ()=>{p.archived=false; p.modified=new Date().toISOString(); save();}); }} ])); }
+    [{label:'Archivar', icon:MI.archive, red:true, fn:archive}] ]}); }
 
 /* Quick add (R5). The title field and, glued to the keyboard, a bar of 44 pt icons: Fecha, Proyecto, Prioridad and Añadir.
    Each icon opens a strip of options above the bar without taking the focus from the field, so the keyboard stays up and Enter keeps adding.
@@ -2344,7 +2330,8 @@ function calendarHTML(ym, sel){
   const name=MESES_FULL[m-1]; return '<div class="cal"><div class="cal-head"><button data-cal="-1" aria-label="Mes anterior">'+I.back+'</button><span>'+name[0].toUpperCase()+name.slice(1)+' '+y+'</span><button data-cal="1" aria-label="Mes siguiente">'+I.chev+'</button></div><div class="cal-grid">'+['L','M','X','J','V','S','D'].map(d=>'<div class="cal-dow">'+d+'</div>').join('')+cells+'</div></div>';
 }
 function shiftMonth(ym, d){ let [y,m]=ym.split('-').map(Number); m+=d; if(m<1){ m=12; y--; } if(m>12){ m=1; y++; } return y+'-'+String(m).padStart(2,'0'); }
-function pickProjectSheet(id, src){ const ps=activeProjects(); const x=task(id); if(!x) return; if(!UI.wide){ const m=projectPickMenu(id); m.title=''; return popMenu(Object.assign(m, {anchor:src, align:'right'})); } actionSheet('Proyecto', [{label:'Ninguno'+(!x.projectId?'  ✓':''), fn:()=>moveToProject(id,null)}].concat(ps.map(p=>({label:p.name+(x.projectId===p.id?'  ✓':''), fn:()=>moveToProject(id,p.id)})))); }
+// The project of a task: an anchored menu, from the detail's value on the iPhone and as the inspector's pop-up button on the desktop
+function pickProjectSheet(id, src){ const x=task(id); if(!x) return; const m=projectPickMenu(id); m.title=''; popMenu(Object.assign(m, src?{anchor:src, align:UI.wide?'left':'right'}:taskAnchor(id, 'pickProject')||{})); }
 function dateSheet(id, src){ const x=task(id); if(!x) return; const t=todayStr(); const dow=new Date(t+'T00:00:00').getDay(); const chips=[[t,'Hoy'],[addDays(t,1),'Mañana']]; if(dow>=1&&dow<=4) chips.push([nextWeekday(5,true),'Este viernes']); chips.push([nextWeekday(1,true),'Próxima semana'],['','Sin fecha']);
   let ym=(x.date||t).slice(0,7);
   pickerPanel('Fecha', '<div class="chips" style="margin-top:0">'+uniqueBy(chips, c=>c[0]).map(c=>'<button class="chip'+(x.date===c[0]?' on':'')+'" data-d="'+c[0]+'">'+c[1]+'</button>').join('')+'</div><div id="calwrap">'+calendarHTML(ym, x.date)+'</div>', id, src, 'pickDate', (s, done)=>{
@@ -2774,9 +2761,22 @@ function bindAddBar(d){
 }
 function bindDeskEvents(d){
   // Right click opens the row menu, and on a sidebar project the project menu (the iPhone long press)
-  d.addEventListener('contextmenu', e=>{ const pj=e.target.closest('.side [data-view^="project:"]'); if(pj){ e.preventDefault(); if(pj.dataset.view!=='project:none') projectMenu(pj.dataset.view.slice(8)); return; }
-    const dh=e.target.closest('[data-day-head]'); if(dh){ e.preventDefault(); dayHeadMenu(dh); return; } // R14: a day header of Todas
-    const row=e.target.closest('.row[data-id], .wcard[data-id]'); if(!row) return; e.preventDefault(); rowMenu(row.dataset.id); });
+  // R17: each one opens at the pointer, as a Mac context menu; text fields keep the browser's own
+  d.addEventListener('contextmenu', e=>{ if(e.target.closest('input,textarea')) return; const pt={x:e.clientX, y:e.clientY};
+    const pj=e.target.closest('.side [data-view^="project:"]'); if(pj){ e.preventDefault(); if(pj.dataset.view!=='project:none') projectMenu(pj.dataset.view.slice(8), pt); return; }
+    const dh=e.target.closest('[data-day-head]'); if(dh){ e.preventDefault(); dayHeadMenu(dh, pt); return; } // R14: a day header of Todas
+    const row=e.target.closest('.row[data-id], .wcard[data-id]'); if(!row) return; e.preventDefault(); rowMenu(row.dataset.id, pt); });
+  // R17: the week popover closes on a press anywhere outside it, as a Mac popover; the click itself still acts (another card opens its own).
+  // It is taken away at once, without a redraw, so the click lands on what was under the pointer
+  d.addEventListener('mousedown', e=>{ const pn=d.querySelector('.pane.wpop'); if(!pn||pn.contains(e.target)) return; flushEdits(); d._popShut={id:pn.dataset.task, t:Date.now()}; pn.remove(); UI.deskDetail=null; d.querySelectorAll('.wcard.popped').forEach(c=>c.classList.remove('popped')); }, true);
+  // R17: the inspector's left edge resizes it, between 320 and 600 px; the width is kept in the settings
+  d.addEventListener('pointerdown', e=>{ const g=e.target.closest('.igrip'); if(!g||e.button!==0) return; e.preventDefault(); const pn=g.closest('.pane'); let w=pn.offsetWidth; const x0=e.clientX, w0=w;
+    try{ g.setPointerCapture(e.pointerId); }catch(err){} document.body.classList.add('resizing');
+    const mv=ev=>{ w=paneWidth(w0+(x0-ev.clientX)); d.style.setProperty('--panew', w+'px'); };
+    const up=()=>{ g.removeEventListener('pointermove', mv); g.removeEventListener('pointerup', up); g.removeEventListener('pointercancel', up); document.body.classList.remove('resizing');
+      if(w!==w0){ DB.settings.paneWidth=w; save(); log('info','Ancho del panel de detalle', {w}); } };
+    g.addEventListener('pointermove', mv); g.addEventListener('pointerup', up); g.addEventListener('pointercancel', up); });
+  d.addEventListener('dblclick', e=>{ if(!e.target.closest('.igrip')) return; DB.settings.paneWidth=400; save(); d.style.setProperty('--panew', paneWidth(400)+'px'); }); // back to the usual width
   // Week view: drag a card onto a day (or onto "Sin fecha") to reschedule it
   // Only a card drag moves a task: any other drag (a link, a file) clears dragId, so a cancelled card drag never carries over
   let dragId=null;
@@ -2786,11 +2786,13 @@ function bindDeskEvents(d){
   d.addEventListener('dragleave', e=>{ const z=e.target.closest('[data-day]'); if(z && !z.contains(e.relatedTarget)) z.classList.remove('over'); });
   d.addEventListener('drop', e=>{ const z=e.target.closest('[data-day]'); if(!z||!dragId||e.dataTransfer.getData('text/plain')!==dragId||(z.dataset.day&&z.dataset.day<todayStr())) return; /* a past day takes no drop: no task is ever overdue */ e.preventDefault(); const id=dragId; dragId=null; const x=task(id); if(!x) return; const day=z.dataset.day||null; if(x.date===day) { render(); return; } const old=x.date, oldC=x.carried; updTask(id,{date:day}); haptic(6); renderAnimated(); toast(day?'Movida a '+fmtDate(day):'Sin fecha', ()=>updTask(id,{date:old, carried:oldC})); });
   // Week cards open the detail on click
-  d.addEventListener('click', e=>{ const c=e.target.closest('.wcard'); if(!c||e.target.closest('[data-act]')) return; openDetail(c.dataset.id); });
+  // R17: in a popover beside the card; a click on the card whose popover that same press closed leaves it closed (a toggle)
+  d.addEventListener('click', e=>{ const c=e.target.closest('.wcard'); if(!c||e.target.closest('[data-act]')) return; const sh=d._popShut; d._popShut=null;
+    if(sh&&sh.id===c.dataset.id&&Date.now()-sh.t<800) return; openDetail(c.dataset.id); });
 }
 document.addEventListener('keydown', e=>{ if(!UI.wide) return; const tag=(e.target.tagName||'').toLowerCase(); const typing=tag==='input'||tag==='textarea';
-  const modal=sheet.classList.contains('on')||asheet.classList.contains('on');
-  if(e.key==='Escape'){ if(modal){ if(asheet.classList.contains('on')) cancelAction(); else closeSheet(); return; } // a menu over a sheet closes alone
+  const modal=sheet.classList.contains('on')||asheet.classList.contains('on')||menuOpen();
+  if(e.key==='Escape'){ if(menuOpen()){ closeMenu(); return; } if(modal){ if(asheet.classList.contains('on')) cancelAction(); else closeSheet(); return; } // a menu over a sheet closes alone
     if(typing && e.target.dataset.role==='search' && UI.query){ e.preventDefault(); UI.query=''; UI.searchDone=false; render(); return; } // Escape in the search clears it first; render keeps the focus there
     if(UI.deskDetail) pop(); else if(UI.query){ UI.query=''; UI.searchDone=false; render(); } return; }
   if(modal) return; // N and / never reach the page behind a menu or a sheet

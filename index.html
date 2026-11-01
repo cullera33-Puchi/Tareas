@@ -653,8 +653,8 @@ html.wide{font-size:14px;}
 .app.desktop .row-text .tag{flex:0 4 auto;min-width:48px;max-width:45%;font-size:11px;line-height:16px;padding:0 6px;border-radius:5px;vertical-align:0;}
 .app.desktop .row-meta{flex:none;display:flex;margin:0;font-size:12px;font-variant-numeric:tabular-nums;}
 .rc{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right;}
-.rc-date{width:88px;}
-.rc-rem{width:60px;}
+.rc-date{width:84px;}
+.rc-rem{width:100px;}
 .rc-rem svg{width:11px;height:11px;margin-right:3px;vertical-align:-1px;}
 .app.desktop .inds{width:34px;justify-content:flex-end;gap:4px;}
 .app.desktop .inds svg{width:12px;height:12px;}
@@ -1371,12 +1371,12 @@ function deskRowHTML(x, opts, v){ const t=v.t; let date='', dcls='', rem='';
   if(v.done){ if(x.completed) date=opts.byDay?fmtTime(x.completed):fmtDateTime(x.completed); }
   else { if(x.date){ if(x.carried&&x.date<=t){ if(!opts.hideCarried){ date='Aplazada'; dcls=' carried'; } }
       else if(!(opts.noToday&&x.date===t) && x.date!==opts.day){ date=fmtDate(x.date); if(x.date<t) dcls=' over'; } }
-    if(x.reminder) rem=I.bell+(x.date&&localDay(x.reminder)===x.date?fmtTime(x.reminder):fmtDateTime(x.reminder)); }
+    if(x.reminder) rem=x.date&&localDay(x.reminder)===x.date?fmtTime(x.reminder):fmtDateTime(x.reminder); }
   const tag=v.p&&!opts.noProj?'<span class="tag">'+esc(v.p.name)+'</span>':'';
   return '<div class="row'+(v.done?' done':'')+(v.held?' held':'')+(opts.byDay?' byday':'')+(v.selected?' selected':'')+'" data-id="'+x.id+'"'+(v.pc?' style="'+tagVars(v.pc)+'"':'')+'>'+
     '<div class="row-content">'+(v.selecting?'<span class="selbox">'+I.check+'</span>':'<button class="check'+(v.shownDone?' done':'')+'" data-act="check" aria-label="Completar">'+I.check+'</button>')+
     '<div class="row-text"><div class="row-title">'+esc(x.title||'Sin título')+'</div>'+tag+'</div>'+
-    '<span class="inds">'+v.ind+'</span><span class="row-meta"><span class="rc rc-date'+dcls+'">'+date+'</span><span class="rc rc-rem">'+rem+'</span></span>'+
+    '<span class="inds">'+v.ind+'</span><span class="row-meta"><span class="rc rc-date'+dcls+'"'+(date?' title="'+esc(date)+'"':'')+'>'+date+'</span><span class="rc rc-rem"'+(rem?' title="Recordatorio: '+esc(rem)+'"':'')+'>'+(rem?I.bell+rem:'')+'</span></span>'+
     '<span class="pri'+(v.pri?(x.priority==='high'?' high':' mid'):'')+'">'+(v.pri?(x.priority==='high'?'!!!':'!!'):'')+'</span>'+
     (v.selecting?'':opts.simple?'<span class="rowmore" aria-hidden="true"></span>':'<button class="rowmore" data-act="rowMenu" aria-label="Más" title="Más">'+I.more+'</button>')+'</div></div>'; } // "Lo primero" keeps the columns aligned with the list
 // The reminder line of the summary: the next one within two hours, kept until five minutes after its time
@@ -1950,14 +1950,14 @@ function menuTrack(x, y){ const m=PM; if(!m) return; if(!m.moved&&Math.hypot(x-m
 // It lifts: on an option, that option runs; after sliding away from where it started, outside the menu, the menu closes
 function menuRelease(x, y){ const m=PM; if(!m) return; clearTimeout(m.subT); const b=m.hl; if(b){ b.classList.remove('hl'); m.hl=null; pmActivate(b.dataset.mi); return; }
   if(m.moved){ const el=document.elementFromPoint(x, y); if(!(el&&el.closest('#pmenu .pm-menu'))) closeMenu(); } m.moved=false; }
-pmEl.addEventListener('touchstart', e=>{ const m=PM; if(!m) return; const t=e.touches[0]; m.x0=t.clientX; m.y0=t.clientY; m.moved=false; m.scroll=false; m.inMenu=!!e.target.closest('.pm-menu');
+pmEl.addEventListener('touchstart', e=>{ const m=PM; if(!m||m.mac) return; // a desktop menu touched on a touch screen acts on the click const t=e.touches[0]; m.x0=t.clientX; m.y0=t.clientY; m.moved=false; m.scroll=false; m.inMenu=!!e.target.closest('.pm-menu');
   pmHighlight(e.target.closest('.pm-menu [data-mi]'), false); },{passive:true});
-pmEl.addEventListener('touchmove', e=>{ const m=PM; if(!m) return; const t=e.touches[0], mn=pmEl.querySelector('.pm-menu');
+pmEl.addEventListener('touchmove', e=>{ const m=PM; if(!m||m.mac) return; const t=e.touches[0], mn=pmEl.querySelector('.pm-menu');
   if(m.inMenu&&mn.scrollHeight>mn.clientHeight+1){ if(m.scroll||Math.abs(t.clientY-m.y0)>8){ m.scroll=true; pmHighlight(null); } return; } // a menu taller than the screen scrolls instead
   e.preventDefault(); menuTrack(t.clientX, t.clientY); },{passive:false});
-pmEl.addEventListener('touchend', e=>{ const m=PM; if(!m) return; if(e.cancelable) e.preventDefault(); if(m.scroll){ m.scroll=false; return; } const t=e.changedTouches[0];
+pmEl.addEventListener('touchend', e=>{ const m=PM; if(!m||m.mac) return; if(e.cancelable) e.preventDefault(); if(m.scroll){ m.scroll=false; return; } const t=e.changedTouches[0];
   if(m.hl){ menuRelease(t.clientX, t.clientY); return; } const el=document.elementFromPoint(t.clientX, t.clientY); if(!(el&&el.closest('.pm-menu'))) closeMenu(); });
-pmEl.addEventListener('touchcancel', ()=>{ if(PM) pmHighlight(null); });
+pmEl.addEventListener('touchcancel', ()=>{ if(PM&&!PM.mac) pmHighlight(null); });
 pmEl.addEventListener('click', e=>{ if(!PM) return; const b=e.target.closest('.pm-menu [data-mi]'); if(b){ if(PM.mac) macActivate(b); else pmActivate(b.dataset.mi); return; } if(!e.target.closest('.pm-menu')) closeMenu(); }); // a mouse, or a tap that touchend let through
 addEventListener('resize', ()=>{ if(PM) closeMenu(true); });
 /* ---------- R17: macOS menus and popovers (desktop) ----------
@@ -2576,7 +2576,7 @@ const wideMQ = matchMedia('(min-width: 900px) and (min-height: 500px)');
 backupChain=refreshBackups().then(()=>{ if(onSettings()) render(); return dailyBackup(false); }).catch(()=>{});
 function tipsSheet(){ // the desktop has no swipes or long presses: it explains its own clicks and keys
   const how = UI.wide
-    ? '<h2>En el escritorio</h2><div class="tips"><p><b>Haz clic en una tarea</b> para abrirla en el panel de la derecha.</p><p><b>Clic derecho</b> en una tarea, o en sus tres puntos, para cambiar prioridad, fecha o proyecto sin abrirla. En un proyecto de la barra lateral, para renombrarlo, ordenarlo o archivarlo.</p><p><b>Teclas:</b> N añade una tarea, / busca y Esc cierra.</p><p><b>En Semana</b>, arrastra una tarea a otro día para cambiarle la fecha.</p>'
+    ? '<h2>En el escritorio</h2><div class="tips"><p><b>Haz clic en una tarea</b> para abrirla en el panel de la derecha; arrastra su borde para cambiar el ancho. En Semana se abre junto a la tarjeta.</p><p><b>Clic derecho</b> en una tarea, o en sus tres puntos, para cambiar prioridad, fecha o proyecto sin abrirla. En un proyecto de la barra lateral, para renombrarlo, ordenarlo o archivarlo.</p><p><b>Teclas:</b> N añade una tarea, / busca y Esc cierra.</p><p><b>En Semana</b>, arrastra una tarea a otro día para cambiarle la fecha.</p>'
     : '<h2>Tres gestos</h2><div class="tips"><p><b>Desliza una tarea</b> a la derecha para completarla y a la izquierda para aplazarla o eliminarla.</p><p><b>Mantén pulsada</b> una tarea para cambiar prioridad, fecha o proyecto sin abrirla.</p>';
   openSheet(how+'<p><b>Escribe la fecha al final</b> del título al crear una tarea: "Llamar a Marta mañana", "Enviar acta el 12", "Revisar SOW viernes".</p></div><div class="sheet-actions"><button class="btn primary" data-x="ok">Entendido</button></div>', s=>{ s.onclick=e=>{ if(e.target.closest('[data-x=ok]')){ DB.settings.tipsSeen=true; save(); closeSheet(); } }; }); }
 (function(){ // Entry from the iOS Shortcut: ?add=texto opens the new-task sheet with the text
@@ -2787,7 +2787,7 @@ function bindDeskEvents(d){
   d.addEventListener('drop', e=>{ const z=e.target.closest('[data-day]'); if(!z||!dragId||e.dataTransfer.getData('text/plain')!==dragId||(z.dataset.day&&z.dataset.day<todayStr())) return; /* a past day takes no drop: no task is ever overdue */ e.preventDefault(); const id=dragId; dragId=null; const x=task(id); if(!x) return; const day=z.dataset.day||null; if(x.date===day) { render(); return; } const old=x.date, oldC=x.carried; updTask(id,{date:day}); haptic(6); renderAnimated(); toast(day?'Movida a '+fmtDate(day):'Sin fecha', ()=>updTask(id,{date:old, carried:oldC})); });
   // Week cards open the detail on click
   // R17: in a popover beside the card; a click on the card whose popover that same press closed leaves it closed (a toggle)
-  d.addEventListener('click', e=>{ const c=e.target.closest('.wcard'); if(!c||e.target.closest('[data-act]')) return; const sh=d._popShut; d._popShut=null;
+  d.addEventListener('click', e=>{ const sh=d._popShut; d._popShut=null; const c=e.target.closest('.wcard'); if(!c||e.target.closest('[data-act]')) return;
     if(sh&&sh.id===c.dataset.id&&Date.now()-sh.t<800) return; openDetail(c.dataset.id); });
 }
 document.addEventListener('keydown', e=>{ if(!UI.wide) return; const tag=(e.target.tagName||'').toLowerCase(); const typing=tag==='input'||tag==='textarea';

@@ -1191,7 +1191,13 @@ function orderTasks(list){
 function queryMatcher(query){ const q=norm(query); const vn=new Set(DB.voiceNotes.filter(v=>norm(v.text).includes(q)).map(v=>v.taskId));
   return x => norm(x.title).includes(q) || norm(x.notes).includes(q) || (x.projectId && norm((proj(x.projectId)||{}).name).includes(q)) || vn.has(x.id); }
 function matchesQuery(x, query){ return queryMatcher(query)(x); }
-function pendingFor(filter, projectId, query){
+// R18: while one screen is drawn (drawing) each pending list is worked out once: the summary, the counts and the list ask for the same ones,
+// and nothing changes the data in between. Callers only read the lists
+let PF=null;
+function drawing(fn){ if(PF) return fn(); PF=new Map(); try{ return fn(); } finally{ PF=null; } }
+function pendingFor(filter, projectId, query){ if(!PF) return pendingCalc(filter, projectId, query);
+  const k=filter+'|'+projectId+'|'+(query||''); let v=PF.get(k); if(!v){ v=pendingCalc(filter, projectId, query); PF.set(k,v); } return v; }
+function pendingCalc(filter, projectId, query){
   const t=todayStr();
   let list = spaceTasks().filter(x=>x.status==='pending');
   if(projectId!==undefined) list = list.filter(x=> projectId===null ? !x.projectId : x.projectId===projectId);
@@ -1290,7 +1296,7 @@ function rootScreen(tab){
 }
 function renderRoot(scr){
   const tab=scr.dataset.root;
-  swapHTML(scr, tab==='tareas'?viewTareas():tab==='proyectos'?viewProyectos():viewAjustes());
+  drawing(()=>swapHTML(scr, tab==='tareas'?viewTareas():tab==='proyectos'?viewProyectos():viewAjustes(), tab==='tareas'));
 }
 /* FLIP: when a render follows a user action, rows that moved slide to their new place and new rows fade in */
 let FLIP=false;
@@ -1328,9 +1334,88 @@ function armRows(sc){ const st=rowStash; rowStash=null; if(!sc) return; sc._rows
 // Rows within a screen and a half below the visible part are drawn, in order, so the finger never reaches a placeholder
 function fillRows(sc){ const st=sc._rows; if(!st||!sc.clientHeight) return; const lim=sc.getBoundingClientRect().bottom+sc.clientHeight*1.5;
   for(;;){ const phs=sc.querySelectorAll('.rph'); if(!phs.length){ sc._rows=null; return; } if(phs[0].getBoundingClientRect().top>lim) return;
-    for(let k=0;k<phs.length&&k<25;k++){ const ph=phs[k]; ph.insertAdjacentHTML('beforebegin', st[+ph.dataset.ph]); const row=ph.previousElementSibling; ph.remove();
+    for(let k=0;k<phs.length&&k<25;k++){ const ph=phs[k]; const h=st[+ph.dataset.ph]; ph.insertAdjacentHTML('beforebegin', h); const row=ph.previousElementSibling; ph.remove(); if(row) row._h=rowKey(h); // the markup it came from (R18)
       if(row&&!UI.wide&&!UI.select) bindRowGestures(row); } } }
-function swapHTML(scr, html){
+/* ---------- R18: repaint only what changes ----------
+   A list screen (Tareas, a project, the desktop column) is not rebuilt on every render. Its new markup is split into rows and a skeleton
+   (everything else, each row left as a token); the small skeleton is parsed and merged node by node into the live one (attributes,
+   text, children), and each row is reused when its markup is the one it was drawn from and nothing has changed it since (rowWatch).
+   Only new or changed rows are parsed. The result is the same DOM a full rebuild gives, so every view keeps its look and behaviour,
+   while the elements that did not change keep their listeners, focus and layout: completing, postponing, a new priority or project
+   touch one row and the counters; a search drops and adds rows around the field. The desktop pane is kept while its markup is the same */
+// A row (or the desktop pane) changed by code after it was drawn (held, swiped, lifted, FLIP, selection, a title typed) is not reused
+function markDirty(recs){ for(const r of recs){ let n=r.target; if(n.nodeType!==1) n=n.parentElement; const el=n&&n.closest('.row, .pane'); if(el) el._dirty=true; } }
+// Only the boxes merged this way are watched (watchBox): the rest of the app, the detail being typed in among them, costs nothing
+const rowWatch=new MutationObserver(markDirty), WATCH={subtree:true, attributes:true, childList:true, characterData:true};
+function watchBox(el){ if(!el._watched){ el._watched=1; rowWatch.observe(el, WATCH); } }
+// The markup cut into its rows (each from its opening tag to its own closing one, with its task id) and the rest, where each row is a token <b data-rk="i">
+function splitRows(html){ const tag=/<(\/?)div[\s>]/g, rows=[], ids=[], parts=[]; let pos=0, depth=0, start=-1, sd=0, m;
+  while((m=tag.exec(html))){
+    if(m[1]){ depth--; if(start>=0&&depth===sd){ const end=m.index+6; rows.push(html.slice(start,end)); parts.push('<b data-rk="'+(rows.length-1)+'"></b>'); pos=end; start=-1; } }
+    else { if(start<0&&html.startsWith('<div class="row',m.index)){ const c=html[m.index+15]; if(c===' '||c==='"'){ parts.push(html.slice(pos,m.index)); start=m.index; sd=depth;
+      const te=html.indexOf('>',m.index), q=html.indexOf(' data-id="',m.index); ids.push(q>0&&q<te?html.slice(q+10, html.indexOf('"',q+10)):''); } } depth++; } }
+  if(start>=0) return null; parts.push(html.slice(pos)); return {sk:parts.join(''), rows, ids, keys:rows.map(rowKey)}; }
+// A row's markup without the content-visibility class lazyRows gives by position, so a row that only moved past that point is still the same row
+const rowKey = h => h.startsWith('<div class="row cv ')||h.startsWith('<div class="row cv"') ? '<div class="row'+h.slice(18) : h;
+const isRowEl = c => c.nodeType===1 && c.tagName==='DIV' && c.classList.contains('row');
+// Old and new children are paired by tag, first class and the element's own key; the rest is matched in order
+function nodeKey(c){ if(c.nodeType!==1) return '#'+c.nodeType; const cl=c.getAttribute('class')||'', i=cl.indexOf(' ');
+  return c.tagName+'.'+(i<0?cl:cl.slice(0,i))+'#'+(c.getAttribute('data-id')||c.getAttribute('data-day-head')||c.getAttribute('data-pf')||c.getAttribute('data-role')||''); }
+function syncAttrs(o, n){ const na=n.attributes, oa=o.attributes;
+  for(let i=oa.length-1;i>=0;i--){ const a=oa[i]; if(a.namespaceURI?!n.hasAttributeNS(a.namespaceURI,a.localName):!n.hasAttribute(a.name)) o.removeAttributeNode(a); }
+  for(let i=0;i<na.length;i++){ const a=na[i]; if(a.namespaceURI){ if(o.getAttributeNS(a.namespaceURI,a.localName)!==a.value) o.setAttributeNS(a.namespaceURI,a.name,a.value); } else if(o.getAttribute(a.name)!==a.value) o.setAttribute(a.name,a.value); } }
+function morphNode(o, n, cx){
+  if(o.nodeType!==1){ if(o.nodeValue!==n.nodeValue) o.nodeValue=n.nodeValue; return; }
+  if(o===cx.keep) return; // the field being typed in is never touched
+  if(!o.firstChild&&!n.firstChild){ syncAttrs(o, n); return; } // a leaf (a placeholder of a long list): its attributes only
+  if(o.isEqualNode(n)) return;
+  syncAttrs(o, n); morphKids(o, n, cx); }
+const isTok = c => c.nodeType===1 && c.tagName==='B' && c.hasAttribute('data-rk');
+function morphKids(o, n, cx){
+  const want=[]; let oc=o.firstChild, c=n.firstChild;
+  // In step while old and new parts line up (the usual case); from the first difference on, by key
+  for(;c;c=c.nextSibling){
+    if(isTok(c)){ want.push(cx.els[+c.getAttribute('data-rk')]); continue; }
+    while(oc&&isRowEl(oc)) oc=oc.nextSibling;
+    if(!oc||oc.nodeType!==c.nodeType||(c.nodeType===1&&nodeKey(oc)!==nodeKey(c))) break;
+    morphNode(oc, c, cx); want.push(oc); oc=oc.nextSibling; }
+  if(c){ const q=new Map();
+    for(;oc;oc=oc.nextSibling){ if(isRowEl(oc)) continue; const k=nodeKey(oc), a=q.get(k); if(a) a.push(oc); else q.set(k,[oc]); }
+    for(;c;c=c.nextSibling){
+      if(isTok(c)){ want.push(cx.els[+c.getAttribute('data-rk')]); continue; }
+      const a=q.get(nodeKey(c)), m=a&&a.shift();
+      if(m){ morphNode(m, c, cx); want.push(m); }
+      else { if(c.nodeType===1&&c.firstChild) c.querySelectorAll('b[data-rk]').forEach(t=>t.replaceWith(cx.els[+t.getAttribute('data-rk')])); want.push(c); } } } // a new part, with its rows in place
+  const ws=new Set(want); let cur=o.firstChild;
+  for(const w of want){ while(cur&&!ws.has(cur)){ const nx=cur.nextSibling; o.removeChild(cur); cur=nx; } if(cur===w) cur=cur.nextSibling; else o.insertBefore(w, cur); }
+  while(cur){ const nx=cur.nextSibling; o.removeChild(cur); cur=nx; } }
+// A box drawn for the first time (or emptied) is filled at once, and its rows remember the markup they came from
+function fillFresh(box, html, outer, sp){ const t=document.createElement('template'); t.innerHTML=html; let src=t.content;
+  if(outer){ src=t.content.firstElementChild; if(!src||src.tagName!==box.tagName) return false; syncAttrs(box, src); }
+  const rs=src.querySelectorAll('div.row'); if(rs.length===sp.rows.length) rs.forEach((r,i)=>{ r._h=sp.keys[i]; }); // otherwise they are not reused, which is only slower
+  box.append(...src.childNodes); return true; }
+/* Puts html into box (outer: html is box itself, one element) and returns true; false when the markup cannot be split, and nothing changed.
+   keep: a field left exactly as it is. blur: a focused field that stays loses the focus, as a rebuilt one would (the iPhone keyboard closes) */
+function morphInto(box, html, opts={}){ const sp=splitRows(html); if(!sp) return false;
+  markDirty(rowWatch.takeRecords()); watchBox(box);
+  if(!box.firstChild){ const ok=fillFresh(box, html, opts.outer, sp); rowWatch.takeRecords(); return ok; }
+  const pool=new Map(); box.querySelectorAll('div.row').forEach(r=>{ if(r._h===undefined||r._dirty||r._flip) return; const id=r.getAttribute('data-id')||'', a=pool.get(id); if(a) a.push(r); else pool.set(id,[r]); });
+  const els=new Array(sp.rows.length), need=[];
+  sp.keys.forEach((h,i)=>{ const a=pool.get(sp.ids[i]); let k=-1; if(a) for(let j=0;j<a.length;j++) if(a[j]._h===h){ k=j; break; }
+    if(k>=0){ const el=els[i]=a[k]; a.splice(k,1); const raw=sp.rows[i]; if(raw!==h){ const cls=raw.slice(12, raw.indexOf('"',12)); if(el.getAttribute('class')!==cls) el.setAttribute('class', cls); } else if(el.classList.contains('cv')) el.setAttribute('class', raw.slice(12, raw.indexOf('"',12))); }
+    else need.push(i); });
+  if(need.length){ const t=document.createElement('template'); t.innerHTML=need.map(i=>sp.rows[i]).join(''); const kids=[...t.content.children]; if(kids.length!==need.length) return false;
+    need.forEach((i,k)=>{ const el=kids[k]; el._h=sp.keys[i]; els[i]=el; }); }
+  const t=document.createElement('template'); t.innerHTML=sp.sk; const ae=document.activeElement;
+  const cx={els, keep:opts.keep||null};
+  if(opts.outer){ const r=t.content.firstElementChild; if(!r||r.tagName!==box.tagName) return false; morphNode(box, r, cx); }
+  else morphKids(box, t.content, cx);
+  // A field that stays shows what a new one would: the value it is drawn with
+  box.querySelectorAll('input').forEach(i=>{ if(i===cx.keep) return; if(i.type==='checkbox'||i.type==='radio') i.checked=i.hasAttribute('checked'); else { const v=i.getAttribute('value')||''; if(i.value!==v) i.value=v; } });
+  rowWatch.takeRecords(); // its own changes mark nothing
+  if(opts.blur&&ae&&ae!==cx.keep&&/^(INPUT|TEXTAREA)$/.test(ae.tagName)&&box.contains(ae)) ae.blur();
+  return true; }
+function swapHTML(scr, html, morph){
   // A screen drawn while hidden (a tab coming back) reads nothing from its old list, which would lay it out for nothing:
   // its scroll comes from UI.scroll once it is shown (restoreRootScroll)
   const hidden=scr.classList.contains('hidden-tab');
@@ -1339,7 +1424,8 @@ function swapHTML(scr, html){
   const key=el=>el.dataset.id||el.dataset.openProject;
   let prev=null;
   if(FLIP&&sc){ prev=new Map(); sc.querySelectorAll('[data-id]:not(.rph),[data-open-project]').forEach(el=>{ if(!el.closest('.first')) prev.set(key(el), el.getBoundingClientRect().top); }); }
-  scr.innerHTML=lazyRows(html, hidden?(UI.scroll[scr.dataset.root]||0):st, innerHeight); delete scr.dataset.dirty; scr.dataset.ver=dataVer;
+  const lz=lazyRows(html, hidden?(UI.scroll[scr.dataset.root]||0):st, innerHeight), stash=rowStash; // R18: a list screen is merged, not rebuilt
+  if(!(morph&&morphInto(scr, lz, {blur:true}))) scr.innerHTML=lz; rowStash=stash; delete scr.dataset.dirty; scr.dataset.ver=dataVer;
   const sc2=scr.querySelector('.scroll'); armRows(sc2);
   if(sc2){ if(!hidden) sc2.scrollTop=st; bindScroll(scr); }
   { const pc2=!hidden&&scr.querySelector('.pchips'); if(pc2){ if(pc) pc2.scrollLeft=pl; else chipInView(pc2); } } // a row drawn anew (after a search) shows the chip in use
@@ -1350,18 +1436,23 @@ function swapHTML(scr, html){
     const els=[...sc2.querySelectorAll('[data-id]:not(.rph),[data-open-project]')].filter(el=>!el.closest('.first'));
     const tops=els.map(el=>el.getBoundingClientRect().top);
     const r=sc2.getBoundingClientRect(), m=r.height/2, near=y=>y>=r.top-m&&y<=r.bottom+m;
-    const moved=[];
-    els.forEach((el,i)=>{ const k=key(el), nt=tops[i];
-      if(!prev.has(k)){ if(near(nt)){ el.classList.add('enter'); moved.push(el); } return; }
-      const d=prev.get(k)-nt; if(Math.abs(d)>0.5&&!RM.matches&&(near(nt)||near(prev.get(k)))){ el.style.transform='translate3d(0,'+d+'px,0)'; moved.push(el); } });
-    if(moved.length){ requestAnimationFrame(()=>requestAnimationFrame(()=>{ moved.forEach(el=>{ el.classList.add('flip'); el.style.transform=''; el.classList.remove('enter'); }); setTimeout(()=>moved.forEach(el=>el.classList.remove('flip')),350); })); }
+    // R18: the slide leaves each row exactly as drawn (its style attribute put back as it was), so a later merge can keep it;
+    // a row still sliding (_flip) is drawn anew by a render that comes meanwhile, as before
+    const moved=[], own=fn=>{ markDirty(rowWatch.takeRecords()); fn(); rowWatch.takeRecords(); };
+    own(()=>els.forEach((el,i)=>{ const k=key(el), nt=tops[i];
+      if(!prev.has(k)){ if(near(nt)){ el.classList.add('enter'); el._flip=true; moved.push(el); } return; }
+      const d=prev.get(k)-nt; if(Math.abs(d)>0.5&&!RM.matches&&(near(nt)||near(prev.get(k)))){ el._st=el.getAttribute('style'); el._flip=true; el.style.transform='translate3d(0,'+d+'px,0)'; moved.push(el); } }));
+    if(moved.length){ requestAnimationFrame(()=>requestAnimationFrame(()=>{ own(()=>moved.forEach(el=>{ el.classList.add('flip');
+        if(el._st!==undefined){ if(el._st===null) el.removeAttribute('style'); else el.setAttribute('style', el._st); delete el._st; } el.classList.remove('enter'); }));
+      setTimeout(()=>own(()=>moved.forEach(el=>{ el.classList.remove('flip'); el._flip=false; })),350); })); }
   }
   bindCommon(scr);
 }
 // Scrolls the project chips just enough to show the active one, without touching the vertical scroll
 function chipInView(pc){ const on=pc.querySelector('.chip.on'); if(!on) return; const a=pc.getBoundingClientRect(), b=on.getBoundingClientRect(), pad=16;
   if(b.left<a.left+pad) pc.scrollLeft-=a.left+pad-b.left; else if(b.right>a.right-pad) pc.scrollLeft+=b.right-(a.right-pad); }
-function render(){
+function render(){ drawing(renderNow); }
+function renderNow(){
   // List state that no longer applies is dropped before drawing, on the iPhone and the desktop alike:
   // a project filter whose project was archived, removed or belongs to another space would hide tasks with no chip to clear it,
   // and an emptied search asks again before showing completed tasks
@@ -1386,7 +1477,8 @@ function render(){
     if(top) s.el.classList.remove('under'); else s.el.classList.add('under'); });
   if(UI.stack.length) scheduleRefresh();
 }
-function renderPushed(s){ const osc=s.el.querySelector('.scroll'), ost=osc?osc.scrollTop:0; swapHTML(s.el, s.kind==='detail'?viewDetail(s.id):viewProject(s.id));
+function renderPushed(s){ drawing(()=>renderPushedNow(s)); }
+function renderPushedNow(s){ const osc=s.el.querySelector('.scroll'), ost=osc?osc.scrollTop:0; swapHTML(s.el, s.kind==='detail'?viewDetail(s.id):viewProject(s.id), s.kind==='project');
   if(s.kind==='detail'){ bindDetail(s.el, s.id); const sc=s.el.querySelector('.scroll'); if(sc) sc.scrollTop=ost; } } // restored once the text areas have their full height, or a long note would clamp it to the top
 // A root put away keeps its scroll in UI.scroll; it is drawn anew when it comes back and gets it back there
 function hideRoot(s){ if(s.classList.contains('hidden-tab')) return; const sc=s.querySelector('.scroll'), pc=s.querySelector('.pchips');
@@ -1464,7 +1556,9 @@ $('#selbar').addEventListener('click', e=>{ const b=e.target.closest('[data-act]
 })();
 // A text field focused in this screen: a render from a timer must not rebuild it, or iOS closes the keyboard and the typing is lost
 function typingIn(scr){ const ae=document.activeElement; return !!scr && !!ae && /^(INPUT|TEXTAREA)$/.test(ae.tagName) && scr.contains(ae); }
-function bindScroll(scr){ const sc=scr.querySelector('.scroll'), nav=scr.querySelector('.nav'); if(!sc||!nav) return; const f=()=>nav.classList.toggle('compact', sc.scrollTop>36); sc.addEventListener('scroll',f,{passive:true}); f(); }
+// A list kept by a merge (R18) keeps its listener, which reads the header it has now
+function bindScroll(scr){ const sc=scr.querySelector('.scroll'), nav=scr.querySelector('.nav'); if(!sc||!nav) return; sc._nav=nav;
+  if(!sc._bs){ sc._bs=1; sc.addEventListener('scroll',()=>{ const n=sc._nav; if(n) n.classList.toggle('compact', sc.scrollTop>36); },{passive:true}); } nav.classList.toggle('compact', sc.scrollTop>36); }
 
 /* ---------- Tasks view ---------- */
 /* R3: a project capsule keeps the stored colour but its text is made readable, above 4.4:1 on its own background:
@@ -1747,7 +1841,7 @@ function bindDetail(el, id){
 function bindRows(box){
   if(!UI.select) box.querySelectorAll('.row:not(.first .row)').forEach(bindRowGestures);
   box.querySelectorAll('[data-day-head]').forEach(h=>bindLongPress(h, ()=>dayHeadMenu(h))); // R14: a long press on a day header moves its tasks
-  box.querySelectorAll('.first .row').forEach(r=>{ r.addEventListener('click',e=>{ if(e.target.closest('[data-act=check]')) return; if(HELD.has(r.dataset.id)) toggleHold(r.dataset.id); else openDetail(r.dataset.id); }); }); }
+  box.querySelectorAll('.first .row').forEach(r=>{ if(r._fc) return; r._fc=1; r.addEventListener('click',e=>{ if(e.target.closest('[data-act=check]')) return; if(HELD.has(r.dataset.id)) toggleHold(r.dataset.id); else openDetail(r.dataset.id); }); }); }
 function bindCommon(scr){
   scr.addEventListener('click', onClick);
   bindRows(scr);
@@ -1760,7 +1854,8 @@ function bindCommon(scr){
    and the caret, an accent typed with a dead key or IME text being composed are never cut off. */
 let searchT=null;
 function bindSearch(s, around){
-  let composing=false; s.dataset.shown=UI.query; // the query the screen around the field was drawn with
+  s.dataset.shown=UI.query; // the query the screen around the field was drawn with
+  if(s._sb) return; s._sb=1; let composing=false; // a field kept by a merge (R18) is bound once
   const go=()=>{ searchT=null; if(composing||!s.isConnected||s.closest('.hidden-tab')) return; if(UI.query===s.dataset.shown) return;
     if(!UI.query) UI.searchDone=false;
     if(around()){ s.dataset.shown=UI.query; return; }
@@ -1770,16 +1865,12 @@ function bindSearch(s, around){
   s.addEventListener('input', e=>{ if(!e.isComposing) typed(); });
   s.addEventListener('compositionend', typed); // Chrome sends the last input of a composition before this event, still marked as composing
 }
-// Moves the new content around a search field that stays: what comes before and after its bar, and the bar's other buttons (Cancelar)
-function morphAround(bar, nbar){ const s=bar.querySelector('[data-role=search]').closest('.search');
-  while(bar.previousSibling) bar.previousSibling.remove(); while(bar.nextSibling) bar.nextSibling.remove();
-  const before=[], after=[]; for(let n=nbar.parentNode.firstChild; n&&n!==nbar; n=n.nextSibling) before.push(n); for(let n=nbar.nextSibling; n; n=n.nextSibling) after.push(n);
-  bar.before(...before); bar.after(...after);
-  [...bar.children].forEach(c=>{ if(c!==s) c.remove(); }); [...nbar.children].forEach(c=>{ if(!c.querySelector('[data-role=search]')) bar.appendChild(c); }); }
-// iPhone: the Tareas screen is drawn into a template and its content is moved around the live field
-function searchAround(s){ const bar=s.closest('.searchbar'), sc=bar&&bar.parentElement, scr=sc&&sc.closest('.screen.root'); if(!scr||!sc.classList.contains('scroll')) return false;
-  const t=document.createElement('div'); t.innerHTML=lazyRows(viewTareas(), sc.scrollTop, innerHeight); const nbar=t.querySelector('.scroll > .searchbar'); if(!nbar) return false;
-  morphAround(bar, nbar); armRows(sc); delete scr.dataset.dirty; scr.dataset.ver=dataVer;
+// iPhone: the Tareas screen is merged around the live field (R18): rows that still match stay where they are, the others go,
+// and the summary, filters, Cancelar and the count follow; the field is never touched
+function searchAround(s){ return drawing(()=>searchAroundNow(s)); }
+function searchAroundNow(s){ const bar=s.closest('.searchbar'), sc=bar&&bar.parentElement, scr=sc&&sc.closest('.screen.root'); if(!scr||!sc.classList.contains('scroll')) return false;
+  const html=lazyRows(viewTareas(), sc.scrollTop, innerHeight), stash=rowStash; if(!morphInto(scr, html, {keep:s})||!s.isConnected||!sc.isConnected) return false; rowStash=stash;
+  armRows(sc); delete scr.dataset.dirty; scr.dataset.ver=dataVer;
   if(openRow&&!openRow.isConnected) openRow=null;
   bindRows(sc); const pc=sc.querySelector('.pchips'); if(pc) chipInView(pc);
   return true; }
@@ -1875,11 +1966,13 @@ function push(kind,id){
   const below=underScreen(); app.appendChild(el); navLock(); const s={kind,id,el}; UI.stack.push(s); renderPushed(s); if(below) below.classList.add('under');
   requestAnimationFrame(()=>requestAnimationFrame(()=>{ el.classList.remove('pushed'); el.classList.add('shown'); }));
 }
-function openDetail(id){ if(UI.wide){ const ds=UI.dsel; UI.deskDetail=id; ds.cur=ds.anchor=id; ds.ids.clear(); ds.mode=false; render(); return; } push('detail', id); } // R15: the task in the inspector is the selected row
+function openDetail(id){ if(UI.wide){ const ds=UI.dsel, plain=deskPlain()&&!!deskRow(id); UI.deskDetail=id; ds.cur=ds.anchor=id; ds.ids.clear(); ds.mode=false; if(plain) deskSelPane(); else render(); return; } push('detail', id); } // R15: the task in the inspector is the selected row
+// R18: a desktop list with one selected row at most and no title being edited: opening, closing or moving the inspector changes only it and the highlight
+function deskPlain(){ return UI.wide && deskListView() && !deskMulti() && !UI.dsel.mode && !UI.dsel.edit && !!$('#desk .main .mbody') && $('#desk')._mainKind==='list'; }
 // The task the open detail shows: the desktop pane, or the top pushed screen on the iPhone
 function detailTaskId(){ if(UI.wide) return UI.deskDetail; const cur=UI.stack[UI.stack.length-1]; return cur&&cur.kind==='detail'?cur.id:null; }
 function pop(){
-  if(UI.wide){ UI.deskDetail=null; render(); return; }
+  if(UI.wide){ const plain=deskPlain(); UI.deskDetail=null; if(plain) deskSelPane(); else render(); return; }
   if(UI.select&&UI.select.scope==='project'){ UI.select=null; app.classList.remove('selecting'); }
   const s=UI.stack.pop(); if(!s) return; navLock();
   s.el.classList.remove('shown','dragging'); if(!RM.matches) s.el.style.transform=''; s.el.classList.add('pushed'); // with Reduce Motion it fades where the finger left it
@@ -1919,7 +2012,7 @@ function reopenRow(old){ const id=old.dataset.id, scr=old.closest('.screen'); dr
   const c=r.querySelector('.row-content'); c.classList.add('drag'); r.classList.add('swiping','dir-l'); c.style.transform='translate3d(-160px,0,0)'; r.dataset.open='1'; openRow=r; requestAnimationFrame(()=>c.classList.remove('drag')); }
 function closeRow(row){ if(!row) return; const c=row.querySelector('.row-content'); c.classList.remove('drag'); c.style.transform=''; row.classList.remove('armed'); const ic=row.querySelector('.row-bg.left span'); if(ic) ic.style.transform=''; row.dataset.open='0'; if(openRow===row) openRow=null; setTimeout(()=>{ if(row.dataset.open!=='1'&&!c.classList.contains('drag')) row.classList.remove('swiping','dir-l','dir-r'); },320); }
 function bindRowGestures(row){
-  const c=row.querySelector('.row-content'); if(!c||!row.querySelector('.row-bg')) return;
+  const c=row.querySelector('.row-content'); if(!c||!row.querySelector('.row-bg')||row._gb) return; row._gb=1; // once per row: a merge (R18) keeps rows that are bound
   let x0=0,y0=0,dx=0,mode=null,lp=null,thr=false,edge=false,lastX=0,lastT=0,vx=0; // vx: the finger's speed in px/ms (R4)
   row.addEventListener('touchstart',e=>{ const t=e.touches[0]; x0=lastX=t.clientX;y0=t.clientY;dx=0;thr=false;vx=0;lastT=e.timeStamp; if(row.closest('.hidden-tab')){ mode='off'; return; } mode=null; dragStart(); // a row on a screen just put away (a tab slide settled by this touch) acts on nothing unseen
     edge=x0<EDGE&&!!row.closest('.pushed-screen'); // the left edge of a pushed screen belongs to the back swipe
@@ -1954,7 +2047,7 @@ function bindRowGestures(row){
 }
 // Long press on a project: same 8 and 10 px tolerance as task rows; every touch starts with the flag clear, so a tap after a cancelled menu opens the project
 // R10: fn gets {row, x, y} to lift the element; once the menu is open the same finger slides over its options and lifts on one
-function bindLongPress(el, fn){ let t=null, x0=0, y0=0, fired=false;
+function bindLongPress(el, fn){ if(el._lpb) return; el._lpb=1; let t=null, x0=0, y0=0, fired=false; // once per element (R18)
   el.addEventListener('touchstart',e=>{ const p=e.touches[0]; x0=p.clientX; y0=p.clientY; fired=false; el.dataset.lp='0'; clearTimeout(t); t=setTimeout(()=>{ if(el.closest('.hidden-tab')) return; /* its screen was put away meanwhile (a tab slide settled by this touch) */ fired=true; haptic(15); el.dataset.lp='1'; fn({row:el, x:x0, y:y0}); },500); },{passive:true});
   el.addEventListener('touchmove',e=>{ const p=e.touches[0]; if(fired&&menuOpen()){ if(e.cancelable) e.preventDefault(); menuTrack(p.clientX, p.clientY); return; } if(Math.abs(p.clientY-y0)>8||Math.abs(p.clientX-x0)>10) clearTimeout(t); },{passive:false});
   el.addEventListener('touchend',e=>{ clearTimeout(t); if(fired&&e.cancelable) e.preventDefault(); const p=e.changedTouches[0]; if(fired&&menuOpen()&&p) menuRelease(p.clientX, p.clientY); }); // the menu is open: lifting the finger must not click
@@ -2806,11 +2899,12 @@ function deskListView(){ const v=UI.deskView; return v==='hoy'||v==='todas'||v.s
 // The rows of the visible list in order, with the placeholders of a long one; "Lo primero" repeats rows and is left out
 function deskOrder(){ return [...document.querySelectorAll('#desk .main .mbody .row[data-id], #desk .main .mbody .rph[data-id]')].filter(r=>!r.closest('.first')).map(r=>r.dataset.id); }
 function deskRow(id){ return id?document.querySelector('#desk .main .mbody .row[data-id="'+CSS.escape(id)+'"]:not(.first .row)'):null; }
-// The selection changed without the rows' markup: classes, ARIA and the one row the Tab key reaches
+// The selection changed without the rows' markup: classes, ARIA and the one row the Tab key reaches.
+// Only what differs is written, so the rows that keep their state are not marked as changed (R18)
 function paintSel(){ const ds=UI.dsel, multi=deskMulti();
-  document.querySelectorAll('#desk .main .mbody .row[data-id]').forEach(r=>{ if(r.closest('.first')) return; const id=r.dataset.id, s=multi&&ds.ids.has(id), c=!multi&&ds.cur===id;
-    r.classList.toggle('selected', s); r.classList.toggle('cur', c); r.setAttribute('aria-selected', s||c); r.tabIndex=ds.cur===id?0:-1; });
-  const f=deskRow(ds.cur)||[...document.querySelectorAll('#desk .main .mbody .row[data-id]')].find(r=>!r.closest('.first')); if(f) f.tabIndex=0; } // the list is one stop of the Tab key
+  document.querySelectorAll('#desk .main .mbody .row[data-id]').forEach(r=>{ if(r.closest('.first')) return; const id=r.dataset.id, s=multi&&ds.ids.has(id), c=!multi&&ds.cur===id, a=String(s||c), ti=ds.cur===id?0:-1;
+    r.classList.toggle('selected', s); r.classList.toggle('cur', c); if(r.getAttribute('aria-selected')!==a) r.setAttribute('aria-selected', a); if(r.tabIndex!==ti) r.tabIndex=ti; });
+  const f=deskRow(ds.cur)||[...document.querySelectorAll('#desk .main .mbody .row[data-id]')].find(r=>!r.closest('.first')); if(f&&f.tabIndex!==0) f.tabIndex=0; } // the list is one stop of the Tab key
 // A row brought into view (a long list draws it first) and given the focus, which shows the ring when it came from the keyboard
 function revealRow(id, focus){ let r=deskRow(id); const sc=document.querySelector('#desk .main .mbody');
   if(!r&&sc){ const ph=sc.querySelector('.rph[data-id="'+CSS.escape(id)+'"]'); if(ph){ ph.scrollIntoView({block:'nearest'}); fillRows(sc); r=deskRow(id); } }
@@ -2860,7 +2954,7 @@ function moveSel(dir, extend){ const ds=UI.dsel, o=deskOrder(); if(!o.length) re
   // A new stretch starts at the selected row
   if(extend&&!ds.mode){ const a=was&&ds.anchor&&o.includes(ds.anchor)?ds.anchor:(i>=0?ds.cur:id); ds.anchor=a; ds.ids.clear(); selRange(a, id).forEach(k=>ds.ids.add(k)); ds.cur=id; if(deskMulti()) UI.deskDetail=null; else oneLeft(was); }
   else { if(!ds.mode){ ds.ids.clear(); ds.anchor=id; } ds.cur=id; if(UI.deskDetail&&!deskMulti()) UI.deskDetail=id; }
-  if(was||deskMulti()||UI.deskDetail) render(); else paintSel(); // the pane says how many
+  if(was||deskMulti()) render(); else if(UI.deskDetail) deskSelPane(); else paintSel(); // the pane says how many; R18: one row to another changes only the highlight and the inspector
   revealRow(id); }
 // The task the single-key shortcuts act on: the one the inspector shows, or the selected row while it is listed
 function keyTarget(){ const id=UI.deskDetail||UI.dsel.cur; if(!id||!task(id)) return null; return id===UI.deskDetail||deskRow(id)||document.querySelector('#desk .main .rph[data-id="'+CSS.escape(id)+'"]')?id:null; }
@@ -3090,24 +3184,53 @@ function ariaList(d){ const mb=d.querySelector('.main .mbody'); if(!mb) return; 
   mb.querySelectorAll('.group').forEach(g=>{ if(!g.querySelector('.row[data-id], .rph')) return; g.setAttribute('role','listbox'); g.setAttribute('aria-multiselectable','true');
     const t=g.previousElementSibling&&g.previousElementSibling.classList.contains('group-title')?g.previousElementSibling:g.parentElement&&g.parentElement.querySelector(':scope > .group-title');
     const l=t&&(t.querySelector('.gl')||t); g.setAttribute('aria-label', name+(l&&l.firstChild?', '+(l.firstChild.textContent||'').trim():'')); }); }
+// The pane's markup: the selected task's inspector, the multiple selection's actions, or none (and then no task is shown)
+function deskPaneHTML(){ const dx = UI.deskDetail && task(UI.deskDetail); // only a task of the active space: the spaces never mix on screen
+  const pop = isCalView(UI.deskView), multi = deskMulti() && deskListView(); // R16: several tasks selected, the pane offers what can be done with them
+  const pane = multi ? multiPaneHTML() : dx && dx.spaceId===space().id ? '<section class="pane'+(pop?' wpop':'')+'" data-task="'+esc(UI.deskDetail)+'">'+(pop?'':'<div class="igrip" title="Arrastra para cambiar el ancho"></div>')+'<div class="screen detail">'+viewDetail(UI.deskDetail)+'</div></section>' : '';
+  if(!pane||multi) UI.deskDetail=null; app.classList.toggle('has-pane', !!pane&&!pop); return pane; }
+/* R18: the pane is drawn again only when its markup changed or something changed it since (typing, a link strip, the week popover's place);
+   otherwise it stays as it is, with its scroll and focus. The inspector slides in from the right when it opens (a fade with Reduce Motion);
+   the week popover keeps its own fade. Returns true when the pane was drawn anew */
+function putPane(d, html){ let pn=d.querySelector(':scope > .pane'); const was=!!pn&&!pn.classList.contains('wpop');
+  // bindDetail holds the task object: data reloaded from another window has new objects, so the pane is bound again
+  if(pn&&html&&pn._h===html&&pn._x===(UI.deskDetail?task(UI.deskDetail):null)&&!(markDirty(rowWatch.takeRecords()), pn._dirty)) return false;
+  const ps=pn&&pn.querySelector('.scroll'), pst=ps?ps.scrollTop:0, pid=pn?pn.dataset.task:null; // the pane keeps its scroll while it shows the same task
+  if(!html){ if(pn) pn.remove(); return false; }
+  const t=document.createElement('template'); t.innerHTML=html; const nw=t.content.firstElementChild; nw._h=html; nw._x=UI.deskDetail?task(UI.deskDetail):null;
+  if(pn) pn.replaceWith(nw); else d.appendChild(nw); pn=nw; watchBox(pn);
+  if(UI.deskDetail){ bindDetail(pn, UI.deskDetail); if(pid===UI.deskDetail){ const p2=pn.querySelector('.scroll'); if(p2) p2.scrollTop=pst; } } // restored after bindDetail has grown the text areas
+  markDirty(rowWatch.takeRecords()); pn._dirty=false; // what bindDetail set is part of the drawing
+  if(!was&&!pn.classList.contains('wpop')&&pn.animate){ try{ pn.animate(RM.matches?[{opacity:0},{opacity:1}]:[{transform:'translate3d(24px,0,0)',opacity:0},{transform:'none',opacity:1}], {duration:RM.matches?200:260, easing:'cubic-bezier(.2,.8,.2,1)'}); }catch(e){} }
+  return true; }
+// R18: the selected row moved (arrows, J and K, Tab): only the highlight and the inspector change, the column and the sidebar stay
+function deskSelPane(){ const d=$('#desk'); if(!d) return render(); paintSel(); const i=deskOrder().indexOf(UI.dsel.cur); if(i>=0) UI.dsel.idx=i; deskRedraw=true; try{ drawing(()=>putPane(d, deskPaneHTML())); } finally{ deskRedraw=false; } }
 function renderDesktop(again){
   let d=$('#desk'); if(!d){ d=document.createElement('div'); d.id='desk'; d.className='desk'; app.appendChild(d); d.addEventListener('click', onClick); bindDeskEvents(d); UI.deskScroll={}; UI.deskKey=null; }
   // Each view keeps its own scroll (per space), like the iPhone tabs; a view seen for the first time opens at the top
   const body=d.querySelector('.mbody'); if(body&&UI.deskKey) UI.deskScroll[UI.deskKey]=body.scrollTop; const side=d.querySelector('.side'); const sst=side?side.scrollTop:0;
-  const ps=d.querySelector('.pane .scroll'), pst=ps?ps.scrollTop:0, pid=ps?d.querySelector('.pane').dataset.task:null; // the pane keeps its scroll while it shows the same task
   // The add bar or the search keep focus and caret across the rebuild (a click elsewhere has already taken the focus)
   const ae=document.activeElement, fr=ae&&d.contains(ae)&&(ae.dataset.role==='addbar'||ae.dataset.role==='search'||ae.dataset.role==='rowedit') ? {role:ae.dataset.role, a:ae.selectionStart, b:ae.selectionEnd} : null;
   const rowF=ae&&d.contains(ae)&&ae.classList.contains('row'), paneWas=UI.deskDetail; // R15: a focused row gives the focus to the selected row of the new markup
-  const dx = UI.deskDetail && task(UI.deskDetail); // only a task of the active space: the spaces never mix on screen
   const pop = isCalView(UI.deskView); // R17: in Semana the detail is a popover next to its card, so the seven columns keep their width
-  const multi = deskMulti() && deskListView(); // R16: several tasks selected, the pane offers what can be done with them
-  const pane = multi ? multiPaneHTML() : dx && dx.spaceId===space().id ? '<section class="pane'+(pop?' wpop':'')+'" data-task="'+esc(UI.deskDetail)+'">'+(pop?'':'<div class="igrip" title="Arrastra para cambiar el ancho"></div>')+'<div class="screen detail">'+viewDetail(UI.deskDetail)+'</div></section>' : '';
-  if(!pane||multi) UI.deskDetail=null; app.classList.toggle('has-pane', !!pane&&!pop);
+  const pane = deskPaneHTML();
   d.style.setProperty('--panew', paneWidth(DB.settings.paneWidth)+'px');
   const sideHTML=deskSide(), mainHTML=deskMain();
   const key=UI.deskView+'|'+DB.settings.activeSpace; // read after deskMain, which may fall back to another view
   const keep={}; d.querySelectorAll('[data-keep]').forEach(e=>{ keep[e.dataset.keep]=e.scrollTop; }); // the calendar's own scroll boxes (columns, tray, hours)
-  deskRedraw=true; try{ d.innerHTML = sideHTML+lazyRows(mainHTML, UI.deskScroll[key]||0, innerHeight)+pane; } finally{ deskRedraw=false; } armRows(d.querySelector('.mbody'));
+  // R18: the sidebar, the column and the pane are put in place each on its own. A list column is merged (morphInto): its rows that did not
+  // change stay, with their focus. The calendar and Ajustes columns are drawn anew, as before
+  deskRedraw=true; try{
+    let side=d.querySelector(':scope > .side'), main=d.querySelector(':scope > .main');
+    if(!side){ d.insertAdjacentHTML('afterbegin', '<aside class="side"></aside>'); side=d.firstElementChild; }
+    morphInto(side, sideHTML, {outer:true});
+    const lz=lazyRows(mainHTML, UI.deskScroll[key]||0, innerHeight), stash=rowStash, list=deskListView();
+    if(list){ if(!main||d._mainKind!=='list'){ const m=document.createElement('main'); m.className='main'; if(main) main.replaceWith(m); else side.after(m); main=m; }
+      if(!morphInto(main, lz, {outer:true})){ const t=document.createElement('template'); t.innerHTML=lz; const m=t.content.firstElementChild; main.replaceWith(m); main=m; } }
+    else { const t=document.createElement('template'); t.innerHTML=lz; const m=t.content.firstElementChild; if(main) main.replaceWith(m); else side.after(m); main=m; }
+    d._mainKind=list?'list':'other'; rowStash=stash;
+    putPane(d, pane);
+  } finally{ deskRedraw=false; } armRows(d.querySelector('.mbody'));
   d.querySelectorAll('[data-keep]').forEach(e=>{ const k=e.dataset.keep; if(k in keep) e.scrollTop=keep[k]; else if(k==='hours') scrollHours(e); });
   const b2=d.querySelector('.mbody'); if(b2) b2.scrollTop=UI.deskScroll[key]||0; UI.deskKey=key;
   const s2=d.querySelector('.side'); if(s2) s2.scrollTop=sst;
@@ -3115,7 +3238,6 @@ function renderDesktop(again){
   if(fr){ const n=$('#desk [data-role='+fr.role+']'); if(n){ n.focus({preventScroll:true}); try{ n.setSelectionRange(fr.a, fr.b); }catch(e){} } }
   else if(UI.dsel.edit){ const n=$('#desk [data-role=rowedit]'); if(n){ n.focus({preventScroll:true}); if(UI.dsel.edit.fresh){ n.select(); UI.dsel.edit.fresh=false; } } }
   else if(rowF){ const r=deskRow(UI.dsel.cur); if(r) r.focus({preventScroll:true}); }
-  if(UI.deskDetail){ bindDetail(d.querySelector('.pane'), UI.deskDetail); if(pid===UI.deskDetail){ const p2=d.querySelector('.pane .scroll'); if(p2) p2.scrollTop=pst; } } // restored after bindDetail has grown the text areas
   if(pop&&UI.deskDetail){ placeWeekPop(d); const wk=d.querySelector('.week'); if(wk) wk.addEventListener('scroll', ()=>placeWeekPop(d), {passive:true, capture:true}); } // each column scrolls on its own
   const s=$('[data-role=search]',d); if(s) bindSearch(s, ()=>deskResults(d));
   bindAddBar(d);
@@ -3132,19 +3254,25 @@ function placeWeekPop(d){ const pn=d.querySelector('.pane.wpop'); if(!pn) return
   if(!a){ left=dr.width-W-16; top=8; }
   else { left = a.right+10+W<=dr.right-8 ? a.right+10-dr.left : a.left-10-W>=dr.left+8 ? a.left-10-W-dr.left : dr.width-W-8; top=a.top-dr.top-8; }
   pn.style.left=Math.max(8, left)+'px'; pn.style.top=Math.max(8, Math.min(dr.height-H-8, top))+'px'; }
-// Desktop search: the list under the head, the project filter and the Cancelar button change; the field, the sidebar and the detail pane stay
-function deskResults(d){ const ob=d.querySelector('.main .mbody'), oi=ob&&ob.querySelector('.inner'), bar=d.querySelector('.main .mhead .searchbar'); if(!oi||!bar) return false;
-  const t=document.createElement('div'); t.innerHTML=lazyRows(deskMain(), ob.scrollTop, innerHeight); const ni=t.querySelector('.mbody .inner'), nbar=t.querySelector('.mhead .searchbar'); if(!ni||!nbar) return false;
-  oi.replaceWith(ni); armRows(ob); const sb=bar.querySelector('.search'); [...bar.children].forEach(c=>{ if(c!==sb) c.remove(); }); [...nbar.children].forEach(c=>{ if(!c.querySelector('[data-role=search]')) bar.appendChild(c); });
-  const os=d.querySelector('.main .mhead .pfslot'), ns=t.querySelector('.mhead .pfslot'); if(os&&ns) os.replaceWith(ns);
+// Desktop search: the column is merged around the live field (R18): the rows that still match stay, the others go, and the project filter
+// and the Cancelar button follow; the field, the sidebar and the detail pane stay. The calendar columns are drawn anew under the head
+function deskResults(d){ return drawing(()=>deskResultsNow(d)); }
+function deskResultsNow(d){ const main=d.querySelector(':scope > .main'), ob=main&&main.querySelector('.mbody'), s=main&&main.querySelector('.mhead [data-role=search]'); if(!ob||!s) return false;
+  const html=lazyRows(deskMain(), ob.scrollTop, innerHeight), stash=rowStash;
+  if(d._mainKind==='list'&&deskListView()){ deskRedraw=true; let ok; try{ ok=morphInto(main, html, {outer:true, keep:s}); } finally{ deskRedraw=false; } if(!ok||!s.isConnected) return false; }
+  else { const t=document.createElement('div'); t.innerHTML=html; const oi=ob.querySelector('.inner'), ni=t.querySelector('.mbody .inner'), bar=s.closest('.searchbar'), nbar=t.querySelector('.mhead .searchbar'); if(!oi||!ni||!bar||!nbar) return false;
+    oi.replaceWith(ni); const sb=bar.querySelector('.search'); [...bar.children].forEach(c=>{ if(c!==sb) c.remove(); }); [...nbar.children].forEach(c=>{ if(!c.querySelector('[data-role=search]')) bar.appendChild(c); });
+    const os=main.querySelector('.mhead .pfslot'), ns=t.querySelector('.mhead .pfslot'); if(os&&ns) os.replaceWith(ns); }
+  rowStash=stash; armRows(ob);
   bindAddBar(d); if(isCalView(UI.deskView)&&UI.deskDetail) placeWeekPop(d); ariaList(d); syncSel(UI.deskDetail); paintSel(); return true; }
 function bindAddBar(d){
-  const ab=$('[data-role=addbar]',d); if(!ab) return; const said=$('#deskSaid',d); const base=()=>deskAddBase(ab.dataset.project);
+  const ab=$('[data-role=addbar]',d); if(!ab) return; const base=()=>deskAddBase(ab.dataset.project);
   const refocus=()=>{ const n=$('#desk [data-role=addbar]'); if(n){ n.focus(); const l=n.value.length; n.setSelectionRange(l,l); } };
   // R7: the recognised parts are tinted in the field and spelled out under it
-  const upd=()=>{ const r=quickTask(ab.value, base()); paintQuick(ab, r.toks); const q=quickSaid(r);
+  const upd=()=>{ const said=$('#deskSaid',d), r=quickTask(ab.value, base()); paintQuick(ab, r.toks); const q=quickSaid(r);
     if(said) said.innerHTML=(q.out.length?'Entendido: <b>'+esc(q.out.join(', '))+'</b>'+(q.warn.length?'. ':''):'')+(q.warn.length?'<span class="warn">'+esc(q.warn.join(' '))+'</span>':''); return r; };
-  bindQuickScroll(ab); upd();
+  upd(); bindPasteBox(d, refocus); if(ab._ab) return; ab._ab=1; // R18: a bar kept by a merge keeps its listeners
+  bindQuickScroll(ab);
   ab.addEventListener('input',()=>{ UI.addDraft=ab.value; upd(); }); // a render keeps the half-typed task
   ab.addEventListener('paste',e=>{ const ls=pasteLines(e.clipboardData&&e.clipboardData.getData('text')); if(ls.length<2) return; e.preventDefault(); UI.addPaste=(UI.addPaste||[]).concat(ls); render(); refocus(); });
   ab.addEventListener('keydown',e=>{
@@ -3154,9 +3282,10 @@ function bindAddBar(d){
     if(UI.addPaste){ const v=ab.value.trim(); if(v){ UI.addPaste.push(v); UI.addDraft=''; render(); refocus(); } return; } // with a pasted list waiting, Enter adds a line to it
     const r=upd(); if(!r.title) return;
     const x=addTask({title:r.title, date:r.date, projectId:r.projectId, priority:r.priority, reminder:r.reminder}); UI.addDraft=''; haptic(6); renderAnimated(); toast('Añadida: '+x.title); refocus(); });
-  const pb=$('.pastebox',d); if(pb) pb.addEventListener('click',e=>{ const rm=e.target.closest('[data-paste-rm]'); if(rm){ UI.addPaste.splice(+rm.dataset.pasteRm,1); if(!UI.addPaste.length) UI.addPaste=null; render(); refocus(); return; }
+}
+function bindPasteBox(d, refocus){ const pb=$('.pastebox',d), base=()=>{ const a=$('[data-role=addbar]',d); return deskAddBase(a&&a.dataset.project); }; if(pb&&!pb._pb){ pb._pb=1; pb.addEventListener('click',e=>{ const rm=e.target.closest('[data-paste-rm]'); if(rm){ UI.addPaste.splice(+rm.dataset.pasteRm,1); if(!UI.addPaste.length) UI.addPaste=null; render(); refocus(); return; }
     const b=e.target.closest('[data-paste]'); if(!b) return; if(b.dataset.paste==='cancel'){ UI.addPaste=null; render(); refocus(); return; }
-    const ls=UI.addPaste.slice(); UI.addPaste=null; const ids=addMany(ls, base()); renderAnimated(); log('info','Tareas creadas desde una lista', {n:ids.length}); toast(ids.length===1?'1 tarea creada':ids.length+' tareas creadas', ()=>removeTasks(ids)); refocus(); });
+    const ls=UI.addPaste.slice(); UI.addPaste=null; const ids=addMany(ls, base()); renderAnimated(); log('info','Tareas creadas desde una lista', {n:ids.length}); toast(ids.length===1?'1 tarea creada':ids.length+' tareas creadas', ()=>removeTasks(ids)); refocus(); }); }
 }
 // A dropped card: a slot sets the date and a reminder at that time; "Todo el día" keeps the date and drops the time; a day or the mini month
 // set only the date (a reminder stays as it was); "Sin fecha" clears the date. All with Deshacer
@@ -3211,7 +3340,7 @@ function bindDeskEvents(d){
   d.addEventListener('input', e=>{ if(e.target.dataset.role==='rowedit'&&UI.dsel.edit) UI.dsel.edit.text=e.target.value; });
   d.addEventListener('focusout', e=>{ if(e.target.dataset.role!=='rowedit'||deskRedraw) return; setTimeout(()=>{ const a=document.activeElement; if(UI.dsel.edit&&!(a&&a.dataset&&a.dataset.role==='rowedit')) endRowEdit(true); }, 0); });
   // The Tab key onto a row selects it (a click selects it on its own)
-  d.addEventListener('focusin', e=>{ const r=e.target; if(!r.classList||!r.classList.contains('row')||r.closest('.first')||deskMulti()||UI.dsel.cur===r.dataset.id||!r.matches(':focus-visible')) return; UI.dsel.cur=r.dataset.id; if(UI.deskDetail){ UI.deskDetail=r.dataset.id; render(); } else paintSel(); });
+  d.addEventListener('focusin', e=>{ const r=e.target; if(!r.classList||!r.classList.contains('row')||r.closest('.first')||deskMulti()||UI.dsel.cur===r.dataset.id||!r.matches(':focus-visible')) return; UI.dsel.cur=r.dataset.id; if(UI.deskDetail){ UI.deskDetail=r.dataset.id; deskSelPane(); } else paintSel(); });
   // Double click on an empty part of a month day adds a task with that date (a past day cannot take one)
   d.addEventListener('dblclick', e=>{ const md=e.target.closest('.mday'); if(!md||e.target.closest('.wcard,button')) return; const day=md.dataset.day;
     if(day<todayStr()){ toast('No se puede añadir a un día pasado'); return; } addSheet(null,'',{date:day}); });

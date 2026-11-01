@@ -19,20 +19,20 @@
   --bg:#F2F2F7; --card:#FFFFFF; --sep:#C6C6C8; --ink:#000000; --ink2:#8E8E93; --ink3:#AEAEB2;
   --blue:#007AFF; --red:#FF3B30; --orange:#FF9500; --green:#34C759; --fill:#E5E5EA; --fill2:#D1D1D6;
   --bar:rgba(249,249,249,.82); --mat:rgba(255,255,255,.88); --dim:rgba(0,0,0,.35); --press:#D9D9DE;
-  --kb:0px;
+  --kb:0px; --qhl:rgba(0,122,255,.16);
   box-sizing:border-box; padding-top:env(safe-area-inset-top,0px);
 }
 @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
   color-scheme:dark;
   --bg:#000000; --card:#1C1C1E; --sep:#38383A; --ink:#FFFFFF; --ink2:#8E8E93; --ink3:#636366;
   --blue:#0A84FF; --red:#FF453A; --orange:#FF9F0A; --green:#30D158; --fill:#2C2C2E; --fill2:#3A3A3C;
-  --bar:rgba(22,22,24,.82); --mat:rgba(36,36,38,.9); --dim:rgba(0,0,0,.55); --press:#2C2C2E;
+  --bar:rgba(22,22,24,.82); --mat:rgba(36,36,38,.9); --dim:rgba(0,0,0,.55); --press:#2C2C2E; --qhl:rgba(10,132,255,.34);
 }}
 :root[data-theme="dark"]{
   color-scheme:dark;
   --bg:#000000; --card:#1C1C1E; --sep:#38383A; --ink:#FFFFFF; --ink2:#8E8E93; --ink3:#636366;
   --blue:#0A84FF; --red:#FF453A; --orange:#FF9F0A; --green:#30D158; --fill:#2C2C2E; --fill2:#3A3A3C;
-  --bar:rgba(22,22,24,.82); --mat:rgba(36,36,38,.9); --dim:rgba(0,0,0,.55); --press:#2C2C2E;
+  --bar:rgba(22,22,24,.82); --mat:rgba(36,36,38,.9); --dim:rgba(0,0,0,.55); --press:#2C2C2E; --qhl:rgba(10,132,255,.34);
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
 html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px);font-size:17px;}
@@ -363,6 +363,57 @@ body.desktop .toast{left:auto;right:28px;bottom:28px;width:360px;}
 .chip.on{background:var(--blue);color:#fff;}
 .chip .dot{width:9px;height:9px;border-radius:50%;}
 .chip svg{width:14px;height:14px;}
+/* R5 and R7: quick add. Recognised words are tinted blue behind the text of the field (an overlay that scrolls with it);
+   a bar of 44 pt icons sits on the keyboard and each icon opens a strip of options above it */
+.qin{position:relative;border-radius:10px;background:var(--bg);}
+.qhl{position:absolute;inset:0;display:flex;align-items:center;padding:0 12px;overflow:hidden;pointer-events:none;color:transparent;white-space:pre;font-size:max(16px,1rem);}
+.qhl span{flex:none;white-space:pre;}
+.qhl mark{color:transparent;background:var(--qhl);border-radius:4px;box-shadow:0 0 0 1px var(--qhl);}
+.qin input{position:relative;display:block;background:transparent !important;}
+.sheet.addsheet{padding-top:2px;}
+.kbon .sheet.addsheet{padding-bottom:6px;} /* the keyboard covers the home indicator: the bar sits right on it */
+.qtoks{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 0;}
+.qtoks:empty,.qstatus:empty,.qstrip:empty{display:none;}
+.tok{display:inline-flex;align-items:center;gap:5px;height:28px;padding:0 2px 0 10px;border-radius:14px;background:var(--qhl);color:var(--blue);font-size:0.824rem;font-weight:500;white-space:nowrap;}
+.tok .dot{width:8px;height:8px;border-radius:50%;}
+.tok svg{width:13px;height:13px;}
+.tok .x{position:relative;width:24px;height:24px;display:flex;align-items:center;justify-content:center;border-radius:12px;font-size:1.06rem;line-height:1;opacity:.75;}
+.tok .x::after{content:'';position:absolute;inset:-10px -6px;} /* a 44 pt target around a small cross */
+.qstatus{font-size:0.765rem;color:var(--ink2);margin:8px 2px 0;}
+.qstatus.warn{color:var(--orange);}
+.qstrip{display:flex;gap:8px;overflow-x:auto;margin:10px -16px 0;padding:0 16px;scrollbar-width:none;}
+.qstrip::-webkit-scrollbar{display:none;}
+.qstrip .chip{height:36px;border-radius:18px;}
+.qstrip.calon{display:block;overflow:visible;margin:10px 0 0;padding:0;}
+.qstrip .cal{margin:0;}
+.qbar{display:flex;align-items:center;gap:2px;margin:8px -8px 0;}
+.qbtn{width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:12px;color:var(--ink2);flex:none;}
+.qbtn svg{width:22px;height:22px;}
+.qbtn.set{color:var(--blue);}
+.qbtn.open{background:var(--fill);color:var(--blue);}
+.qbar .grow{flex:1;}
+.qadd{position:relative;height:36px;padding:0 18px;margin-right:4px;border-radius:18px;background:var(--blue);color:#fff;font-weight:600;font-size:0.941rem;flex:none;-webkit-touch-callout:none;}
+.qadd::after{content:'';position:absolute;inset:-4px -2px;}
+.plist{margin-top:10px;background:var(--bg);border-radius:10px;max-height:236px;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+.plhead{display:flex;align-items:center;justify-content:space-between;margin:10px 2px 0;font-size:0.765rem;color:var(--ink2);text-transform:uppercase;letter-spacing:.02em;}
+.plhead button{color:var(--blue);text-transform:none;letter-spacing:0;font-size:0.882rem;height:32px;}
+.pl{display:flex;align-items:center;gap:8px;min-height:44px;padding:4px 0 4px 12px;font-size:0.941rem;}
+.pl + .pl{border-top:.5px solid var(--sep);}
+.pl .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.pl .m{flex:none;color:var(--ink2);font-size:0.765rem;max-width:45%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.pl .x{flex:none;width:44px;height:36px;color:var(--ink3);font-size:1.18rem;}
+.addbar .qin{flex:1;min-width:0;align-self:stretch;display:flex;align-items:center;background:none;border-radius:0;}
+.addbar .qhl{padding:0;}
+.addbar .qin input{width:100%;padding:0;}
+.addhint{font-size:0.765rem;color:var(--ink2);margin:-8px 4px 12px;line-height:1.35;}
+.addhint:empty{display:none;}
+.addhint b{color:var(--blue);font-weight:600;}
+.addhint .warn{color:var(--orange);}
+.pastebox{background:var(--card);border:.5px solid var(--sep);border-radius:12px;margin:-6px 0 14px;padding:4px 0 10px;}
+.pastebox .plist{background:none;margin:0;max-height:300px;}
+.pastebox .plhead{margin:6px 14px 2px;}
+.pastebox .sheet-actions{margin:8px 12px 0;}
+.pastebox .btn{height:34px;font-size:0.882rem;border-radius:8px;flex:none;padding:0 16px;}
 .sheet-actions{display:flex;gap:10px;margin-top:14px;}
 .btn{flex:1;height:48px;border-radius:12px;font-size:1rem;font-weight:600;background:var(--fill);display:flex;align-items:center;justify-content:center;gap:8px;}
 .btn.primary{background:var(--blue);color:#fff;}
@@ -507,7 +558,7 @@ function dateFromDM(day, month){ const t=todayStr(); const y=+t.slice(0,4), m=+t
   if(month){ if(month<1||month>12) return null; const c=mk(y,month); return (c&&c>=t)?c:mk(y+1,month); }
   for(let k=0;k<3;k++){ const mm=(m-1+k)%12+1, yy=y+Math.floor((m-1+k)/12); const c=mk(yy,mm); if(c&&c>=t) return c; } return null; } // a month without that day is skipped: 'el 30' on 31 January is 30 March
 // Trailing date words in a quick-add title: 'hoy', 'mañana', 'pasado mañana', a weekday, 'el 12', '12/11', '12 de noviembre'
-function parseQuickDate(text){
+function quickDateMatch(text){
   const t=todayStr(); const rules=[
     [/\s+pasado\s+mañana\s*$/i, ()=>addDays(t,2)],
     [/\s+mañana\s*$/i, ()=>addDays(t,1)],
@@ -516,9 +567,74 @@ function parseQuickDate(text){
     [/\s+(?:el\s+)?(\d{1,2})\s+de\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)\s*$/i, m=>dateFromDM(+m[1], MESES_FULL.indexOf(m[2].toLowerCase())+1)],
     [/\s+(?:el\s+)?(\d{1,2})\/(\d{1,2})\s*$/, m=>dateFromDM(+m[1],+m[2])],
     [/\s+el\s+(?:día\s+)?(\d{1,2})\s*$/i, m=>dateFromDM(+m[1],null)] ];
-  for(const [re,fn] of rules){ const m=text.match(re); if(m){ const d=fn(m); if(d) return {title:text.slice(0,m.index).trim(), date:d, match:m[0].trim()}; } }
+  for(const [re,fn] of rules){ const m=text.match(re); if(m){ const d=fn(m); if(d) return {index:m.index, len:m[0].length, date:d}; } }
   return null;
 }
+function parseQuickDate(text){ const m=quickDateMatch(text); return m?{title:text.slice(0,m.index).trim(), date:m.date, match:text.substr(m.index,m.len).trim()}:null; }
+/* R7: projects named by '#pro' in a title. A word of the name (or the whole name run together) starts with it, accents ignored.
+   A whole-name match wins over the others ('#flc' picks FLC, not FLC Fase 2); otherwise two or more matches are ambiguous. */
+const projKey = name => norm(name).replace(/[^a-z0-9]/g,'');
+function projectMatches(tok){ const k=projKey(tok); if(!k) return []; const ps=activeProjects();
+  const exact=ps.filter(p=>projKey(p.name)===k); if(exact.length===1) return exact;
+  return ps.filter(p=>projKey(p.name).startsWith(k) || norm(p.name).split(/[^a-z0-9]+/).some(w=>w&&w.startsWith(k))); }
+/* R7: everything a quick-add title says besides its text. '#pro' anywhere picks a project; at the end, in any order,
+   a date (the parseQuickDate words), a time ('a las 9', 'a las 9:30', 'a las 18h', 'a la 1 de la tarde') and '!!!' or '!!' for the priority.
+   tokens: the recognised ranges of the text, to highlight them and to drop them from the title. */
+function parseQuick(text){
+  const src=String(text||''); const toks=[]; const out={title:'', date:null, projectId:null, priority:null, time:null, ambiguous:null, tokens:toks};
+  for(const m of src.matchAll(/(^|\s)#([\p{L}\p{N}_-]+)/gu)){ if(out.projectId) break; const start=m.index+m[1].length, ps=projectMatches(m[2]);
+    if(ps.length===1){ out.projectId=ps[0].id; out.ambiguous=null; toks.push({kind:'proj', start, end:start+1+m[2].length}); }
+    else if(ps.length>1&&!out.ambiguous) out.ambiguous={tok:'#'+m[2], names:ps.map(p=>p.name)}; }
+  const blank=(w,a,b)=>w.slice(0,a)+' '.repeat(b-a)+w.slice(b); let work=src; toks.forEach(t=>{ work=blank(work,t.start,t.end); });
+  const take=(kind,a,b)=>{ while(a<b&&/\s/.test(work[a])) a++; toks.push({kind, start:a, end:b}); work=blank(work,a,b); };
+  for(let more=true; more;){ more=false; let m;
+    // the time goes first: in 'a las 9 de la mañana', 'mañana' is part of the time, not tomorrow
+    if(!out.time && (m=work.match(/\s+a\s+las?\s+(\d{1,2})(?:[:.h](\d{2}))?\s*(?:h|hs|horas?)?(?:\s+de\s+la\s+(mañana|tarde|noche))?\s*$/i))){ let h=+m[1]; const mi=m[2]?+m[2]:0; const part=(m[3]||'').toLowerCase();
+      if(part&&part!=='mañana'&&h<12) h+=12; if(h<=23&&mi<=59){ out.time={h, m:mi}; take('time', m.index, m.index+m[0].trimEnd().length); more=true; continue; } }
+    if(!out.priority && (m=work.match(/\s(!{2,3})\s*$/))){ out.priority=m[1].length===3?'high':'mid'; take('pri', m.index, m.index+1+m[1].length); more=true; continue; }
+    if(!out.date){ const d=quickDateMatch(work); if(d){ out.date=d.date; take('date', d.index, d.index+work.substr(d.index,d.len).trimEnd().length); more=true; } } }
+  toks.sort((a,b)=>a.start-b.start); out.title=quickTitle(src, toks); return out; }
+function quickTitle(src, toks){ let t='', last=0; toks.forEach(k=>{ t+=src.slice(last,k.start)+' '; last=k.end; }); return (t+src.slice(last)).replace(/\s+/g,' ').trim(); }
+// R7: the reminder for a written time: on the task's date or, with none, today, or tomorrow when that time has passed. null when it would be in the past.
+function quickReminder(time, date){ if(!time) return null; const at=d=>{ const x=new Date(d+'T00:00:00'); x.setHours(time.h, time.m, 0, 0); return x; };
+  if(date){ const x=at(date); return x.getTime()>Date.now()?x.toISOString():null; }
+  let x=at(todayStr()); if(x.getTime()<=Date.now()) x=at(addDays(todayStr(),1)); return x.toISOString(); }
+// R7: the task a quick-add title describes, over the values chosen by hand (base: date, projectId, priority).
+// A time that has already passed on the written day sets no reminder and stays in the title (late).
+function quickTask(text, base){ base=base||{}; const q=parseQuick(text); let toks=q.tokens, reminder=null, late=false; const date=q.date||base.date||null;
+  if(q.time){ reminder=quickReminder(q.time, date); if(!reminder){ late=true; toks=toks.filter(t=>t.kind!=='time'); } }
+  return {q, toks, title:late?quickTitle(String(text||''), toks):q.title, date:date||(reminder?localDay(reminder):null), projectId:q.projectId||base.projectId||null, priority:q.priority||base.priority||'none', reminder, late}; }
+// R7: a short line with what was read in the title, and why something was not taken
+function quickSaid(r){ const q=r.q, out=[], warn=[];
+  if(q.date) out.push(fmtDate(q.date));
+  if(q.projectId){ const p=proj(q.projectId); if(p) out.push('proyecto '+p.name); }
+  if(q.priority) out.push(q.priority==='high'?'prioridad alta':'prioridad media');
+  if(r.reminder) out.push('recordatorio '+(!q.date?fmtDate(localDay(r.reminder)).toLowerCase()+' ':'')+'a las '+fmtTime(r.reminder));
+  if(q.ambiguous) warn.push(q.ambiguous.tok+' coincide con '+q.ambiguous.names.slice(0,-1).join(', ')+' y '+q.ambiguous.names.slice(-1)+'. No se asigna proyecto.');
+  if(r.late) warn.push('Esa hora ya ha pasado. No se pone recordatorio.');
+  return {out, warn}; }
+// R6: the values a line of a list will get, in short
+function quickMeta(r){ const m=[]; if(r.date) m.push(fmtDate(r.date)); if(r.reminder) m.push(fmtTime(r.reminder)); const p=r.projectId&&proj(r.projectId); if(p) m.push(p.name); if(r.priority!=='none') m.push(r.priority==='high'?'!!!':'!!'); return m.join(', '); }
+// R7: the field with the recognised parts tinted behind its text
+function qinHTML(input){ return '<div class="qin"><div class="qhl" aria-hidden="true"><span></span></div>'+input+'</div>'; }
+function paintQuick(inp, toks){ const hl=inp.parentNode&&inp.parentNode.querySelector('.qhl span'); if(!hl) return; const v=inp.value; let o='', last=0;
+  toks.forEach(t=>{ o+=esc(v.slice(last,t.start))+'<mark>'+esc(v.slice(t.start,t.end))+'</mark>'; last=t.end; }); hl.innerHTML=o+esc(v.slice(last)); syncQuick(inp); }
+function syncQuick(inp){ const hl=inp.parentNode&&inp.parentNode.querySelector('.qhl span'); if(hl) hl.style.transform='translateX('+(-inp.scrollLeft)+'px)'; }
+function bindQuickScroll(inp){ ['scroll','keyup','select','click','focus'].forEach(n=>inp.addEventListener(n,()=>syncQuick(inp))); }
+// R7: Tab in a '#pro' token completes the project; with several matches each Tab moves to the next one
+function completeProjectTag(inp){ const pos=inp.selectionStart, v=inp.value; const m=v.slice(0,pos).match(/(^|\s)#([\p{L}\p{N}_-]*)$/u); if(!m) return false;
+  const tail=v.slice(pos).match(/^[\p{L}\p{N}_-]*/u)[0]; const start=pos-m[2].length; const typed=inp.dataset.tagBase&&inp.dataset.tagAt==String(start)?inp.dataset.tagBase:m[2]+tail;
+  const ps=typed?projectMatches(typed):activeProjects(); if(!ps.length) return false;
+  const word=p=>{ const w=p.name.split(/[^\p{L}\p{N}]+/u).find(x=>norm(x).startsWith(norm(typed))); const one=w&&projectMatches(w); return one&&one.length===1&&one[0].id===p.id?w:p.name.replace(/[^\p{L}\p{N}_-]+/gu,''); };
+  const cur=m[2]+tail; const names=ps.map(word); const i=names.indexOf(cur); const next=names[(i+1)%names.length];
+  inp.value=v.slice(0,start)+next+v.slice(pos+tail.length); const at=start+next.length; inp.setSelectionRange(at,at);
+  inp.dataset.tagBase=typed; inp.dataset.tagAt=String(start); inp.dispatchEvent(new Event('input')); return true; }
+// R6: pasted lines to task titles, without bullets, numbering or check boxes; empty lines dropped
+const LIST_MARK=/^\s*(?:(?:[-*•·◦▪–—+]|\d{1,3}[.)]|[a-zA-Z]\))\s+|\[[ xX]?\]\s*|[☐☑✓✔]\s*)+/;
+const pasteLines = text => String(text||'').split(/\r?\n/).map(l=>l.replace(LIST_MARK,'').replace(/\s+/g,' ').trim()).filter(Boolean);
+// R6: lines of a note that read as pending items: '- ', '* ', '[ ]' or '☐' (a ticked box is left out)
+const NOTE_ITEM=/^\s*(?:[-*•]\s+(?:\[ ?\]\s*)?|\[ ?\]\s*|☐\s*)(?!\[[xX]\])(\S.*)$/;
+const noteItems = notes => String(notes||'').split(/\r?\n/).map(l=>{ const m=l.match(NOTE_ITEM); return m?m[1].replace(LIST_MARK,'').trim():''; }).filter(Boolean);
 const norm = s => String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
 const tint = (hex,a) => { const n=parseInt(String(hex).slice(1),16); return isNaN(n)?'transparent':'rgba('+(n>>16&255)+','+(n>>8&255)+','+(n&255)+','+a+')'; };
 const URL_RE=/(https?:\/\/[^\s<>"']+|www\.[^\s<>"']+)/gi, TEL_RE=/(\+?\d[\d .-]{7,}\d)/g;
@@ -668,7 +784,7 @@ function doneList(projectId){
 }
 
 /* ---------- UI state ---------- */
-const UI = { tab:'tareas', query:'', stack:[], scroll:{}, sumFilter:null, summaryFirst:false, searchDone:false, select:null, projFilter:null, wide:false, deskView:'hoy', deskDetail:null, weekStart:null, addDraft:'', deskScroll:{}, deskKey:null };
+const UI = { tab:'tareas', query:'', stack:[], scroll:{}, sumFilter:null, summaryFirst:false, searchDone:false, select:null, projFilter:null, wide:false, deskView:'hoy', deskDetail:null, weekStart:null, addDraft:'', addPaste:null, convertedNotes:{}, deskScroll:{}, deskKey:null };
 
 /* ---------- Toast with undo ---------- */
 let toastTimer=null, undoFn=null;
@@ -1082,7 +1198,7 @@ function viewDetail(id){
   const pl={high:'Alta',mid:'Media',none:'Ninguna'}[x.priority]||'Ninguna'; const chev=I.chev.replace('<svg','<svg class="chev"'); const links=detailLinks(x.notes);
   return '<header class="nav"><div class="nav-row"><button class="back" data-act="back">'+(UI.wide?'Cerrar':I.back+'Atrás')+'</button><div class="nav-title">Detalles</div><div class="actions"><button class="action" data-act="share" aria-label="Compartir">'+I.share+'</button><button class="action" data-act="menu" aria-label="Más">'+I.more+'</button></div></div></header>'+
    '<div class="scroll">'+
-   '<div class="group"><div class="cell input"><textarea class="titlein" data-role="title" rows="1" placeholder="Título" enterkeyhint="done">'+esc(x.title)+'</textarea></div><div class="cell input"><textarea data-role="notes" placeholder="Notas">'+esc(x.notes)+'</textarea></div>'+(links.length?'<div class="links">'+linksHTML(links)+'</div>':'')+'</div>'+
+   '<div class="group"><div class="cell input"><textarea class="titlein" data-role="title" rows="1" placeholder="Título" enterkeyhint="done">'+esc(x.title)+'</textarea></div><div class="cell input"><textarea data-role="notes" placeholder="Notas">'+esc(x.notes)+'</textarea></div>'+(links.length?'<div class="links">'+linksHTML(links)+'</div>':'')+convertHTML(x)+'</div>'+
    '<div class="group"><button class="cell" data-act="pickProject"><span class="lbl">Proyecto</span><span class="val">'+(p?'<span class="dot" style="background:'+p.color+'"></span>'+esc(p.name):'Ninguno')+'</span>'+chev+'</button>'+
    '<button class="cell" data-act="pickDate"><span class="lbl">Fecha</span><span class="val">'+(x.date?fmtDate(x.date):'Sin fecha')+'</span>'+chev+'</button>'+
    '<button class="cell" data-act="pickReminder"><span class="lbl">Recordatorio</span><span class="val">'+(x.reminder?fmtDateTime(x.reminder):'Ninguno')+'</span>'+chev+'</button>'+
@@ -1092,6 +1208,12 @@ function viewDetail(id){
    '</div>';
 }
 const detailLinks = notes => extractLinks(notes).slice(0,6);
+/* R6: note lines that start with a dash, an asterisk or an empty box can become tasks of the same project. The note keeps its lines;
+   once converted, the link hides until the note changes. */
+function convertHTML(x){ const n=UI.convertedNotes[x.id]===x.notes?0:noteItems(x.notes).length; return n?'<button class="cell link convert" data-act="convertLines">'+I.list.replace('<svg','<svg style="width:18px;height:18px"')+'<span class="lbl">Convertir '+n+(n===1?' línea en tarea':' líneas en tareas')+'</span></button>':''; }
+function convertNoteLines(id){ const x=task(id); if(!x) return; const ls=noteItems(x.notes); if(!ls.length) return;
+  const ids=addMany(ls, {date:null, projectId:x.projectId, priority:'none'}, x.projectId?{}:{spaceId:x.spaceId}); UI.convertedNotes[id]=x.notes; renderAnimated();
+  log('info','Líneas de notas convertidas en tareas', {n:ids.length}); toast(ids.length===1?'1 tarea creada':ids.length+' tareas creadas', ()=>{ removeTasks(ids); delete UI.convertedNotes[id]; }); }
 function linksHTML(links){ return links.map(l=>'<a href="'+esc(l.href)+'"'+(l.href.startsWith('tel:')?'':' target="_blank" rel="noopener"')+'>'+esc(l.label)+'</a>').join(''); }
 function bindDetail(el, id){
   const x=task(id); if(!x) return;
@@ -1113,7 +1235,8 @@ function bindDetail(el, id){
     if(!ls.length){ box.remove(); return; }
     if(!box){ if(!no.isConnected) return; box=document.createElement('div'); box.className='links'; no.closest('.cell').after(box); }
     box.innerHTML=linksHTML(ls); };
-  no.addEventListener('input',()=>{ saveEdit(x,{notes:no.value}); grow(); clearTimeout(lt); lt=setTimeout(refreshLinks, 400); });
+  const refreshConvert=()=>{ const old=$('.convert',el), html=convertHTML(x); if(!no.isConnected) return; if(old&&old.outerHTML===html) return; if(old) old.remove(); if(html) no.closest('.group').insertAdjacentHTML('beforeend', html); };
+  no.addEventListener('input',()=>{ saveEdit(x,{notes:no.value}); grow(); clearTimeout(lt); lt=setTimeout(()=>{ refreshLinks(); refreshConvert(); }, 400); });
   no.addEventListener('blur', flushEdits);
 }
 
@@ -1195,6 +1318,7 @@ function onClick(e){
     case 'toggleSummary': { const fold=!summaryCollapsed(pendingFor('hoy').length); DB.settings.summaryState = fold?'closed':'open'; if(fold) UI.sumFilter=null; UI.summaryFirst=false; save(); render(); break; } // a folded summary hides its figures, so their filter goes too
     case 'toggleDone': DB.settings.doneOpen=!DB.settings.doneOpen; save(); render(); break;
     case 'add': addSheet(act.dataset.project||null); break;
+    case 'convertLines': { const id=detailTaskId(); if(id){ flushEdits(); convertNoteLines(id); } break; }
     case 'spaceMenu': actionSheet('Espacio', DB.spaces.slice().sort((a,b)=>a.order-b.order).map(s=>({label:s.name+(s.id===space().id?'  ✓':''), fn:()=>{ DB.settings.activeSpace=s.id; save(); resetListState();
       if(UI.wide){ UI.deskDetail=null; if(UI.deskView.startsWith('project:')&&UI.deskView!=='project:none') UI.deskView=DB.settings.filter||'hoy'; } // the other space's project and task never stay on screen
       render(); }})).concat([{label:'Nuevo espacio', fn:()=>spaceSheet(null)}])); break;
@@ -1321,7 +1445,7 @@ function bindLongPress(el, fn){ let t=null, x0=0, y0=0, fired=false;
 const sheet=$('#sheet'), scrim=$('#scrim'), asheet=$('#asheet');
 const dimApp = on => app.classList.toggle('sheet-open', !!on);
 let sheetOnClose=null; // one shot, set by the sheet's owner: runs however the sheet closes (a button, the scrim, a drag down, Escape)
-function openSheet(html, onOpen){ sheetOnClose=null; sheet.innerHTML='<div class="handle"></div>'+html; sheet.classList.add('on'); scrim.classList.add('on'); dimApp(true); bindSheetDrag(); onOpen&&onOpen(sheet); }
+function openSheet(html, onOpen){ sheetOnClose=null; sheet.classList.remove('addsheet'); sheet.innerHTML='<div class="handle"></div>'+html; sheet.classList.add('on'); scrim.classList.add('on'); dimApp(true); bindSheetDrag(); onOpen&&onOpen(sheet); }
 function closeSheet(){ sheet.classList.remove('on','drag'); sheet.style.transform=''; asheet.classList.remove('on'); asheet.onclick=null; scrim.classList.remove('on'); dimApp(false); try{ stopRec&&stopRec(); }catch(e){} setTimeout(()=>{ if(!sheet.classList.contains('on')) sheet.innerHTML=''; if(!asheet.classList.contains('on')) asheet.innerHTML=''; },350); const oc=sheetOnClose; sheetOnClose=null; if(oc) oc(); if(staleView) setTimeout(flushStale, 0); } // a closed menu keeps no buttons or handler that a stray click could fire; data reloaded meanwhile is drawn now, unless the caller already redrew
 /* An action menu opened over an open sheet (the Proyecto and Prioridad chips of Nueva tarea) is nested:
    Cancelar, a tap outside or Escape close only the menu and give the sheet back with what was typed */
@@ -1403,44 +1527,93 @@ function projectMenu(id){ const p=proj(id); if(!p) return; const ps=activeProjec
   i>0?[{label:'Subir', fn:()=>moveProject(id,-1)}]:[], i<ps.length-1?[{label:'Bajar', fn:()=>moveProject(id,1)}]:[], [
   {label:'Archivar', red:true, fn:()=>{ p.archived=true; p.modified=new Date().toISOString(); save(); render(); toast('Proyecto archivado', ()=>{p.archived=false; p.modified=new Date().toISOString(); save();}); }} ])); }
 
-/* Quick add */
+/* Quick add (R5). The title field and, glued to the keyboard, a bar of 44 pt icons: Fecha, Proyecto, Prioridad and Añadir.
+   Each icon opens a strip of options above the bar without taking the focus from the field, so the keyboard stays up and Enter keeps adding.
+   What the title says (R7: date, '#proyecto', '!!', 'a las 9') wins over a pick; a value picked by hand stays for the next task.
+   Pasting two or more lines (R6) turns the sheet into a list that Añadir creates in one go. A long press on Añadir adds and opens. */
 function addSheet(projectId){
-  const st={title:'', date:null, projectId:projectId||null, priority:'none', auto:null, manual:false, added:0};
+  const prefill=arguments[1]||'', preset=arguments[2]||{};
+  const st={date:preset.date||null, projectId:projectId||null, priority:'none', open:null, ym:null, lines:null, added:0, msg:'', warn:false};
   // Quick date chips, each a different date: on a Thursday 'Viernes' is tomorrow and on a Sunday 'Próx. semana' is, so they are left out
   const quick=()=>{ const t=todayStr(); return uniqueBy([['hoy',t,'Hoy'],['man',addDays(t,1),'Mañana'],['vie',nextWeekday(5,true),'Viernes'],['nsem',nextWeekday(1,true),'Próx. semana']], q=>q[1]); };
-  const draw=()=>{
-    const p=st.projectId?proj(st.projectId):null; const q=quick(); const custom=st.date&&!q.some(c=>c[1]===st.date);
-    $('#chips',sheet).innerHTML=
-      q.map(c=>'<button class="chip'+(st.date===c[1]?' on':'')+'" data-c="'+c[0]+'">'+I.cal+c[2]+'</button>').join('')+
-      '<button class="chip'+(custom?' on':'')+'" data-c="fecha">'+I.cal+(custom?fmtDate(st.date):'Fecha')+'</button>'+
-      '<button class="chip'+(p?' on':'')+'" data-c="proj">'+(p?'<span class="dot" style="background:'+p.color+'"></span>'+esc(p.name):I.folder.replace('<svg','<svg style="width:14px;height:14px"')+'Proyecto')+'</button>'+
-      '<button class="chip'+(st.priority!=='none'?' on':'')+'" data-c="pri">'+I.flag+(st.priority==='high'?'Alta':st.priority==='mid'?'Media':'Prioridad')+'</button>';
-  };
-  const prefill = arguments[1]||''; const preset = arguments[2]||{}; if(preset.date){ st.date=preset.date; st.manual=true; }
-  openSheet('<h2>Nueva tarea</h2><input class="titlein" placeholder="Qué hay que hacer" autocomplete="off" enterkeyhint="done"><div class="chips" id="chips"></div><div class="hint" id="addHint" style="text-align:left;margin:6px 2px 0">Escribe "mañana", "viernes" o "el 12" al final y se toma como fecha. Enter añade y sigue; Añadir termina.</div><input type="date" id="hiddenDate" min="'+todayStr()+'" style="position:absolute;opacity:0;width:1px;height:1px;left:-10px"><div class="sheet-actions"><button class="btn" data-x="cancel">Cancelar</button><button class="btn primary" data-x="ok">Añadir</button></div><div class="sheet-actions" style="margin-top:10px"><button class="btn" data-x="open" style="height:40px;font-weight:500">Añadir y abrir</button></div>', s=>{
-    const inp=$('.titlein',s), hint=$('#addHint',s); inp.focus(); draw();
-    if(prefill){ inp.value=prefill; setTimeout(()=>inp.dispatchEvent(new Event('input')),0); }
-    // Date words typed at the end of the title set the date chip until the user picks one by hand
-    inp.addEventListener('input',()=>{ const r=parseQuickDate(inp.value); if(r){ if(!st.manual){ st.date=r.date; st.auto=r.match; draw(); } } else if(st.auto){ st.auto=null; if(!st.manual) st.date=null; draw(); } });
-    let lastId=null;
-    const add=()=>{ let t=inp.value.trim(); if(!t) return false; const r=st.auto?parseQuickDate(t):null; if(r&&r.title) t=r.title; lastId=addTask({title:t,date:st.date,projectId:st.projectId,priority:st.priority}).id; st.added++; haptic(8); return t; };
+  const base=()=>({date:st.date, projectId:st.projectId, priority:st.priority});
+  let inp, cur=quickTask('', base()), lastId=null;
+  const strip=()=>{ const k=st.open; if(!k) return ''; const on=(c,v)=>c===v?' on':'';
+    if(k==='date'){ if(st.ym) return calendarHTML(st.ym, cur.date); const q=quick();
+      return q.map(c=>'<button class="chip'+on(cur.date,c[1])+'" data-c="'+c[0]+'">'+c[2]+'</button>').join('')+'<button class="chip'+(cur.date&&!q.some(c=>c[1]===cur.date)?' on':'')+'" data-c="fecha">'+I.cal+(cur.date&&!q.some(c=>c[1]===cur.date)?fmtDate(cur.date):'Otra fecha')+'</button>'+(cur.date?'<button class="chip" data-c="none">Sin fecha</button>':''); }
+    if(k==='proj'){ const ps=activeProjects(); if(!ps.length) return '<button class="chip" disabled>Crea un proyecto en la pestaña Proyectos</button>';
+      return '<button class="chip'+(cur.projectId?'':' on')+'" data-p="">Ninguno</button>'+ps.map(p=>'<button class="chip'+on(cur.projectId,p.id)+'" data-p="'+p.id+'"><span class="dot" style="background:'+p.color+'"></span>'+esc(p.name)+'</button>').join(''); }
+    return [['high','Alta'],['mid','Media'],['none','Ninguna']].map(c=>'<button class="chip'+on(cur.priority,c[0])+'" data-pr="'+c[0]+'">'+I.flag+c[1]+'</button>').join(''); };
+  const tokHTML=(k,label,icon)=>'<span class="tok" data-tok="'+k+'">'+icon+'<span>'+label+'</span><button class="x" data-untok="'+k+'" aria-label="Quitar">×</button></span>';
+  const many=()=>(st.lines||[]).concat(inp&&inp.value.trim()?[inp.value.trim()]:[]);
+  const draw=()=>{ const s=sheet; if(!inp) return;
+    cur=quickTask(inp.value, base()); paintQuick(inp, cur.toks);
+    const p=cur.projectId&&proj(cur.projectId); let t='';
+    if(!st.lines){ if(cur.date) t+=tokHTML('date', fmtDate(cur.date), I.cal);
+      if(cur.reminder) t+=tokHTML('time', fmtTime(cur.reminder), I.bell);
+      if(p) t+=tokHTML('proj', esc(p.name), '<span class="dot" style="background:'+p.color+'"></span>');
+      if(cur.priority!=='none') t+=tokHTML('pri', cur.priority==='high'?'Alta':'Media', I.flag); }
+    else { if(st.date) t+=tokHTML('date', fmtDate(st.date), I.cal); const sp=st.projectId&&proj(st.projectId); if(sp) t+=tokHTML('proj', esc(sp.name), '<span class="dot" style="background:'+sp.color+'"></span>'); if(st.priority!=='none') t+=tokHTML('pri', st.priority==='high'?'Alta':'Media', I.flag); }
+    $('#qtoks',s).innerHTML=t;
+    const said=st.lines?{warn:[]}:quickSaid(cur); const hint=$('#addHint',s); hint.textContent=said.warn.length?said.warn.join(' '):st.msg; hint.classList.toggle('warn', !!said.warn.length);
+    const pl=$('#qlist',s); if(st.lines){ const all=many(); pl.innerHTML='<div class="plhead"><span>'+all.length+(all.length===1?' tarea':' tareas')+'</span><button data-x="unlist">Cancelar</button></div><div class="plist">'+all.map((l,i)=>{ const r=quickTask(l, base()); return '<div class="pl"><span class="t">'+esc(r.title||l)+'</span><span class="m">'+esc(quickMeta(r))+'</span>'+(i<st.lines.length?'<button class="x" data-rm="'+i+'" aria-label="Quitar">×</button>':'<span style="width:44px"></span>')+'</div>'; }).join('')+'</div>'; } else pl.innerHTML='';
+    const sEl=$('#qstrip',s), was=sEl.dataset.k||''; sEl.innerHTML=strip(); sEl.classList.toggle('calon', st.open==='date'&&!!st.ym); sEl.dataset.k=st.open||''; if(st.open&&st.open!==was) chipInView(sEl); // a strip just opened shows its lit option
+    const val={date:st.lines?st.date:cur.date, proj:st.lines?st.projectId:cur.projectId, pri:(st.lines?st.priority:cur.priority)!=='none'};
+    s.querySelectorAll('.qbtn').forEach(b=>{ b.classList.toggle('set', !!val[b.dataset.k]); b.classList.toggle('open', st.open===b.dataset.k); });
+    const n=st.lines?many().length:0; $('.qadd',s).textContent=st.lines?'Crear '+n+(n===1?' tarea':' tareas'):'Añadir'; };
+  // Drops what the title says for one kind, so that a pick (or the cross of its token) is what counts
+  const dropText=kind=>{ const tk=cur.toks.filter(t=>t.kind===kind); if(!tk.length) return false; let v=inp.value; tk.slice().reverse().forEach(t=>{ v=v.slice(0,t.start)+v.slice(t.end); }); inp.value=v.replace(/\s{2,}/g,' ').replace(/^\s+/,''); return true; };
+  openSheet(qinHTML('<input class="titlein" placeholder="Nueva tarea" aria-label="Nueva tarea" autocomplete="off" autocapitalize="sentences" enterkeyhint="done">')+'<div class="qtoks" id="qtoks"></div><div class="qstatus" id="addHint"></div><div id="qlist"></div><div class="qstrip" id="qstrip"></div>'+
+    '<div class="qbar"><button class="qbtn" data-k="date" aria-label="Fecha">'+I.cal+'</button><button class="qbtn" data-k="proj" aria-label="Proyecto">'+I.folder+'</button><button class="qbtn" data-k="pri" aria-label="Prioridad">'+I.flag+'</button><span class="grow"></span><button class="qadd" data-x="ok">Añadir</button></div>', s=>{
+    sheet.classList.add('addsheet'); inp=$('.titlein',s); inp.focus(); bindQuickScroll(inp);
+    inp.addEventListener('input',()=>{ st.msg=''; draw(); });
+    // A pasted list (R6): two or more lines become a list; bullets, numbers and check boxes go
+    inp.addEventListener('paste',e=>{ const txt=e.clipboardData&&e.clipboardData.getData('text'); const ls=pasteLines(txt); if(ls.length<2) return; e.preventDefault(); takeLines(ls); });
+    const takeLines=ls=>{ st.lines=(st.lines||[]).concat(ls); st.open=null; st.ym=null; draw(); };
+    if(prefill){ const ls=pasteLines(prefill); if(ls.length>1) takeLines(ls); else inp.value=ls[0]||''; }
+    draw();
+    const add=()=>{ const r=quickTask(inp.value, base()); if(!r.title) return false;
+      lastId=addTask({title:r.title, date:r.date, projectId:r.projectId, priority:r.priority, reminder:r.reminder}).id; st.added++; haptic(8); return r.title; };
     // The list behind the sheet is drawn once, when the sheet closes (any way it closes), not after every Enter
     sheetOnClose=()=>{ if(st.added) render(); };
     const finish=()=>{ closeSheet(); if(st.added) toast(st.added===1?'Tarea añadida':st.added+' tareas añadidas'); };
-    const ok=()=>{ if(!add()){ inp.focus(); return; } finish(); };
-    const okAndNext=()=>{ const t=add(); if(!t){ finish(); return; } inp.value=''; st.auto=null; if(!st.manual) st.date=null; draw(); hint.textContent=st.added+(st.added===1?' añadida: ':' añadidas. Última: ')+t; inp.focus(); };
+    const createList=()=>{ const ls=many(); if(!ls.length){ st.lines=null; draw(); inp.focus(); return; } const ids=addMany(ls, base()); st.added=0; closeSheet(); renderAnimated();
+      log('info','Tareas creadas desde una lista', {n:ids.length}); toast(ids.length===1?'1 tarea creada':ids.length+' tareas creadas', ()=>removeTasks(ids)); };
+    const ok=()=>{ if(st.lines){ createList(); return; } if(!add()){ if(st.added) finish(); else inp.focus(); return; } finish(); };
+    const okAndNext=()=>{ if(st.lines){ const v=inp.value.trim(); if(v){ st.lines.push(v); inp.value=''; draw(); } inp.focus(); return; }
+      const t=add(); if(!t){ finish(); return; } inp.value=''; st.open=null; st.ym=null; st.msg=st.added+(st.added===1?' añadida: ':' añadidas. Última: ')+t; draw(); inp.focus(); };
+    const addOpen=()=>{ if(st.lines){ createList(); return; } if(!add()){ inp.focus(); return; } finish(); openDetail(lastId); };
     inp.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); okAndNext(); } });
-    s.onclick=e=>{ const b=e.target.closest('[data-x]'); if(b){ if(b.dataset.x==='open'){ if(!add()){ inp.focus(); return; } finish(); openDetail(lastId); } else b.dataset.x==='ok'?ok():finish(); return; }
-      const c=e.target.closest('[data-c]'); if(!c) return; const k=c.dataset.c; const qc=quick().find(q=>q[0]===k); if(qc||k==='fecha'){ st.manual=true; st.auto=null; }
-      if(qc) st.date = st.date===qc[1]?null:qc[1]; // a second tap on the lit chip clears the date
-      else if(k==='fecha'){ const d=$('#hiddenDate',s); d.value=st.date||todayStr(); d.onchange=()=>{ if(d.value&&d.value<todayStr()) return; st.date=d.value||null; draw(); }; try{ d.showPicker?d.showPicker():d.click(); }catch(e){ d.click(); } return; }
-      else if(k==='proj'){ const ps=activeProjects(); if(!ps.length){ toast('Crea un proyecto en la pestaña Proyectos'); return; } actionSheet('Proyecto', [{label:'Ninguno', fn:()=>{st.projectId=null; reopen();}}].concat(ps.map(p=>({label:p.name, fn:()=>{st.projectId=p.id; reopen();}}))), ()=>inp.focus()); return; }
-      else if(k==='pri'){ actionSheet('Prioridad',[{label:'Alta',fn:()=>{st.priority='high';reopen();}},{label:'Media',fn:()=>{st.priority='mid';reopen();}},{label:'Ninguna',fn:()=>{st.priority='none';reopen();}}], ()=>inp.focus()); return; }
-      draw();
-    };
-    const reopen=()=>{ st.title=inp.value; sheet.classList.add('on'); scrim.classList.add('on'); dimApp(true); draw(); inp.focus(); }; // focus inside the tap: iOS brings the keyboard back
+    // Buttons never take the focus from the field: the keyboard stays where it is (and each handler focuses it again inside the tap)
+    s.addEventListener('mousedown',e=>{ if(e.target.closest('button')) e.preventDefault(); });
+    // Añadir y abrir: a long press on Añadir
+    const ab=$('.qadd',s); let lpT=null, lpDone=false, lpX=0, lpY=0;
+    ab.addEventListener('pointerdown',e=>{ lpDone=false; lpX=e.clientX; lpY=e.clientY; clearTimeout(lpT); lpT=setTimeout(()=>{ lpDone=true; haptic(12); swallowClick(); addOpen(); },500); });
+    ab.addEventListener('pointermove',e=>{ if(Math.abs(e.clientX-lpX)>10||Math.abs(e.clientY-lpY)>10) clearTimeout(lpT); });
+    ['pointerup','pointercancel','pointerleave'].forEach(n=>ab.addEventListener(n,()=>clearTimeout(lpT)));
+    ab.addEventListener('contextmenu',e=>e.preventDefault());
+    // The sheet is gone when the finger lifts: the click that follows a long press must not reach what was under the button (the tab bar)
+    ab.addEventListener('touchend',e=>{ if(lpDone) e.preventDefault(); });
+    s.onclick=e=>{ const x=e.target.closest('[data-x]');
+      if(x){ const k=x.dataset.x; if(k==='ok'){ if(lpDone){ lpDone=false; return; } ok(); } else if(k==='unlist'){ st.lines=null; draw(); inp.focus(); } return; }
+      const rm=e.target.closest('[data-rm]'); if(rm){ st.lines.splice(+rm.dataset.rm,1); if(!st.lines.length) st.lines=null; draw(); inp.focus(); return; }
+      const un=e.target.closest('[data-untok]'); if(un){ const k=un.dataset.untok; if(!dropText(k)){ if(k==='date') st.date=null; else if(k==='proj') st.projectId=null; else if(k==='pri') st.priority='none'; } haptic(4); draw(); inp.focus(); return; }
+      const qb=e.target.closest('.qbtn'); if(qb){ st.open=st.open===qb.dataset.k?null:qb.dataset.k; st.ym=null; draw(); inp.focus(); return; }
+      const nav=e.target.closest('[data-cal]'); if(nav){ st.ym=shiftMonth(st.ym,+nav.dataset.cal); draw(); inp.focus(); return; }
+      const d=e.target.closest('[data-d]'); if(d){ dropText('date'); st.date=d.dataset.d; st.open=null; st.ym=null; haptic(4); draw(); inp.focus(); return; }
+      const c=e.target.closest('[data-c]'); if(c){ const k=c.dataset.c; if(k==='fecha'){ st.ym=(cur.date||todayStr()).slice(0,7); draw(); inp.focus(); return; }
+        const qc=quick().find(q=>q[0]===k); const was=cur.date; dropText('date'); st.date= k==='none'||(qc&&was===qc[1]) ? null : qc[1]; // a second tap on the lit chip clears the date
+        st.open=null; haptic(4); draw(); inp.focus(); return; }
+      const pj=e.target.closest('[data-p]'); if(pj){ dropText('proj'); st.projectId=pj.dataset.p||null; st.open=null; haptic(4); draw(); inp.focus(); return; }
+      const pr=e.target.closest('[data-pr]'); if(pr){ dropText('pri'); st.priority=pr.dataset.pr; st.open=null; haptic(4); draw(); inp.focus(); return; }
+      if(!e.target.closest('input')) inp.focus(); };
   });
 }
+// After a long press that closed what was under the finger, the click the browser may still send is dropped
+function swallowClick(){ const f=e=>{ e.stopPropagation(); e.preventDefault(); off(); }; const off=()=>{ document.removeEventListener('click', f, true); clearTimeout(t); }; document.addEventListener('click', f, true); const t=setTimeout(off, 1000); }
+// R6: several tasks at once (a pasted list, the items of a note). Each line is read as a quick-add title over the shared values.
+function addMany(lines, base, extra){ const ids=[]; batch(()=>{ lines.forEach(l=>{ const r=quickTask(l, base); if(!r.title) return; ids.push(addTask(Object.assign({title:r.title, date:r.date, projectId:r.projectId, priority:r.priority, reminder:r.reminder}, extra||{})).id); }); }); haptic(8); return ids; }
+function removeTasks(ids){ const set=new Set(ids); DB.tasks=DB.tasks.filter(x=>!set.has(x.id)); DB.voiceNotes=DB.voiceNotes.filter(v=>!set.has(v.taskId)); save(); }
 /* New or edited project */
 function projectSheet(id){
   const p=id?proj(id):null; let color=p?p.color:COLORS[4];
@@ -1700,7 +1873,7 @@ if(DB.settings.shakeUndo){ armShake(); // iOS asks again per launch: re-request 
   if(typeof DeviceMotionEvent!=='undefined' && typeof DeviceMotionEvent.requestPermission==='function'){ const once=()=>{ document.removeEventListener('touchend', once); DeviceMotionEvent.requestPermission().catch(()=>{}); }; document.addEventListener('touchend', once); } }
 
 /* Keyboard: reposition sheets */
-if(window.visualViewport){ const vv=window.visualViewport; const f=()=>{ const kb=Math.max(0, innerHeight - vv.height - vv.offsetTop); document.documentElement.style.setProperty('--kb', kb+'px'); }; vv.addEventListener('resize',f); vv.addEventListener('scroll',f); }
+if(window.visualViewport){ const vv=window.visualViewport; const f=()=>{ const kb=Math.max(0, innerHeight - vv.height - vv.offsetTop); document.documentElement.style.setProperty('--kb', kb+'px'); document.documentElement.classList.toggle('kbon', kb>40); }; vv.addEventListener('resize',f); vv.addEventListener('scroll',f); }
 document.addEventListener('gesturestart',e=>e.preventDefault());
 document.addEventListener('touchmove',e=>{ if(e.touches.length>1) e.preventDefault(); },{passive:false});
 
@@ -1817,7 +1990,12 @@ function deskSide(){
     '<button class="it add" data-act="newProject">'+I.plus+'<span>Nuevo proyecto</span></button>'+
     '<div class="grow"></div>'+it('settings',I.gear,'Ajustes',undefined,v==='settings')+'</aside>';
 }
-function addBarHTML(projectId){ return '<div class="addbar">'+I.plus+'<input type="text" placeholder="Nueva tarea… escribe la fecha al final: mañana, viernes, el 12" data-role="addbar"'+(projectId?' data-project="'+projectId+'"':'')+' value="'+esc(UI.addDraft||'')+'" autocomplete="off"><span class="kbd">N</span></div>'; }
+function addBarHTML(projectId){ return '<div class="addbar">'+I.plus+qinHTML('<input type="text" placeholder="Nueva tarea… mañana, a las 9, !! o #proyecto" data-role="addbar"'+(projectId?' data-project="'+projectId+'"':'')+' value="'+esc(UI.addDraft||'')+'" autocomplete="off" spellcheck="false">')+'<span class="kbd">N</span></div><div class="addhint" id="deskSaid"></div>'+pasteBoxHTML(projectId); }
+// The desktop add bar starts from today in Hoy and from the project in a project view; the title can say otherwise (R7)
+function deskAddBase(projectId){ return {date:UI.deskView==='hoy'?todayStr():null, projectId:projectId||null, priority:'none'}; }
+// R6: a list pasted into the desktop add bar waits under it until it is created or dropped
+function pasteBoxHTML(projectId){ const ls=UI.addPaste; if(!ls||!ls.length) return ''; const b=deskAddBase(projectId); const n=ls.length+' '+(ls.length===1?'tarea':'tareas');
+  return '<div class="pastebox"><div class="plhead"><span>'+n+'</span></div><div class="plist">'+ls.map((l,i)=>{ const r=quickTask(l,b); return '<div class="pl"><span class="t">'+esc(r.title||l)+'</span><span class="m">'+esc(quickMeta(r))+'</span><button class="x" data-paste-rm="'+i+'" aria-label="Quitar">×</button></div>'; }).join('')+'</div><div class="sheet-actions"><button class="btn" data-paste="cancel">Cancelar</button><span style="flex:1"></span><button class="btn primary" data-paste="ok">Crear '+n+'</button></div></div>'; }
 // The project filter chips of the desktop lists and week (the same filter as the iPhone list)
 function pchipsHTML(){ return activeProjects().length?'<div class="pchips">'+activeProjects().map(p=>'<button class="chip'+(UI.projFilter===p.id?' on':'')+'" data-pf="'+p.id+'"'+(UI.projFilter===p.id?' style="background:'+p.color+'"':'')+'><span class="dot" style="background:'+(UI.projFilter===p.id?'#fff':p.color)+'"></span>'+esc(p.name)+'</button>').join('')+'<button class="chip'+(UI.projFilter==='none'?' on':'')+'" data-pf="none"><span class="dot" style="background:'+(UI.projFilter==='none'?'#fff':'var(--ink3)')+'"></span>Sin proyecto</button></div>':''; }
 function deskMain(){
@@ -1871,8 +2049,25 @@ function deskResults(d){ const ob=d.querySelector('.main .mbody'), oi=ob&&ob.que
   oi.replaceWith(ni); armRows(ob); const sb=bar.querySelector('.search'); [...bar.children].forEach(c=>{ if(c!==sb) c.remove(); }); [...nbar.children].forEach(c=>{ if(!c.querySelector('[data-role=search]')) bar.appendChild(c); });
   bindAddBar(d); const pc=ni.querySelector('.pchips'); if(pc) chipInView(pc); return true; }
 function bindAddBar(d){
-  const ab=$('[data-role=addbar]',d); if(ab){ ab.addEventListener('input',()=>{ UI.addDraft=ab.value; }); // a render keeps the half-typed task
-    ab.addEventListener('keydown',e=>{ if(e.key!=='Enter') return; e.preventDefault(); let t=ab.value.trim(); if(!t) return; const r=parseQuickDate(t); let date=null; if(r){ t=r.title; date=r.date; } else if(UI.deskView==='hoy') date=todayStr(); const x=addTask({title:t, date, projectId:ab.dataset.project||null}); UI.addDraft=''; haptic(6); renderAnimated(); toast('Añadida: '+x.title); const n=$('#desk [data-role=addbar]'); if(n) n.focus(); }); } }
+  const ab=$('[data-role=addbar]',d); if(!ab) return; const said=$('#deskSaid',d); const base=()=>deskAddBase(ab.dataset.project);
+  const refocus=()=>{ const n=$('#desk [data-role=addbar]'); if(n){ n.focus(); const l=n.value.length; n.setSelectionRange(l,l); } };
+  // R7: the recognised parts are tinted in the field and spelled out under it
+  const upd=()=>{ const r=quickTask(ab.value, base()); paintQuick(ab, r.toks); const q=quickSaid(r);
+    if(said) said.innerHTML=(q.out.length?'Entendido: <b>'+esc(q.out.join(', '))+'</b>'+(q.warn.length?'. ':''):'')+(q.warn.length?'<span class="warn">'+esc(q.warn.join(' '))+'</span>':''); return r; };
+  bindQuickScroll(ab); upd();
+  ab.addEventListener('input',()=>{ UI.addDraft=ab.value; upd(); }); // a render keeps the half-typed task
+  ab.addEventListener('paste',e=>{ const ls=pasteLines(e.clipboardData&&e.clipboardData.getData('text')); if(ls.length<2) return; e.preventDefault(); UI.addPaste=(UI.addPaste||[]).concat(ls); render(); refocus(); });
+  ab.addEventListener('keydown',e=>{
+    if(e.key==='Tab'&&!e.shiftKey&&!e.metaKey&&!e.ctrlKey&&!e.altKey){ if(completeProjectTag(ab)) e.preventDefault(); return; }
+    if(e.key!=='Shift') delete ab.dataset.tagBase;
+    if(e.key!=='Enter') return; e.preventDefault();
+    if(UI.addPaste){ const v=ab.value.trim(); if(v){ UI.addPaste.push(v); UI.addDraft=''; render(); refocus(); } return; } // with a pasted list waiting, Enter adds a line to it
+    const r=upd(); if(!r.title) return;
+    const x=addTask({title:r.title, date:r.date, projectId:r.projectId, priority:r.priority, reminder:r.reminder}); UI.addDraft=''; haptic(6); renderAnimated(); toast('Añadida: '+x.title); refocus(); });
+  const pb=$('.pastebox',d); if(pb) pb.addEventListener('click',e=>{ const rm=e.target.closest('[data-paste-rm]'); if(rm){ UI.addPaste.splice(+rm.dataset.pasteRm,1); if(!UI.addPaste.length) UI.addPaste=null; render(); refocus(); return; }
+    const b=e.target.closest('[data-paste]'); if(!b) return; if(b.dataset.paste==='cancel'){ UI.addPaste=null; render(); refocus(); return; }
+    const ls=UI.addPaste.slice(); UI.addPaste=null; const ids=addMany(ls, base()); renderAnimated(); log('info','Tareas creadas desde una lista', {n:ids.length}); toast(ids.length===1?'1 tarea creada':ids.length+' tareas creadas', ()=>removeTasks(ids)); refocus(); });
+}
 function bindDeskEvents(d){
   // Right click opens the row menu, and on a sidebar project the project menu (the iPhone long press)
   d.addEventListener('contextmenu', e=>{ const pj=e.target.closest('.side [data-view^="project:"]'); if(pj){ e.preventDefault(); if(pj.dataset.view!=='project:none') projectMenu(pj.dataset.view.slice(8)); return; }

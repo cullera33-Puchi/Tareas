@@ -1,5 +1,39 @@
 # Registro de cambios
 
+## v0.14.5. Animaciones con el ritmo de iOS (1 de noviembre de 2026)
+
+- Las animaciones iban demasiado rápidas. Ahora usan las duraciones de iOS con la misma curva de frenado:
+  - Hojas inferiores, como Fecha, Recordatorio o Nota de voz, y entrar en una pantalla o volver atrás: medio segundo, antes 0,35.
+  - Menús inferiores: 0,45 segundos, antes 0,3.
+  - Oscurecido del fondo: 0,45 segundos.
+  - Cambio de pestaña al deslizar, filas que vuelven a su sitio y reordenación de la lista: 0,4 segundos.
+  - Aviso de Deshacer: 0,4 segundos.
+- La pantalla de detrás se encoge al mismo ritmo que sube la hoja.
+- Con «Reducir movimiento» activado siguen siendo fundidos cortos.
+
+## v0.14.4. Editar y eliminar notas de voz (1 de noviembre de 2026)
+
+- En el detalle de una tarea, cada nota de voz se desliza como una fila. A la izquierda aparece Eliminar y se queda ahí; al tocarlo, la nota se borra con Deshacer durante 4 segundos.
+- A la derecha aparece Editar; un deslizamiento largo la abre directamente. La hoja «Editar nota» trae el texto para corregirlo, y «Volver a dictar» lo borra y deja el campo listo para dictar otra vez con el micrófono del teclado. Guardar ofrece Deshacer.
+- En escritorio, un clic sobre la nota ofrece Editar nota y Eliminar nota.
+- Modelo de datos: la nota de voz añade el campo `modified`, que se rellena al editarla. La nota muestra «editada» junto a la hora, y al importar una copia gana la versión editada más reciente. Acordado con Enric.
+
+## v0.14.3. Botones de las hojas visibles con el teclado (1 de noviembre de 2026)
+
+- En el iPhone, con el teclado abierto, la barra flotante del teclado tapaba Descartar y Guardar en la nota de voz. Las hojas con campo de texto (nota de voz, nueva tarea, proyecto, espacio e importar texto) llevan ahora las acciones en la cabecera, como en iOS: Cancelar o Descartar a la izquierda, el título en el centro y Guardar, Crear o Añadir a la derecha.
+- Con el teclado abierto, la hoja deja sitio abajo para la barra del teclado, así el texto escrito no queda debajo.
+- El registro mostró que el iPhone reduce toda la ventana al abrir el teclado y avisa tarde. La hoja ya no sube a la parte superior en ese caso, y la decisión se toma 1,2 segundos después de enfocar el campo, cuando el teclado ya está colocado. El registro anota las medidas en las cuatro primeras aperturas.
+
+## v0.14.2. Hojas tapadas por el teclado (1 de noviembre de 2026)
+
+- En el iPhone, al escribir en una hoja (nota de voz, nueva tarea, nombre de proyecto), la hoja podía quedarse detrás del teclado: el sistema no informaba a la app instalada de que el teclado había salido. Si medio segundo después de enfocar el campo no se ha detectado el teclado, la hoja pasa a la parte superior de la pantalla. Si el teclado se detecta, todo sigue igual.
+- El registro anota una vez por arranque las medidas de pantalla al abrir el teclado, para afinarlo con datos del dispositivo.
+
+## v0.14.1. Hojas que se cerraban solas en el iPhone (1 de noviembre de 2026)
+
+- En el detalle de una tarea, la hoja de Fecha podía abrirse y cerrarse al instante y el menú de Proyecto aparecía de golpe. Durante el primer medio segundo tras abrir una hoja o un menú, un toque en el fondo, en un día del calendario o en una opción del menú ya no cuenta: así un toque repetido no cierra la hoja ni elige algo por error.
+- Diagnóstico: si una hoja se cierra en menos de 0,8 segundos, el registro de Ajustes anota desde dónde se cerró.
+
 ## v0.14.0. Revisión completa de móvil y escritorio (1 de noviembre de 2026)
 
 Revisión con 107 hallazgos: 83 confirmados por dos verificadores independientes y 24 confirmados al corregirlos. Corregidos 98, dos ya quedaban resueltos por otra corrección, tres son parciales y cuatro esperan decisión de Enric (al final). Cada corrección se reprodujo antes y después, y la batería de 18 pruebas pasa entera.

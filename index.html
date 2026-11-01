@@ -177,7 +177,7 @@ body.desktop .toast{left:auto;right:28px;bottom:28px;width:360px;}
 .summary{background:var(--card);border-radius:12px;padding:12px 16px 12px;margin:8px 0 12px;}
 .summary-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
 .summary-head h3{margin:0;font-size:0.882rem;font-weight:600;color:var(--ink2);}
-.summary-head button{color:var(--ink3);width:28px;height:28px;display:flex;align-items:center;justify-content:center;}
+.summary-head button{color:var(--ink3);width:44px;height:44px;margin:-8px -12px -8px 0;display:flex;align-items:center;justify-content:center;} /* 44 pt to the finger (R2), drawn as before: the negative margin keeps the head's height */
 .summary-head svg{width:14px;height:14px;transition:transform .25s;}
 .summary.collapsed .summary-head svg{transform:rotate(-90deg);}
 .summary.collapsed .summary-body{display:none;}
@@ -243,7 +243,13 @@ body.desktop .toast{left:auto;right:28px;bottom:28px;width:360px;}
 .enter{opacity:0;}
 .row-content:active{background:var(--press);}
 .first .row-content{padding:8px 0;min-height:44px;}
-.check{flex:none;width:22px;height:22px;border-radius:50%;border:1.5px solid var(--ink3);display:flex;align-items:center;justify-content:center;transition:background .2s,border-color .2s,transform .15s;}
+.check{flex:none;position:relative;width:22px;height:22px;border-radius:50%;border:1.5px solid var(--ink3);display:flex;align-items:center;justify-content:center;transition:background .2s,border-color .2s,transform .15s;}
+/* R2: the circle is drawn at 22 pt but takes the finger over 44 by 44 pt (Apple's minimum); a tap there completes instead of opening the detail */
+.check::after,.selbox::after{content:"";position:absolute;left:50%;top:50%;width:44px;height:44px;margin:-22px 0 0 -22px;}
+.wcard .check::after{display:none;} /* desktop week cards: mouse only, and the area would cover the title */
+.first .row{overflow:visible;} /* "Lo primero" rows have no swipe background to clip, and their circle's area reaches into the card's padding */
+/* R1: a row just marked stays where it is, dimmed, until the marks settle (flushHeld) */
+.row.held .row-text,.row.held .inds,.row.held .pri{opacity:.4;transition:opacity .2s;}
 .check:active{transform:scale(.88);}
 .check.done{background:var(--pc,var(--blue));border-color:var(--pc,var(--blue));}
 .check.done.just{animation:pop .32s cubic-bezier(.34,1.56,.64,1);}
@@ -253,16 +259,21 @@ body.desktop .toast{left:auto;right:28px;bottom:28px;width:360px;}
 .row-text{flex:1;min-width:0;}
 .row-title{font-size:1rem;line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-word;}
 .row.done .row-title{color:var(--ink2);text-decoration:line-through;}
+.row.done.byday .row-title{text-decoration:none;} /* R3: the Completadas day groups already say they are done */
 .row-meta{display:block;font-size:0.765rem;color:var(--ink2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .row-meta .dot{display:inline-block;width:8px;height:8px;border-radius:50%;vertical-align:middle;margin-right:5px;position:relative;top:-1px;}
 .row-meta .sep{color:var(--ink3);margin:0 6px;}
-.tag{display:inline-block;padding:1px 7px;border-radius:6px;font-size:0.706rem;font-weight:500;color:var(--pc);background:var(--tagbg);vertical-align:1px;max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-@supports (color: color-mix(in srgb, red, blue)){ .tag{background:color-mix(in srgb, var(--pc) 15%, transparent);} :root[data-theme="dark"] .tag{background:color-mix(in srgb, var(--pc) 24%, transparent);} @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .tag{background:color-mix(in srgb, var(--pc) 24%, transparent);} } }
+.tag{display:inline-block;padding:1px 7px;border-radius:6px;font-size:0.706rem;font-weight:500;color:var(--tagl,var(--pc));background:var(--tagbg);vertical-align:1px;max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+/* R3: text and background colours of a project capsule come from tagVars, above 4.4:1 in both themes */
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .tag{color:var(--tagd,var(--pc));background:var(--tagbgd,var(--tagbg));} }
+:root[data-theme="dark"] .tag{color:var(--tagd,var(--pc));background:var(--tagbgd,var(--tagbg));}
 .row-meta .over{color:var(--red);}
 .row-meta .bell{display:inline-flex;align-items:center;gap:3px;}
 .row-meta .bell svg{width:11px;height:11px;vertical-align:-1px;}
-.row-meta .ind{display:inline-block;margin-right:4px;color:var(--ink3);}
-.row-meta .ind svg{width:12px;height:12px;vertical-align:-2px;}
+.row-meta .carried{color:var(--orange);font-weight:500;}
+/* R3: the notes and voice indicators sit on the right, next to the priority */
+.inds{flex:none;display:flex;align-items:center;gap:5px;color:var(--ink3);}
+.inds svg{width:14px;height:14px;display:block;}
 .pri{flex:none;font-weight:700;font-size:1rem;min-width:14px;text-align:center;letter-spacing:-1px;}
 .pri.high{color:var(--red);}
 .pri.mid{color:var(--orange);}
@@ -308,7 +319,7 @@ body.desktop .toast{left:auto;right:28px;bottom:28px;width:360px;}
 .closeday{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:10px;padding:10px 0 2px;border-top:.5px solid var(--sep);color:var(--blue);font-weight:600;font-size:0.882rem;}
 .closeday svg{width:16px;height:16px;}
 .seg.mini button{height:24px;font-size:0.706rem;}
-.selbox{flex:none;width:22px;height:22px;border-radius:50%;border:1.5px solid var(--ink3);display:flex;align-items:center;justify-content:center;transition:background .15s,border-color .15s;}
+.selbox{flex:none;position:relative;width:22px;height:22px;border-radius:50%;border:1.5px solid var(--ink3);display:flex;align-items:center;justify-content:center;transition:background .15s,border-color .15s;}
 .selbox svg{width:12px;height:12px;color:#fff;opacity:0;}
 .row.selected .selbox{background:var(--blue);border-color:var(--blue);}
 .row.selected .selbox svg{opacity:1;}
@@ -407,6 +418,7 @@ body.desktop .toast{left:auto;right:28px;bottom:28px;width:360px;}
 
 /* Detail */
 .detail .scroll{padding-top:4px;}
+.screen.pushed-screen.detail{touch-action:pan-y;} /* R4: a sideways move anywhere in the detail is the back swipe's */
 .project .scroll{padding-top:12px;}
 .detail .titlein{width:100%;font-size:max(16px,1rem);font-weight:600;background:none;border:0;outline:0;padding:0;resize:none;overflow:hidden;line-height:1.3;display:block;min-height:22px;}
 .detail textarea{width:100%;min-height:72px;background:none;border:0;outline:0;resize:none;padding:0;line-height:1.4;overflow:hidden;display:block;}
@@ -679,12 +691,38 @@ function updTask(id, patch){ const x=task(id); if(!x) return; if('date' in patch
    Runs at start and whenever the app comes back to the foreground (the day may have changed). */
 // It leaves 'modified' alone: every device repeats it, so it must not beat a real edit in an import ('newer wins').
 function rollOver(){ const t=todayStr(); let n=0; if(DB.settings.summaryDay!==t){ DB.settings.summaryDay=t; UI.summaryFirst=true; save(); } DB.tasks.forEach(x=>{ if(x.status==='pending'&&x.date&&x.date<t){ x.date=t; x.carried=true; n++; } }); if(n) save(); return n; }
+// The data side of completing or reopening, with no feedback
+function applyDone(id, done){ const x=task(id); if(!x||(x.status==='done')===done) return;
+  if(done) updTask(id,{status:'done', completed:new Date().toISOString()});
+  else { const t=todayStr(); updTask(id, x.date&&x.date<t ? {status:'pending', completed:null, date:t, carried:true} : {status:'pending', completed:null}); } } // a reopened task never comes back overdue (decision 8.5)
 function completeTask(id, silent){
   const x=task(id); if(!x) return;
-  const was = x.status;
-  if(was==='pending'){ updTask(id,{status:'done', completed:new Date().toISOString()}); haptic(12); if(!silent) toast('Tarea completada', ()=>updTask(id,{status:'pending', completed:null})); }
-  else { const t=todayStr(); updTask(id, x.date&&x.date<t ? {status:'pending', completed:null, date:t, carried:true} : {status:'pending', completed:null}); haptic(8); } // a reopened task never comes back overdue (decision 8.5)
+  const was = x.status; applyDone(id, was==='pending');
+  if(was==='pending'){ haptic(12); if(!silent) toast('Tarea completada', ()=>updTask(id,{status:'pending', completed:null})); }
+  else haptic(8);
 }
+/* R1: the circle and the swipe to the right mark a row and leave it where it is, dimmed, for HOLD_MS.
+   Each new mark restarts the wait, so several can be marked in a row without the list moving under the finger;
+   then all of them leave together, with one toast and one Deshacer. A second tap on a marked row (or a swipe) unmarks it.
+   HELD maps a task to the state it is about to take (true: done, false: pending again); rowHTML draws it so,
+   whatever renders meanwhile, and the data changes only when the marks settle (flushHeld). */
+const HELD=new Map(), HOLD_MS=1500; let heldT=null;
+function holdRows(id){ const x=task(id), on=HELD.has(id), d=on?HELD.get(id):!!x&&x.status==='done';
+  document.querySelectorAll('.row[data-id="'+id+'"]').forEach(r=>{ r.classList.toggle('held', on); const c=r.querySelector('.check'); if(!c) return; c.classList.toggle('done', d); c.classList.toggle('just', on&&d); }); }
+function toggleHold(id){ const x=task(id); if(!x) return;
+  if(HELD.has(id)){ HELD.delete(id); haptic(6); } else { HELD.set(id, x.status!=='done'); haptic(x.status==='done'?8:12); }
+  holdRows(id); clearTimeout(heldT); heldT=HELD.size?setTimeout(()=>flushHeld(false), HOLD_MS):null; }
+// Another action on a marked task (postpone, delete, the row menu) takes it out of the marks first
+function releaseHold(id){ if(!HELD.has(id)) return; HELD.delete(id); holdRows(id); if(!HELD.size){ clearTimeout(heldT); heldT=null; } }
+// quiet: the app is going to the background or another mode starts; the data is saved at once and drawn without the exit
+function flushHeld(quiet){ clearTimeout(heldT); heldT=null; if(!HELD.size) return;
+  const items=[...HELD].filter(([id,d])=>{ const x=task(id); return x&&(x.status==='done')!==d; }); HELD.clear();
+  if(items.length){ const prev=items.map(([id])=>{ const x=task(id); return {id, status:x.status, completed:x.completed, date:x.date, carried:x.carried}; });
+    batch(()=>items.forEach(([id,d])=>applyDone(id,d)));
+    const n=items.filter(([,d])=>d).length; // reopened tasks are drawn back without a toast, as before
+    if(n) toast(n===1?'Tarea completada':n+' tareas completadas', ()=>batch(()=>prev.forEach(o=>{ if(task(o.id)) updTask(o.id,{status:o.status, completed:o.completed, date:o.date, carried:o.carried}); }))); }
+  if(quiet||!items.length){ render(); return; }
+  items.forEach(([id])=>leaveRows(id)); setTimeout(renderAnimated, 240); }
 function rescheduleTask(id, date, label){ const x=task(id); if(!x) return; const old=x.date, oldC=x.carried; updTask(id,{date}); haptic(10); toast('Aplazada a '+label, ()=>updTask(id,{date:old, carried:oldC})); } // undo gives back the Aplazadas mark too
 function tomorrowTask(id){ const x=task(id); if(!x) return; const old=x.date, oldC=x.carried; updTask(id,{date:addDays(todayStr(),1)}); haptic(10); toast('Aplazada a mañana', ()=>updTask(id,{date:old, carried:oldC})); }
 function deleteTask(id){
@@ -718,6 +756,7 @@ const RM=matchMedia('(prefers-reduced-motion: reduce)'); // Reduce Motion: trans
    The gesture's end runs the pending render (dragEnd(true)) or leaves it to its own timer (dragEnd(false)). */
 let touchDrag=false, renderPending=false, renderPendingFlip=false;
 const EDGE=28; // px from the left edge of a pushed screen that belong to the back swipe, never to a row
+const FLICK=0.4; // px/ms: a release this fast counts as a flick (R4), the same speed the tab swipe takes
 function dragStart(){ touchDrag=true; }
 function dragEnd(flush){ touchDrag=false; if(flush&&renderPending){ if(renderPendingFlip) renderAnimated(); else render(); } }
 window.addEventListener('touchstart',e=>{ if(e.touches.length===1) touchDrag=false; },{capture:true,passive:true}); // safety net: a new single touch means no drag is still running
@@ -873,7 +912,7 @@ $('#selbar').addEventListener('click', e=>{ const b=e.target.closest('[data-act]
   }
   const end=e=>{ const was=mode; mode=null;
     if(was==='swipe'){ const ct=e.type==='touchend'&&e.changedTouches[0]; const dx=ct?ct.clientX-x0:0; const d=dir===1?Math.min(0,dx):Math.max(0,dx);
-      finish(!!ct && (Math.abs(d)>w/3 || (Math.abs(vx)>0.4 && Math.sign(vx)===-dir && Math.abs(d)>20))); // a cancelled touch never switches tab
+      finish(!!ct && (Math.abs(d)>w/3 || (Math.abs(vx)>FLICK && Math.sign(vx)===-dir && Math.abs(d)>20))); // a cancelled touch never switches tab
       if(!e.touches.length) dragEnd(false); } // the 320 ms timer renders
     if(!e.touches.length&&touchDrag) dragEnd(true); // the last finger is up: nothing may keep render() waiting
   };
@@ -884,20 +923,40 @@ function typingIn(scr){ const ae=document.activeElement; return !!scr && !!ae &&
 function bindScroll(scr){ const sc=scr.querySelector('.scroll'), nav=scr.querySelector('.nav'); if(!sc||!nav) return; const f=()=>nav.classList.toggle('compact', sc.scrollTop>36); sc.addEventListener('scroll',f,{passive:true}); f(); }
 
 /* ---------- Tasks view ---------- */
+/* R3: a project capsule keeps the stored colour but its text is made readable, above 4.4:1 on its own background:
+   in the light theme the colour is mixed with black, in the dark theme the system's dark variant is used (lightened if still short) */
+const TAG_DARK={'#FF3B30':'#FF453A','#FF9500':'#FF9F0A','#FFCC00':'#FFD60A','#34C759':'#30D158','#007AFF':'#0A84FF','#5856D6':'#5E5CE6','#AF52DE':'#BF5AF2','#A2845E':'#AC8E68'};
+const tagCache=new Map();
+function tagVars(c){ let v=tagCache.get(c); if(v) return v;
+  const rgb=h=>/^#[0-9a-f]{6}$/i.test(h)?[0,2,4].map(i=>parseInt(h.slice(1+i,3+i),16)):null;
+  const lin=u=>{ u/=255; return u<=.03928?u/12.92:Math.pow((u+.055)/1.055,2.4); }, lum=a=>.2126*lin(a[0])+.7152*lin(a[1])+.0722*lin(a[2]);
+  const ratio=(a,b)=>{ const x=lum(a), y=lum(b); return (Math.max(x,y)+.05)/(Math.min(x,y)+.05); }, mix=(a,b,k)=>a.map((u,i)=>Math.round(u*(1-k)+b[i]*k));
+  const css=a=>'rgb('+a.join(',')+')', fit=(ink,bg,to)=>{ let k=0, t=ink; while(ratio(t,bg)<4.6&&k<1){ k+=.02; t=mix(ink,to,k); } return t; };
+  const l=rgb(c); if(!l){ v='--pc:'+c+';--tagbg:'+tint(c,.15); tagCache.set(c,v); return v; } // a colour this code cannot read keeps the old look
+  const d=rgb(TAG_DARK[String(c).toUpperCase()]||c), bgl=mix([255,255,255],l,.15), bgd=mix([28,28,30],d,.24); // over the card of each theme
+  v='--pc:'+c+';--tagbg:'+css(bgl)+';--tagl:'+css(fit(l,bgl,[0,0,0]))+';--tagbgd:'+css(bgd)+';--tagd:'+css(fit(d,bgd,[255,255,255]));
+  tagCache.set(c,v); return v; }
+/* A row. R3: it leaves out what the screen around it already says. opts:
+   noProj (inside a project, grouped by project or with a project filter: no capsule), noToday (a Hoy list or group: no "Hoy"),
+   hideCarried (the Aplazadas group: no "Aplazada"), byDay (Completadas grouped by day: the time alone, not struck through),
+   simple ("Lo primero": no swipe). A carried task says "Aplazada" in orange where it would say "Hoy". */
 function rowHTML(x, opts={}){
   const p = x.projectId?proj(x.projectId):null; const t=todayStr();
   const done=x.status==='done';
-  const meta=[]; if(p) meta.push('<span class="tag">'+esc(p.name)+'</span>');
-  if(done){ if(x.completed) meta.push('<span>Hecha '+fmtDateTime(x.completed)+'</span>'); }
-  else { if(x.date) meta.push('<span class="'+(x.date<t?'over':'')+'">'+fmtDate(x.date)+'</span>'); if(x.reminder) meta.push('<span class="bell">'+I.bell+(x.date&&localDay(x.reminder)===x.date?fmtTime(x.reminder):fmtDateTime(x.reminder))+'</span>'); } // the reminder's own day when it is not the task's date (moved task, no date)
-  const ind=(x.notes&&x.notes.trim()?'<span class="ind">'+I.note+'</span>':'')+(DB.voiceNotes.some(v=>v.taskId===x.id)?'<span class="ind">'+I.mic+'</span>':''); if(ind) meta.push(ind);
+  const held=HELD.has(x.id), shownDone=held?HELD.get(x.id):done; // R1: a marked row shows the state it is about to take
+  const meta=[]; if(p&&!opts.noProj) meta.push('<span class="tag">'+esc(p.name)+'</span>');
+  if(done){ if(x.completed) meta.push('<span>'+(opts.byDay?fmtTime(x.completed):'Hecha '+fmtDateTime(x.completed))+'</span>'); }
+  else { if(x.date){ if(x.carried&&x.date<=t){ if(!opts.hideCarried) meta.push('<span class="carried">Aplazada</span>'); }
+      else if(!(opts.noToday&&x.date===t)) meta.push('<span class="'+(x.date<t?'over':'')+'">'+fmtDate(x.date)+'</span>'); }
+    if(x.reminder) meta.push('<span class="bell">'+I.bell+(x.date&&localDay(x.reminder)===x.date?fmtTime(x.reminder):fmtDateTime(x.reminder))+'</span>'); } // the reminder's own day when it is not the task's date (moved task, no date)
+  const ind=(x.notes&&x.notes.trim()?I.note:'')+(DB.voiceNotes.some(v=>v.taskId===x.id)?I.mic:'');
   const pri = done?'':x.priority==='high'?'<span class="pri high">!!!</span>':x.priority==='mid'?'<span class="pri mid">!!</span>':'';
   const pc=p?p.color:null;
   const selecting = UI.select && !opts.simple; const selected = selecting && UI.select.ids.has(x.id);
-  return '<div class="row'+(done?' done':'')+(selected?' selected':'')+'" data-id="'+x.id+'"'+(pc?' style="--pc:'+pc+';--tagbg:'+tint(pc,.15)+'"':'')+'>'+
+  return '<div class="row'+(done?' done':'')+(held?' held':'')+(opts.byDay?' byday':'')+(selected?' selected':'')+'" data-id="'+x.id+'"'+(pc?' style="'+tagVars(pc)+'"':'')+'>'+
     (opts.simple||selecting?'':'<div class="row-bg left"><span>'+I.check+'</span></div><div class="row-bg right"><button class="b-tomorrow" data-act="postpone">Aplazar</button><button class="b-delete" data-act="delete">Eliminar</button></div>')+
-    '<div class="row-content">'+(selecting?'<span class="selbox">'+I.check+'</span>':'<button class="check'+(x.status==='done'?' done':'')+'" data-act="check" aria-label="Completar">'+I.check+'</button>')+
-    '<div class="row-text"><div class="row-title">'+esc(x.title||'Sin título')+'</div>'+(meta.length?'<div class="row-meta">'+meta.join('<span class="sep">·</span>')+'</div>':'')+'</div>'+pri+(UI.wide&&!selecting&&!opts.simple?'<button class="rowmore" data-act="rowMenu" aria-label="Más">'+I.more+'</button>':'')+'</div></div>';
+    '<div class="row-content">'+(selecting?'<span class="selbox">'+I.check+'</span>':'<button class="check'+(shownDone?' done':'')+'" data-act="check" aria-label="Completar">'+I.check+'</button>')+
+    '<div class="row-text"><div class="row-title">'+esc(x.title||'Sin título')+'</div>'+(meta.length?'<div class="row-meta">'+meta.join('<span class="sep">·</span>')+'</div>':'')+'</div>'+(ind?'<span class="inds">'+ind+'</span>':'')+pri+(UI.wide&&!selecting&&!opts.simple?'<button class="rowmore" data-act="rowMenu" aria-label="Más">'+I.more+'</button>':'')+'</div></div>';
 }
 // The reminder line of the summary: the next one within two hours, kept until five minutes after its time
 function soonReminder(){ return spaceTasks().filter(x=>x.status==='pending'&&x.reminder).map(x=>({x,d:new Date(x.reminder).getTime()-Date.now()})).filter(o=>o.d>-5*6e4&&o.d<2*36e5).sort((a,b)=>a.d-b.d)[0]; }
@@ -914,7 +973,7 @@ function summaryHTML(){
    '<div class="summary-body"><div class="nums"><button class="num" data-sum="all"><b>'+deHoy+'</b><span>para hoy</span></button><button class="num'+(carried?' orange':'')+(UI.sumFilter==='carried'?' on':'')+'" data-sum="carried"><b>'+carried+'</b><span>aplazadas</span></button><button class="num'+(prio?' red':'')+(UI.sumFilter==='high'?' on':'')+'" data-sum="high"><b>'+prio+'</b><span>prioritarias</span></button></div>'+
    (hoy.length&&new Date().getHours()>=19?'<button class="closeday" data-act="closeDay">'+I.cal+'<span>Pasar lo pendiente a mañana ('+hoy.length+')</span></button>':'')+
    (!hoy.length&&doneToday?'<div class="alldone">'+I.check+'<span>Todo hecho por hoy: '+doneToday+(doneToday===1?' tarea completada':' tareas completadas')+'</span></div>':'')+
-   ((first.length||soon)?'<div class="first">'+(first.length?'<h4>Lo primero</h4>'+first.map(x=>rowHTML(x,{simple:true})).join(''):'')+
+   ((first.length||soon)?'<div class="first">'+(first.length?'<h4>Lo primero</h4>'+first.map(x=>rowHTML(x,{simple:true,noToday:true})).join(''):'')+
    (soon?'<div class="soon"'+(first.length?'':' style="border-top:0;padding-top:0"')+'>'+I.bell+'<span>Recordatorio a las '+fmtTime(soon.x.reminder)+': '+esc(soon.x.title)+'</span></div>':'')+'</div>':'')+'</div></section>';
 }
 // Date buckets for the "Todas" list
@@ -926,6 +985,9 @@ function listHTML(filter, projectId){
   if(root && filter==='hoy' && !UI.query && UI.sumFilter) list = list.filter(x=> UI.sumFilter==='carried' ? x.carried : x.priority==='high');
   if(root && !UI.query && UI.projFilter!==null) list = list.filter(x=> UI.projFilter==='none' ? !x.projectId : x.projectId===UI.projFilter);
   const done = doneList(projectId); const dm = UI.query ? done.filter(queryMatcher(UI.query)) : [];
+  // R3: no project capsule inside a project or under a project filter (a search ignores the filter, so it shows them)
+  const noProj = projectId!==undefined || (root && !UI.query && UI.projFilter!==null);
+  const R = (x,o)=>rowHTML(x, Object.assign({noProj}, o));
   const addBtn = '<button class="btn-link" data-act="add"'+(projectId!==undefined?' data-project="'+(projectId||'')+'"':'')+'>Añadir tarea</button>';
   let h='';
   if(!list.length){ if(!(UI.query && UI.searchDone && dm.length)){ // the completed matches are listed below: no "Sin resultados" above them
@@ -937,22 +999,22 @@ function listHTML(filter, projectId){
     else { title='Sin tareas pendientes'; sub='Toca + o añade una desde aquí'; acts=addBtn; }
     h += '<div class="empty">'+I.inbox+'<b>'+title+'</b>'+sub+'<div class="acts">'+acts+'</div></div>';
   } }
-  else if(UI.query){ h += '<div class="group-title">'+list.length+(list.length===1?' resultado':' resultados')+'</div><div class="group">'+list.map(x=>rowHTML(x)).join('')+'</div>'; }
-  if(UI.query){ if(dm.length){ h += UI.searchDone ? '<div class="group-title">Completadas</div><div class="group">'+dm.map(x=>rowHTML(x)).join('')+'</div>' : '<div class="empty" style="padding:8px 0 16px"><div class="acts"><button class="btn-link" data-act="searchDone">Incluir '+dm.length+(dm.length===1?' completada':' completadas')+'</button></div></div>'; } return h; }
+  else if(UI.query){ h += '<div class="group-title">'+list.length+(list.length===1?' resultado':' resultados')+'</div><div class="group">'+list.map(x=>R(x)).join('')+'</div>'; }
+  if(UI.query){ if(dm.length){ h += UI.searchDone ? '<div class="group-title">Completadas</div><div class="group">'+dm.map(x=>R(x)).join('')+'</div>' : '<div class="empty" style="padding:8px 0 16px"><div class="acts"><button class="btn-link" data-act="searchDone">Incluir '+dm.length+(dm.length===1?' completada':' completadas')+'</button></div></div>'; } return h; }
   else if(filter==='todas' && root && DB.settings.allGroup==='project'){ const ps=activeProjects(); const by={}; list.forEach(x=>{ const k=!x.projectId||!proj(x.projectId)?'none':ps.some(p=>p.id===x.projectId)?x.projectId:'archived'; (by[k]=by[k]||[]).push(x); });
-    ps.forEach(p=>{ if(by[p.id]) h += '<div class="group-title"><span class="dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+p.color+';margin-right:6px;vertical-align:1px"></span>'+esc(p.name)+' <span style="color:var(--ink3)">'+by[p.id].length+'</span></div><div class="group">'+by[p.id].map(x=>rowHTML(x)).join('')+'</div>'; });
-    if(by.archived) h += '<div class="group-title">Proyectos archivados <span style="color:var(--ink3)">'+by.archived.length+'</span></div><div class="group">'+by.archived.map(x=>rowHTML(x)).join('')+'</div>';
-    if(by.none) h += '<div class="group-title">Sin proyecto <span style="color:var(--ink3)">'+by.none.length+'</span></div><div class="group">'+by.none.map(x=>rowHTML(x)).join('')+'</div>'; }
+    ps.forEach(p=>{ if(by[p.id]) h += '<div class="group-title"><span class="dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+p.color+';margin-right:6px;vertical-align:1px"></span>'+esc(p.name)+' <span style="color:var(--ink3)">'+by[p.id].length+'</span></div><div class="group">'+by[p.id].map(x=>R(x,{noProj:true})).join('')+'</div>'; });
+    if(by.archived) h += '<div class="group-title">Proyectos archivados <span style="color:var(--ink3)">'+by.archived.length+'</span></div><div class="group">'+by.archived.map(x=>R(x)).join('')+'</div>';
+    if(by.none) h += '<div class="group-title">Sin proyecto <span style="color:var(--ink3)">'+by.none.length+'</span></div><div class="group">'+by.none.map(x=>R(x)).join('')+'</div>'; }
   else if(filter==='todas'){ const t=todayStr(); const by={}; list.forEach(x=>{ (by[dateBucket(x,t)]=by[dateBucket(x,t)]||[]).push(x); });
-    BUCKETS.forEach(([k,label])=>{ if(by[k]) h += '<div class="group-title" style="display:flex;justify-content:space-between;align-items:center"><span>'+label+'</span>'+(k==='none'&&root&&!UI.select?'<button class="btn-link" data-act="plan" style="font-size:0.765rem;font-weight:600">Planificar ('+by[k].length+')</button>':'')+'</div><div class="group">'+by[k].map(x=>rowHTML(x)).join('')+'</div>'; }); }
-  else if(filter==='hoy' && root && list.some(x=>x.carried) && list.some(x=>!x.carried)){ const c=list.filter(x=>x.carried), d=list.filter(x=>!x.carried); h += '<div class="group-title">Aplazadas</div><div class="group">'+c.map(x=>rowHTML(x)).join('')+'</div><div class="group-title">Hoy</div><div class="group">'+d.map(x=>rowHTML(x)).join('')+'</div>'; }
-  else h += '<div class="group">'+list.map(x=>rowHTML(x)).join('')+'</div>';
+    BUCKETS.forEach(([k,label])=>{ if(by[k]) h += '<div class="group-title" style="display:flex;justify-content:space-between;align-items:center"><span>'+label+'</span>'+(k==='none'&&root&&!UI.select?'<button class="btn-link" data-act="plan" style="font-size:0.765rem;font-weight:600">Planificar ('+by[k].length+')</button>':'')+'</div><div class="group">'+by[k].map(x=>R(x,{noToday:k==='today'})).join('')+'</div>'; }); }
+  else if(filter==='hoy' && root && list.some(x=>x.carried) && list.some(x=>!x.carried)){ const c=list.filter(x=>x.carried), d=list.filter(x=>!x.carried); h += '<div class="group-title">Aplazadas</div><div class="group">'+c.map(x=>R(x,{noToday:true,hideCarried:true})).join('')+'</div><div class="group-title">Hoy</div><div class="group">'+d.map(x=>R(x,{noToday:true})).join('')+'</div>'; }
+  else h += '<div class="group">'+list.map(x=>R(x,{noToday:filter==='hoy', hideCarried:root&&filter==='hoy'&&UI.sumFilter==='carried'})).join('')+'</div>'; // the aplazadas filter already says it
   if(root && filter==='hoy' && !UI.query && !UI.sumFilter){ const tm=pendingFor('todas').filter(x=>x.date===addDays(todayStr(),1)).length; if(tm) h += '<button class="preview" data-filter="todas"><span>Mañana: '+tm+(tm===1?' tarea':' tareas')+'</span>'+I.chev+'</button>'; }
   if(done.length){ const dt=done.filter(x=>x.completed&&localDay(x.completed)===todayStr()).length;
     if(!DB.settings.doneOpen){ h += '<div class="group"><button class="cell link" data-act="toggleDone" style="justify-content:center"><span>Mostrar completadas ('+done.length+(dt?', '+dt+' hoy':'')+')</span></button></div>'; }
     else { const t=todayStr(), yd=addDays(t,-1); const by={}, order=[]; done.forEach(x=>{ const d=x.completed?localDay(x.completed):'0000'; if(!by[d]){ by[d]=[]; order.push(d); } by[d].push(x); });
       h += '<div class="group"><button class="cell link" data-act="toggleDone" style="justify-content:center"><span>Ocultar completadas</span></button></div>';
-      order.forEach(d=>{ const label=d===t?'Hoy':d===yd?'Ayer':d==='0000'?'Sin fecha':fmtDate(d); h += '<div class="group-title">'+label+'</div><div class="group">'+by[d].map(x=>rowHTML(x)).join('')+'</div>'; }); } }
+      order.forEach(d=>{ const label=d===t?'Hoy':d===yd?'Ayer':d==='0000'?'Sin fecha':fmtDate(d); h += '<div class="group-title">'+label+'</div><div class="group">'+by[d].map(x=>R(x,{byDay:true})).join('')+'</div>'; }); } }
   return h;
 }
 function selectNav(){ const n=UI.select.ids.size; return '<header class="nav"><div class="nav-row"><button class="action" data-act="selAll">'+(UI.select.all?'Ninguna':'Todas')+'</button><div class="nav-title" id="selTitle">'+(n?n+(n===1?' seleccionada':' seleccionadas'):'Seleccionar')+'</div><button class="action strong" data-act="selDone">OK</button></div></header>'; }
@@ -1058,7 +1120,7 @@ function bindDetail(el, id){
 /* ---------- Shared events ---------- */
 function bindRows(box){
   if(!UI.select) box.querySelectorAll('.row:not(.first .row)').forEach(bindRowGestures);
-  box.querySelectorAll('.first .row').forEach(r=>{ r.addEventListener('click',e=>{ if(e.target.closest('[data-act=check]')) return; openDetail(r.dataset.id); }); }); }
+  box.querySelectorAll('.first .row').forEach(r=>{ r.addEventListener('click',e=>{ if(e.target.closest('[data-act=check]')) return; if(HELD.has(r.dataset.id)) toggleHold(r.dataset.id); else openDetail(r.dataset.id); }); }); }
 function bindCommon(scr){
   scr.addEventListener('click', onClick);
   bindRows(scr);
@@ -1111,13 +1173,13 @@ function onClick(e){
   const pf=e.target.closest('[data-pf]'); if(pf){ const v=pf.dataset.pf; UI.projFilter=(v===''||UI.projFilter===v)?null:v; haptic(4); render(); return; }
   if(UI.select){ const row=e.target.closest('.row'); if(row && !row.closest('.first')){ toggleSelected(row); return; } }
   const act=e.target.closest('[data-act]'); if(!act) { const row=e.target.closest('.row');
-    if(row && row.closest('.first')){ if(UI.wide) openDetail(row.dataset.id); return; } // on the iPhone bindCommon opens "Lo primero" rows; the desktop has only this handler
-    if(row) { if(row.dataset.open==='1'){ closeRow(row); return; } openDetail(row.dataset.id); } return; }
+    if(row && row.closest('.first')){ if(UI.wide){ if(HELD.has(row.dataset.id)) toggleHold(row.dataset.id); else openDetail(row.dataset.id); } return; } // on the iPhone bindCommon opens "Lo primero" rows; the desktop has only this handler
+    if(row) { if(row.dataset.open==='1'){ closeRow(row); return; } if(HELD.has(row.dataset.id)){ toggleHold(row.dataset.id); return; } openDetail(row.dataset.id); } return; } // a tap on a marked row unmarks it
   const row=act.closest('.row'); const a=act.dataset.act;
   const detailId = UI.wide ? detailTaskId() : (entry&&entry.kind==='detail'?entry.id:null); // the task of the screen that was tapped, not of the stack top
   switch(a){
-    case 'check': { const id=row.dataset.id; if(completing.has(id)) break; completing.add(id); const toDone=act.classList.toggle('done'); act.classList.add('just'); leaveRows(id); setTimeout(()=>{ completing.delete(id); setDone(id, toDone); renderAnimated(); },240); break; }
-    case 'tomorrow': { const id=row.dataset.id; closeRow(row); leaveRows(id); setTimeout(()=>{ tomorrowTask(id); renderAnimated(); },200); break; }
+    case 'check': if(row) toggleHold(row.dataset.id); break; // R1: marked now, leaves with the others a moment later
+    case 'tomorrow': { const id=row.dataset.id; releaseHold(id); closeRow(row); leaveRows(id); setTimeout(()=>{ tomorrowTask(id); renderAnimated(); },200); break; }
     case 'delete': if(row){ closeRow(row); confirmDelete(row.dataset.id); } else if(detailId){ confirmDelete(detailId, closeDetailOf(detailId)); } break;
     case 'clearSearch': UI.query=''; UI.searchDone=false; render(); break;
     case 'selDone': endSelect(); break;
@@ -1188,21 +1250,28 @@ function pop(){
 function underScreen(){ return UI.stack.length? UI.stack[UI.stack.length-1].el : app.querySelector('.screen.root:not(.hidden-tab)'); }
 function bindBackSwipe(scr){
   if(!scr.classList.contains('pushed-screen')||scr.dataset.bs) return; scr.dataset.bs='1'; // once per screen: render() runs bindCommon on the same element again
-  let x0=0,y0=0,drag=false,live=false,w=innerWidth; // live: this touch started in the edge zone; drag: it is still moving the screen
+  // live: this touch may move the screen; drag: it is moving it; pend (R4, detail only): it started away from the edge and waits for a sideways move
+  let x0=0,y0=0,drag=false,live=false,pend=false,w=innerWidth,lastX=0,lastT=0,vx=0;
+  const anywhere=scr.classList.contains('detail'); // R4: the detail goes back from anywhere, except from a text field (it has no rows with gestures of their own)
   const isTop=()=>{ const t=UI.stack[UI.stack.length-1]; return !!t&&t.el===scr; };
   const under=()=>UI.stack.length>1?UI.stack[UI.stack.length-2].el:app.querySelector('.screen.root:not(.hidden-tab)');
   const reset=()=>{ const u=under(); scr.classList.remove('dragging'); scr.style.transform=''; if(u){ u.classList.remove('dragging-under'); u.style.transform=''; } };
-  scr.addEventListener('touchstart',e=>{ const t=e.touches[0]; x0=t.clientX;y0=t.clientY; drag=live=x0<EDGE&&isTop(); w=innerWidth; if(live) dragStart(); },{passive:true});
-  scr.addEventListener('touchmove',e=>{ if(!drag) return; const t=e.touches[0]; const dx=Math.max(0,t.clientX-x0); if(Math.abs(t.clientY-y0)>40&&dx<20){ drag=false; reset(); return; } /* it became a scroll: put both screens back */ const u=under(); if(!scr.classList.contains('dragging')) drawIfDirty(u); /* the screen behind shows from the first move: current, if a render waited for it */ scr.classList.add('dragging'); scr.style.transform='translate3d('+dx+'px,0,0)'; if(!RM.matches){ u.classList.add('dragging-under'); u.style.transform='translate3d('+(-33+33*dx/w)+'%,0,0)'; } },{passive:true}); // with Reduce Motion the screen behind stays still
-  scr.addEventListener('touchend',e=>{ if(!live) return; live=false; const was=drag; drag=false; if(!was){ dragEnd(true); return; } const dx=e.changedTouches[0].clientX-x0, go=dx>w/3&&isTop(); if(go&&RM.matches) scr.classList.remove('dragging'); else reset(); if(go){ dragEnd(false); haptic(6); pop(); } else dragEnd(true); }); // with Reduce Motion a screen let go past a third fades out where it is
-  scr.addEventListener('touchcancel',()=>{ if(!live) return; live=drag=false; reset(); dragEnd(true); }); // a cancelled touch puts the screens back and never pops
+  scr.addEventListener('touchstart',e=>{ const t=e.touches[0]; x0=lastX=t.clientX;y0=t.clientY; lastT=e.timeStamp; vx=0; w=innerWidth; pend=false;
+    drag=live=x0<EDGE&&isTop()&&e.touches.length===1;
+    if(!live&&anywhere&&isTop()&&e.touches.length===1&&!e.target.closest('input,textarea,select,[contenteditable]')){ live=pend=true; }
+    if(live) dragStart(); },{passive:true});
+  scr.addEventListener('touchmove',e=>{ if(!live) return; const t=e.touches[0];
+    if(pend){ const mx=t.clientX-x0, my=t.clientY-y0; if(Math.abs(my)>8&&Math.abs(my)>=Math.abs(mx)){ pend=false; return; } /* a scroll: the screen stays */ if(Math.abs(mx)<10) return; pend=false; if(mx<0) return; drag=true; }
+    if(!drag) return; const dx=Math.max(0,t.clientX-x0); if(Math.abs(t.clientY-y0)>40&&dx<20){ drag=false; reset(); return; } /* it became a scroll: put both screens back */
+    if(e.cancelable) e.preventDefault(); const now=e.timeStamp; if(now>lastT){ vx=0.6*(t.clientX-lastX)/(now-lastT)+0.4*vx; lastX=t.clientX; lastT=now; }
+    const u=under(); if(!scr.classList.contains('dragging')) drawIfDirty(u); /* the screen behind shows from the first move: current, if a render waited for it */ scr.classList.add('dragging'); scr.style.transform='translate3d('+dx+'px,0,0)'; if(!RM.matches){ u.classList.add('dragging-under'); u.style.transform='translate3d('+(-33+33*dx/w)+'%,0,0)'; } },{passive:false}); // with Reduce Motion the screen behind stays still
+  // R4: past a third of the width, or a quick flick to the right (a finger that stopped before lifting has no speed left)
+  scr.addEventListener('touchend',e=>{ if(!live) return; live=pend=false; const was=drag; drag=false; if(!was){ dragEnd(true); return; } const dx=e.changedTouches[0].clientX-x0, v=e.timeStamp-lastT>80?0:vx, go=(dx>w/3||(v>FLICK&&dx>30))&&isTop(); if(go&&RM.matches) scr.classList.remove('dragging'); else reset(); if(go){ dragEnd(false); haptic(6); pop(); } else dragEnd(true); }); // with Reduce Motion a screen let go past a third fades out where it is
+  scr.addEventListener('touchcancel',()=>{ if(!live) return; live=drag=pend=false; reset(); dragEnd(true); }); // a cancelled touch puts the screens back and never pops
 }
 
 /* ---------- Row gestures ---------- */
 let openRow=null;
-const completing=new Set(); // tasks whose completion is already scheduled: a second tap or swipe during the animation does nothing
-// The row's gesture says which state it wants; a stale row (its render still waiting) cannot toggle the task back
-function setDone(id, done){ const x=task(id); if(x&&(x.status==='done')!==done) completeTask(id); }
 // A render that waited for a left swipe has replaced the row: open the new one in place, without sliding again
 function reopenRow(old){ const id=old.dataset.id, scr=old.closest('.screen'); dragEnd(true); openRow=null;
   const r=scr&&[...scr.querySelectorAll('.row[data-id="'+id+'"]')].find(x=>x.querySelector('.row-bg')); if(!r) return;
@@ -1210,15 +1279,16 @@ function reopenRow(old){ const id=old.dataset.id, scr=old.closest('.screen'); dr
 function closeRow(row){ if(!row) return; const c=row.querySelector('.row-content'); c.classList.remove('drag'); c.style.transform=''; row.classList.remove('armed'); const ic=row.querySelector('.row-bg.left span'); if(ic) ic.style.transform=''; row.dataset.open='0'; if(openRow===row) openRow=null; setTimeout(()=>{ if(row.dataset.open!=='1'&&!c.classList.contains('drag')) row.classList.remove('swiping','dir-l','dir-r'); },320); }
 function bindRowGestures(row){
   const c=row.querySelector('.row-content'); if(!c||!row.querySelector('.row-bg')) return;
-  let x0=0,y0=0,dx=0,mode=null,lp=null,thr=false,edge=false;
-  row.addEventListener('touchstart',e=>{ const t=e.touches[0]; x0=t.clientX;y0=t.clientY;dx=0;thr=false; if(row.closest('.hidden-tab')){ mode='off'; return; } mode=null; dragStart(); // a row on a screen just put away (a tab slide settled by this touch) acts on nothing unseen
+  let x0=0,y0=0,dx=0,mode=null,lp=null,thr=false,edge=false,lastX=0,lastT=0,vx=0; // vx: the finger's speed in px/ms (R4)
+  row.addEventListener('touchstart',e=>{ const t=e.touches[0]; x0=lastX=t.clientX;y0=t.clientY;dx=0;thr=false;vx=0;lastT=e.timeStamp; if(row.closest('.hidden-tab')){ mode='off'; return; } mode=null; dragStart(); // a row on a screen just put away (a tab slide settled by this touch) acts on nothing unseen
     edge=x0<EDGE&&!!row.closest('.pushed-screen'); // the left edge of a pushed screen belongs to the back swipe
     if(openRow&&openRow!==row) closeRow(openRow);
     lp=setTimeout(()=>{ if(mode===null){ mode='lp'; haptic(15); rowMenu(row.dataset.id); } },500); },{passive:true});
   row.addEventListener('touchmove',e=>{ const t=e.touches[0]; const mx=t.clientX-x0, my=t.clientY-y0;
     if(mode===null){ if(Math.abs(my)>8){ mode='scroll'; clearTimeout(lp); } else if(Math.abs(mx)>10){ clearTimeout(lp); if(edge){ mode='edge'; return; } mode='swipe'; row.classList.add('swiping'); c.classList.add('drag'); } }
     if(mode!=='swipe') return;
-    e.preventDefault(); const base=row.dataset.open==='1'?-160:0; let raw=base+mx;
+    e.preventDefault(); const now=e.timeStamp; if(now>lastT){ vx=0.6*(t.clientX-lastX)/(now-lastT)+0.4*vx; lastX=t.clientX; lastT=now; }
+    const base=row.dataset.open==='1'?-160:0; let raw=base+mx;
     if(raw<-160) raw=-160+(raw+160)*0.15; // elastic stop at the buttons
     if(raw>110) raw=110+(raw-110)*0.25;   // and a softer one past the complete threshold
     dx=Math.max(-176,Math.min(150, raw));
@@ -1228,13 +1298,12 @@ function bindRowGestures(row){
   },{passive:false});
   const end=e=>{ clearTimeout(lp); if(mode==='off'){ mode=null; return; } if(mode==='lp'&&e.cancelable) e.preventDefault(); // the menu is open: lifting the finger must not click it closed
     if(mode!=='swipe'){ mode=null; dragEnd(true); return; } c.classList.remove('drag'); mode=null;
-    if(dx>90){ // Commit: the row settles back while the circle fills, then it fades out and the list closes up
-      const id=row.dataset.id, wasDone=row.classList.contains('done'); dragEnd(false); // the commit timer renders
-      if(completing.has(id)){ closeRow(row); return; } completing.add(id);
-      c.style.transform=''; row.classList.remove('armed');
-      const chk=row.querySelector('.check'); if(chk){ chk.classList.toggle('done', !wasDone); chk.classList.add('just'); }
-      setTimeout(()=>leaveRows(id),160); setTimeout(()=>{ completing.delete(id); setDone(id, !wasDone); renderAnimated(); },380); }
-    else if(dx<-70){ c.style.transform='translate3d(-160px,0,0)'; row.dataset.open='1'; openRow=row; dragEnd(false); if(renderPending) reopenRow(row); }
+    // R4: a quick flick counts like a long drag. A finger that stopped before lifting has no speed left
+    const v=e.timeStamp-lastT>80?0:vx, open=row.dataset.open==='1';
+    if(dx>90 || (!open && v>FLICK && dx>40)){ // R1: the row slides back and stays, marked, while the circle fills; it leaves with the other marks
+      const id=row.dataset.id; dragEnd(false); closeRow(row); toggleHold(id);
+      setTimeout(()=>{ if(renderPending&&!touchDrag) render(); },330); } // a render that waited for the gesture runs once the row is back in place
+    else if(open ? (dx<-70 && !(v>FLICK)) : (dx<-70 || (v<-FLICK && dx<-30))){ c.style.transform='translate3d(-160px,0,0)'; row.dataset.open='1'; openRow=row; dragEnd(false); if(renderPending) reopenRow(row); }
     else { closeRow(row); dragEnd(true); }
   };
   row.addEventListener('touchend',end);
@@ -1260,16 +1329,22 @@ let asheetNested=false, asheetCancel=null;
 function closeAction(){ asheet.classList.remove('on'); asheet.onclick=null; setTimeout(()=>{ if(!asheet.classList.contains('on')) asheet.innerHTML=''; },350); }
 function cancelAction(){ if(asheetNested&&sheet.classList.contains('on')){ const f=asheetCancel; asheetCancel=null; closeAction(); f&&f(); } else closeSheet(); }
 scrim.addEventListener('click', ()=>{ if(asheet.classList.contains('on')) cancelAction(); else closeSheet(); });
-function bindSheetDrag(){ const h=sheet; let y0=0,dy=0,drag=false,inner=null;
+function bindSheetDrag(){ const h=sheet; let y0=0,dy=0,drag=false,inner=null,lastY=0,lastT=0,vy=0,hh=1;
   // A scrolled inner box (a long textarea, the log) keeps the finger until it is back at its top; only then does the sheet follow it down
   const scroller=t=>{ for(let el=t; el&&el!==h; el=el.parentElement){ if(el.scrollHeight>el.clientHeight+1){ const o=getComputedStyle(el).overflowY; if(el.tagName==='TEXTAREA'||o==='auto'||o==='scroll') return el; } } return null; };
-  const reset=()=>{ h.classList.remove('drag'); h.style.transform=''; };
-  h.ontouchstart=e=>{ const onHandle=!!e.target.closest('.handle'); drag=false; dy=0; inner=null; if(h.scrollTop>0&&!onHandle) return; if(!onHandle) inner=scroller(e.target); y0=e.touches[0].clientY; drag=!(inner&&inner.scrollTop>0); };
+  // R4: the dimming and the screen behind follow the finger (p: 0 open, 1 closed); let go, they return to their classes with a transition
+  const follow=p=>{ scrim.style.transition='none'; scrim.style.opacity=String(1-p);
+    if(!UI.wide&&!RM.matches){ app.style.transition='none'; app.style.transform='scale('+(0.96+0.04*p).toFixed(4)+')'; } };
+  const unfollow=()=>{ scrim.style.transition=''; scrim.style.opacity=''; app.style.transition=''; app.style.transform=''; };
+  const reset=()=>{ h.classList.remove('drag'); h.style.transform=''; unfollow(); };
+  h.ontouchstart=e=>{ const onHandle=!!e.target.closest('.handle'); drag=false; dy=0; vy=0; inner=null; if(h.scrollTop>0&&!onHandle) return; if(!onHandle) inner=scroller(e.target); y0=lastY=e.touches[0].clientY; lastT=e.timeStamp; hh=h.offsetHeight||1; drag=!(inner&&inner.scrollTop>0); };
   h.ontouchmove=e=>{ const y=e.touches[0].clientY;
     if(inner&&inner.scrollTop>0){ if(drag){ drag=false; dy=0; reset(); } return; } // the inner box is scrolling
-    if(!drag){ if(!inner) return; drag=true; y0=y; dy=0; } // the inner box reached its top: from here the sheet follows
-    dy=Math.max(0,y-y0); if(dy>0){ h.classList.add('drag'); h.style.transform='translate3d(0,calc('+dy+'px - var(--kb)),0)'; } }; // keeps the keyboard offset of .sheet.on
-  h.ontouchend=()=>{ inner=null; if(!drag) return; drag=false; h.classList.remove('drag'); if(dy>110) closeSheet(); else h.style.transform=''; };
+    if(!drag){ if(!inner) return; drag=true; y0=lastY=y; lastT=e.timeStamp; dy=0; } // the inner box reached its top: from here the sheet follows
+    const now=e.timeStamp; if(now>lastT){ vy=0.6*(y-lastY)/(now-lastT)+0.4*vy; lastY=y; lastT=now; }
+    dy=Math.max(0,y-y0); if(dy>0){ h.classList.add('drag'); h.style.transform='translate3d(0,calc('+dy+'px - var(--kb)),0)'; follow(Math.min(1,dy/hh)); } }; // keeps the keyboard offset of .sheet.on
+  // R4: it closes past 110 px or on a quick flick down (a finger that stopped before lifting has no speed left)
+  h.ontouchend=e=>{ inner=null; if(!drag) return; drag=false; h.classList.remove('drag'); unfollow(); const v=e.timeStamp-lastT>80?0:vy; if(dy>110||(v>FLICK&&dy>30)) closeSheet(); else h.style.transform=''; };
   h.ontouchcancel=()=>{ inner=null; if(!drag) return; drag=false; reset(); }; }
 function actionSheet(title, items, onCancel){ asheetNested=sheet.classList.contains('on'); asheetCancel=onCancel||null; asheet.innerHTML='<div class="grp">'+(title?'<div class="t">'+esc(title)+'</div>':'')+items.map((it,i)=>'<button class="it'+(it.red?' red':'')+'" data-i="'+i+'">'+esc(it.label)+'</button>').join('')+'</div><div class="grp"><button class="it cancel" data-i="-1">Cancelar</button></div>'; asheet.classList.add('on'); scrim.classList.add('on'); dimApp(true); asheet.onclick=e=>{ const b=e.target.closest('[data-i]'); if(!b) return; const i=+b.dataset.i; if(i<0){ cancelAction(); return; } if(asheetNested&&sheet.classList.contains('on')) closeAction(); else closeSheet(); items[i].fn(); }; }
 function confirmSheet(title, text, fn){ actionSheet(text, [{label:title, red:true, fn}]); }
@@ -1283,18 +1358,18 @@ function moveToSpaceSheet(id){ const x=task(id); if(!x) return; const others=DB.
   actionSheet('Mover a espacio', others.map(sp=>({label:sp.name, fn:()=>{ const old={spaceId:x.spaceId, projectId:x.projectId}; leaveRows(id); setTimeout(()=>{ updTask(id,{spaceId:sp.id, projectId:null}); if(detailTaskId()===id) pop(); else renderAnimated(); toast('Movida a '+sp.name, ()=>updTask(id,old)); },200); }}))); }
 function duplicateTask(id){ const x=task(id); if(!x) return; const n=addTask({title:x.title, projectId:x.projectId, priority:x.priority, notes:x.notes, spaceId:x.spaceId}); haptic(8); renderAnimated(); toast('Tarea duplicada'); openDetail(n.id); }
 function leaveRows(id){ document.querySelectorAll('.row[data-id="'+id+'"]').forEach(r=>r.classList.add('leaving')); }
-function confirmDelete(id, after){ const x=task(id); if(!x) return; confirmSheet('Eliminar tarea', '"'+x.title+'" se eliminará. Podrás deshacerlo durante unos segundos.', ()=>{ leaveRows(id); setTimeout(()=>{ deleteTask(id); after?after():renderAnimated(); },200); }); }
+function confirmDelete(id, after){ const x=task(id); if(!x) return; releaseHold(id); confirmSheet('Eliminar tarea', '"'+x.title+'" se eliminará. Podrás deshacerlo durante unos segundos.', ()=>{ leaveRows(id); setTimeout(()=>{ deleteTask(id); after?after():renderAnimated(); },200); }); }
 function detailMenu(id){ const x=task(id); if(!x) return; actionSheet(x.title, [
   {label:x.status==='done'?'Marcar pendiente':'Marcar completada', fn:()=>{ completeTask(id,true); render(); }}].concat(DB.spaces.length>1?[{label:'Mover a otro espacio', fn:()=>moveToSpaceSheet(id)}]:[], [
   {label:'Duplicar', fn:()=>duplicateTask(id)},
   {label:'Eliminar tarea', red:true, fn:()=>confirmDelete(id, closeDetailOf(id))} ])); }
 // After a delete from the detail, close that task's detail only if it is still the one showing: Atrás may have been tapped meanwhile
 const closeDetailOf = id => ()=>{ if(detailTaskId()===id) pop(); else renderAnimated(); };
-function postponeSheet(id){ const t=todayStr(); const opts=uniqueBy([['Mañana',addDays(t,1)],['Fin de semana',weekendDay()],['Próxima semana',nextWeekday(1,true)]], o=>o[1]);
+function postponeSheet(id){ releaseHold(id); const t=todayStr(); const opts=uniqueBy([['Mañana',addDays(t,1)],['Fin de semana',weekendDay()],['Próxima semana',nextWeekday(1,true)]], o=>o[1]);
   actionSheet('Aplazar', opts.map(([l,d])=>({label:l+(l==='Mañana'?'':'  ('+fmtDate(d)+')'), fn:()=>{ leaveRows(id); setTimeout(()=>{ rescheduleTask(id,d,l.toLowerCase()); renderAnimated(); },200); }})).concat([{label:'Elegir fecha', fn:()=>dateSheet(id)}])); }
 /* Multi-select: entered from the long-press menu; a bottom bar replaces the tab bar */
 function renderSelbar(){ const n=UI.select?UI.select.ids.size:0; const b=(act,ic,l,red)=>'<button data-act="'+act+'"'+(n?'':' disabled')+(red?' class="red"':'')+'>'+ic+'<span>'+l+'</span></button>'; $('#selbar').innerHTML=b('bulkComplete',I.check,'Completar')+b('bulkPostpone',I.cal,'Aplazar')+b('bulkMove',I.folder,'Mover')+b('bulkDelete',I.trash,'Eliminar',true); }
-function startSelect(id){ const top=UI.stack[UI.stack.length-1]; UI.select={scope: top&&top.kind==='project'?'project':'root', ids:new Set(id?[id]:[]), all:false}; if(openRow) closeRow(openRow); app.classList.add('selecting'); render(); renderSelbar(); haptic(6); }
+function startSelect(id){ flushHeld(true); const top=UI.stack[UI.stack.length-1]; UI.select={scope: top&&top.kind==='project'?'project':'root', ids:new Set(id?[id]:[]), all:false}; if(openRow) closeRow(openRow); app.classList.add('selecting'); render(); renderSelbar(); haptic(6); }
 function endSelect(){ UI.select=null; app.classList.remove('selecting'); render(); }
 function visibleRowIds(){ const scr=UI.select.scope==='project'?UI.stack[UI.stack.length-1].el:rootScreen('tareas'); return [...scr.querySelectorAll('.scroll .row[data-id], .scroll .rph[data-id]')].filter(r=>!r.closest('.first')).map(r=>r.dataset.id); } // rows of a long list not drawn yet count too
 function updateSelectUI(){ const n=UI.select.ids.size; const t=$('#selTitle'); if(t) t.textContent=n?n+(n===1?' seleccionada':' seleccionadas'):'Seleccionar'; const b=$('[data-act=selAll]'); if(b) b.textContent=UI.select.all?'Ninguna':'Todas'; renderSelbar(); } // the label always says what a tap will do
@@ -1313,7 +1388,7 @@ function rescheduleMany(xs, date, label){ if(!xs.length) return; const prev=xs.m
 function closeDaySheet(){ const hoy=pendingFor('hoy'); if(!hoy.length) return; const high=hoy.filter(x=>x.priority==='high'), rest=hoy.filter(x=>x.priority!=='high'); const tm=addDays(todayStr(),1);
   const items=[{label:'Todas ('+hoy.length+')', fn:()=>rescheduleMany(hoy, tm, 'mañana')}]; if(high.length&&rest.length) items.push({label:'Solo las no prioritarias ('+rest.length+')', fn:()=>rescheduleMany(rest, tm, 'mañana')});
   actionSheet('Pasar lo pendiente a mañana', items); }
-function rowMenu(id){ const x=task(id); if(!x) return; const pl={high:'alta',mid:'media',none:'ninguna'}[x.priority];
+function rowMenu(id){ const x=task(id); if(!x) return; releaseHold(id); const pl={high:'alta',mid:'media',none:'ninguna'}[x.priority];
   actionSheet(x.title, [
     {label:'Prioridad: '+pl, fn:()=>priorityMenu(id)},
     {label:'Aplazar', fn:()=>postponeSheet(id)},
@@ -1667,8 +1742,8 @@ function returnHome(){
   if(UI.select){ UI.select=null; app.classList.remove('selecting'); } openRow=null; UI.projFilter=null; UI.searchDone=false; // back to Hoy as on a fresh start
   if(UI.wide){ closeSheet(); setDeskView('hoy'); log('info','Vuelta a Hoy tras más de dos horas fuera'); return; } // the desktop returns through its own view; it has no iPhone stack
   UI.stack.forEach(s=>s.el.remove()); UI.stack=[]; UI.tab='tareas'; UI.query=''; UI.sumFilter=null; DB.settings.filter='hoy'; save(); closeSheet(); render(); const sc=rootScreen('tareas').querySelector('.scroll'); if(sc) sc.scrollTop=0; log('info','Vuelta a Hoy tras más de dos horas fuera'); }
-window.addEventListener('pagehide', flushEdits);
-document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='hidden'){ hiddenAt=Date.now(); flushEdits(); return; } reloadIfChanged(); const n=rollOver(); if(n) log('info','Tareas pasadas a hoy: '+n); queueDailyBackup();
+window.addEventListener('pagehide', ()=>{ flushHeld(true); flushEdits(); });
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='hidden'){ hiddenAt=Date.now(); flushHeld(true); flushEdits(); return; } reloadIfChanged(); const n=rollOver(); if(n) log('info','Tareas pasadas a hoy: '+n); queueDailyBackup();
   const away=hiddenAt && Date.now()-hiddenAt>2*36e5;
   if(away && !sheetBusy()) returnHome();
   else { if(away) log('info','Vuelta a Hoy omitida: hoja con texto sin guardar'); if(n || todayStr()!==renderedDay || clockStale()) render(); } });

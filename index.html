@@ -343,6 +343,11 @@ body.desktop .toast{left:auto;right:28px;bottom:28px;width:360px;}
 .scrim.on{opacity:1;pointer-events:auto;}
 .sheet{position:fixed;left:0;right:0;bottom:0;background:var(--mat);-webkit-backdrop-filter:saturate(180%) blur(24px);backdrop-filter:saturate(180%) blur(24px);border-radius:14px 14px 0 0;transform:translate3d(0,110%,0);transition:transform .35s cubic-bezier(.32,.72,0,1);z-index:21;padding:6px max(16px,env(safe-area-inset-right,0px)) calc(16px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));max-height:85%;overflow-y:auto;}
 .sheet.on{transform:translate3d(0,calc(-1 * var(--kb)),0);}
+/* Keyboard not reported by the system (kbFallback): the sheet moves to the top of the screen, above where the keyboard is */
+.sheet.on.top{top:calc(env(safe-area-inset-top,0px) + 8px);bottom:auto;left:8px;right:8px;border-radius:14px;transform:none;max-height:46%;padding-bottom:14px;animation:sheetTop .25s ease-out;}
+.sheet.on.top .handle{display:none;}
+@keyframes sheetTop{from{opacity:0;transform:translate3d(0,-12px,0)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion: reduce){.sheet.on.top{animation:none;}}
 .sheet.drag{transition:none;}
 .handle{width:36px;height:5px;border-radius:3px;background:var(--fill2);margin:4px auto 10px;}
 .sheet h2{font-size:1rem;font-weight:600;margin:4px 0 12px;text-align:center;}
@@ -445,7 +450,7 @@ body.desktop .toast{left:auto;right:28px;bottom:28px;width:360px;}
 
 <script>
 'use strict';
-const APP_VERSION = '0.14.1';
+const APP_VERSION = '0.14.2';
 let pendingSW = null; // service worker installed and waiting to take over
 let updateRequested = false; // the user asked for the waiting worker to take over
 
@@ -1256,7 +1261,7 @@ let sheetOnClose=null; // one shot, set by the sheet's owner: runs however the s
 let sheetOpenedAt=0; const sheetFresh=()=>performance.now()-sheetOpenedAt<450;
 function noteEarlyClose(kind){ const ms=Math.round(performance.now()-sheetOpenedAt); if(sheetOpenedAt&&ms<800) log('warn','Hoja cerrada a los '+ms+' ms ('+kind+')', String((new Error()).stack||'').split('\n').slice(2,5).map(l=>l.trim().slice(0,90)).join(' | ')); }
 function openSheet(html, onOpen){ sheetOpenedAt=performance.now(); sheetOnClose=null; sheet.innerHTML='<div class="handle"></div>'+html; sheet.classList.add('on'); scrim.classList.add('on'); dimApp(true); bindSheetDrag(); onOpen&&onOpen(sheet); }
-function closeSheet(){ if(sheet.classList.contains('on')||asheet.classList.contains('on')) noteEarlyClose('cerrar'); sheet.classList.remove('on','drag'); sheet.style.transform=''; asheet.classList.remove('on'); asheet.onclick=null; scrim.classList.remove('on'); dimApp(false); try{ stopRec&&stopRec(); }catch(e){} setTimeout(()=>{ if(!sheet.classList.contains('on')) sheet.innerHTML=''; if(!asheet.classList.contains('on')) asheet.innerHTML=''; },350); const oc=sheetOnClose; sheetOnClose=null; if(oc) oc(); if(staleView) setTimeout(flushStale, 0); } // a closed menu keeps no buttons or handler that a stray click could fire; data reloaded meanwhile is drawn now, unless the caller already redrew
+function closeSheet(){ if(sheet.classList.contains('on')||asheet.classList.contains('on')) noteEarlyClose('cerrar'); sheet.classList.remove('on','drag','top'); sheet.style.transform=''; asheet.classList.remove('on'); asheet.onclick=null; scrim.classList.remove('on'); dimApp(false); try{ stopRec&&stopRec(); }catch(e){} setTimeout(()=>{ if(!sheet.classList.contains('on')) sheet.innerHTML=''; if(!asheet.classList.contains('on')) asheet.innerHTML=''; },350); const oc=sheetOnClose; sheetOnClose=null; if(oc) oc(); if(staleView) setTimeout(flushStale, 0); } // a closed menu keeps no buttons or handler that a stray click could fire; data reloaded meanwhile is drawn now, unless the caller already redrew
 /* An action menu opened over an open sheet (the Proyecto and Prioridad chips of Nueva tarea) is nested:
    Cancelar, a tap outside or Escape close only the menu and give the sheet back with what was typed */
 let asheetNested=false, asheetCancel=null;
@@ -1628,7 +1633,19 @@ if(DB.settings.shakeUndo){ armShake(); // iOS asks again per launch: re-request 
   if(typeof DeviceMotionEvent!=='undefined' && typeof DeviceMotionEvent.requestPermission==='function'){ const once=()=>{ document.removeEventListener('touchend', once); DeviceMotionEvent.requestPermission().catch(()=>{}); }; document.addEventListener('touchend', once); } }
 
 /* Keyboard: reposition sheets */
-if(window.visualViewport){ const vv=window.visualViewport; const f=()=>{ const kb=Math.max(0, innerHeight - vv.height - vv.offsetTop); document.documentElement.style.setProperty('--kb', kb+'px'); }; vv.addEventListener('resize',f); vv.addEventListener('scroll',f); }
+let kbNow=0;
+if(window.visualViewport){ const vv=window.visualViewport; const f=()=>{ const kb=Math.max(0, innerHeight - vv.height - vv.offsetTop); kbNow=kb; document.documentElement.style.setProperty('--kb', kb+'px'); if(kb>=60) sheet.classList.remove('top'); }; vv.addEventListener('resize',f); vv.addEventListener('scroll',f); }
+// Some iOS versions do not shrink the visual viewport of an installed web app when the keyboard opens: --kb stays 0 and a
+// bottom sheet stays hidden behind the keyboard. If a field in the sheet has the focus and no keyboard has been reported
+// shortly after, the sheet moves to the top of the screen. The measures are logged once per launch to tune this on the device.
+let kbLogged=false;
+function kbFallback(){ if(UI.wide||!sheet.classList.contains('on')) return; const ae=document.activeElement;
+  if(!ae||!sheet.contains(ae)||!/^(INPUT|TEXTAREA)$/.test(ae.tagName)||/^(date|time|datetime-local|checkbox|file)$/.test(ae.type||'')) return;
+  const vv=window.visualViewport;
+  if(!kbLogged){ kbLogged=true; log('info','Teclado: ventana '+innerHeight+', visible '+(vv?Math.round(vv.height):'?')+', desplazado '+(vv?Math.round(vv.offsetTop):'?')+', teclado detectado '+Math.round(kbNow)); }
+  if(kbNow<60) sheet.classList.add('top'); }
+sheet.addEventListener('focusin', ()=>{ setTimeout(kbFallback, 500); });
+sheet.addEventListener('focusout', ()=>{ setTimeout(()=>{ if(!sheet.contains(document.activeElement)) sheet.classList.remove('top'); }, 60); });
 document.addEventListener('gesturestart',e=>e.preventDefault());
 document.addEventListener('touchmove',e=>{ if(e.touches.length>1) e.preventDefault(); },{passive:false});
 

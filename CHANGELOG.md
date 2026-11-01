@@ -1,5 +1,10 @@
 # Registro de cambios
 
+## v0.14.2. Hojas tapadas por el teclado (1 de noviembre de 2026)
+
+- En el iPhone, al escribir en una hoja (nota de voz, nueva tarea, nombre de proyecto), la hoja podía quedarse detrás del teclado: el sistema no informaba a la app instalada de que el teclado había salido. Si medio segundo después de enfocar el campo no se ha detectado el teclado, la hoja pasa a la parte superior de la pantalla. Si el teclado se detecta, todo sigue igual.
+- El registro anota una vez por arranque las medidas de pantalla al abrir el teclado, para afinarlo con datos del dispositivo.
+
 ## v0.14.1. Hojas que se cerraban solas en el iPhone (1 de noviembre de 2026)
 
 - En el detalle de una tarea, la hoja de Fecha podía abrirse y cerrarse al instante y el menú de Proyecto aparecía de golpe. Durante el primer medio segundo tras abrir una hoja o un menú, un toque en el fondo, en un día del calendario o en una opción del menú ya no cuenta: así un toque repetido no cierra la hoja ni elige algo por error.

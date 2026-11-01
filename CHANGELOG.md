@@ -1,5 +1,12 @@
 # Registro de cambios
 
+## v0.14.4. Editar y eliminar notas de voz (1 de noviembre de 2026)
+
+- En el detalle de una tarea, cada nota de voz se desliza como una fila. A la izquierda aparece Eliminar y se queda ahí; al tocarlo, la nota se borra con Deshacer durante 4 segundos.
+- A la derecha aparece Editar; un deslizamiento largo la abre directamente. La hoja «Editar nota» trae el texto para corregirlo, y «Volver a dictar» lo borra y deja el campo listo para dictar otra vez con el micrófono del teclado. Guardar ofrece Deshacer.
+- En escritorio, un clic sobre la nota ofrece Editar nota y Eliminar nota.
+- Modelo de datos: la nota de voz añade el campo `modified`, que se rellena al editarla. La nota muestra «editada» junto a la hora, y al importar una copia gana la versión editada más reciente. Acordado con Enric.
+
 ## v0.14.3. Botones de las hojas visibles con el teclado (1 de noviembre de 2026)
 
 - En el iPhone, con el teclado abierto, la barra flotante del teclado tapaba Descartar y Guardar en la nota de voz. Las hojas con campo de texto (nota de voz, nueva tarea, proyecto, espacio e importar texto) llevan ahora las acciones en la cabecera, como en iOS: Cancelar o Descartar a la izquierda, el título en el centro y Guardar, Crear o Añadir a la derecha.

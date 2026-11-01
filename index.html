@@ -423,8 +423,16 @@ body.desktop .toast{left:auto;right:28px;bottom:28px;width:360px;}
 .project .scroll{padding-top:12px;}
 .detail .titlein{width:100%;font-size:max(16px,1rem);font-weight:600;background:none;border:0;outline:0;padding:0;resize:none;overflow:hidden;line-height:1.3;display:block;min-height:22px;}
 .detail textarea{width:100%;min-height:72px;background:none;border:0;outline:0;resize:none;padding:0;line-height:1.4;overflow:hidden;display:block;}
-.vn{padding:10px 16px;border-top:.5px solid var(--sep);margin-left:0;font-size:0.882rem;line-height:1.4;white-space:pre-wrap;}
+.vn{position:relative;overflow:hidden;border-top:.5px solid var(--sep);}
 .vn:first-child{border-top:0;}
+.vn-c{position:relative;background:var(--card);padding:10px 16px;font-size:0.882rem;line-height:1.4;white-space:pre-wrap;transition:transform .3s cubic-bezier(.32,.72,0,1);}
+.vn-c.drag{transition:none;}
+.vn-bg{position:absolute;top:0;bottom:0;display:none;}
+.vn-bg button{width:88px;height:100%;color:#fff;font-size:0.882rem;font-weight:500;}
+.vn-bg.l{left:0;background:var(--blue);} .vn-bg.r{right:0;background:var(--red);}
+.vn.dir-r .vn-bg.l,.vn.dir-l .vn-bg.r{display:block;}
+.wide .vn-c{cursor:pointer;} .wide .vn-c:hover{background:var(--fill);}
+.sheet .btn.slim{width:100%;height:44px;font-weight:500;margin-top:10px;color:var(--blue);}
 .vn small{display:block;color:var(--ink2);font-size:0.706rem;margin-bottom:2px;}
 .vn a,.links a{color:var(--blue);text-decoration:none;}
 .links{display:flex;flex-wrap:wrap;gap:8px;padding:0 16px 12px;}
@@ -458,7 +466,7 @@ body.desktop .toast{left:auto;right:28px;bottom:28px;width:360px;}
 
 <script>
 'use strict';
-const APP_VERSION = '0.14.3';
+const APP_VERSION = '0.14.4';
 let pendingSW = null; // service worker installed and waiting to take over
 let updateRequested = false; // the user asked for the waiting worker to take over
 
@@ -1039,10 +1047,12 @@ function viewDetail(id){
    '<button class="cell" data-act="pickReminder"><span class="lbl">Recordatorio</span><span class="val">'+(x.reminder?fmtDateTime(x.reminder):'Ninguno')+'</span>'+chev+'</button>'+
    '<button class="cell" data-act="pickPriority"><span class="lbl">Prioridad</span><span class="val '+(x.priority==='none'?'':x.priority)+'">'+pl+'</span>'+chev+'</button></div>'+
    '<div class="footnote">La notificación en el iPhone llega con la sincronización.</div>'+
-   '<div class="group-title">Notas de voz</div><div class="group">'+vns.map(v=>'<div class="vn"><small>'+fmtDateTime(v.created)+'</small>'+linkify(v.text)+'</div>').join('')+'<button class="cell link" data-act="voice">'+I.mic.replace('<svg','<svg style="width:18px;height:18px"')+'<span class="lbl">Añadir nota de voz</span></button></div>'+
+   '<div class="group-title">Notas de voz</div><div class="group">'+vns.map(vnHTML).join('')+'<button class="cell link" data-act="voice">'+I.mic.replace('<svg','<svg style="width:18px;height:18px"')+'<span class="lbl">Añadir nota de voz</span></button></div>'+
    '</div>';
 }
 const detailLinks = notes => extractLinks(notes).slice(0,6);
+// A voice note row: swipe right to edit, left to delete (on the desktop, a click offers both)
+const vnHTML = v => '<div class="vn" data-vn="'+v.id+'"><div class="vn-bg l"><button data-vact="edit">Editar</button></div><div class="vn-bg r"><button data-vact="del">Eliminar</button></div><div class="vn-c"><small>'+fmtDateTime(v.created)+(v.modified?', editada':'')+'</small>'+linkify(v.text)+'</div></div>';
 function linksHTML(links){ return links.map(l=>'<a href="'+esc(l.href)+'"'+(l.href.startsWith('tel:')?'':' target="_blank" rel="noopener"')+'>'+esc(l.label)+'</a>').join(''); }
 function bindDetail(el, id){
   const x=task(id); if(!x) return;
@@ -1075,6 +1085,7 @@ function bindRows(box){
 function bindCommon(scr){
   scr.addEventListener('click', onClick);
   bindRows(scr);
+  if(!UI.wide) scr.querySelectorAll('.vn[data-vn]').forEach(bindVnGestures);
   scr.querySelectorAll('[data-open-project]').forEach(b=>bindLongPress(b, ()=>{ if(b.dataset.openProject!=='none') projectMenu(b.dataset.openProject); }));
   const s=$('[data-role=search]',scr); if(s) bindSearch(s, ()=>searchAround(s));
   bindBackSwipe(scr);
@@ -1122,6 +1133,8 @@ function onClick(e){
   const ua=e.target.closest('[data-unarchive]'); if(ua){ const p=proj(ua.dataset.unarchive); p.archived=false; p.modified=new Date().toISOString(); save(); render(); return; }
   const gb=e.target.closest('[data-group]'); if(gb){ DB.settings.allGroup=gb.dataset.group; save(); render(); return; }
   const pf=e.target.closest('[data-pf]'); if(pf){ const v=pf.dataset.pf; UI.projFilter=(v===''||UI.projFilter===v)?null:v; haptic(4); render(); return; }
+  const va=e.target.closest('[data-vact]'); if(va){ const el=va.closest('.vn'); const vid=el&&el.dataset.vn; closeVn(el); if(va.dataset.vact==='del') deleteVoiceNote(vid); else editVoiceNote(vid); return; }
+  const vnEl=e.target.closest('.vn[data-vn]'); if(vnEl&&!e.target.closest('a')){ if(vnEl.dataset.open){ closeVn(vnEl); return; } if(UI.wide) voiceNoteMenu(vnEl.dataset.vn); return; }
   if(UI.select){ const row=e.target.closest('.row'); if(row && !row.closest('.first')){ toggleSelected(row); return; } }
   const act=e.target.closest('[data-act]'); if(!act) { const row=e.target.closest('.row');
     if(row && row.closest('.first')){ if(UI.wide) openDetail(row.dataset.id); return; } // on the iPhone bindCommon opens "Lo primero" rows; the desktop has only this handler
@@ -1253,6 +1266,29 @@ function bindRowGestures(row){
   row.addEventListener('touchend',end);
   row.addEventListener('touchcancel',()=>{ clearTimeout(lp); const was=mode; mode=null; if(was==='off') return; if(was==='swipe') closeRow(row); dragEnd(true); }); // a cancelled touch never completes the task or opens the buttons
 }
+// Voice note rows: right reveals Editar (a long swipe opens it), left reveals Eliminar and stops there, like task rows
+let openVn=null;
+function closeVn(el){ if(!el) return; const c=el.querySelector('.vn-c'); c.classList.remove('drag'); c.style.transform=''; delete el.dataset.open; if(openVn===el) openVn=null; setTimeout(()=>{ if(!el.dataset.open) el.classList.remove('dir-l','dir-r'); },300); }
+function bindVnGestures(el){ const c=el.querySelector('.vn-c'); let x0=0,y0=0,dx=0,mode=null,edge=false,thr=false;
+  el.addEventListener('touchstart',e=>{ const t=e.touches[0]; x0=t.clientX; y0=t.clientY; dx=0; mode=null; thr=false; edge=x0<EDGE&&!!el.closest('.pushed-screen'); if(openVn&&openVn!==el) closeVn(openVn); if(openRow) closeRow(openRow); },{passive:true});
+  el.addEventListener('touchmove',e=>{ const t=e.touches[0], mx=t.clientX-x0, my=t.clientY-y0;
+    if(mode===null){ if(Math.abs(my)>8) mode='scroll'; else if(Math.abs(mx)>10){ if(edge){ mode='edge'; return; } mode='swipe'; c.classList.add('drag'); } }
+    if(mode!=='swipe') return; e.preventDefault();
+    const base=el.dataset.open==='l'?-88:el.dataset.open==='r'?88:0; let raw=base+mx;
+    if(raw<-88) raw=-88+(raw+88)*0.15; // stops at Eliminar
+    if(raw>150) raw=150+(raw-150)*0.25;
+    dx=Math.max(-104,Math.min(190,raw)); c.style.transform='translate3d('+dx+'px,0,0)'; el.classList.toggle('dir-r',dx>0); el.classList.toggle('dir-l',dx<0);
+    const passed=dx>150; if(passed&&!thr){ thr=true; haptic(8); } if(!passed) thr=false; },{passive:false});
+  const end=()=>{ if(mode!=='swipe'){ mode=null; return; } mode=null; c.classList.remove('drag');
+    if(dx>150){ closeVn(el); editVoiceNote(el.dataset.vn); }
+    else if(dx>50){ c.style.transform='translate3d(88px,0,0)'; el.dataset.open='r'; openVn=el; }
+    else if(dx<-50){ c.style.transform='translate3d(-88px,0,0)'; el.dataset.open='l'; openVn=el; }
+    else closeVn(el); };
+  el.addEventListener('touchend',end); el.addEventListener('touchcancel',()=>{ mode=null; closeVn(el); }); }
+function deleteVoiceNote(vid){ const i=DB.voiceNotes.findIndex(v=>v.id===vid); if(i<0) return; const [v]=DB.voiceNotes.splice(i,1); if(task(v.taskId)) updTask(v.taskId,{}); else save(); haptic(14); render(); log('info','Nota de voz eliminada');
+  toast('Nota de voz eliminada', ()=>{ if(!DB.voiceNotes.some(x=>x.id===v.id)) DB.voiceNotes.push(v); save(); render(); }); }
+function editVoiceNote(vid){ const v=DB.voiceNotes.find(x=>x.id===vid); if(v) voiceSheet(v.taskId, v.id); }
+function voiceNoteMenu(vid){ actionSheet('Nota de voz', [{label:'Editar nota', fn:()=>editVoiceNote(vid)},{label:'Eliminar nota', red:true, fn:()=>deleteVoiceNote(vid)}]); }
 // Long press on a project: same 8 and 10 px tolerance as task rows; every touch starts with the flag clear, so a tap after a cancelled menu opens the project
 function bindLongPress(el, fn){ let t=null, x0=0, y0=0, fired=false;
   el.addEventListener('touchstart',e=>{ const p=e.touches[0]; x0=p.clientX; y0=p.clientY; fired=false; el.dataset.lp='0'; clearTimeout(t); t=setTimeout(()=>{ if(el.closest('.hidden-tab')) return; /* its screen was put away meanwhile (a tab slide settled by this touch) */ fired=true; haptic(15); el.dataset.lp='1'; fn(); },500); },{passive:true});
@@ -1467,12 +1503,14 @@ function planStep(ids, i, st){
    in standalone (home screen) mode Safari refuses it, so it is not shown. */
 let stopRec=null;
 const isStandalone = () => { try{ return navigator.standalone===true || matchMedia('(display-mode: standalone)').matches; }catch(e){ return false; } };
-function voiceSheet(id){ if(!task(id)) return; // a note always belongs to an existing task
+function voiceSheet(id, editId){ if(!task(id)) return; // a note always belongs to an existing task
+  const editing=editId?DB.voiceNotes.find(v=>v.id===editId):null; if(editId&&!editing) return;
   const SR = (!isStandalone() && (window.SpeechRecognition||window.webkitSpeechRecognition)) || null; let rec=null, recording=false, final='', sess=0; // sess: only the newest recognizer may touch the text
   const kbHint = UI.wide ? 'El dictado no está disponible en este navegador. Escribe la nota.' : 'Toca el micrófono del teclado para dictar. Revisa el texto y guarda.'; // a desktop has no keyboard mic
   const errHint = UI.wide ? kbHint : 'El dictado automático no está disponible. Usa el micrófono del teclado.';
-  openSheet(sheadHTML('Nota de voz','Descartar','Guardar')+(SR?'<button class="mic" data-x="mic" aria-label="Grabar">'+I.mic+'</button>':'')+'<div class="hint">'+(SR?'Toca para empezar a dictar':kbHint)+'</div><textarea placeholder="El texto aparecerá aquí" enterkeyhint="done"></textarea>', s=>{
+  openSheet(sheadHTML(editing?'Editar nota':'Nota de voz',editing?'Cancelar':'Descartar','Guardar')+(SR?'<button class="mic" data-x="mic" aria-label="Grabar">'+I.mic+'</button>':'')+'<div class="hint">'+(editing?(SR?'Corrige el texto o toca el micrófono para dictar de nuevo':(UI.wide?'Corrige el texto y guarda.':'Corrige el texto, o toca Volver a dictar y usa el micrófono del teclado.')):(SR?'Toca para empezar a dictar':kbHint))+'</div><textarea placeholder="El texto aparecerá aquí" enterkeyhint="done">'+(editing?esc(editing.text):'')+'</textarea>'+(editing?'<button class="btn slim" data-x="redo">Volver a dictar</button>':''), s=>{
     const ta=$('textarea',s), mic=$('.mic',s), hint=$('.hint',s);
+    if(editing){ ta.setSelectionRange(ta.value.length, ta.value.length); }
     // Focus synchronously inside the tap handler: iOS only opens the keyboard then.
     if(!SR) ta.focus();
     const fallback=msg=>{ if(mic) mic.style.display='none'; hint.textContent=msg||kbHint; ta.focus(); };
@@ -1486,9 +1524,14 @@ function voiceSheet(id){ if(!task(id)) return; // a note always belongs to an ex
       r.start(); recording=true; mic.classList.add('rec'); hint.textContent='Escuchando. Toca para parar'; haptic(10); }catch(e){ stop(); fallback(); } };
     stopRec=stop;
     ta.addEventListener('input',()=>{ sess++; if(recording) stop(); }); // a hand edit pauses dictation and wins over any late result; the next tap on the mic goes on from the edited text
-    const saveNote=()=>{ const t=ta.value.trim(); if(!t){ ta.focus(); return false; } if(!task(id)) return true; DB.voiceNotes.push({id:uid(), taskId:id, text:t, created:new Date().toISOString()}); updTask(id,{}); haptic(8); return true; };
+    const saveNote=()=>{ const t=ta.value.trim(); if(!t){ ta.focus(); return false; } if(!task(id)) return true;
+      if(editing){ const cur=DB.voiceNotes.find(v=>v.id===editing.id); if(!cur) return true; if(cur.text===t) return true; const prev={text:cur.text, modified:cur.modified};
+        cur.text=t; cur.modified=new Date().toISOString(); updTask(id,{}); haptic(8); log('info','Nota de voz editada');
+        setTimeout(()=>toast('Nota de voz editada', ()=>{ const v=DB.voiceNotes.find(x=>x.id===editing.id); if(!v) return; v.text=prev.text; if(prev.modified) v.modified=prev.modified; else delete v.modified; save(); render(); }),0); return true; }
+      DB.voiceNotes.push({id:uid(), taskId:id, text:t, created:new Date().toISOString()}); updTask(id,{}); haptic(8); return true; };
     s.onclick=e=>{ const b=e.target.closest('[data-x]'); if(!b) return;
       if(b.dataset.x==='mic'){ recording?stop():start(); return; }
+      if(b.dataset.x==='redo'){ ta.value=''; ta.focus(); if(SR&&!recording) start(); return; } // focus inside the tap so iOS opens the keyboard
       stop();
       if(b.dataset.x==='ok'){ if(!saveNote()) return; }
       closeSheet(); render(); };

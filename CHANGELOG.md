@@ -1,5 +1,73 @@
 # Registro de cambios
 
+## v0.14.0. Revisión completa de móvil y escritorio (1 de noviembre de 2026)
+
+Revisión con 107 hallazgos: 83 confirmados por dos verificadores independientes y 24 confirmados al corregirlos. Corregidos 98, dos ya quedaban resueltos por otra corrección, tres son parciales y cuatro esperan decisión de Enric (al final). Cada corrección se reprodujo antes y después, y la batería de 18 pruebas pasa entera.
+
+Errores graves
+- Con el tema Claro u Oscuro casi ningún toque funcionaba: la app confundía cualquier clic con un cambio de tema.
+- Escritorio: los controles del panel de detalle (Proyecto, Fecha, Recordatorio, Prioridad, Compartir, menú, nota de voz) no hacían nada; ahora actúan sobre la tarea del panel.
+- Escritorio: no se podía desplazar la lista por debajo de la primera pantalla; la barra lateral, la lista y el panel tienen ahora su propio desplazamiento.
+- Escritorio: las hojas cerradas seguían recibiendo clics invisibles en el centro de la pantalla.
+- Dos pestañas o ventanas abiertas se pisaban los datos. Ahora cada una recoge lo que guarda la otra sin cerrar la hoja que tengas abierta ni perder lo que escribes.
+- El service worker borraba las cachés de otras apps publicadas en github.io; ahora solo toca las suyas.
+- Volver deslizando desde el borde cerraba varias pantallas a la vez tras unos cuantos cambios en el detalle.
+
+Móvil
+- Gestos: el deslizamiento hacia atrás que empieza sobre una fila ya no completa la tarea; los chips de proyecto se pueden desplazar sin cambiar de pestaña; un gesto interrumpido por el sistema se cancela en lugar de ejecutarse; pulsación larga en proyectos con tolerancia normal al movimiento.
+- Navegación: no se pueden encadenar dos aperturas o dos vueltas atrás durante la transición; la barra de selección múltiple ya no queda tapada dentro de un proyecto; volver a la app tras dos horas no descarta lo que estabas escribiendo en una hoja.
+- Nueva tarea: cancelar el menú de Proyecto o Prioridad ya no cierra la hoja; los atajos de fecha no se duplican en jueves ni domingo.
+- Detalle: salir del título ya no repinta la pantalla ni pierde el siguiente toque; las notas largas no vuelven arriba al escribir; un título vacío no se guarda; la franja de enlaces se actualiza al escribir.
+- Fechas pasadas: el calendario ya no deja elegir días pasados y reabrir una tarea antigua la pasa a hoy como aplazada.
+- Deshacer tras Aplazar conserva la marca de aplazada.
+- El área segura en horizontal se respeta en los iPhone con isla dinámica.
+
+Escritorio
+- Clic en una tarea de "Lo primero" abre el detalle.
+- Cambiar de espacio cierra el proyecto y el panel del otro espacio; la barra de alta ya no guarda en el espacio anterior.
+- El texto a medio escribir en la barra de alta y en la búsqueda sobrevive a los repintados.
+- Clic derecho sobre un proyecto de la barra lateral: renombrar, cambiar color, subir, bajar o archivar.
+- Semana: siempre hay zona "Sin fecha" para soltar, no se aplica un filtro de proyecto invisible, un arrastre cancelado no mueve otra tarea después y la búsqueda filtra también la semana.
+- Escape cierra primero el menú abierto; los atajos N y / no se disparan con un menú encima.
+- Al cambiar de vista la lista empieza arriba; el panel conserva su posición al editar.
+- Los consejos de la primera vez y los textos de Ajustes hablan del ordenador, no del iPhone.
+- El modo escritorio pide al menos 900 px de ancho y 500 de alto, así un iPhone grande en horizontal sigue en modo móvil.
+
+Datos y fechas
+- La app abre siempre en Hoy, como pide el diseño.
+- Con la app abierta a medianoche, las tareas pasan a hoy, se redibuja y se hace la copia diaria, también al volver a la app otro día.
+- Pasar las tareas a hoy ya no cambia su fecha de modificación, así una importación no descarta cambios hechos en otro dispositivo; archivar y restaurar proyectos sí la cambian.
+- Si el almacenamiento está lleno, el aviso dice "No se pudo guardar en el dispositivo" en lugar de confirmar algo que no se guardó, y se recorta el registro para hacer sitio.
+- Datos guardados con otra forma se reparan en lugar de descartarse; si no se pueden leer, se apartan en una copia y se anota en el registro.
+- Un recordatorio en el pasado no se guarda y se avisa en la hoja.
+- El aviso de nueva versión ya no sustituye a un Deshacer pendiente, y Actualizar funciona también en la primera sesión.
+- La barra del sistema toma el color del tema oscuro.
+
+Voz, enlaces y compartir
+- Dictado: un silencio ya no oculta el micrófono, escribir a mano pausa el dictado sin que se sobrescriba, y no se duplica el texto al reanudar.
+- Los saltos de línea de las notas de voz se respetan.
+- Detección de enlaces y teléfonos más fiable: no convierte fechas ni números de factura en teléfonos y no se come la puntuación final.
+- El texto compartido usa el formato de fecha del diseño ("31/10 09:15") y el espacio de la propia tarea.
+- Copiar al portapapeles avisa si falla.
+- El CSV protege las celdas que empiezan por =, +, - o @ para que Excel no las ejecute como fórmulas.
+
+Rendimiento y fluidez
+- Las acciones en bloque guardan una sola vez; seleccionar todas y completar ya no congela la app.
+- Las listas de más de 200 filas solo pintan lo visible y el resto se completa al desplazarse.
+- La animación al completar mide antes de mover y solo anima las filas visibles.
+- Escribir en el título o las notas guarda 400 ms después de la última tecla, no en cada pulsación.
+- La búsqueda filtra sin sustituir el campo, de modo que los acentos y las teclas muertas funcionan.
+- Abrir un detalle o cambiar de pestaña ya no repinta pantallas ocultas; el escritorio no pinta antes la versión móvil.
+- Con "Reducir movimiento" activado, los movimientos pasan a fundidos.
+
+Pendiente de decisión de Enric
+- Atajo de iOS: abre Safari, cuyo almacenamiento es distinto del de la app instalada, así que la tarea no llega a la app. Opciones en el CLAUDE.md.
+- Recordatorio al aplazar: si debe moverse con la tarea manteniendo la hora.
+- Nueva tarea desde Hoy: si debe proponer la fecha de hoy y el proyecto del filtro activo.
+- Eliminar un espacio con proyectos archivados o completadas antiguas.
+- Cerrar la hoja de nota de voz con texto: pedir confirmación o guardar borrador.
+- Editar o eliminar una nota de voz ya guardada.
+
 ## v0.13.1 (31 de octubre de 2026)
 
 - Escritorio: la vista Semana usa todo el ancho de la columna central; las tarjetas recortan el título a tres líneas y llevan la prioridad delante del texto; los nombres largos de proyecto no se parten en la barra lateral.

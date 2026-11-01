@@ -1,6 +1,6 @@
 /* Service worker: app shell cache and update notice.
    Bump CACHE on every release so installed devices pick up the new version. */
-const CACHE = 'tareas-v0.13.1';
+const CACHE = 'tareas-v0.14.0';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
@@ -10,7 +10,8 @@ self.addEventListener('install', e => {
 });
 
 self.addEventListener('activate', e => {
-  e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim()));
+  // Other apps on the same github.io origin share CacheStorage: delete only this app's old caches.
+  e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k.startsWith('tareas-') && k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim()));
 });
 
 self.addEventListener('message', e => {
@@ -21,8 +22,16 @@ self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
   // Navigations always resolve to the cached shell so the app opens offline.
+  // If the shell is missing (for example another app on the origin removed the cache), the network copy refills it.
   if (req.mode === 'navigate') {
-    e.respondWith(caches.match('./index.html').then(r => r || fetch(req)));
+    e.respondWith(caches.open(CACHE).then(c => c.match('./index.html').then(r => r || fetch(req).then(res => {
+      const p = new URL(req.url).pathname;
+      if (res.ok && (p.endsWith('/') || p.endsWith('/index.html'))) {
+        const w = c.put('./index.html', res.clone()).catch(() => {});
+        try { e.waitUntil(w); } catch (err) {}
+      }
+      return res;
+    }))));
     return;
   }
   // Cache first for the rest of the shell; the cache is refreshed only on install.

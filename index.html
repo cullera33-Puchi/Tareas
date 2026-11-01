@@ -637,7 +637,18 @@ html.wide{font-size:14px;}
 .app.desktop .check::after{width:32px;height:32px;margin:-16px 0 0 -16px;}
 .app.desktop .row-text{display:flex;align-items:center;gap:8px;}
 .app.desktop .row-title{display:block;flex:0 1 auto;min-width:0;font-size:14px;white-space:nowrap;text-overflow:ellipsis;}
-.app.desktop .row-text .tag{flex:0 4 auto;min-width:48px;max-width:45%;font-size:11px;line-height:16px;padding:0 6px;border-radius:5px;vertical-align:0;}
+.app.desktop .row-text{flex:1 1 auto;min-width:0;}
+.app.desktop .pcol{flex:none;width:132px;display:flex;align-items:center;min-width:0;}
+.app.desktop.has-pane .pcol{width:100px;}
+/* With the inspector open the list is narrow: the date column tightens and a reminder shows as its bell only (the time is in the tooltip and the inspector) */
+.app.desktop.has-pane .rc-date{width:70px;}
+.app.desktop.has-pane .rc-rem{width:18px;font-size:0;}
+.app.desktop.has-pane .rc-rem svg{margin:0;}
+.app.desktop .pcol .tag{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;line-height:16px;padding:0 6px;border-radius:5px;margin:0;}
+/* Date, reminder and notes columns only take room when some row of the list uses them */
+.app.desktop .main:not(:has(.row .rc-date:not(:empty))) .rc-date{display:none;}
+.app.desktop .main:not(:has(.row .rc-rem:not(:empty))) .rc-rem{display:none;}
+.app.desktop .main:not(:has(.row .inds:not(:empty))) .inds{display:none;}
 .app.desktop .row-meta{flex:none;display:flex;margin:0;font-size:12px;font-variant-numeric:tabular-nums;}
 .rc{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right;}
 .rc-date{width:84px;}
@@ -953,7 +964,7 @@ body.resizing,body.resizing *{cursor:col-resize !important;-webkit-user-select:n
 
 <script>
 'use strict';
-const APP_VERSION = '0.15.0';
+const APP_VERSION = '0.15.1';
 let pendingSW = null; // service worker installed and waiting to take over
 let updateRequested = false; // the user asked for the waiting worker to take over
 
@@ -1627,13 +1638,14 @@ function deskRowHTML(x, opts, v){ const t=v.t; let date='', dcls='', rem='';
   else { if(x.date){ if(x.carried&&x.date<=t){ if(!opts.hideCarried){ date='Aplazada'; dcls=' carried'; } }
       else if(!(opts.noToday&&x.date===t) && x.date!==opts.day){ date=fmtDate(x.date); if(x.date<t) dcls=' over'; } }
     if(x.reminder) rem=x.date&&localDay(x.reminder)===x.date?fmtTime(x.reminder):fmtDateTime(x.reminder); }
-  const tag=v.p&&!opts.noProj?'<span class="tag">'+esc(v.p.name)+'</span>':'';
+  // The project goes in a fixed column on the left, so titles start aligned and keep the room on the right; a list of one project has no column
+  const pcol=opts.noProj?'':'<span class="pcol">'+(v.p?'<span class="tag" title="'+esc(v.p.name)+'">'+esc(v.p.name)+'</span>':'')+'</span>';
   // R15, R16: the selected row (cur), the multiple selection, the selection mode's boxes and the title edited in place; "Lo primero" repeats rows and shows none of the selection
   const ds=UI.dsel, own=!opts.simple, multi=deskMulti(), sel=own&&multi&&ds.ids.has(x.id), cur=own&&!multi&&ds.cur===x.id, edit=own&&ds.edit&&ds.edit.id===x.id;
   v.selecting=own&&ds.mode;
   return '<div class="row'+(v.done?' done':'')+(v.held?' held':'')+(opts.byDay?' byday':'')+(sel?' selected':'')+(cur?' cur':'')+'" data-id="'+x.id+'"'+(v.pc?' style="'+tagVars(v.pc)+'"':'')+' role="option" aria-selected="'+(sel||cur)+'" tabindex="'+(own&&ds.cur===x.id?0:-1)+'"'+(edit?'':' draggable="true"')+'>'+
-    '<div class="row-content">'+(v.selecting?'<span class="selbox">'+I.check+'</span>':'<button class="check'+(v.shownDone?' done':'')+'" data-act="check" aria-label="Completar" tabindex="-1">'+I.check+'</button>')+
-    '<div class="row-text">'+(edit?'<input class="rowedit" data-role="rowedit" type="text" value="'+esc(ds.edit.text)+'" aria-label="Título" autocomplete="off" spellcheck="false">':'<div class="row-title">'+esc(x.title||'Sin título')+'</div>'+tag)+'</div>'+
+    '<div class="row-content">'+(v.selecting?'<span class="selbox">'+I.check+'</span>':'<button class="check'+(v.shownDone?' done':'')+'" data-act="check" aria-label="Completar" tabindex="-1">'+I.check+'</button>')+pcol+
+    '<div class="row-text">'+(edit?'<input class="rowedit" data-role="rowedit" type="text" value="'+esc(ds.edit.text)+'" aria-label="Título" autocomplete="off" spellcheck="false">':'<div class="row-title" title="'+esc(x.title||'')+'">'+esc(x.title||'Sin título')+'</div>')+'</div>'+
     '<span class="inds">'+v.ind+'</span><span class="row-meta"><span class="rc rc-date'+dcls+'"'+(date?' title="'+esc(date)+'"':'')+'>'+date+'</span><span class="rc rc-rem"'+(rem?' title="Recordatorio: '+esc(rem)+'"':'')+'>'+(rem?I.bell+rem:'')+'</span></span>'+
     '<span class="pri'+(v.pri?(x.priority==='high'?' high':' mid'):'')+'">'+(v.pri?(x.priority==='high'?'!!!':'!!'):'')+'</span>'+
     (v.selecting?'':opts.simple?'<span class="rowmore" aria-hidden="true"></span>':'<button class="rowmore" data-act="rowMenu" aria-label="Más" title="Más" tabindex="-1">'+I.more+'</button>')+'</div></div>'; } // "Lo primero" keeps the columns aligned with the list
@@ -1843,7 +1855,7 @@ function bindDetail(el, id){
   const fit=(ta,h)=>{ const y=sc?sc.scrollTop:0; ta.style.height='auto'; ta.style.height=h()+'px'; if(sc) sc.scrollTop=y; };
   const growT=()=>fit(ti,()=>ti.scrollHeight); growT();
   // The lists behind show the new title as it is typed; no render here, which would rebuild this screen under the finger
-  const showTitle=()=>{ document.querySelectorAll('.row[data-id="'+id+'"] .row-title').forEach(e=>e.textContent=x.title||'Sin título');
+  const showTitle=()=>{ document.querySelectorAll('.row[data-id="'+id+'"] .row-title').forEach(e=>{ e.textContent=x.title||'Sin título'; if(e.hasAttribute('title')) e.title=x.title||''; }); // the desktop tooltip follows the title
     document.querySelectorAll('.wcard[data-id="'+id+'"] .t').forEach(e=>{ const n=[...e.childNodes].find(c=>c.nodeType===3); if(n) n.nodeValue=x.title; }); };
   // The title is required: an empty field never reaches the data, and on leaving it the last title comes back
   ti.addEventListener('input',()=>{ const v=ti.value.replace(/\n/g,' '); if(v.trim()){ saveEdit(x,{title:v}); showTitle(); } growT(); });

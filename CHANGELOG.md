@@ -1,5 +1,12 @@
 # Registro de cambios
 
+## v0.15.1. Escritorio: proyecto a la izquierda y más sitio para el título (1 de noviembre de 2026)
+
+- La etiqueta del proyecto pasa a una columna fija a la izquierda, justo después del círculo. Todos los títulos empiezan a la misma altura. Dentro de un proyecto o con un filtro de proyecto no se muestra la columna.
+- Las columnas de fecha, recordatorio e indicadores solo ocupan sitio si alguna tarea de la lista las usa. En Hoy, sin fechas que mostrar, el título gana unos 85 px.
+- Con el panel de detalle abierto, la columna de fecha se estrecha y el recordatorio se muestra solo con la campana: la hora está en el aviso al pasar el ratón y en el panel. A 1280 px, el título pasa de unos 15 caracteres visibles a unos 35.
+- Al pasar el ratón sobre una tarea se ve el título completo.
+
 ## v0.15.0. Roadmap R1 a R20 (1 de noviembre de 2026)
 
 Aplicadas las veinte mejoras de la revisión de usabilidad, fluidez y diseño. Dos partes quedan fuera porque necesitan campos nuevos sin acordar: «aplazada desde» en R9 y la duración de los bloques en R20.

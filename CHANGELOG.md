@@ -1,5 +1,11 @@
 # Registro de cambios
 
+## v0.14.3. Botones de las hojas visibles con el teclado (1 de noviembre de 2026)
+
+- En el iPhone, con el teclado abierto, la barra flotante del teclado tapaba Descartar y Guardar en la nota de voz. Las hojas con campo de texto (nota de voz, nueva tarea, proyecto, espacio e importar texto) llevan ahora las acciones en la cabecera, como en iOS: Cancelar o Descartar a la izquierda, el título en el centro y Guardar, Crear o Añadir a la derecha.
+- Con el teclado abierto, la hoja deja sitio abajo para la barra del teclado, así el texto escrito no queda debajo.
+- El registro mostró que el iPhone reduce toda la ventana al abrir el teclado y avisa tarde. La hoja ya no sube a la parte superior en ese caso, y la decisión se toma 1,2 segundos después de enfocar el campo, cuando el teclado ya está colocado. El registro anota las medidas en las cuatro primeras aperturas.
+
 ## v0.14.2. Hojas tapadas por el teclado (1 de noviembre de 2026)
 
 - En el iPhone, al escribir en una hoja (nota de voz, nueva tarea, nombre de proyecto), la hoja podía quedarse detrás del teclado: el sistema no informaba a la app instalada de que el teclado había salido. Si medio segundo después de enfocar el campo no se ha detectado el teclado, la hoja pasa a la parte superior de la pantalla. Si el teclado se detecta, todo sigue igual.

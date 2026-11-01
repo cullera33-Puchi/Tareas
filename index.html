@@ -351,6 +351,14 @@ body.desktop .toast{left:auto;right:28px;bottom:28px;width:360px;}
 .sheet.drag{transition:none;}
 .handle{width:36px;height:5px;border-radius:3px;background:var(--fill2);margin:4px auto 10px;}
 .sheet h2{font-size:1rem;font-weight:600;margin:4px 0 12px;text-align:center;}
+/* iOS sheet header with text fields: Cancelar, title and the main action stay above the keyboard and its floating bar */
+.shead{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;min-height:44px;margin:0 -6px 8px;}
+.shead h2{margin:0;padding:0 6px;}
+.hbtn{height:44px;padding:0 6px;font-size:1rem;color:var(--blue);justify-self:start;}
+.hbtn.ok{justify-self:end;font-weight:600;}
+.hbtn:active{opacity:.4;}
+/* While the keyboard is up, room for the floating input bar iOS draws over the page */
+.kbup .sheet.on:not(.top){padding-bottom:64px;}
 .sheet .titlein{width:100%;background:var(--bg);border:0;border-radius:10px;height:44px;padding:0 12px;outline:0;font-size:max(16px,1rem);}
 .chips{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 4px;}
 .chip{flex:none;display:flex;align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:16px;background:var(--fill);font-size:0.824rem;font-weight:500;white-space:nowrap;}
@@ -450,7 +458,7 @@ body.desktop .toast{left:auto;right:28px;bottom:28px;width:360px;}
 
 <script>
 'use strict';
-const APP_VERSION = '0.14.2';
+const APP_VERSION = '0.14.3';
 let pendingSW = null; // service worker installed and waiting to take over
 let updateRequested = false; // the user asked for the waiting worker to take over
 
@@ -1337,6 +1345,8 @@ function projectMenu(id){ const p=proj(id); if(!p) return; const ps=activeProjec
   {label:'Archivar', red:true, fn:()=>{ p.archived=true; p.modified=new Date().toISOString(); save(); render(); toast('Proyecto archivado', ()=>{p.archived=false; p.modified=new Date().toISOString(); save();}); }} ])); }
 
 /* Quick add */
+// Header used by sheets with text fields: on the iPhone the bottom of a sheet ends up under the keyboard bar
+function sheadHTML(title, cancel, ok){ return '<div class="shead"><button class="hbtn" data-x="cancel">'+cancel+'</button><h2>'+title+'</h2><button class="hbtn ok" data-x="ok">'+ok+'</button></div>'; }
 function addSheet(projectId){
   const st={title:'', date:null, projectId:projectId||null, priority:'none', auto:null, manual:false, added:0};
   // Quick date chips, each a different date: on a Thursday 'Viernes' is tomorrow and on a Sunday 'Próx. semana' is, so they are left out
@@ -1350,7 +1360,7 @@ function addSheet(projectId){
       '<button class="chip'+(st.priority!=='none'?' on':'')+'" data-c="pri">'+I.flag+(st.priority==='high'?'Alta':st.priority==='mid'?'Media':'Prioridad')+'</button>';
   };
   const prefill = arguments[1]||''; const preset = arguments[2]||{}; if(preset.date){ st.date=preset.date; st.manual=true; }
-  openSheet('<h2>Nueva tarea</h2><input class="titlein" placeholder="Qué hay que hacer" autocomplete="off" enterkeyhint="done"><div class="chips" id="chips"></div><div class="hint" id="addHint" style="text-align:left;margin:6px 2px 0">Escribe "mañana", "viernes" o "el 12" al final y se toma como fecha. Enter añade y sigue; Añadir termina.</div><input type="date" id="hiddenDate" min="'+todayStr()+'" style="position:absolute;opacity:0;width:1px;height:1px;left:-10px"><div class="sheet-actions"><button class="btn" data-x="cancel">Cancelar</button><button class="btn primary" data-x="ok">Añadir</button></div><div class="sheet-actions" style="margin-top:10px"><button class="btn" data-x="open" style="height:40px;font-weight:500">Añadir y abrir</button></div>', s=>{
+  openSheet(sheadHTML('Nueva tarea','Cancelar','Añadir')+'<input class="titlein" placeholder="Qué hay que hacer" autocomplete="off" enterkeyhint="done"><div class="chips" id="chips"></div><div class="hint" id="addHint" style="text-align:left;margin:6px 2px 0">Escribe "mañana", "viernes" o "el 12" al final y se toma como fecha. Enter añade y sigue; Añadir termina.</div><input type="date" id="hiddenDate" min="'+todayStr()+'" style="position:absolute;opacity:0;width:1px;height:1px;left:-10px"><div class="sheet-actions"><button class="btn" data-x="open" style="height:40px;font-weight:500">Añadir y abrir</button></div>', s=>{
     const inp=$('.titlein',s), hint=$('#addHint',s); inp.focus(); draw();
     if(prefill){ inp.value=prefill; setTimeout(()=>inp.dispatchEvent(new Event('input')),0); }
     // Date words typed at the end of the title set the date chip until the user picks one by hand
@@ -1377,7 +1387,7 @@ function addSheet(projectId){
 /* New or edited project */
 function projectSheet(id){
   const p=id?proj(id):null; let color=p?p.color:COLORS[4];
-  openSheet('<h2>'+(p?'Editar proyecto':'Nuevo proyecto')+'</h2><input class="titlein" placeholder="Nombre" value="'+(p?esc(p.name):'')+'" autocomplete="off"><div class="colors">'+COLORS.map(c=>'<button data-col="'+c+'" style="background:'+c+'" class="'+(c===color?'on':'')+'" aria-label="Color"></button>').join('')+'</div><div class="sheet-actions"><button class="btn" data-x="cancel">Cancelar</button><button class="btn primary" data-x="ok">'+(p?'Guardar':'Crear')+'</button></div>', s=>{
+  openSheet(sheadHTML(p?'Editar proyecto':'Nuevo proyecto','Cancelar',p?'Guardar':'Crear')+'<input class="titlein" placeholder="Nombre" value="'+(p?esc(p.name):'')+'" autocomplete="off"><div class="colors">'+COLORS.map(c=>'<button data-col="'+c+'" style="background:'+c+'" class="'+(c===color?'on':'')+'" aria-label="Color"></button>').join('')+'</div>', s=>{
     const inp=$('.titlein',s); inp.focus();
     s.onclick=e=>{ const cb=e.target.closest('[data-col]'); if(cb){ color=cb.dataset.col; s.querySelectorAll('[data-col]').forEach(b=>b.classList.toggle('on',b.dataset.col===color)); return; }
       const b=e.target.closest('[data-x]'); if(!b) return; if(b.dataset.x==='cancel'){ closeSheet(); return; }
@@ -1393,9 +1403,8 @@ function spaceContents(id){ const lim=Date.now()-30*864e5, ts=DB.tasks.filter(x=
   return parts.length>1 ? parts.slice(0,-1).join(', ')+' y '+parts[parts.length-1] : parts.join(''); }
 function spaceSheet(id){
   const sp=id?DB.spaces.find(x=>x.id===id):null; const canDelete=sp&&DB.spaces.length>1&&spaceIsEmpty(sp.id);
-  openSheet('<h2>'+(sp?'Editar espacio':'Nuevo espacio')+'</h2><input class="titlein" placeholder="Nombre" value="'+(sp?esc(sp.name):'')+'" autocomplete="off" enterkeyhint="done">'+
+  openSheet(sheadHTML(sp?'Editar espacio':'Nuevo espacio','Cancelar',sp?'Guardar':'Crear')+'<input class="titlein" placeholder="Nombre" value="'+(sp?esc(sp.name):'')+'" autocomplete="off" enterkeyhint="done">'+
     (sp&&!canDelete?'<div class="hint" style="margin-top:10px">'+(DB.spaces.length>1?'Para eliminarlo tiene que estar vacío. Ahora tiene '+esc(spaceContents(sp.id))+'.':'Es el único espacio; no se puede eliminar.')+'</div>':'')+
-    '<div class="sheet-actions"><button class="btn" data-x="cancel">Cancelar</button><button class="btn primary" data-x="ok">'+(sp?'Guardar':'Crear')+'</button></div>'+
     (canDelete?'<div class="sheet-actions" style="margin-top:10px"><button class="btn red" data-x="del">Eliminar espacio</button></div>':''), s=>{
     const inp=$('.titlein',s); inp.focus();
     s.onclick=e=>{ const b=e.target.closest('[data-x]'); if(!b) return;
@@ -1462,7 +1471,7 @@ function voiceSheet(id){ if(!task(id)) return; // a note always belongs to an ex
   const SR = (!isStandalone() && (window.SpeechRecognition||window.webkitSpeechRecognition)) || null; let rec=null, recording=false, final='', sess=0; // sess: only the newest recognizer may touch the text
   const kbHint = UI.wide ? 'El dictado no está disponible en este navegador. Escribe la nota.' : 'Toca el micrófono del teclado para dictar. Revisa el texto y guarda.'; // a desktop has no keyboard mic
   const errHint = UI.wide ? kbHint : 'El dictado automático no está disponible. Usa el micrófono del teclado.';
-  openSheet('<h2>Nota de voz</h2>'+(SR?'<button class="mic" data-x="mic" aria-label="Grabar">'+I.mic+'</button>':'')+'<div class="hint">'+(SR?'Toca para empezar a dictar':kbHint)+'</div><textarea placeholder="El texto aparecerá aquí" enterkeyhint="done"></textarea><div class="sheet-actions"><button class="btn" data-x="cancel">Descartar</button><button class="btn primary" data-x="ok">Guardar</button></div>', s=>{
+  openSheet(sheadHTML('Nota de voz','Descartar','Guardar')+(SR?'<button class="mic" data-x="mic" aria-label="Grabar">'+I.mic+'</button>':'')+'<div class="hint">'+(SR?'Toca para empezar a dictar':kbHint)+'</div><textarea placeholder="El texto aparecerá aquí" enterkeyhint="done"></textarea>', s=>{
     const ta=$('textarea',s), mic=$('.mic',s), hint=$('.hint',s);
     // Focus synchronously inside the tap handler: iOS only opens the keyboard then.
     if(!SR) ta.focus();
@@ -1561,7 +1570,7 @@ function importData(text){
   save(); rollOver(); log('info','Importación', {added, updated, spaces:(d.spaces||[]).length, projects:(d.projects||[]).length, tasks:(d.tasks||[]).length});
   return {added, updated};
 }
-function importSheet(){ openSheet('<h2>Importar pegando texto</h2><div class="hint">Pega aquí una copia exportada.</div><textarea placeholder="{ ... }"></textarea><div class="sheet-actions"><button class="btn" data-x="cancel">Cancelar</button><button class="btn primary" data-x="ok">Importar</button></div>', s=>{ const ta=$('textarea',s); ta.focus(); s.onclick=e=>{ const b=e.target.closest('[data-x]'); if(!b) return; if(b.dataset.x==='cancel'){ closeSheet(); return; } try{ const r=importData(ta.value); closeSheet(); render(); toast(r.added+' nuevos, '+r.updated+' actualizados'); }catch(err){ log('warn','Importar texto: '+err.message); toast('El texto no es un JSON válido'); } }; }); }
+function importSheet(){ openSheet(sheadHTML('Importar texto','Cancelar','Importar')+'<div class="hint">Pega aquí una copia exportada.</div><textarea placeholder="{ ... }"></textarea>', s=>{ const ta=$('textarea',s); ta.focus(); s.onclick=e=>{ const b=e.target.closest('[data-x]'); if(!b) return; if(b.dataset.x==='cancel'){ closeSheet(); return; } try{ const r=importData(ta.value); closeSheet(); render(); toast(r.added+' nuevos, '+r.updated+' actualizados'); }catch(err){ log('warn','Importar texto: '+err.message); toast('El texto no es un JSON válido'); } }; }); }
 function pickImportFile(){
   let inp=$('#importFile'); if(!inp){ inp=document.createElement('input'); inp.type='file'; inp.id='importFile'; inp.accept='application/json,.json,text/plain'; inp.style.cssText='position:fixed;left:-100px;top:0;width:1px;height:1px;opacity:0'; document.body.appendChild(inp); }
   inp.value=''; inp.onchange=()=>{ const f=inp.files&&inp.files[0]; if(!f) return; const rd=new FileReader(); rd.onload=()=>{ try{ const r=importData(rd.result); render(); toast(r.added+' nuevos, '+r.updated+' actualizados'); }catch(err){ log('warn','Importar archivo '+f.name+': '+err.message); toast('El archivo no es una copia válida'); } }; rd.onerror=()=>{ log('error','No se pudo leer '+f.name); toast('No se pudo leer el archivo'); }; rd.readAsText(f); };
@@ -1634,18 +1643,22 @@ if(DB.settings.shakeUndo){ armShake(); // iOS asks again per launch: re-request 
 
 /* Keyboard: reposition sheets */
 let kbNow=0;
-if(window.visualViewport){ const vv=window.visualViewport; const f=()=>{ const kb=Math.max(0, innerHeight - vv.height - vv.offsetTop); kbNow=kb; document.documentElement.style.setProperty('--kb', kb+'px'); if(kb>=60) sheet.classList.remove('top'); }; vv.addEventListener('resize',f); vv.addEventListener('scroll',f); }
+// iOS 26 can shrink the whole window with the keyboard instead of the visual viewport: the page then already fits above it
+const kbShrunk=()=>!UI.wide && screen.height>0 && innerHeight < screen.height*0.75 && innerWidth < screen.width+2;
+if(window.visualViewport){ const vv=window.visualViewport; const f=()=>{ const kb=Math.max(0, innerHeight - vv.height - vv.offsetTop); kbNow=kb; document.documentElement.style.setProperty('--kb', kb+'px'); document.documentElement.classList.toggle('kbup', kb>=60||kbShrunk()); if(kb>=60) sheet.classList.remove('top'); }; vv.addEventListener('resize',f); vv.addEventListener('scroll',f); }
 // Some iOS versions do not shrink the visual viewport of an installed web app when the keyboard opens: --kb stays 0 and a
 // bottom sheet stays hidden behind the keyboard. If a field in the sheet has the focus and no keyboard has been reported
 // shortly after, the sheet moves to the top of the screen. The measures are logged once per launch to tune this on the device.
-let kbLogged=false;
-function kbFallback(){ if(UI.wide||!sheet.classList.contains('on')) return; const ae=document.activeElement;
+let kbLogs=0;
+function kbFallback(when){ if(UI.wide||!sheet.classList.contains('on')) return; const ae=document.activeElement;
   if(!ae||!sheet.contains(ae)||!/^(INPUT|TEXTAREA)$/.test(ae.tagName)||/^(date|time|datetime-local|checkbox|file)$/.test(ae.type||'')) return;
-  const vv=window.visualViewport;
-  if(!kbLogged){ kbLogged=true; log('info','Teclado: ventana '+innerHeight+', visible '+(vv?Math.round(vv.height):'?')+', desplazado '+(vv?Math.round(vv.offsetTop):'?')+', teclado detectado '+Math.round(kbNow)); }
-  if(kbNow<60) sheet.classList.add('top'); }
-sheet.addEventListener('focusin', ()=>{ setTimeout(kbFallback, 500); });
-sheet.addEventListener('focusout', ()=>{ setTimeout(()=>{ if(!sheet.contains(document.activeElement)) sheet.classList.remove('top'); }, 60); });
+  const vv=window.visualViewport, shrunk=kbShrunk();
+  document.documentElement.classList.toggle('kbup', kbNow>=60||shrunk);
+  const top = when==='late' && kbNow<60 && !shrunk; // decided only once the keyboard has settled
+  if(kbLogs<4){ kbLogs++; const r=sheet.getBoundingClientRect(); log('info','Teclado ('+when+'): pantalla '+screen.height+', ventana '+innerHeight+', visible '+(vv?Math.round(vv.height):'?')+', desplazado '+(vv?Math.round(vv.offsetTop):'?')+', scroll '+Math.round(scrollY)+', teclado '+Math.round(kbNow)+', hoja '+Math.round(r.top)+' a '+Math.round(r.bottom)+(top?', hoja arriba':'')); }
+  if(top) sheet.classList.add('top'); }
+sheet.addEventListener('focusin', ()=>{ setTimeout(()=>kbFallback('early'), 400); setTimeout(()=>kbFallback('late'), 1200); });
+sheet.addEventListener('focusout', ()=>{ setTimeout(()=>{ if(!sheet.contains(document.activeElement)){ sheet.classList.remove('top'); if(!(kbNow>=60)) document.documentElement.classList.remove('kbup'); } }, 60); });
 document.addEventListener('gesturestart',e=>e.preventDefault());
 document.addEventListener('touchmove',e=>{ if(e.touches.length>1) e.preventDefault(); },{passive:false});
 

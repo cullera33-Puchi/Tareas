@@ -630,6 +630,42 @@ html.wide{font-size:14px;}
 .app.desktop .row.held .row-meta{opacity:.4;transition:opacity .2s;}
 .app.desktop .row.cv{contain-intrinsic-size:auto 32px;}
 .app.desktop .rph{height:32px;}
+/* R15, R16: the selected row in the accent tint (apart from the hover gray), the multiple selection, the keyboard's focus ring,
+   the title edited in place and the rows being dragged */
+.app.desktop .main .row{outline:none;scroll-margin:40px 0 8px;}
+.app.desktop .main .row.cur > .row-content,.app.desktop .main .row.selected > .row-content{background:var(--qhl);border-radius:6px;}
+.app.desktop .main .row.cur > .row-content::before,.app.desktop .main .row.selected > .row-content::before,.app.desktop .main .row.cur + .row > .row-content::before,.app.desktop .main .row.selected + .row > .row-content::before{opacity:0;}
+.app.desktop .main .row:focus-visible > .row-content{box-shadow:inset 0 0 0 2px var(--blue);border-radius:6px;}
+.app.desktop .main .row.selected + .row.selected > .row-content{border-top-left-radius:0;border-top-right-radius:0;}
+.app.desktop .main .row.selected:has(+ .row.selected) > .row-content{border-bottom-left-radius:0;border-bottom-right-radius:0;}
+.app.desktop .main .row.selected .selbox{background:var(--blue);border-color:var(--blue);}
+.app.desktop .selbox{width:16px;height:16px;border-width:1.2px;}
+.app.desktop .selbox svg{width:9px;height:9px;}
+.app.desktop .row.dragging{opacity:.45;}
+.rowedit{flex:1;min-width:0;height:24px;margin:0 0 0 -5px;padding:0 5px;border:0;border-radius:5px;font-size:14px;background:var(--dmain);box-shadow:0 0 0 2px var(--blue);outline:none;}
+.app.desktop .side .it.over{background:var(--qhl);box-shadow:inset 0 0 0 1.5px var(--blue);color:var(--ink);}
+.dragcount{position:fixed;left:-1000px;top:0;padding:4px 10px;border-radius:12px;background:var(--blue);color:#fff;font:600 13px -apple-system,BlinkMacSystemFont,sans-serif;white-space:nowrap;}
+.pane.multi .mtitle{margin:4px 0 8px;font-size:17px;font-weight:600;}
+.pane.multi .mlist{list-style:none;margin:0 0 12px;padding:0;font-size:13px;color:var(--ink2);}
+.pane.multi .mlist li{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.6;}
+.pane.multi .mlist li.more{font-style:normal;color:var(--ink3);}
+.pane.multi .mhint{margin:0 0 14px;font-size:12px;line-height:1.45;color:var(--ink2);}
+.pane.multi .mgroup{background:var(--dgroup);border-radius:8px;margin:0 0 12px;overflow:hidden;}
+.mact{display:flex;align-items:center;gap:10px;width:100%;height:34px;padding:0 12px;font-size:13px;color:var(--ink);text-align:left;}
+.mact + .mact{box-shadow:inset 0 .5px 0 var(--dline);}
+.mact:hover:not(:disabled){background:var(--dhov);}
+.mact svg{width:17px;height:17px;flex:none;color:var(--blue);}
+.mact .l{flex:1;min-width:0;}
+.mact .k{font-size:11px;color:var(--ink3);}
+.mact.red,.mact.red svg{color:var(--red);}
+.mact:disabled{opacity:.4;}
+body.desktop .sheet.keysheet{width:min(680px, calc(100% - 48px));}
+.keys{columns:2;column-gap:28px;margin:0 0 8px;}
+.keys .kg{break-inside:avoid;margin:0 0 12px;}
+.keys .ks{margin:0 0 4px;font-size:12px;font-weight:600;color:var(--ink2);}
+.keys .kr{display:flex;align-items:baseline;gap:10px;font-size:13px;line-height:1.35;padding:2px 0;}
+.keys .kk{flex:none;width:140px;text-align:right;white-space:nowrap;}
+.keys kbd{display:inline-block;min-width:20px;padding:0 5px;border-radius:4px;border:.5px solid var(--sep);background:var(--dgroup);font:500 11px/18px -apple-system,BlinkMacSystemFont,sans-serif;text-align:center;color:var(--ink);}
 /* Groups: rows straight on the content, headers in small bold text, stuck to the top on a translucent white */
 .app.desktop .main .group{background:none;border-radius:0;margin-bottom:12px;}
 .app.desktop .group-title{font-size:12px;font-weight:600;padding:0 4px 4px;}
@@ -1172,7 +1208,11 @@ function doneList(projectId){
 
 /* ---------- UI state ---------- */
 const CAL_VIEWS=['day','week','month'], H0=7*60, H1=21*60, SLOT=30, SH=22; // R12, R19, R20: the calendar views; the hours grid's first and last minute, its slot and the slot's height in px
-const UI = { tab:'tareas', query:'', stack:[], scroll:{}, sumFilter:null, summaryFirst:false, searchDone:false, select:null, projFilter:null, wide:false, deskView:'hoy', deskDetail:null, weekStart:null, calDay:null, calMonth:null, miniYM:null, addDraft:'', addPaste:null, convertedNotes:{}, deskScroll:{}, deskKey:null };
+const UI = { tab:'tareas', query:'', stack:[], scroll:{}, sumFilter:null, summaryFirst:false, searchDone:false, select:null, projFilter:null, wide:false, deskView:'hoy', deskDetail:null, weekStart:null, calDay:null, calMonth:null, miniYM:null, addDraft:'', addPaste:null, convertedNotes:{}, deskScroll:{}, deskKey:null,
+  dsel:{cur:null, ids:new Set(), anchor:null, mode:false, edit:null, idx:0, order:[], key:null, follow:false} }; // R15, R16: the desktop selection (see deskOrder)
+let deskRedraw=false; // while renderDesktop replaces the markup: a field it takes away is not a field the user left (R15)
+const MODK=/Mac|iPhone|iPad/.test(navigator.platform||navigator.userAgent||'')?'Comando':'Control'; // the key a Mac calls Comando
+const bulkN = n => n+(n===1?' tarea':' tareas');
 
 /* ---------- Toast with undo ---------- */
 let toastTimer=null, undoFn=null;
@@ -1472,12 +1512,15 @@ function deskRowHTML(x, opts, v){ const t=v.t; let date='', dcls='', rem='';
       else if(!(opts.noToday&&x.date===t) && x.date!==opts.day){ date=fmtDate(x.date); if(x.date<t) dcls=' over'; } }
     if(x.reminder) rem=x.date&&localDay(x.reminder)===x.date?fmtTime(x.reminder):fmtDateTime(x.reminder); }
   const tag=v.p&&!opts.noProj?'<span class="tag">'+esc(v.p.name)+'</span>':'';
-  return '<div class="row'+(v.done?' done':'')+(v.held?' held':'')+(opts.byDay?' byday':'')+(v.selected?' selected':'')+'" data-id="'+x.id+'"'+(v.pc?' style="'+tagVars(v.pc)+'"':'')+'>'+
-    '<div class="row-content">'+(v.selecting?'<span class="selbox">'+I.check+'</span>':'<button class="check'+(v.shownDone?' done':'')+'" data-act="check" aria-label="Completar">'+I.check+'</button>')+
-    '<div class="row-text"><div class="row-title">'+esc(x.title||'Sin título')+'</div>'+tag+'</div>'+
+  // R15, R16: the selected row (cur), the multiple selection, the selection mode's boxes and the title edited in place; "Lo primero" repeats rows and shows none of the selection
+  const ds=UI.dsel, own=!opts.simple, multi=deskMulti(), sel=own&&multi&&ds.ids.has(x.id), cur=own&&!multi&&ds.cur===x.id, edit=own&&ds.edit&&ds.edit.id===x.id;
+  v.selecting=own&&ds.mode;
+  return '<div class="row'+(v.done?' done':'')+(v.held?' held':'')+(opts.byDay?' byday':'')+(sel?' selected':'')+(cur?' cur':'')+'" data-id="'+x.id+'"'+(v.pc?' style="'+tagVars(v.pc)+'"':'')+' role="option" aria-selected="'+(sel||cur)+'" tabindex="'+(own&&ds.cur===x.id?0:-1)+'"'+(edit?'':' draggable="true"')+'>'+
+    '<div class="row-content">'+(v.selecting?'<span class="selbox">'+I.check+'</span>':'<button class="check'+(v.shownDone?' done':'')+'" data-act="check" aria-label="Completar" tabindex="-1">'+I.check+'</button>')+
+    '<div class="row-text">'+(edit?'<input class="rowedit" data-role="rowedit" type="text" value="'+esc(ds.edit.text)+'" aria-label="Título" autocomplete="off" spellcheck="false">':'<div class="row-title">'+esc(x.title||'Sin título')+'</div>'+tag)+'</div>'+
     '<span class="inds">'+v.ind+'</span><span class="row-meta"><span class="rc rc-date'+dcls+'"'+(date?' title="'+esc(date)+'"':'')+'>'+date+'</span><span class="rc rc-rem"'+(rem?' title="Recordatorio: '+esc(rem)+'"':'')+'>'+(rem?I.bell+rem:'')+'</span></span>'+
     '<span class="pri'+(v.pri?(x.priority==='high'?' high':' mid'):'')+'">'+(v.pri?(x.priority==='high'?'!!!':'!!'):'')+'</span>'+
-    (v.selecting?'':opts.simple?'<span class="rowmore" aria-hidden="true"></span>':'<button class="rowmore" data-act="rowMenu" aria-label="Más" title="Más">'+I.more+'</button>')+'</div></div>'; } // "Lo primero" keeps the columns aligned with the list
+    (v.selecting?'':opts.simple?'<span class="rowmore" aria-hidden="true"></span>':'<button class="rowmore" data-act="rowMenu" aria-label="Más" title="Más" tabindex="-1">'+I.more+'</button>')+'</div></div>'; } // "Lo primero" keeps the columns aligned with the list
 // The reminder line of the summary: the next one within two hours, kept until five minutes after its time
 function soonReminder(){ return spaceTasks().filter(x=>x.status==='pending'&&x.reminder).map(x=>({x,d:new Date(x.reminder).getTime()-Date.now()})).filter(o=>o.d>-5*6e4&&o.d<2*36e5).sort((a,b)=>a.d-b.d)[0]; }
 // What the summary shows that changes with the clock alone (that reminder line and the 19:00 button): the minute timer redraws when it differs
@@ -1761,6 +1804,7 @@ function onClick(e){
   const ua=e.target.closest('[data-unarchive]'); if(ua){ const p=proj(ua.dataset.unarchive); p.archived=false; p.modified=new Date().toISOString(); save(); render(); return; }
   const pf=e.target.closest('[data-pf]'); if(pf){ const v=pf.dataset.pf; UI.projFilter=(v===''||UI.projFilter===v)?null:v; haptic(4); render(); return; }
   if(UI.select){ const row=e.target.closest('.row'); if(row && !row.closest('.first')){ toggleSelected(row); return; } }
+  if(UI.wide){ const row=e.target.closest('.main .mbody .row[data-id]'); if(row && deskRowClick(e, row)) return; } // R16: Comando, Mayúsculas or the selection mode
   const act=e.target.closest('[data-act]'); if(!act) { const row=e.target.closest('.row');
     if(row && row.closest('.first')){ if(UI.wide){ if(HELD.has(row.dataset.id)) toggleHold(row.dataset.id); else openDetail(row.dataset.id); } return; } // on the iPhone bindCommon opens "Lo primero" rows; the desktop has only this handler
     if(row) { if(row.dataset.open==='1'){ closeRow(row); return; } if(HELD.has(row.dataset.id)){ toggleHold(row.dataset.id); return; } openDetail(row.dataset.id); } return; } // a tap on a marked row unmarks it
@@ -1782,6 +1826,9 @@ function onClick(e){
     case 'bulkPostpone': bulkPostponeSheet(act); break;
     case 'bulkMove': bulkMoveSheet(act); break;
     case 'bulkDelete': bulkDelete(); break;
+    case 'bulkDate': bulkDateMenu(act); break; // R16, desktop pane
+    case 'bulkPriority': bulkPriorityMenu(act); break;
+    case 'bulkSpace': bulkSpaceMenu(act); break;
     case 'searchDone': UI.searchDone=true; render(); break;
     case 'toggleSummary': toggleSummary(); break;
     case 'toggleDone': DB.settings.doneOpen=!DB.settings.doneOpen; save(); render(); break;
@@ -1828,7 +1875,7 @@ function push(kind,id){
   const below=underScreen(); app.appendChild(el); navLock(); const s={kind,id,el}; UI.stack.push(s); renderPushed(s); if(below) below.classList.add('under');
   requestAnimationFrame(()=>requestAnimationFrame(()=>{ el.classList.remove('pushed'); el.classList.add('shown'); }));
 }
-function openDetail(id){ if(UI.wide){ UI.deskDetail=id; render(); return; } push('detail', id); }
+function openDetail(id){ if(UI.wide){ const ds=UI.dsel; UI.deskDetail=id; ds.cur=ds.anchor=id; ds.ids.clear(); ds.mode=false; render(); return; } push('detail', id); } // R15: the task in the inspector is the selected row
 // The task the open detail shows: the desktop pane, or the top pushed screen on the iPhone
 function detailTaskId(){ if(UI.wide) return UI.deskDetail; const cur=UI.stack[UI.stack.length-1]; return cur&&cur.kind==='detail'?cur.id:null; }
 function pop(){
@@ -1918,7 +1965,7 @@ function bindLongPress(el, fn){ let t=null, x0=0, y0=0, fired=false;
 const sheet=$('#sheet'), scrim=$('#scrim'), asheet=$('#asheet');
 const dimApp = on => app.classList.toggle('sheet-open', !!on);
 let sheetOnClose=null; // one shot, set by the sheet's owner: runs however the sheet closes (a button, the scrim, a drag down, Escape)
-function openSheet(html, onOpen){ sheetOnClose=null; sheet.classList.remove('addsheet'); sheet.innerHTML='<div class="handle"></div>'+html; sheet.classList.add('on'); scrim.classList.add('on'); dimApp(true); bindSheetDrag(); onOpen&&onOpen(sheet); }
+function openSheet(html, onOpen){ sheetOnClose=null; sheet.classList.remove('addsheet','keysheet'); sheet.innerHTML='<div class="handle"></div>'+html; sheet.classList.add('on'); scrim.classList.add('on'); dimApp(true); bindSheetDrag(); onOpen&&onOpen(sheet); }
 function closeSheet(){ closeMenu(true); sheet.classList.remove('on','drag'); sheet.style.transform=''; asheet.classList.remove('on'); asheet.onclick=null; scrim.classList.remove('on'); dimApp(false); try{ stopRec&&stopRec(); }catch(e){} setTimeout(()=>{ if(!sheet.classList.contains('on')) sheet.innerHTML=''; if(!asheet.classList.contains('on')) asheet.innerHTML=''; },350); const oc=sheetOnClose; sheetOnClose=null; if(oc) oc(); if(staleView) setTimeout(flushStale, 0); } // a closed menu keeps no buttons or handler that a stray click could fire; data reloaded meanwhile is drawn now, unless the caller already redrew
 /* An action menu opened over an open sheet (the Proyecto and Prioridad chips of Nueva tarea) is nested:
    Cancelar, a tap outside or Escape close only the menu and give the sheet back with what was typed */
@@ -2167,7 +2214,7 @@ function dateMenu(id){ const x=task(id); if(!x) return null; const t=todayStr();
   const ds=uniqueBy([['Hoy',t,'H'],['Mañana',addDays(t,1),'M'],['Viernes',nextWeekday(5,true),'V'],['Próxima semana',nextWeekday(1,true),'S']], o=>o[1]);
   return {title:'Fecha', groups:[ds.map(([l,d,k])=>({label:l, key:k, on:x.date===d, fn:()=>setTaskDate(id,d)})), [{label:'Sin fecha', on:!x.date, fn:()=>setTaskDate(id,null)}], [{label:'Elegir fecha…', key:'F', fn:()=>dateSheet(id)}]]}; }
 /* R17: the desktop menu of a task (right click, its three dots): Completar, then Fecha, Prioridad and Proyecto as submenus with a check
-   on the current value, Mover a otro espacio, Duplicar and Eliminar, each with the key batch G gives it */
+   on the current value, Mover a otro espacio, Duplicar and Eliminar, each with the key that acts on the selected row (R15) */
 function deskTaskMenu(id){ const x=task(id); if(!x) return null; const done=x.status==='done';
   return {groups:[
     [{label:done?'Marcar pendiente':'Completar', key:'C', fn:()=>{ releaseHold(id); leaveRows(id); setTimeout(()=>{ completeTask(id); renderAnimated(); },200); }}],
@@ -2188,19 +2235,21 @@ function postponeSheet(id, src){ releaseHold(id); const m=postponeMenu(id); if(m
 /* Multi-select: entered from the long-press menu; a bottom bar replaces the tab bar */
 function renderSelbar(){ const n=UI.select?UI.select.ids.size:0; const b=(act,ic,l,red)=>'<button data-act="'+act+'"'+(n?'':' disabled')+(red?' class="red"':'')+'>'+ic+'<span>'+l+'</span></button>'; $('#selbar').innerHTML=b('bulkComplete',I.check,'Completar')+b('bulkPostpone',I.cal,'Aplazar')+b('bulkMove',I.folder,'Mover')+b('bulkDelete',I.trash,'Eliminar',true); }
 function startSelect(id){ flushHeld(true); const top=UI.stack[UI.stack.length-1]; UI.select={scope: top&&top.kind==='project'?'project':'root', ids:new Set(id?[id]:[]), all:false}; if(openRow) closeRow(openRow); app.classList.add('selecting'); render(); renderSelbar(); haptic(6); }
-function endSelect(){ UI.select=null; app.classList.remove('selecting'); render(); }
+function endSelect(){ if(UI.wide){ endDeskSelect(); return; } UI.select=null; app.classList.remove('selecting'); render(); } // the desktop's own selection (R16) ends the same way
 function visibleRowIds(){ const scr=UI.select.scope==='project'?UI.stack[UI.stack.length-1].el:rootScreen('tareas'); return [...scr.querySelectorAll('.scroll .row[data-id], .scroll .rph[data-id]')].filter(r=>!r.closest('.first')).map(r=>r.dataset.id); } // rows of a long list not drawn yet count too
 function updateSelectUI(){ const n=UI.select.ids.size; const t=$('#selTitle'); if(t) t.textContent=n?n+(n===1?' seleccionada':' seleccionadas'):'Seleccionar'; const b=$('[data-act=selAll]'); if(b) b.textContent=UI.select.all?'Ninguna':'Todas'; renderSelbar(); } // the label always says what a tap will do
 function toggleSelected(row){ const id=row.dataset.id; if(UI.select.ids.has(id)){ UI.select.ids.delete(id); row.classList.remove('selected'); } else { UI.select.ids.add(id); row.classList.add('selected'); } const vis=visibleRowIds(); UI.select.all=vis.length>0&&vis.every(i=>UI.select.ids.has(i)); haptic(4); updateSelectUI(); }
 function selectAllVisible(){ const ids=visibleRowIds(); if(UI.select.all){ UI.select.ids.clear(); UI.select.all=false; } else { ids.forEach(i=>UI.select.ids.add(i)); UI.select.all=true; } render(); renderSelbar(); }
-function selectedTasks(){ return UI.select ? [...UI.select.ids].map(task).filter(Boolean) : []; } // empty once selection mode has ended
+// The selected ids: the iPhone's selection mode or, on the desktop, its multiple selection (R16), which the same bulk actions use
+function selSet(){ return UI.wide ? (deskMulti()?UI.dsel.ids:null) : UI.select ? UI.select.ids : null; }
+function selectedTasks(){ const s=selSet(); return s ? [...s].map(task).filter(Boolean) : []; } // empty once selection mode has ended
 function bulkComplete(){ const xs=selectedTasks(); if(!xs.length) return; const prev=xs.map(x=>({id:x.id, status:x.status, completed:x.completed})); const now=new Date().toISOString(); batch(()=>xs.forEach(x=>{ if(x.status==='pending') updTask(x.id,{status:'done', completed:now}); })); const n=prev.filter(p=>p.status==='pending').length; log('info','Completadas en bloque: '+n); endSelect(); toast(n+(n===1?' tarea completada':' tareas completadas'), ()=>batch(()=>prev.forEach(p=>updTask(p.id,{status:p.status, completed:p.completed})))); }
 function bulkDelete(){ const xs=selectedTasks(); if(!xs.length) return; confirmSheet('Eliminar '+xs.length+(xs.length===1?' tarea':' tareas'), 'Podrás deshacerlo durante unos segundos.', ()=>{ const ids=new Set(xs.map(x=>x.id)); const removedT=DB.tasks.filter(x=>ids.has(x.id)), removedV=DB.voiceNotes.filter(v=>ids.has(v.taskId)); DB.tasks=DB.tasks.filter(x=>!ids.has(x.id)); DB.voiceNotes=DB.voiceNotes.filter(v=>!ids.has(v.taskId)); save(); log('info','Eliminadas en bloque: '+removedT.length); endSelect(); haptic(14); toast(removedT.length+(removedT.length===1?' tarea eliminada':' tareas eliminadas'), ()=>{ DB.tasks.push(...removedT); DB.voiceNotes.push(...removedV); save(); }); }); }
 function bulkReschedule(date, label){ const xs=selectedTasks(); if(!xs.length) return; const prev=xs.map(x=>({id:x.id, date:x.date, carried:x.carried})); batch(()=>xs.forEach(x=>updTask(x.id,{date}))); endSelect(); toast(xs.length+(xs.length===1?' tarea aplazada a ':' tareas aplazadas a ')+label, ()=>batch(()=>prev.forEach(p=>updTask(p.id,{date:p.date, carried:p.carried})))); }
-function bulkPostponeSheet(src){ if(!UI.select||!UI.select.ids.size) return; const t=todayStr(); const opts=uniqueBy([['Mañana',addDays(t,1)],['Fin de semana',weekendDay()],['Próxima semana',nextWeekday(1,true)],['En una semana',addDays(t,7)]], o=>o[1]);
-  popMenu({anchor:src, title:'Aplazar '+UI.select.ids.size+(UI.select.ids.size===1?' tarea':' tareas'), groups:[opts.map(([l,d])=>dateItem(l, d, ()=>bulkReschedule(d,l.toLowerCase()))), [dateItem('Sin fecha', null, ()=>bulkReschedule(null,'sin fecha'))]]}); }
-function bulkMoveSheet(src){ if(!UI.select||!UI.select.ids.size) return; const ps=activeProjects(); const n=UI.select.ids.size;
-  const dot=c=>'<span class="pm-dot" style="background:'+c+'"></span>'; popMenu({anchor:src, title:'Mover '+n+(n===1?' tarea':' tareas'), groups:[[{label:'Sin proyecto', icon:dot('var(--ink3)'), fn:()=>bulkMove(null)}].concat(ps.map(p=>({label:p.name, icon:dot(p.color), fn:()=>bulkMove(p.id)})))]}); }
+function bulkPostponeSheet(src){ const sel=selSet(); if(!sel||!sel.size) return; const t=todayStr(); const opts=uniqueBy([['Mañana',addDays(t,1)],['Fin de semana',weekendDay()],['Próxima semana',nextWeekday(1,true)],['En una semana',addDays(t,7)]], o=>o[1]);
+  popMenu({anchor:src, align:UI.wide?'left':undefined, title:'Aplazar '+sel.size+(sel.size===1?' tarea':' tareas'), groups:[opts.map(([l,d])=>dateItem(l, d, ()=>bulkReschedule(d,l.toLowerCase()))), [dateItem('Sin fecha', null, ()=>bulkReschedule(null,'sin fecha'))]]}); }
+function bulkMoveSheet(src){ const sel=selSet(); if(!sel||!sel.size) return; const ps=activeProjects(); const n=sel.size;
+  const dot=c=>'<span class="pm-dot" style="background:'+c+'"></span>'; popMenu({anchor:src, align:UI.wide?'left':undefined, title:'Mover '+n+(n===1?' tarea':' tareas'), groups:[[{label:'Sin proyecto', icon:dot('var(--ink3)'), fn:()=>bulkMove(null)}].concat(ps.map(p=>({label:p.name, icon:dot(p.color), fn:()=>bulkMove(p.id)})))]}); }
 function bulkMove(projectId){ const xs=selectedTasks(); if(!xs.length) return; const prev=xs.map(x=>({id:x.id, projectId:x.projectId})); batch(()=>xs.forEach(x=>updTask(x.id,{projectId}))); const p=projectId?proj(projectId):null; endSelect(); toast(xs.length+(xs.length===1?' tarea movida a ':' tareas movidas a ')+(p?p.name:'Sin proyecto'), ()=>batch(()=>prev.forEach(q=>updTask(q.id,{projectId:q.projectId})))); }
 function rescheduleMany(xs, date, label){ if(!xs.length) return; const prev=xs.map(x=>({id:x.id, date:x.date, carried:x.carried})); batch(()=>xs.forEach(x=>updTask(x.id,{date}))); renderAnimated(); haptic(8); log('info','Aplazadas en bloque: '+xs.length+' a '+date); toast(xs.length+(xs.length===1?' tarea ':' tareas ')+(date?(xs.length===1?'pasada a ':'pasadas a ')+label:'sin fecha'), ()=>batch(()=>prev.forEach(p=>updTask(p.id,{date:p.date, carried:p.carried})))); }
 // What tomorrow starts with, in the active space: "Mañana empieza con 6 tareas, 2 prioritarias"
@@ -2270,9 +2319,9 @@ function spaceMenu(src){ const pickSpace=s=>{ DB.settings.activeSpace=s.id; save
   popMenu({anchor:src, align:'left', groups:[sps.map(s=>({label:s.name, on:s.id===space().id, fn:()=>pickSpace(s)})), [{label:'Nuevo espacio', icon:MI.plus, fn:()=>spaceSheet(null)}]]}); }
 function viewMenu(src){ const top=UI.stack[UI.stack.length-1]; const inProject=UI.wide?UI.deskView.startsWith('project:'):!!(top&&top.kind==='project');
   const f=inProject?null:UI.wide?UI.deskView:DB.settings.filter; const k=f==='hoy'?'hoyGroup':'allGroup', g=DB.settings[k]==='project'?'project':'date';
-  // R10 and R17: an anchored menu, the grouping as a checked pair. The desktop has no multiple selection yet (R16)
+  // R10 and R17: an anchored menu, the grouping as a checked pair. On the desktop Seleccionar tareas starts its own selection (R16)
   popMenu({anchor:src, align:UI.wide?'right':undefined, groups:[
-    (UI.wide?[]:[{label:'Seleccionar tareas', icon:MI.select, fn:()=>startSelect(null)}]).concat([{label:DB.settings.doneOpen?'Ocultar completadas':'Mostrar completadas', icon:DB.settings.doneOpen?MI.eyeOff:MI.eye, fn:()=>{ DB.settings.doneOpen=!DB.settings.doneOpen; save(); render(); }}]),
+    [{label:'Seleccionar tareas', icon:MI.select, fn:()=>UI.wide?startDeskSelect():startSelect(null)}].concat([{label:DB.settings.doneOpen?'Ocultar completadas':'Mostrar completadas', icon:DB.settings.doneOpen?MI.eyeOff:MI.eye, fn:()=>{ DB.settings.doneOpen=!DB.settings.doneOpen; save(); render(); }}]),
     f==='hoy'||f==='todas'?[{label:'Agrupar por fecha', icon:MI.cal, on:g==='date', fn:()=>setGrouping(k,'date')}, {label:'Agrupar por proyecto', icon:MI.folder, on:g==='project', fn:()=>setGrouping(k,'project')}]:[],
     f==='hoy'?[{label:summaryCollapsed(pendingFor('hoy').length)?'Mostrar resumen del día':'Plegar resumen del día', icon:MI.summary, fn:toggleSummary}]:[] ]}); }
 /* R14: a day header of Todas. A long press (iPhone) or a right click (desktop, at the pointer: pt) offers to move its tasks to another day */
@@ -2745,15 +2794,158 @@ window.addEventListener('pageshow', e=>{ if(e.persisted) reloadIfChanged(); });
 
 /* ---------- Desktop layout ---------- */
 function mondayOf(d){ const x=new Date(d+'T00:00:00'); return addDays(d, -((x.getDay()+6)%7)); }
-function setDeskView(v){ if(v==='project:none') v='project:none'; UI.deskView=v; UI.deskDetail=null; UI.query=''; UI.searchDone=false; UI.sumFilter=null; if(v==='hoy'||v==='todas'){ DB.settings.filter=v; save(); } render(); }
+function setDeskView(v){ if(v==='project:none') v='project:none'; UI.deskView=v; UI.deskDetail=null; UI.dsel.ids.clear(); UI.dsel.mode=false; UI.dsel.edit=null; UI.query=''; UI.searchDone=false; UI.sumFilter=null; if(v==='hoy'||v==='todas'){ DB.settings.filter=v; save(); } render(); } // another list starts with nothing selected (R16)
+/* ---------- R15, R16: the desktop lists' selected row, keyboard and multiple selection ----------
+   UI.dsel.cur is the selected row, apart from the hover (the inspector, when open, shows it); arrows or J and K move it and the inspector
+   follows, as in Mail. ids is the multiple selection (Comando clic, Mayúsculas clic, Comando A, Mayúsculas y flechas): it counts from two
+   rows on, or from none in the mode the view menu starts (Seleccionar tareas), and then the pane offers the iPhone's bulk actions.
+   order and idx remember the list as last drawn, so a row that leaves it (done, moved, deleted) hands the selection to its neighbour.
+   The iPhone keeps its own selection mode (UI.select) */
+function deskMulti(){ return UI.wide && (UI.dsel.mode || UI.dsel.ids.size>1); }
+function deskListView(){ const v=UI.deskView; return v==='hoy'||v==='todas'||v.startsWith('project:'); }
+// The rows of the visible list in order, with the placeholders of a long one; "Lo primero" repeats rows and is left out
+function deskOrder(){ return [...document.querySelectorAll('#desk .main .mbody .row[data-id], #desk .main .mbody .rph[data-id]')].filter(r=>!r.closest('.first')).map(r=>r.dataset.id); }
+function deskRow(id){ return id?document.querySelector('#desk .main .mbody .row[data-id="'+CSS.escape(id)+'"]:not(.first .row)'):null; }
+// The selection changed without the rows' markup: classes, ARIA and the one row the Tab key reaches
+function paintSel(){ const ds=UI.dsel, multi=deskMulti();
+  document.querySelectorAll('#desk .main .mbody .row[data-id]').forEach(r=>{ if(r.closest('.first')) return; const id=r.dataset.id, s=multi&&ds.ids.has(id), c=!multi&&ds.cur===id;
+    r.classList.toggle('selected', s); r.classList.toggle('cur', c); r.setAttribute('aria-selected', s||c); r.tabIndex=ds.cur===id?0:-1; });
+  const f=deskRow(ds.cur)||[...document.querySelectorAll('#desk .main .mbody .row[data-id]')].find(r=>!r.closest('.first')); if(f) f.tabIndex=0; } // the list is one stop of the Tab key
+// A row brought into view (a long list draws it first) and given the focus, which shows the ring when it came from the keyboard
+function revealRow(id, focus){ let r=deskRow(id); const sc=document.querySelector('#desk .main .mbody');
+  if(!r&&sc){ const ph=sc.querySelector('.rph[data-id="'+CSS.escape(id)+'"]'); if(ph){ ph.scrollIntoView({block:'nearest'}); fillRows(sc); r=deskRow(id); } }
+  if(!r) return null; r.scrollIntoView({block:'nearest'}); if(focus!==false) r.focus({preventScroll:true}); return r; }
+// After a desktop draw: the selection keeps only rows still listed, and a selected row that left hands over to its neighbour.
+// The inspector follows it only after a key (follow); a task done or moved from the inspector stays shown and selected.
+// Returns true when the pane must change (a redraw)
+function syncSel(paneWas){ const ds=UI.dsel, key=UI.deskView+'|'+DB.settings.activeSpace, before=deskMulti();
+  if(!deskListView()){ ds.ids.clear(); ds.mode=false; ds.edit=null; ds.cur=UI.deskDetail; ds.order=[]; ds.key=key; ds.follow=false; return false; }
+  const order=deskOrder(), has=new Set(order); let redo=false;
+  ds.ids.forEach(id=>{ if(!has.has(id)) ds.ids.delete(id); });
+  if(ds.edit&&!has.has(ds.edit.id)) ds.edit=null;
+  if(ds.cur&&!has.has(ds.cur)&&!(UI.deskDetail===ds.cur&&!ds.follow)){
+    const i=ds.key===key?ds.order.indexOf(ds.cur):-1; let n=null;
+    if(i>=0){ for(let k=i+1;k<ds.order.length&&!n;k++) if(has.has(ds.order[k])) n=ds.order[k]; for(let k=i-1;k>=0&&!n;k--) if(has.has(ds.order[k])) n=ds.order[k]; }
+    if(ds.follow&&paneWas===ds.cur&&!deskMulti()){ UI.deskDetail=n; redo=true; }
+    ds.cur=n; }
+  if(!ds.mode&&ds.ids.size===1){ ds.cur=[...ds.ids][0]; ds.ids.clear(); }
+  if(before!==deskMulti()) redo=true;
+  const ci=order.indexOf(ds.cur); if(ci>=0) ds.idx=ci;
+  ds.follow=false; ds.order=order; ds.key=key; return redo; }
+function endDeskSelect(){ const ds=UI.dsel; ds.ids.clear(); ds.mode=false; ds.anchor=ds.cur; render(); }
+// Seleccionar tareas (the view menu): plain clicks then add and remove rows, as on the iPhone; the selected row starts it
+function startDeskSelect(){ const ds=UI.dsel; flushHeld(true); ds.mode=true; ds.ids.clear(); ds.edit=null; if(ds.cur&&deskRow(ds.cur)) ds.ids.add(ds.cur); UI.deskDetail=null; render(); }
+// Comando A: every row of the list (the rows of a long list not drawn yet too)
+function selectAllDesk(){ const ds=UI.dsel, o=deskOrder(); if(!o.length) return; flushHeld(true); o.forEach(id=>ds.ids.add(id)); if(!ds.cur||!o.includes(ds.cur)) ds.cur=o[0]; if(o.length>1||ds.mode) UI.deskDetail=null; else ds.ids.clear(); render(); }
+function selRange(a, b){ const o=deskOrder(); let i=o.indexOf(a), j=o.indexOf(b); if(j<0) return []; if(i<0) i=j; if(i>j) [i,j]=[j,i]; return o.slice(i, j+1); }
+// One selected task left of several: it shows in the inspector, which was showing the selection
+function oneLeft(wasMulti){ const ds=UI.dsel; if(ds.mode||ds.ids.size!==1) return; const id=[...ds.ids][0]; ds.ids.clear(); ds.cur=id; ds.anchor=id; if(wasMulti||UI.deskDetail) UI.deskDetail=id; }
+// A click on a row with Comando or Control (add or take it out), with Mayúsculas (the stretch from the last row clicked), or any click
+// in the selection mode. A plain click is left to onClick: it selects the row and opens the inspector (openDetail)
+function deskRowClick(e, row){ const ds=UI.dsel, id=row.dataset.id, mod=e.metaKey||e.ctrlKey;
+  if(e.target.closest('.rowedit')) return true; // a click inside the title being edited stays there
+  // R15: a double click edits the title in place. Read from the second click: the first one redrew the row, so no dblclick event reaches it
+  if(e.detail===2&&!mod&&!e.shiftKey&&!ds.mode&&!row.closest('.first')&&!e.target.closest('button')){ startRowEdit(id); return true; }
+  if(e.target.closest('[data-act=rowMenu]')||(!mod&&!e.shiftKey&&!ds.mode)) return false;
+  if(!task(id)) return true; const was=deskMulti(); flushEdits(); flushHeld(true);
+  if(e.shiftKey){ const r=selRange(ds.anchor&&deskRow(ds.anchor)?ds.anchor:ds.cur||id, id); if(!mod&&!ds.mode) ds.ids.clear(); else if(!ds.ids.size&&ds.cur&&deskRow(ds.cur)) ds.ids.add(ds.cur); r.forEach(i=>ds.ids.add(i)); ds.cur=id; }
+  else { if(!ds.mode&&!ds.ids.size&&ds.cur&&ds.cur!==id&&deskRow(ds.cur)) ds.ids.add(ds.cur); // the row already selected joins the new one
+    if(ds.ids.has(id)) ds.ids.delete(id); else ds.ids.add(id); ds.cur=id; ds.anchor=id; }
+  if(deskMulti()) UI.deskDetail=null; else oneLeft(was);
+  haptic(4); render(); return true; }
+// Arrows (or J and K) move the selected row; with Mayúsculas they stretch the selection. With the inspector open it shows the new row
+function moveSel(dir, extend){ const ds=UI.dsel, o=deskOrder(); if(!o.length) return; const i=o.indexOf(ds.cur), was=deskMulti();
+  const n = i>=0 ? Math.max(0, Math.min(o.length-1, i+dir)) : ds.cur ? (dir>0?Math.min(ds.idx, o.length-1):Math.max(0, ds.idx-1)) : dir>0?0:o.length-1; // a row that just left: its neighbours
+  const id=o[n]; ds.idx=n;
+  // A new stretch starts at the selected row
+  if(extend&&!ds.mode){ const a=was&&ds.anchor&&o.includes(ds.anchor)?ds.anchor:(i>=0?ds.cur:id); ds.anchor=a; ds.ids.clear(); selRange(a, id).forEach(k=>ds.ids.add(k)); ds.cur=id; if(deskMulti()) UI.deskDetail=null; else oneLeft(was); }
+  else { if(!ds.mode){ ds.ids.clear(); ds.anchor=id; } ds.cur=id; if(UI.deskDetail&&!deskMulti()) UI.deskDetail=id; }
+  if(was||deskMulti()||UI.deskDetail) render(); else paintSel(); // the pane says how many
+  revealRow(id); }
+// The task the single-key shortcuts act on: the one the inspector shows, or the selected row while it is listed
+function keyTarget(){ const id=UI.deskDetail||UI.dsel.cur; if(!id||!task(id)) return null; return id===UI.deskDetail||deskRow(id)||document.querySelector('#desk .main .rph[data-id="'+CSS.escape(id)+'"]')?id:null; }
+// An action that may take the row out of the list: the selection, and the inspector, go on to the next row (as Mail)
+function followAct(fn){ UI.dsel.follow=true; try{ fn(); } finally{ UI.dsel.follow=false; } }
+function togglePane(){ if(deskMulti()) return; if(UI.deskDetail){ pop(); revealRow(UI.dsel.cur); return; } const id=keyTarget(); if(id){ openDetail(id); revealRow(id); } }
+/* R15: the title edited in the row itself (Intro or a double click): Intro keeps it, Esc leaves it as it was, and a click elsewhere keeps it too.
+   It is drawn by deskRowHTML from UI.dsel.edit, so a redraw meanwhile keeps the field and what was typed */
+function startRowEdit(id){ const x=task(id); if(!x||!deskRow(id)||deskMulti()) return; flushEdits(); UI.dsel.edit={id, text:x.title, fresh:true}; UI.dsel.cur=id; render(); }
+function endRowEdit(keep){ const ds=UI.dsel, ed=ds.edit; if(!ed) return false; ds.edit=null; const x=task(ed.id), inp=document.querySelector('#desk [data-role=rowedit]'); const v=(inp?inp.value:ed.text).replace(/\s+/g,' ').trim();
+  const ok=keep&&x&&v&&v!==x.title;
+  if(inp){ const t=document.createElement('div'); t.className='row-title'; t.textContent=(ok?v:x&&x.title)||'Sin título'; const row=inp.closest('.row'); inp.replaceWith(t); if(row) row.draggable=true; } // in place: a click elsewhere keeps its target
+  if(ok){ const old=x.title; updTask(ed.id,{title:v}); log('info','Título cambiado en la fila'); toast('Título cambiado', ()=>updTask(ed.id,{title:old})); }
+  return ok; }
+/* R15: the single-key shortcuts of the desktop, the ones deskTaskMenu and dateMenu show. With several rows selected they act on all of them */
+function deskShortcut(k){ const t=todayStr(), dates={h:t, m:addDays(t,1), v:nextWeekday(5,true), s:nextWeekday(1,true)}, pr={'1':'high','2':'mid','0':'none'};
+  const del=k==='Delete'||k==='Backspace'; k=k.length===1?k.toLowerCase():k;
+  if(deskMulti()){ if(!UI.dsel.ids.size) return false; const btn=a=>document.querySelector('#desk .pane.multi [data-act='+a+']');
+    if(k==='c') bulkComplete(); else if(k in pr) bulkPriority(pr[k]); else if(k in dates) bulkDate(dates[k]); else if(k==='f') bulkDateMenu(btn('bulkDate')); else if(k==='p') bulkMoveSheet(btn('bulkMove')); else if(del) bulkDelete(); else return false; return true; }
+  const id=keyTarget(); if(!id) return false; const x=task(id);
+  if(k==='c'){ releaseHold(id); leaveRows(id); setTimeout(()=>{ if(!task(id)) return; followAct(()=>{ completeTask(id); renderAnimated(); }); revealRow(UI.dsel.cur); }, 200); }
+  else if(k in pr) setPriority(id, pr[k]);
+  else if(k in dates){ followAct(()=>setTaskDate(id, dates[k])); revealRow(UI.dsel.cur); }
+  else if(k==='f') dateSheet(id);
+  else if(k==='p') pickProjectSheet(id);
+  else if(del) confirmDelete(id, ()=>{ followAct(()=>renderAnimated()); revealRow(UI.dsel.cur); });
+  else return false;
+  return !!x; }
+function shortcutsSheet(){ const k=(a,b)=>'<div class="kr"><span class="kk">'+a.map(x=>'<kbd>'+x+'</kbd>').join(' ')+'</span><span>'+b+'</span></div>', g=(t,rows)=>'<div class="kg"><div class="ks">'+t+'</div>'+rows.join('')+'</div>';
+  openSheet('<h2>Atajos de teclado</h2><div class="keys">'+
+    g('Lista', [k(['Arriba','Abajo'],'Tarea anterior o siguiente'), k(['J','K'],'Lo mismo'), k(['Mayúsculas','Abajo'],'Ampliar la selección'), k(['Espacio'],'Abrir o cerrar el detalle'), k(['Intro'],'Cambiar el título, también con doble clic'), k(['N'],'Nueva tarea'), k(['/'],'Buscar'), k(['Esc'],'Cerrar o quitar la selección')])+
+    g('Varias tareas', [k([MODK,'clic'],'Añadir o quitar una'), k(['Mayúsculas','clic'],'Seleccionar un tramo'), k([MODK,'A'],'Seleccionar todas'), k(['Arrastrar'],'A un proyecto, a Hoy o a un día')])+
+    g('Tarea seleccionada', [k(['C'],'Completar'), k(['1','2','0'],'Prioridad alta, media o ninguna'), k(['H','M'],'Hoy o mañana'), k(['V','S'],'Viernes o la próxima semana'), k(['F'],'Elegir fecha'), k(['P'],'Elegir proyecto'), k(['Supr'],'Eliminar')])+
+    g('General', [k([MODK,'Z'],'Deshacer'), k(['?'],'Estos atajos')])+
+    '</div><div class="sheet-actions"><span style="flex:1"></span><button class="btn primary" data-close>Hecho</button></div>', s=>{ s.classList.add('keysheet'); s.onclick=e=>{ if(e.target.closest('[data-close]')) closeSheet(); }; }); }
+/* R16: the pane with several tasks selected: how many, which, and the iPhone's bulk actions plus Fecha, Prioridad and Mover a espacio */
+function multiPaneHTML(){ const ds=UI.dsel, xs=[...ds.ids].map(task).filter(Boolean), n=xs.length, dis=n?'':' disabled';
+  const b=(act,ic,l,key,red)=>'<button class="mact'+(red?' red':'')+'" data-act="'+act+'"'+dis+' aria-haspopup="'+(/Complete|Delete/.test(act)?'false':'menu')+'">'+ic+'<span class="l">'+l+'</span>'+(key?'<span class="k">'+key+'</span>':'')+'</button>';
+  const list=xs.slice(0,6).map(x=>'<li>'+esc(x.title||'Sin título')+'</li>').join('')+(n>6?'<li class="more">y '+(n-6)+' más</li>':'');
+  return '<section class="pane multi" aria-label="Tareas seleccionadas"><div class="screen detail"><header class="ihead"><button class="ix" data-act="selDone" aria-label="Quitar la selección" title="Quitar la selección (Esc)">'+XICON+'</button><span class="grow"></span></header><div class="scroll">'+
+    '<h2 class="mtitle">'+(n?(n===1?'1 tarea seleccionada':n+' tareas seleccionadas'):'Ninguna tarea seleccionada')+'</h2>'+(n?'<ul class="mlist">'+list+'</ul>':'')+
+    (ds.mode?'<p class="mhint">Haz clic en las tareas para añadirlas o quitarlas. Con Mayúsculas y clic, un tramo.</p>':'')+
+    '<div class="mgroup">'+b('bulkComplete',MI.done,'Completar','C')+b('bulkPostpone',MI.postpone,'Aplazar')+b('bulkDate',MI.cal,'Fecha','F')+b('bulkMove',MI.folder,'Proyecto','P')+b('bulkPriority',MI.p3,'Prioridad')+(DB.spaces.length>1?b('bulkSpace',MI.space,'Mover a espacio'):'')+'</div>'+
+    '<div class="mgroup">'+b('bulkDelete',MI.trash,'Eliminar','Supr',true)+'</div></div></div></section>'; }
+// The desktop bulk actions the iPhone does not have; they end the selection and give one Deshacer, as the others
+function bulkPriority(pr){ const xs=selectedTasks().filter(x=>x.priority!==pr), n=UI.dsel.ids.size; if(!n) return; const prev=xs.map(x=>({id:x.id, priority:x.priority}));
+  batch(()=>xs.forEach(x=>updTask(x.id,{priority:pr}))); haptic(8); log('info','Prioridad en bloque: '+xs.length); endSelect();
+  toast(bulkN(n)+' '+{high:'con prioridad alta',mid:'con prioridad media',none:'sin prioridad'}[pr], xs.length?()=>batch(()=>prev.forEach(p=>updTask(p.id,{priority:p.priority}))):null); }
+function bulkPriorityMenu(src){ const s=selSet(); if(!s||!s.size) return;
+  popMenu({anchor:src, align:'left', title:'Prioridad de '+bulkN(s.size), groups:[[['high','Alta',MI.p3,'1'],['mid','Media',MI.p2,'2'],['none','Ninguna',MI.p0,'0']].map(([k,l,ic,key])=>({label:l, icon:ic, key, fn:()=>bulkPriority(k)}))]}); }
+function bulkDate(d){ const xs=selectedTasks().filter(x=>x.date!==d||x.carried); endSelect(); xs.forEach(x=>releaseHold(x.id)); rescheduleMany(xs, d, d?fmtDate(d).toLowerCase():''); }
+function bulkDateMenu(src){ const s=selSet(); if(!s||!s.size) return; const t=todayStr();
+  const ds=uniqueBy([['Hoy',t,'H'],['Mañana',addDays(t,1),'M'],['Viernes',nextWeekday(5,true),'V'],['Próxima semana',nextWeekday(1,true),'S']], o=>o[1]);
+  popMenu({anchor:src, align:'left', title:'Fecha de '+bulkN(s.size), groups:[ds.map(([l,d,k])=>({label:l, key:k, fn:()=>bulkDate(d)})), [{label:'Sin fecha', fn:()=>bulkDate(null)}], [{label:'Elegir fecha…', fn:()=>bulkCalendar(src)}]]}); }
+function bulkCalendar(src){ let ym=todayStr().slice(0,7);
+  pickerPanel('Fecha', '<div id="calwrap">'+calendarHTML(ym, null)+'</div>', null, src, null, (s, done)=>{
+    s.onclick=e=>{ const nav=e.target.closest('[data-cal]'); if(nav){ ym=shiftMonth(ym,+nav.dataset.cal); $('#calwrap',s).innerHTML=calendarHTML(ym, null); return; }
+      const c=e.target.closest('[data-d]'); if(c){ done(); bulkDate(c.dataset.d||null); } }; }); }
+function bulkSpaceMenu(src){ const s=selSet(); if(!s||!s.size) return; const sps=DB.spaces.filter(sp=>sp.id!==space().id).sort((a,b)=>a.order-b.order); if(!sps.length) return;
+  popMenu({anchor:src, align:'left', title:'Mover '+bulkN(s.size)+' a', groups:[sps.map(sp=>({label:sp.name, icon:MI.space, fn:()=>bulkSpace(sp)}))]}); }
+function bulkSpace(sp){ const xs=selectedTasks(); if(!xs.length) return; const prev=xs.map(x=>({id:x.id, spaceId:x.spaceId, projectId:x.projectId}));
+  xs.forEach(x=>releaseHold(x.id)); batch(()=>xs.forEach(x=>updTask(x.id,{spaceId:sp.id, projectId:null}))); haptic(8); log('info','Movidas a otro espacio en bloque: '+xs.length); endSelect();
+  toast(bulkN(xs.length)+(xs.length===1?' movida a ':' movidas a ')+sp.name, ()=>batch(()=>prev.forEach(p=>updTask(p.id,{spaceId:p.spaceId, projectId:p.projectId})))); }
+// R16: rows dropped on a sidebar project or Sin proyecto
+function dropToProject(ids, pid){ const xs=ids.map(task).filter(x=>x&&(x.projectId||null)!==pid); if(!xs.length){ render(); return; }
+  xs.forEach(x=>releaseHold(x.id)); if(ids.length===1){ moveToProject(xs[0].id, pid); haptic(6); return; } // its own toast and Deshacer
+  const prev=xs.map(x=>({id:x.id, projectId:x.projectId})), p=pid?proj(pid):null; batch(()=>xs.forEach(x=>updTask(x.id,{projectId:pid}))); haptic(6); renderAnimated(); log('info','Tareas arrastradas a un proyecto', {n:xs.length});
+  toast(bulkN(xs.length)+(xs.length===1?' movida a ':' movidas a ')+(p?p.name:'Sin proyecto'), ()=>batch(()=>prev.forEach(q=>updTask(q.id,{projectId:q.projectId})))); }
+// R16: several rows dropped on a day, Hoy, a half hour or Sin fecha, with the rules of dropTask and one Deshacer
+function dropMany(ids, z){ if(ids.length===1) return dropTask(ids[0], z); const xs=ids.map(task).filter(Boolean); if(!xs.length) return;
+  const prev=xs.map(x=>({id:x.id, date:x.date, carried:x.carried, reminder:x.reminder})); let patch, msg;
+  if(z.dataset.slot){ const [day,hm]=z.dataset.slot.split('T'), iso=new Date(day+'T'+hm+':00').toISOString(); patch=()=>({date:day, reminder:iso}); msg=' movidas a '+fmtDate(day).toLowerCase()+' a las '+fmtTime(iso); }
+  else if(z.dataset.allday){ const day=z.dataset.day; patch=x=>remMin(x)!==null?{date:day, reminder:null}:{date:day}; msg=' movidas a '+fmtDate(day).toLowerCase(); }
+  else { const day=z.dataset.day||null; patch=()=>({date:day}); msg=day?' movidas a '+fmtDate(day).toLowerCase():' sin fecha'; }
+  xs.forEach(x=>releaseHold(x.id)); batch(()=>xs.forEach(x=>updTask(x.id, patch(x)))); haptic(6); renderAnimated(); log('info','Tareas arrastradas a una fecha', {n:xs.length, date:z.dataset.day||z.dataset.slot||null});
+  toast(bulkN(xs.length)+msg, ()=>batch(()=>prev.forEach(o=>updTask(o.id,{date:o.date, carried:o.carried, reminder:o.reminder})))); }
 function applyWide(){ const w=wideMQ.matches; if(w===UI.wide) return; closeMenu(true); UI.wide=w; document.documentElement.classList.toggle('wide', w); document.body.classList.toggle('desktop', w); app.classList.toggle('desktop', w);
   if(w){ // the pushed iPhone screens map onto the desktop: a project becomes the view and the last detail the pane
     let pr=null; UI.deskDetail=null; UI.stack.forEach(s=>{ if(s.kind==='project') pr=s.id; else UI.deskDetail=s.id; s.el.remove(); }); UI.stack=[];
     if(UI.select){ UI.select=null; app.classList.remove('selecting'); closeSheet(); } // an open bulk menu would act on nothing
+    Object.assign(UI.dsel, {ids:new Set(), mode:false, edit:null, follow:false});
     if(pr) UI.deskView='project:'+pr; else if(UI.tab==='ajustes') UI.deskView='settings';
     else if(!isCalView(UI.deskView)) UI.deskView=DB.settings.filter; // the list the iPhone showed; the calendar has no iPhone screen, so it is kept
     app.querySelectorAll('.screen.root').forEach(s=>s.remove()); } // hidden on the desktop; render() rebuilds them on the way back
-  else { const d=$('#desk'); if(d) d.remove(); app.classList.remove('has-pane');
+  else { const d=$('#desk'); if(d) d.remove(); app.classList.remove('has-pane'); Object.assign(UI.dsel, {ids:new Set(), mode:false, edit:null, follow:false}); // the iPhone has its own selection mode
     const v=UI.deskView; UI.tab = v==='settings'?'ajustes' : v.startsWith('project:')?'proyectos' : 'tareas';
     // The desktop project view and pane become pushed screens, already in place (no slide-in)
     const put=(kind,id)=>{ const el=document.createElement('div'); el.className='screen pushed-screen shown '+kind; el.dataset.kind=kind; app.appendChild(el); UI.stack.push({kind,id,el}); };
@@ -2763,11 +2955,12 @@ function applyWide(){ const w=wideMQ.matches; if(w===UI.wide) return; closeMenu(
   log('info', w?'Modo escritorio':'Modo móvil'); render(); }
 function deskSide(){
   const ps=activeProjects(); const pend=spaceTasks().filter(x=>x.status==='pending'); const cnt=id=>pend.filter(x=> id===null?!x.projectId:x.projectId===id).length; const v=UI.deskView;
-  const it=(view,ic,label,n,on)=>'<button class="it'+(on?' on':'')+'" data-view="'+view+'">'+ic+'<span>'+label+'</span>'+(n!==undefined?'<span class="n">'+n+'</span>':'')+'</button>';
+  // R16: Hoy takes dropped rows and cards as today (data-day), a project or Sin proyecto as that project (data-drop-project)
+  const it=(view,ic,label,n,on,attr)=>'<button class="it'+(on?' on':'')+'" data-view="'+view+'"'+(attr||'')+'>'+ic+'<span>'+label+'</span>'+(n!==undefined?'<span class="n">'+n+'</span>':'')+'</button>';
   return '<aside class="side"><button class="sp" data-act="spaceMenu">'+esc(space().name)+I.chevD+'</button>'+
-    it('hoy',I.list,'Hoy',pendingFor('hoy').length,v==='hoy')+it('todas',I.inbox.replace('viewBox="0 0 48 48"','viewBox="0 0 48 48" stroke-width="3"'),'Todas',pendingFor('todas').length,v==='todas')+it('week',I.cal,'Semana',undefined,isCalView(v))+miniMonthHTML()+
-    '<div class="sec">Proyectos</div>'+ps.map(p=>'<button class="it'+(v==='project:'+p.id?' on':'')+'" data-view="project:'+p.id+'"><span class="dot" style="background:'+p.color+'"></span><span>'+esc(p.name)+'</span><span class="n">'+cnt(p.id)+'</span></button>').join('')+
-    '<button class="it'+(v==='project:none'?' on':'')+'" data-view="project:none"><span class="dot" style="background:var(--ink3)"></span><span>Sin proyecto</span><span class="n">'+cnt(null)+'</span></button>'+
+    it('hoy',I.list,'Hoy',pendingFor('hoy').length,v==='hoy',' data-day="'+todayStr()+'"')+it('todas',I.inbox.replace('viewBox="0 0 48 48"','viewBox="0 0 48 48" stroke-width="3"'),'Todas',pendingFor('todas').length,v==='todas')+it('week',I.cal,'Semana',undefined,isCalView(v))+miniMonthHTML()+
+    '<div class="sec">Proyectos</div>'+ps.map(p=>'<button class="it'+(v==='project:'+p.id?' on':'')+'" data-view="project:'+p.id+'" data-drop-project="'+p.id+'"><span class="dot" style="background:'+p.color+'"></span><span>'+esc(p.name)+'</span><span class="n">'+cnt(p.id)+'</span></button>').join('')+
+    '<button class="it'+(v==='project:none'?' on':'')+'" data-view="project:none" data-drop-project=""><span class="dot" style="background:var(--ink3)"></span><span>Sin proyecto</span><span class="n">'+cnt(null)+'</span></button>'+
     '<button class="it add" data-act="newProject">'+I.plus+'<span>Nuevo proyecto</span></button>'+
     '<div class="grow"></div>'+it('settings',I.gear,'Ajustes',undefined,v==='settings')+'</aside>';
 }
@@ -2892,26 +3085,36 @@ function miniMonthHTML(){ const ym=UI.miniYM||calAnchor().slice(0,7), v=UI.deskV
 function agendaHTML(){ return '<aside class="hagenda"><div class="ahead"><b>Agenda</b><span>'+(()=>{ const d=new Date(); return DIAS_FULL[d.getDay()]+' '+d.getDate(); })()+'</span></div>'+hoursHTML([todayStr()], true)+'</aside>'; }
 // R17: the inspector's width, from the settings, kept between 320 and 600 px and never squeezing the list under 360 px
 function paneWidth(w){ const max=Math.max(320, Math.min(600, innerWidth-220-360)); return Math.round(Math.max(320, Math.min(max, +w||400))); }
-function renderDesktop(){
+// R15: each group of rows is a list box of options (the rows), named after the view and its group; only the selected row, or the first, takes the Tab key
+function ariaList(d){ const mb=d.querySelector('.main .mbody'); if(!mb) return; const h=d.querySelector('.main .mhead h1'), name=h?h.textContent:'Tareas';
+  mb.querySelectorAll('.group').forEach(g=>{ if(!g.querySelector('.row[data-id], .rph')) return; g.setAttribute('role','listbox'); g.setAttribute('aria-multiselectable','true');
+    const t=g.previousElementSibling&&g.previousElementSibling.classList.contains('group-title')?g.previousElementSibling:g.parentElement&&g.parentElement.querySelector(':scope > .group-title');
+    const l=t&&(t.querySelector('.gl')||t); g.setAttribute('aria-label', name+(l&&l.firstChild?', '+(l.firstChild.textContent||'').trim():'')); }); }
+function renderDesktop(again){
   let d=$('#desk'); if(!d){ d=document.createElement('div'); d.id='desk'; d.className='desk'; app.appendChild(d); d.addEventListener('click', onClick); bindDeskEvents(d); UI.deskScroll={}; UI.deskKey=null; }
   // Each view keeps its own scroll (per space), like the iPhone tabs; a view seen for the first time opens at the top
   const body=d.querySelector('.mbody'); if(body&&UI.deskKey) UI.deskScroll[UI.deskKey]=body.scrollTop; const side=d.querySelector('.side'); const sst=side?side.scrollTop:0;
   const ps=d.querySelector('.pane .scroll'), pst=ps?ps.scrollTop:0, pid=ps?d.querySelector('.pane').dataset.task:null; // the pane keeps its scroll while it shows the same task
   // The add bar or the search keep focus and caret across the rebuild (a click elsewhere has already taken the focus)
-  const ae=document.activeElement, fr=ae&&d.contains(ae)&&(ae.dataset.role==='addbar'||ae.dataset.role==='search') ? {role:ae.dataset.role, a:ae.selectionStart, b:ae.selectionEnd} : null;
+  const ae=document.activeElement, fr=ae&&d.contains(ae)&&(ae.dataset.role==='addbar'||ae.dataset.role==='search'||ae.dataset.role==='rowedit') ? {role:ae.dataset.role, a:ae.selectionStart, b:ae.selectionEnd} : null;
+  const rowF=ae&&d.contains(ae)&&ae.classList.contains('row'), paneWas=UI.deskDetail; // R15: a focused row gives the focus to the selected row of the new markup
   const dx = UI.deskDetail && task(UI.deskDetail); // only a task of the active space: the spaces never mix on screen
   const pop = isCalView(UI.deskView); // R17: in Semana the detail is a popover next to its card, so the seven columns keep their width
-  const pane = dx && dx.spaceId===space().id ? '<section class="pane'+(pop?' wpop':'')+'" data-task="'+esc(UI.deskDetail)+'">'+(pop?'':'<div class="igrip" title="Arrastra para cambiar el ancho"></div>')+'<div class="screen detail">'+viewDetail(UI.deskDetail)+'</div></section>' : '';
-  if(!pane) UI.deskDetail=null; app.classList.toggle('has-pane', !!pane&&!pop);
+  const multi = deskMulti() && deskListView(); // R16: several tasks selected, the pane offers what can be done with them
+  const pane = multi ? multiPaneHTML() : dx && dx.spaceId===space().id ? '<section class="pane'+(pop?' wpop':'')+'" data-task="'+esc(UI.deskDetail)+'">'+(pop?'':'<div class="igrip" title="Arrastra para cambiar el ancho"></div>')+'<div class="screen detail">'+viewDetail(UI.deskDetail)+'</div></section>' : '';
+  if(!pane||multi) UI.deskDetail=null; app.classList.toggle('has-pane', !!pane&&!pop);
   d.style.setProperty('--panew', paneWidth(DB.settings.paneWidth)+'px');
   const sideHTML=deskSide(), mainHTML=deskMain();
   const key=UI.deskView+'|'+DB.settings.activeSpace; // read after deskMain, which may fall back to another view
   const keep={}; d.querySelectorAll('[data-keep]').forEach(e=>{ keep[e.dataset.keep]=e.scrollTop; }); // the calendar's own scroll boxes (columns, tray, hours)
-  d.innerHTML = sideHTML+lazyRows(mainHTML, UI.deskScroll[key]||0, innerHeight)+pane; armRows(d.querySelector('.mbody'));
+  deskRedraw=true; try{ d.innerHTML = sideHTML+lazyRows(mainHTML, UI.deskScroll[key]||0, innerHeight)+pane; } finally{ deskRedraw=false; } armRows(d.querySelector('.mbody'));
   d.querySelectorAll('[data-keep]').forEach(e=>{ const k=e.dataset.keep; if(k in keep) e.scrollTop=keep[k]; else if(k==='hours') scrollHours(e); });
   const b2=d.querySelector('.mbody'); if(b2) b2.scrollTop=UI.deskScroll[key]||0; UI.deskKey=key;
   const s2=d.querySelector('.side'); if(s2) s2.scrollTop=sst;
+  ariaList(d); if(syncSel(paneWas)&&!again) return renderDesktop(true); paintSel(); // R15, R16: a selected row that left the list hands over to its neighbour
   if(fr){ const n=$('#desk [data-role='+fr.role+']'); if(n){ n.focus({preventScroll:true}); try{ n.setSelectionRange(fr.a, fr.b); }catch(e){} } }
+  else if(UI.dsel.edit){ const n=$('#desk [data-role=rowedit]'); if(n){ n.focus({preventScroll:true}); if(UI.dsel.edit.fresh){ n.select(); UI.dsel.edit.fresh=false; } } }
+  else if(rowF){ const r=deskRow(UI.dsel.cur); if(r) r.focus({preventScroll:true}); }
   if(UI.deskDetail){ bindDetail(d.querySelector('.pane'), UI.deskDetail); if(pid===UI.deskDetail){ const p2=d.querySelector('.pane .scroll'); if(p2) p2.scrollTop=pst; } } // restored after bindDetail has grown the text areas
   if(pop&&UI.deskDetail){ placeWeekPop(d); const wk=d.querySelector('.week'); if(wk) wk.addEventListener('scroll', ()=>placeWeekPop(d), {passive:true, capture:true}); } // each column scrolls on its own
   const s=$('[data-role=search]',d); if(s) bindSearch(s, ()=>deskResults(d));
@@ -2934,7 +3137,7 @@ function deskResults(d){ const ob=d.querySelector('.main .mbody'), oi=ob&&ob.que
   const t=document.createElement('div'); t.innerHTML=lazyRows(deskMain(), ob.scrollTop, innerHeight); const ni=t.querySelector('.mbody .inner'), nbar=t.querySelector('.mhead .searchbar'); if(!ni||!nbar) return false;
   oi.replaceWith(ni); armRows(ob); const sb=bar.querySelector('.search'); [...bar.children].forEach(c=>{ if(c!==sb) c.remove(); }); [...nbar.children].forEach(c=>{ if(!c.querySelector('[data-role=search]')) bar.appendChild(c); });
   const os=d.querySelector('.main .mhead .pfslot'), ns=t.querySelector('.mhead .pfslot'); if(os&&ns) os.replaceWith(ns);
-  bindAddBar(d); if(isCalView(UI.deskView)&&UI.deskDetail) placeWeekPop(d); return true; }
+  bindAddBar(d); if(isCalView(UI.deskView)&&UI.deskDetail) placeWeekPop(d); ariaList(d); syncSel(UI.deskDetail); paintSel(); return true; }
 function bindAddBar(d){
   const ab=$('[data-role=addbar]',d); if(!ab) return; const said=$('#deskSaid',d); const base=()=>deskAddBase(ab.dataset.project);
   const refocus=()=>{ const n=$('#desk [data-role=addbar]'); if(n){ n.focus(); const l=n.value.length; n.setSelectionRange(l,l); } };
@@ -2987,17 +3190,28 @@ function bindDeskEvents(d){
   // Calendar (Día, Semana, Mes, the mini month, the agenda of Hoy): drag a card onto a day, a half-hour slot, "Todo el día" or "Sin fecha"
   // Only a card drag moves a task: any other drag (a link, a file) clears dragId, so a cancelled card drag never carries over
   let dragId=null, dropped=false, refusal=null;
-  const zoneOf=t=>t.closest('[data-slot],[data-day]');
+  let dragIds=null; // R16: the rows of a multiple selection dragged together
+  const zoneOf=t=>t.closest('[data-slot],[data-day],[data-drop-project]');
   // Why a zone takes no drop: a past day (no task is ever overdue) or a past half hour (a reminder must be ahead, as in Recordatorio)
   const refuse=z=>{ if(z.dataset.slot){ const [dy,hm]=z.dataset.slot.split('T'), dt=new Date(dy+'T'+hm+':00'); return dt.getTime()<=Date.now()?(dy<todayStr()?'No se puede mover a un día pasado':'Esa hora ya ha pasado'):null; }
+    if(z.dataset.dropProject!==undefined) return null;
     return z.dataset.day&&z.dataset.day<todayStr()?'No se puede mover a un día pasado':null; };
-  d.addEventListener('dragstart', e=>{ const c=e.target.closest&&e.target.closest('[draggable="true"][data-id]'); dragId=c?c.dataset.id:null; dropped=false; refusal=null; if(!c) return; c.classList.add('dragging'); try{ e.dataTransfer.setData('text/plain', dragId); e.dataTransfer.effectAllowed='move'; }catch(err){} });
-  d.addEventListener('dragend', e=>{ const id=dragId; dragId=null; const c=e.target.closest&&e.target.closest('[data-id]'); if(c) c.classList.remove('dragging'); d.querySelectorAll('.over').forEach(x=>x.classList.remove('over'));
+  d.addEventListener('dragstart', e=>{ const c=e.target.closest&&e.target.closest('[draggable="true"][data-id]'); dragId=c?c.dataset.id:null; dragIds=null; dropped=false; refusal=null; if(!c) return; c.classList.add('dragging'); try{ e.dataTransfer.setData('text/plain', dragId); e.dataTransfer.effectAllowed='move'; }catch(err){}
+    // R16: a row of the multiple selection takes the whole selection along, under a badge with how many
+    if(c.classList.contains('row')&&deskMulti()&&UI.dsel.ids.has(dragId)&&UI.dsel.ids.size>1){ dragIds=[...UI.dsel.ids]; dragIds.forEach(id=>{ const r=deskRow(id); if(r) r.classList.add('dragging'); });
+      const g=document.createElement('div'); g.className='dragcount'; g.textContent=bulkN(dragIds.length); document.body.appendChild(g); try{ e.dataTransfer.setDragImage(g, 14, 14); }catch(err){} setTimeout(()=>g.remove(), 0); } });
+  d.addEventListener('dragend', e=>{ const id=dragId; dragId=null; dragIds=null; d.querySelectorAll('.dragging').forEach(x=>x.classList.remove('dragging')); d.querySelectorAll('.over').forEach(x=>x.classList.remove('over'));
     if(id&&!dropped&&refusal){ toast(refusal); haptic(10); } refusal=null; }); // let go over a past day: said, not silently ignored
   d.addEventListener('dragover', e=>{ if(!dragId) return; const z=zoneOf(e.target); refusal=z?refuse(z):null; if(!z||refusal){ d.querySelectorAll('.over').forEach(x=>x.classList.remove('over')); return; }
     e.preventDefault(); e.dataTransfer.dropEffect='move'; d.querySelectorAll('.over').forEach(x=>{ if(x!==z) x.classList.remove('over'); }); z.classList.add('over'); });
   d.addEventListener('dragleave', e=>{ const z=zoneOf(e.target); if(z && !z.contains(e.relatedTarget)) z.classList.remove('over'); });
-  d.addEventListener('drop', e=>{ const z=zoneOf(e.target); if(!z||!dragId||e.dataTransfer.getData('text/plain')!==dragId||refuse(z)) return; e.preventDefault(); dropped=true; const id=dragId; dragId=null; dropTask(id, z); });
+  d.addEventListener('drop', e=>{ const z=zoneOf(e.target); if(!z||!dragId||e.dataTransfer.getData('text/plain')!==dragId||refuse(z)) return; e.preventDefault(); dropped=true; const id=dragId, ids=dragIds||[id]; dragId=null; dragIds=null;
+    if(z.dataset.dropProject!==undefined) dropToProject(ids, z.dataset.dropProject||null); else dropMany(ids, z); }); // R16: a project of the sidebar, or a date
+  // R15: the title edited in place (a double click, see deskRowClick) keeps what is typed across a redraw and keeps it when left
+  d.addEventListener('input', e=>{ if(e.target.dataset.role==='rowedit'&&UI.dsel.edit) UI.dsel.edit.text=e.target.value; });
+  d.addEventListener('focusout', e=>{ if(e.target.dataset.role!=='rowedit'||deskRedraw) return; setTimeout(()=>{ const a=document.activeElement; if(UI.dsel.edit&&!(a&&a.dataset&&a.dataset.role==='rowedit')) endRowEdit(true); }, 0); });
+  // The Tab key onto a row selects it (a click selects it on its own)
+  d.addEventListener('focusin', e=>{ const r=e.target; if(!r.classList||!r.classList.contains('row')||r.closest('.first')||deskMulti()||UI.dsel.cur===r.dataset.id||!r.matches(':focus-visible')) return; UI.dsel.cur=r.dataset.id; if(UI.deskDetail){ UI.deskDetail=r.dataset.id; render(); } else paintSel(); });
   // Double click on an empty part of a month day adds a task with that date (a past day cannot take one)
   d.addEventListener('dblclick', e=>{ const md=e.target.closest('.mday'); if(!md||e.target.closest('.wcard,button')) return; const day=md.dataset.day;
     if(day<todayStr()){ toast('No se puede añadir a un día pasado'); return; } addSheet(null,'',{date:day}); });
@@ -3006,14 +3220,33 @@ function bindDeskEvents(d){
   d.addEventListener('click', e=>{ const sh=d._popShut; d._popShut=null; const c=e.target.closest('.wcard'); if(!c||e.target.closest('[data-act]')) return;
     if(sh&&sh.id===c.dataset.id&&Date.now()-sh.t<800) return; openDetail(c.dataset.id); });
 }
-document.addEventListener('keydown', e=>{ if(!UI.wide) return; const tag=(e.target.tagName||'').toLowerCase(); const typing=tag==='input'||tag==='textarea';
+document.addEventListener('keydown', e=>{ if(!UI.wide) return; const tag=(e.target.tagName||'').toLowerCase(); const typing=tag==='input'||tag==='textarea'||tag==='select'||!!e.target.isContentEditable;
   const modal=sheet.classList.contains('on')||asheet.classList.contains('on')||menuOpen();
+  // R15: the title edited in its row: Intro keeps it, Esc gives it back
+  if(e.target.dataset&&e.target.dataset.role==='rowedit'){ const ed=UI.dsel.edit, id=ed&&ed.id;
+    if(e.key==='Enter'&&!e.isComposing){ e.preventDefault(); endRowEdit(true); render(); revealRow(id); }
+    else if(e.key==='Escape'){ e.preventDefault(); endRowEdit(false); revealRow(id); } return; }
   if(e.key==='Escape'){ if(menuOpen()){ closeMenu(); return; } if(modal){ if(asheet.classList.contains('on')) cancelAction(); else closeSheet(); return; } // a menu over a sheet closes alone
     if(typing && e.target.dataset.role==='search' && UI.query){ e.preventDefault(); UI.query=''; UI.searchDone=false; render(); return; } // Escape in the search clears it first; render keeps the focus there
-    if(UI.deskDetail) pop(); else if(UI.query){ UI.query=''; UI.searchDone=false; render(); } return; }
-  if(modal) return; // N and / never reach the page behind a menu or a sheet
-  if(!typing && (e.key==='n'||e.key==='N')){ const ab=$('#desk [data-role=addbar]'); if(ab){ e.preventDefault(); ab.focus(); } return; }
-  if(!typing && e.key==='/' ){ const s=$('#desk [data-role=search]'); if(s){ e.preventDefault(); s.focus(); } } });
+    if(deskMulti()||UI.dsel.ids.size){ endSelect(); revealRow(UI.dsel.cur); return; } // R16: the multiple selection goes first
+    if(UI.deskDetail){ const f=!typing; pop(); if(f) revealRow(UI.dsel.cur); } else if(UI.query){ UI.query=''; UI.searchDone=false; render(); } return; }
+  if(modal||typing) return; // N, / and the keys below never reach the page behind a menu or a sheet, nor a field being typed in
+  const k=e.key, mod=e.metaKey||e.ctrlKey;
+  if(mod){ if(e.altKey||e.shiftKey) return; // the browser keeps its own (Comando L, T, W, R...); only these two are the app's
+    if(k==='z'||k==='Z'){ if(undoFn&&$('#toast').classList.contains('on')){ e.preventDefault(); $('#toastBtn').click(); } return; } // R15: the last action's Deshacer
+    if((k==='a'||k==='A')&&deskListView()){ e.preventDefault(); selectAllDesk(); } return; }
+  if(e.altKey) return;
+  // Space and Intro on a focused button or control are that control's own
+  if((k===' '||k==='Enter')&&e.target.closest&&e.target.closest('button,a,select,summary,[role=button],[role=radio],.gtap')) return;
+  if(k==='n'||k==='N'){ const ab=$('#desk [data-role=addbar]'); if(ab){ e.preventDefault(); ab.focus(); } return; }
+  if(k==='/'){ const s=$('#desk [data-role=search]'); if(s){ e.preventDefault(); s.focus(); } return; }
+  if(k==='?'){ e.preventDefault(); shortcutsSheet(); return; }
+  // R15: the selected row moves with the arrows (J and K too); with Mayúsculas the selection stretches
+  if(k==='ArrowDown'||k==='ArrowUp'||(!e.shiftKey&&(k==='j'||k==='k'))){ if(!deskListView()) return; e.preventDefault(); moveSel(k==='ArrowDown'||k==='j'?1:-1, e.shiftKey); return; }
+  if(k===' '){ if(!deskListView()&&!UI.deskDetail) return; e.preventDefault(); togglePane(); return; }
+  if(k==='Enter'){ const id=UI.dsel.cur; if(id&&deskRow(id)&&!deskMulti()){ e.preventDefault(); startRowEdit(id); } return; }
+  if(e.shiftKey&&k.length===1&&!/[A-Z]/.test(k)) return; // a shifted symbol is not one of the keys
+  if(/^[chmvsfp120]$/i.test(k)||k==='Delete'||k==='Backspace'){ if(deskShortcut(k)) e.preventDefault(); } });
 // A project group header (R13) is a div with the button role: Enter and Space act on it as on a button
 document.addEventListener('keydown', e=>{ if((e.key==='Enter'||e.key===' ')&&e.target.classList&&e.target.classList.contains('gtap')){ e.preventDefault(); e.target.click(); } });
 wideMQ.addEventListener('change', applyWide); // first applied at start, before the first render

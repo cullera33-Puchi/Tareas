@@ -1,5 +1,38 @@
 # Registro de cambios
 
+## v0.15.0. Roadmap R1 a R20 (1 de noviembre de 2026)
+
+Aplicadas las veinte mejoras de la revisión de usabilidad, fluidez y diseño. Dos partes quedan fuera porque necesitan campos nuevos sin acordar: «aplazada desde» en R9 y la duración de los bloques en R20.
+
+iPhone
+- R1. Al completar, la fila se queda atenuada 1,5 segundos; si se marcan varias seguidas, salen juntas con un solo aviso y Deshacer. Tocarla otra vez la desmarca.
+- R2. El círculo de completar, la casilla de selección y los botones pequeños responden en una zona de 44 puntos.
+- R3. Las filas no repiten lo que ya dice la pantalla («Hoy», el proyecto dentro de su propio filtro); las aplazadas llevan «Aplazada» en naranja; notas y voz pasan a la derecha. Las cápsulas de proyecto son legibles en los dos temas.
+- R4. Volver atrás, cerrar hojas y deslizar filas aceptan un gesto corto y rápido. En el detalle se vuelve deslizando desde cualquier punto, salvo en campos de texto y notas de voz.
+- R5. Nueva tarea con una barra de iconos sobre el teclado (Fecha, Proyecto, Prioridad, Añadir) que no quita el foco al campo. Pulsación larga en Añadir: añadir y abrir.
+- R10. La pulsación larga eleva la fila y abre un menú compacto junto a ella, con iconos; se puede elegir sin levantar el dedo. El mismo menú sustituye a las hojas del selector de espacio, del botón de tres puntos y de Proyecto y Prioridad en el detalle.
+
+Los dos
+- R6. Pegar varias líneas en Nueva tarea crea varias tareas, con un solo Deshacer. En el detalle, «Convertir N líneas en tareas» para las notas con guiones o casillas.
+- R7. En el título: «#flc» asigna el proyecto, «!!!» o «!!» la prioridad y «a las 9» el recordatorio, con vista previa de lo entendido.
+- R8. Desde las 19:00, «Cerrar el día» aparece al final de Hoy y en el resumen plegado, con balance y tres opciones.
+- R9. «Repasar (N)» en las aplazadas: decidir una a una, con balance final y Deshacer.
+- R13. Botón de opciones de vista en Tareas: seleccionar, mostrar completadas, agrupar por fecha o por proyecto (también en Hoy) y mostrar el resumen.
+- R14. Todas agrupada día a día los próximos 14 días y después por meses, con cabeceras fijas, añadir en un día y mover las tareas de un día a otro. El calendario de Fecha marca la carga con puntos.
+- R18. La app redibuja solo lo que cambia. Cambiar prioridad, aplazar o mover a proyecto tarda la mitad; en escritorio, moverse con las flechas pasa de unos 200 ms a 50 ms.
+
+Escritorio
+- R11. Densidad de Mac: texto de 14 px, filas de una línea con fecha, recordatorio y prioridad en columnas, resumen en una línea y desplegable «Proyecto: Todos».
+- R12. Semana desde hoy (opción de lunes a domingo), columnas con desplazamiento propio, carga del día, tarjetas de una línea y bandeja lateral Sin fecha.
+- R15. Fila seleccionada, flechas o J y K, Espacio para el panel, Intro o doble clic para renombrar y atajos de una tecla (C, 1, 2, 0, H, M, V, S, F, P, Supr, Comando Z, ?).
+- R16. Selección múltiple con Comando y Mayúsculas, panel «N tareas seleccionadas» con acciones en bloque y arrastre de tareas a proyectos, a Hoy y a días del calendario.
+- R17. Menú contextual junto al puntero con submenús, ventanas pequeñas ancladas para Fecha, Recordatorio y Proyecto, inspector con prioridad en segmento y ancho ajustable.
+- R19. Vista Mes y mes en miniatura en la barra lateral, con arrastre para cambiar la fecha.
+- R20. Vista por horas en Semana y Día, de 7:00 a 21:00, con bloques de media hora; arrastrar a una hora pone el recordatorio. Con más de 1400 px, Hoy muestra la agenda del día.
+
+Revisión final
+- Incluye los arreglos v0.14.1 a v0.14.5. Corregidos además: la pantalla de debajo asomaba por el borde con una hoja abierta, el contador del segmento en tema oscuro y el singular en el resumen de importar. 31 pruebas automáticas en verde.
+
 ## v0.14.5. Animaciones con el ritmo de iOS (1 de noviembre de 2026)
 
 - Las animaciones iban demasiado rápidas. Ahora usan las duraciones de iOS con la misma curva de frenado:

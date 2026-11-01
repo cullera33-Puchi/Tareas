@@ -120,6 +120,7 @@ body.desktop .toast{left:auto;right:28px;bottom:28px;width:360px;}
 .screen.pushed{transform:translate3d(100%,0,0);transition:transform .5s cubic-bezier(.32,.72,0,1);}
 .screen.shown{transform:translate3d(0,0,0);transition:transform .5s cubic-bezier(.32,.72,0,1);}
 .screen.under{transform:translate3d(-33%,0,0);transition:transform .5s cubic-bezier(.32,.72,0,1);}
+.app.sheet-open .screen.under{visibility:hidden;} /* under a sheet the app is scaled: the covered screen behind would bleed through the antialiased edge as a thin column of its text */
 .screen.dragging,.screen.dragging-under{transition:none;}
 .screen.hidden-tab{display:none;}
 .screen.root{touch-action:pan-y;}
@@ -189,8 +190,9 @@ body.desktop .toast{left:auto;right:28px;bottom:28px;width:360px;}
 .seg button{flex:1;height:28px;border-radius:7px;font-size:0.765rem;font-weight:500;color:var(--ink);}
 .seg button.on{background:var(--card);box-shadow:0 1px 3px rgba(0,0,0,.12);font-weight:600;}
 .seg button .n{font-weight:400;color:var(--ink2);margin-left:5px;font-size:.765rem;}
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .seg button.on{background:#636366;}}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .seg button.on{background:#636366;}:root:not([data-theme="light"]) .seg button.on .n{color:rgba(235,235,245,.6);}}
 :root[data-theme="dark"] .seg button.on{background:#636366;}
+:root[data-theme="dark"] .seg button.on .n{color:rgba(235,235,245,.6);} /* the count of the lit segment: the usual gray is lost on #636366 */
 
 /* Lists */
 .group{background:var(--card);border-radius:12px;overflow:hidden;margin-bottom:16px;}
@@ -951,7 +953,7 @@ body.resizing,body.resizing *{cursor:col-resize !important;-webkit-user-select:n
 
 <script>
 'use strict';
-const APP_VERSION = '0.14.5';
+const APP_VERSION = '0.15.0';
 let pendingSW = null; // service worker installed and waiting to take over
 let updateRequested = false; // the user asked for the waiting worker to take over
 
@@ -2785,6 +2787,8 @@ async function exportFile(){
   catch(e){ log('error','Exportar a archivo falló: '+(e&&e.message||e)); exportJSON(); }
 }
 // Merge an exported copy: unknown ids are added, known ids are replaced when the copy is newer.
+// "1 nuevo, 3 actualizados": the import's summary, in the singular when it is one
+const importLine = r => (r.added===1?'1 nuevo':r.added+' nuevos')+', '+(r.updated===1?'1 actualizado':r.updated+' actualizados');
 function importData(text){
   const d=JSON.parse(text); if(!d||typeof d!=='object') throw new Error('Formato no reconocido');
   let added=0, updated=0;
@@ -2794,10 +2798,10 @@ function importData(text){
   save(); rollOver(); log('info','Importación', {added, updated, spaces:(d.spaces||[]).length, projects:(d.projects||[]).length, tasks:(d.tasks||[]).length});
   return {added, updated};
 }
-function importSheet(){ openSheet(sheadHTML('Importar texto','Cancelar','Importar')+'<div class="hint">Pega aquí una copia exportada.</div><textarea placeholder="{ ... }"></textarea>', s=>{ const ta=$('textarea',s); ta.focus(); s.onclick=e=>{ const b=e.target.closest('[data-x]'); if(!b) return; if(b.dataset.x==='cancel'){ closeSheet(); return; } try{ const r=importData(ta.value); closeSheet(); render(); toast(r.added+' nuevos, '+r.updated+' actualizados'); }catch(err){ log('warn','Importar texto: '+err.message); toast('El texto no es un JSON válido'); } }; }); }
+function importSheet(){ openSheet(sheadHTML('Importar texto','Cancelar','Importar')+'<div class="hint">Pega aquí una copia exportada.</div><textarea placeholder="{ ... }"></textarea>', s=>{ const ta=$('textarea',s); ta.focus(); s.onclick=e=>{ const b=e.target.closest('[data-x]'); if(!b) return; if(b.dataset.x==='cancel'){ closeSheet(); return; } try{ const r=importData(ta.value); closeSheet(); render(); toast(importLine(r)); }catch(err){ log('warn','Importar texto: '+err.message); toast('El texto no es un JSON válido'); } }; }); }
 function pickImportFile(){
   let inp=$('#importFile'); if(!inp){ inp=document.createElement('input'); inp.type='file'; inp.id='importFile'; inp.accept='application/json,.json,text/plain'; inp.style.cssText='position:fixed;left:-100px;top:0;width:1px;height:1px;opacity:0'; document.body.appendChild(inp); }
-  inp.value=''; inp.onchange=()=>{ const f=inp.files&&inp.files[0]; if(!f) return; const rd=new FileReader(); rd.onload=()=>{ try{ const r=importData(rd.result); render(); toast(r.added+' nuevos, '+r.updated+' actualizados'); }catch(err){ log('warn','Importar archivo '+f.name+': '+err.message); toast('El archivo no es una copia válida'); } }; rd.onerror=()=>{ log('error','No se pudo leer '+f.name); toast('No se pudo leer el archivo'); }; rd.readAsText(f); };
+  inp.value=''; inp.onchange=()=>{ const f=inp.files&&inp.files[0]; if(!f) return; const rd=new FileReader(); rd.onload=()=>{ try{ const r=importData(rd.result); render(); toast(importLine(r)); }catch(err){ log('warn','Importar archivo '+f.name+': '+err.message); toast('El archivo no es una copia válida'); } }; rd.onerror=()=>{ log('error','No se pudo leer '+f.name); toast('No se pudo leer el archivo'); }; rd.readAsText(f); };
   inp.click();
 }
 

@@ -99,6 +99,7 @@ Cambios acordados con Enric sobre el diseño de abajo. Mandan sobre el texto del
 18. **Foco en hojas.** Los campos de las hojas se enfocan de forma síncrona dentro del toque; con `setTimeout` iOS no abre el teclado. Las hojas con campo de texto llevan las acciones en la cabecera (`sheadHTML`), porque en iOS 26 la barra flotante del teclado tapa el pie de la hoja (v0.14.3).
 19. **Notas de voz editables (v0.14.4).** En el detalle, deslizar una nota a la izquierda muestra Eliminar (con Deshacer, sin confirmación); a la derecha, Editar, y el deslizamiento largo la abre. La hoja de edición permite corregir el texto o «Volver a dictar». Nota de voz gana el campo `modified` (en Supabase, `modified`), que se rellena solo al editar. En escritorio, clic en la nota abre Editar y Eliminar. Código: `vnHTML`, `bindVnGestures`, `editVoiceNote`, `deleteVoiceNote`, `voiceSheet(id, editId)`. En la rama del roadmap, el deslizamiento atrás desde cualquier punto del detalle (R4) debe excluir las notas de voz.
 20. **Ritmo de las animaciones (v0.14.5).** Enric las veía demasiado rápidas. Hojas, entrar y volver: 0,5 s; menús inferiores y oscurecido: 0,45 s; deslizamiento de pestaña, filas y reordenación: 0,4 s; todo con `cubic-bezier(.32,.72,0,1)`. Sustituye a los 350 ms del diseño. Los temporizadores que esperan al final de una animación (`navLock`, `pop`, `closeSheet`, `closeAction`, cambio de pestaña) van ajustados a estas duraciones.
+21. **Roadmap aplicado (v0.15.0).** R1 a R20 según la sección 10. Preferencias de vista nuevas en `settings`: `hoyGroup`, `paneWidth`, `weekMode`, `weekTray`, `calMode`. Piezas principales: retención al completar (`toggleHold`, `flushHeld`), alta con barra (`addSheet`, `parseQuick`), menús anclados (`popMenu`), menús de Mac (`macMenu`, `pickerPanel`, `inspectorHTML`), calendario (`weekListHTML`, `monthHTML`, `hoursHTML`, `miniMonthHTML`, `dropTask`), selección de escritorio (`UI.dsel`, `deskShortcut`, `dropMany`) y repintado parcial (`morphInto`). Preguntas abiertas de la revisión final en la sección 9.
 
 
 ## 9. Decisiones pendientes de Enric (revisión del 1 de noviembre)
@@ -109,10 +110,15 @@ Cambios acordados con Enric sobre el diseño de abajo. Mandan sobre el texto del
 4. **Eliminar espacios.** Un espacio con proyectos archivados o completadas de más de 30 días no se puede eliminar. Opciones: eliminación en cascada con confirmación, o una forma de borrar proyectos y completadas antiguas.
 5. **Nota de voz sin guardar.** Al cerrar la hoja con texto: pedir confirmación o guardar un borrador por tarea. Decidir también si aplica a Nueva tarea.
 6. ~~Editar o eliminar notas de voz guardadas.~~ Resuelta en v0.14.4 (punto 19 de la sección 8).
+7. **Botones de una fila abierta.** Con Aplazar y Eliminar a la vista, un toque en otro sitio (filtro, cifra, otra fila) también actúa. En iOS ese primer toque solo cierra la fila. Cambiarlo altera el comportamiento publicado.
+8. **Punto medio en la línea de la fila del iPhone** («FLC · Aplazada · 9:00»). Lleva desde la v0.1 y la regla de estilo lo evita: dejar solo espacio o usar coma.
+9. **Columnas vacías en escritorio con el panel abierto.** A 1280 px, fecha, recordatorio y prioridad ocupan unos 310 px aunque estén vacías y los títulos se cortan hacia el carácter 25. Plegar las columnas vacías por lista.
+10. **Confirmar borrados en escritorio.** Sigue siendo la hoja del iPhone centrada; una alerta de Mac sería más nativa.
+11. **Franja «Todo el día» en la vista por horas.** Se desplaza dentro de 96 px sin «N más».
 
 ## 10. Roadmap de mejoras (propuestas del 1 de noviembre)
 
-Salen de una revisión de usabilidad, fluidez y diseño sobre la v0.13.1 en móvil, escritorio y el flujo diario de un director de proyecto. Ninguna está implementada. Las que añaden funciones u opciones se acuerdan antes (regla 6).
+Salen de una revisión de usabilidad, fluidez y diseño sobre la v0.13.1 en móvil, escritorio y el flujo diario de un director de proyecto. Todas implementadas en v0.15.0, salvo dos partes que necesitan un campo nuevo y se preguntan aparte: «aplazada desde» en R9 y la duración de los bloques en R20. Las mejoras nuevas que añadan funciones u opciones se acuerdan antes (regla 6).
 
 | Código | Propuesta | Área | Tipo | Coste | Prioridad |
 | --- | --- | --- | --- | --- | --- |

@@ -248,6 +248,7 @@ Cuatro entidades más la suscripción de notificaciones. Los campos propietario,
 | tarea_id | uuid |  |
 | transcripcion | texto largo | editable por el usuario tras transcribir |
 | creado | fecha y hora |  |
+| modificado | fecha y hora | se rellena al editar la nota (v0.14.4) |
 
 **Suscripción de notificaciones**
 

@@ -15,7 +15,10 @@ const wait=ms=>new Promise(res=>setTimeout(res,ms));
 
 async function mobile(browser, scheme){
   const ctx = await browser.newContext({ viewport:{width:390,height:844}, deviceScaleFactor:2, isMobile:true, hasTouch:true, colorScheme:scheme });
-  const page = await ctx.newPage(); await page.addInitScript(s=>{ if(!localStorage.getItem('tareas-v1')) localStorage.setItem('tareas-v1', s); }, SEED);
+  // Today at 10:10 local: from 19:00 Hoy gains «Cerrar el día» (R8) and the rows move under the taps measured before; the clock is fixed so the
+  // test does not depend on the hour it runs at (it failed after 19:00, with v0.21.0 too)
+  const d0=new Date(); d0.setHours(10,10,0,0);
+  const page = await ctx.newPage(); await page.clock.install({time:d0}); await page.addInitScript(s=>{ if(!localStorage.getItem('tareas-v1')) localStorage.setItem('tareas-v1', s); }, SEED);
   const errors=[]; page.on('pageerror', e=>errors.push(e.message)); page.on('console', m=>{ if(m.type()==='error') errors.push(m.text()); });
   await page.goto(URL); await page.waitForTimeout(400);
   const cdp = await ctx.newCDPSession(page);

@@ -1,5 +1,12 @@
 # Registro de cambios
 
+## v0.22.1. Tareas que se repiten, «Ahora», «Por confirmar» y ajustes (2 de noviembre de 2026)
+
+- Incluye todo lo de la v0.22.0, que no llegó a publicarse: las pruebas de GitHub pararon la publicación por una comprobación demasiado ajustada al tiempo, no por un fallo de la app.
+- Los recordatorios de las tareas «Por confirmar» avisan (hay que volver a desplegar `send-reminders`). La insignia cuenta también las por confirmar cuyo día de revisión ha llegado.
+- Escritorio: las «Por confirmar» se ven en Semana, Día, Horas, Mes y la agenda en su día de revisión, con el círculo a medio llenar; arrastrarlas cambia el día de revisión.
+- Si la misma tarea repetida se completa a la vez en dos dispositivos sin conexión, al sincronizar queda una sola siguiente.
+
 ## v0.22.0. Tareas que se repiten, zona «Ahora» y «Por confirmar» (2 de noviembre de 2026)
 
 - Repetir: fila nueva en el detalle con Cada día, Cada día laborable, Cada semana, Cada 2 semanas, Cada mes, Cada año y Personalizada (cada N días, semanas o meses, días de la semana, o «el primer lunes de cada mes»). Al completarla se crea la siguiente con título, proyecto, prioridad, notas y hora del recordatorio; Deshacer la quita. Al eliminar pregunta «solo esta» o «la serie». Icono de repetición en la fila.

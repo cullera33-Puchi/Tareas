@@ -1,5 +1,12 @@
 # Registro de cambios
 
+## v0.22.0. Tareas que se repiten, zona «Ahora» y «Por confirmar» (2 de noviembre de 2026)
+
+- Repetir: fila nueva en el detalle con Cada día, Cada día laborable, Cada semana, Cada 2 semanas, Cada mes, Cada año y Personalizada (cada N días, semanas o meses, días de la semana, o «el primer lunes de cada mes»). Al completarla se crea la siguiente con título, proyecto, prioridad, notas y hora del recordatorio; Deshacer la quita. Al eliminar pregunta «solo esta» o «la serie». Icono de repetición en la fila.
+- Ahora: hasta 5 tareas para trabajar ya, marcadas desde el menú, la estrella del detalle, la tecla A o arrastrándolas en el ordenador. Bloque arriba de Hoy en el iPhone, bloque arriba de la lista y entrada en la barra lateral en el ordenador. Se vacía al cambiar de día; la tarea conserva su fecha y su sitio.
+- Por confirmar: tercer estado para lo ya hecho que espera confirmación, con «Esperando a» y un día de revisión opcional. Círculo a medio llenar, bloque plegado al final de las listas y entrada en la barra lateral del ordenador. El día de revisión vuelve a Hoy marcada «Revisar». Tocar el círculo la cierra.
+- Supabase: migración `0004_repeat_focus.sql` con los campos nuevos.
+
 ## v0.21.0. Base más sólida (2 de noviembre de 2026)
 
 - Sin cambios visibles en la app.

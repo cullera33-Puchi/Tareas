@@ -231,6 +231,22 @@ Salen de una revisión de usabilidad, fluidez y diseño sobre la v0.13.1 en móv
 - **R20. Bloques de tiempo: vista por horas en Semana y Día.** Responde a la petición de bloques de tiempo. Propuesta: en Semana, un control Lista u Horas, y una vista Día con el mismo motor. En modo Horas, arriba una franja «Todo el día» con las tareas con fecha y sin hora; debajo, una rejilla de 7:00 a 21:00 en tramos de media hora y una línea roja en la hora actual. Las tareas con recordatorio aparecen como bloques de media hora. Arrastrar una tarea a un tramo le pone fecha y recordatorio a esa hora, con Deshacer; devolverla a «Todo el día» le quita la hora. En pantallas de más de 1400 px, Hoy muestra a la derecha la agenda del día con el mismo componente. El recordatorio hace de hora de inicio, así que no cambia el modelo. Dar duración a un bloque necesitaría un campo nuevo en Tarea y se pregunta antes.
 
 
+## 11. Roadmap de mejoras (propuestas del 2 de noviembre)
+
+Orden acordado con Enric: primero Siri y el Atajo de iOS (decisión pendiente 1) y Responsable con «Enviar recordatorio»; después estas mejoras; luego la fase 2 de tareas compartidas (punto 43 de la sección 8) y, al final, Outlook (punto 44). Las que añaden campos u opciones se diseñan y se acuerdan antes de construir (regla 6).
+
+| Código | Mejora | Coste |
+| --- | --- | --- |
+| M4 | Resumen de estado para compartir: texto por proyecto con lo hecho en la semana, en curso, por confirmar y próximos pasos, para Teams, correo o Claude | bajo |
+| M2 | Fecha límite aparte de la fecha de trabajo, en rojo al acercarse aunque la tarea se aplace | bajo o medio, campo nuevo |
+| M1 | Plantillas de tareas con fechas relativas (preparar SteerCo, workshop, cierre de mes, go-live) | medio, dato nuevo |
+| M5 | Bloqueo con Face ID o Touch ID al abrir la app tras un tiempo sin usarla | bajo o medio |
+| M3 | Revisión semanal guiada el viernes: completado, pendiente por proyecto, por confirmar, sin fecha y la semana siguiente | bajo |
+| M6 | Filtros guardados («Prioritarias de OCA esta semana», «Esperando al cliente») | medio |
+| M7 | Transcribir los audios grabados y proponer tareas a partir de ellos | por definir |
+
+M7, condición de Enric: **sin ningún coste**. Se descartan los servicios de pago. Vía propuesta: transcripción en el propio dispositivo con un modelo Whisper que se ejecuta en el navegador (gratis y sin que el audio salga del equipo, lo que además encaja con la política de datos de clientes), primero en el ordenador y en el iPhone si el rendimiento lo permite; la descarga del modelo pesa entre 40 y 250 MB según la calidad. Se diseña con Enric antes de construir.
+
 ---
 
 # Gestor de tareas personal. Diseño funcional v1

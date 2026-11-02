@@ -1,11 +1,14 @@
 /* Service worker: app shell cache and update notice.
    Bump CACHE on every release so installed devices pick up the new version. */
 const CACHE = 'tareas-v0.15.1';
-const SHELL = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png'];
+const SHELL = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png', './vendor/supabase-js-2.117.3.umd.js'];
+// Written at deploy time from the repository secrets (block 8). Cached when present; a copy without it (404) still installs and runs local only.
+const OPTIONAL = ['./config.js'];
 
 self.addEventListener('install', e => {
   // cache: 'reload' skips the HTTP cache so a stale copy from the host never gets installed.
-  e.waitUntil(caches.open(CACHE).then(c => Promise.all(SHELL.map(u => fetch(u, { cache: 'reload' }).then(r => { if (!r.ok) throw new Error(u); return c.put(u, r); })))));
+  e.waitUntil(caches.open(CACHE).then(c => Promise.all(SHELL.map(u => fetch(u, { cache: 'reload' }).then(r => { if (!r.ok) throw new Error(u); return c.put(u, r); }))
+    .concat(OPTIONAL.map(u => fetch(u, { cache: 'reload' }).then(r => r.ok ? c.put(u, r) : null).catch(() => null))))));
   // Do not call skipWaiting here: the page offers the update and asks for it.
 });
 

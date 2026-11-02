@@ -936,7 +936,22 @@ body.resizing,body.resizing *{cursor:col-resize !important;-webkit-user-select:n
 .pm-pop .hint.warn{color:var(--red);font-size:12px;text-align:center;margin:8px 0 0;}
 /* Reduce Motion (last, so it wins over the rules above): what slides or scales fades instead.
    Finger tracking stays; a row or sheet let go jumps to its place. Sheets keep their keyboard offset (.sheet.on). */
+/* Block 8: account in Ajustes and the iPhone pull to refresh (an activity indicator under the bar; the list makes room while it syncs) */
+.sync-acc .sync-line{white-space:normal;}
+.sync-acc .sync-line.warn{color:var(--orange);}
+.sync-acc button.cell[disabled]{opacity:.4;}
+.ptr{position:fixed;left:50%;top:0;z-index:9;pointer-events:none;opacity:0;display:flex;align-items:center;gap:8px;color:var(--ink2);font-size:.8125rem;transform:translate3d(-50%,var(--ptr-y,0px),0);}
+.ptr:not(.on){visibility:hidden;}
+.ptr-spin{display:block;width:24px;height:24px;}
+.ptr-spin svg{display:block;width:24px;height:24px;}
+.ptr.spin .ptr-spin svg{animation:ptrSpin .8s steps(8) infinite;}
+.ptr.done .ptr-spin{display:none;}
+.ptr.done{transition:opacity .3s;}
+@keyframes ptrSpin{to{transform:rotate(360deg);}}
+.screen.ptr-anim .scroll{transition:transform .4s cubic-bezier(.32,.72,0,1);}
+.screen.ptr-hold .scroll{transform:translate3d(0,44px,0);}
 @media (prefers-reduced-motion: reduce){
+ .screen.ptr-hold .scroll{transform:none;}
  .row-content,.flip{transition-property:opacity;}
  .row.leaving .row-content{transform:none;transition:opacity .22s;}
  .check.done.just,.row.armed .row-bg.left svg{animation:none;}
@@ -962,6 +977,9 @@ body.resizing,body.resizing *{cursor:col-resize !important;-webkit-user-select:n
 <label style="position:fixed;left:-200px;top:0;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none" aria-hidden="true"><input type="checkbox" switch id="hap" tabindex="-1"></label>
 <div class="toast" id="toast"><span id="toastText"></span><button id="toastBtn">Deshacer</button></div>
 
+<!-- Optional: window.TAREAS_CONFIG = {url, anonKey} for the sync (block 8). Written by the Pages workflow from the repository secrets,
+     ignored by git. Without it (404) the app stays local only, as before. -->
+<script src="config.js"></script>
 <script>
 'use strict';
 const APP_VERSION = '0.15.1';
@@ -1194,9 +1212,11 @@ function save(){
   }
   lastRaw=raw;
   if(saveFailed){ saveFailed=false; log('info','Se vuelve a guardar con normalidad'); }
+  syncChanged(); // signed in: the change goes up a moment later (block 8)
   return true;
 }
 DB = load();
+let SY=null; // sync state (block 8), set up by the SYNC block below; null while the app is local only
 try{ navigator.storage && navigator.storage.persist && navigator.storage.persist(); }catch(e){}
 function applyTheme(){ const t=DB.settings.theme||'auto'; if(t==='auto') document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme',t);
   // Browser and status bar tint: a chosen theme overrides both metas; in auto each one keeps its media query
@@ -1782,8 +1802,7 @@ function viewAjustes(){
   const th=DB.settings.theme||'auto'; const dev=UI.wide?'este dispositivo':'este iPhone'; // the desktop reuses this view
   return '<header class="nav"><div class="nav-row"><div class="title">Ajustes</div></div></header>'+
    '<div class="scroll">'+
-   '<div class="group-title">Cuenta</div><div class="group"><div class="cell"><span class="lbl">Sincronización</span><span class="val">Solo en este dispositivo</span></div></div>'+
-   '<div class="footnote">Los datos viven en '+dev+' hasta activar la sincronización.</div>'+
+   syncAccountHTML(dev)+
    '<div class="group-title">Espacios</div><div class="group">'+DB.spaces.slice().sort((a,b)=>a.order-b.order).map(sp=>'<button class="cell" data-edit-space="'+sp.id+'"><span class="lbl">'+esc(sp.name)+'</span>'+(sp.id===space().id?'<span class="val">Activo</span>':'')+I.chev.replace('<svg','<svg class="chev"')+'</button>').join('')+'<button class="cell link" data-act="newSpace">'+I.plus.replace('<svg','<svg style="width:18px;height:18px"')+'<span class="lbl">Nuevo espacio</span></button></div>'+
    '<div class="footnote">Un espacio solo se elimina si está vacío.</div>'+
    '<div class="group-title">Datos</div><div class="group"><button class="cell" data-act="exportFile"><span class="lbl">Exportar a archivo</span><span class="val">JSON</span></button><button class="cell" data-act="exportCSV"><span class="lbl">Exportar a Excel</span><span class="val">CSV</span></button><button class="cell" data-act="importFile"><span class="lbl">Importar desde archivo</span><span class="val">JSON</span></button><button class="cell" data-act="import"><span class="lbl">Importar pegando texto</span></button></div>'+
@@ -1993,6 +2012,9 @@ function onClick(e){
     case 'log': logSheet(); break;
     case 'logCopy': copyText(logText(),'Registro copiado'); break;
     case 'update': applyUpdate(); break;
+    case 'signIn': syncSignIn(); break;
+    case 'syncNow': syncRun('manual'); break;
+    case 'signOut': syncSignOutSheet(); break;
   }
 }
 
@@ -2857,6 +2879,303 @@ function clearDemo(){
   });
 }
 
+/* ======================= SYNC (block 8): Supabase =======================
+   The data on the device stays the truth for the screen (rule 7): this block copies it to Supabase and back in the background,
+   and never blocks a tap. Without config.js (or signed out) none of it runs and the app works as before.
+   - Remote adapter (SY.remote): the only part that talks to the network. supabaseRemote() builds it from config.js; a test puts
+     its own fake in window.__tareasRemote. Methods: init, onAuth, signIn, signOut, pull, byIds, upsert, markDeleted, subscribe.
+   - What changed, without touching every action: 'tareas-sync' keeps, per table and id, a signature of the version the server
+     has (known). A local record whose signature differs goes up; a known id missing here goes up as deleted, with the time the
+     deletion was first seen (del); 'x' marks an id the server holds as deleted. A record back after its deletion went up
+     (Deshacer, a restored copy) takes a new modified, so it wins over that deletion.
+   - Pull: the rows changed after each table's cursor (server_ts, with an overlap: a write can commit after a later one), merged
+     with "the newest modified wins" and applied through reloadFromStorage, so open sheets, focused fields and typing are kept.
+   - Never synced: the settings (decision 4), demo- ids (decision 3). 'trabajo' and 'personal' get a real id first (decision 2).
+   - First connection on a device (or with another account): a local backup, then everything is pulled, the initial spaces are
+     matched by name, the newest copy of each record wins and the rest goes up (decision 5). */
+const SYNC_KEY='tareas-sync', SUPABASE_JS='vendor/supabase-js-2.117.3.umd.js';
+const SYNC_PAGE=1000, SYNC_CHUNK=200, SYNC_OVERLAP=30e3, SYNC_DEBOUNCE=1500, EPOCH='1970-01-01T00:00:00.000Z';
+const SYNC_TABLES=[{list:'spaces', table:'spaces'},{list:'projects', table:'projects'},{list:'tasks', table:'tasks'},{list:'voiceNotes', table:'voice_notes'}];
+const INITIAL_SPACES=['trabajo','personal'];
+// Local field, column and kind; id, created and modified are common to all
+const SYNC_FIELDS={
+  spaces:[['name','name','text'],['order','sort_order','int']],
+  projects:[['spaceId','space_id','id'],['name','name','text'],['color','color','id'],['order','sort_order','int'],['archived','archived','bool']],
+  tasks:[['spaceId','space_id','id'],['projectId','project_id','id'],['title','title','text'],['date','date','day'],['reminder','reminder','ts'],['priority','priority','pri'],['status','status','status'],['notes','notes','text'],['carried','carried','bool'],['completed','completed','ts']],
+  voice_notes:[['taskId','task_id','id'],['text','text','text']] };
+const syncTs = v => { if(!v) return null; const d=new Date(v); return isNaN(d) ? null : d.toISOString(); };
+const SYNC_TO={ id:v=>v==null||v===''?null:String(v), text:v=>v==null?'':String(v), int:v=>v==null||v===''||isNaN(+v)?null:Math.round(+v), bool:v=>!!v,
+  day:v=>/^\d{4}-\d{2}-\d{2}$/.test(String(v||''))?v:null, ts:syncTs, pri:v=>['high','mid','none'].includes(v)?v:'none', status:v=>['pending','done'].includes(v)?v:'pending' };
+// A local record as a row: always the same keys in the same order, so the signature only changes with the content
+function syncToRow(table, rec){ const row={id:String(rec.id), created:syncTs(rec.created)};
+  SYNC_FIELDS[table].forEach(([f,c,k])=>{ row[c]=SYNC_TO[k](rec[f]); });
+  row.modified=syncTs(rec.modified)||row.created||EPOCH; return row; }
+// A row as a local record. A voice note keeps no modified until it is edited (decision 19)
+function syncFromRow(table, row){ const rec={id:row.id, created:syncTs(row.created)};
+  SYNC_FIELDS[table].forEach(([f,c,k])=>{ rec[f]=SYNC_TO[k](row[c]); });
+  const m=syncTs(row.modified); if(table!=='voice_notes' || (m && m!==rec.created)) rec.modified=m; return rec; }
+// A short hash of the row text (cyrb53): the signature kept for each record
+function syncHash(str){ let h1=0xdeadbeef, h2=0x41c6ce57; for(let i=0;i<str.length;i++){ const c=str.charCodeAt(i); h1=Math.imul(h1^c,2654435761); h2=Math.imul(h2^c,1597334677); }
+  h1=Math.imul(h1^(h1>>>16),2246822507)^Math.imul(h2^(h2>>>13),3266489909); h2=Math.imul(h2^(h2>>>16),2246822507)^Math.imul(h1^(h1>>>13),3266489909);
+  return (4294967296*(2097151&h2)+(h1>>>0)).toString(36); }
+const syncSig = row => syncHash(JSON.stringify(row));
+const syncDemoId = id => String(id).startsWith('demo-');
+// Records that never go up: demo data, notes of demo tasks, the initial spaces until they get their real id
+const syncSkip = (table, rec) => syncDemoId(rec.id) || (table==='spaces'&&INITIAL_SPACES.includes(rec.id)) || (table==='voice_notes'&&syncDemoId(rec.taskId));
+function syncState(){ let s=null; try{ s=JSON.parse(localStorage.getItem(SYNC_KEY)||'null'); }catch(e){}
+  if(!s||typeof s!=='object') s={}; ['known','cursor','del'].forEach(k=>{ if(!s[k]||typeof s[k]!=='object') s[k]={}; });
+  SYNC_TABLES.forEach(({table})=>{ s.known[table]=s.known[table]||{}; s.del[table]=s.del[table]||{}; }); return s; }
+function syncWrite(s){ try{ localStorage.setItem(SYNC_KEY, JSON.stringify(s)); return true; }catch(e){ log('warn','No se pudo guardar el estado de la sincronización: '+(e&&e.message||e)); return false; } }
+const syncTime = v => { const t=Date.parse(v||''); return isNaN(t)?0:t; };
+const syncOffline = e => !navigator.onLine || /fetch|network|load failed|conexi|timeout|abort/i.test(String(e&&(e.message||e.name)||e));
+
+/* ---------- Remote adapter: Supabase ---------- */
+function loadScript(src){ return new Promise((res,rej)=>{ const s=document.createElement('script'); s.src=src; s.onload=()=>res(); s.onerror=()=>rej(new Error('No se pudo cargar '+src)); document.head.appendChild(s); }); }
+// After the Google sign-in: the code and any error leave the address, other parameters (such as ?add=) stay
+function cleanAuthUrl(){ try{ const u=new URL(location.href); const err=u.searchParams.get('error_description')||u.searchParams.get('error');
+  let n=0; ['code','error','error_code','error_description','state'].forEach(k=>{ if(u.searchParams.has(k)){ u.searchParams.delete(k); n++; } });
+  if(n) history.replaceState(history.state, '', u.pathname+(u.searchParams.toString()?'?'+u.searchParams:'')+u.hash);
+  if(err){ log('error','Inicio de sesión rechazado: '+err); toast('No se pudo iniciar sesión'); } }catch(e){} }
+function supabaseRemote(cfg){
+  let client=null; const T=SYNC_TABLES.map(t=>t.table);
+  const db=()=>{ if(!client) throw new Error('Cliente de Supabase no cargado'); return client; };
+  const rows=({data,error})=>{ if(error) throw error; return data||[]; };
+  const user=u=>u?{id:u.id, email:u.email||''}:null;
+  return {
+    async init(){
+      if(!client){ if(!window.supabase) await loadScript(SUPABASE_JS);
+        client=window.supabase.createClient(cfg.url, cfg.anonKey, {auth:{flowType:'pkce', detectSessionInUrl:true, persistSession:true, autoRefreshToken:true, storageKey:'tareas-auth'}}); }
+      const {data, error}=await client.auth.getSession(); cleanAuthUrl(); if(error) throw error;
+      return user(data&&data.session&&data.session.user); },
+    // The callback runs outside the auth lock: calling the client from inside it can wait for ever
+    onAuth(cb){ db().auth.onAuthStateChange((ev, session)=>{ if(ev==='SIGNED_IN'||ev==='SIGNED_OUT'||ev==='USER_UPDATED') setTimeout(()=>cb(user(session&&session.user), ev), 0); }); },
+    async signIn(){ const {error}=await db().auth.signInWithOAuth({provider:'google', options:{redirectTo:location.origin+location.pathname}}); if(error) throw error; },
+    async signOut(){ const {error}=await db().auth.signOut({scope:'local'}); if(error) throw error; },
+    async pull(table, after, limit){ let q=db().from(table).select('*').order('server_ts',{ascending:true}).order('id',{ascending:true}).limit(limit); if(after) q=q.gt('server_ts', after); return rows(await q); },
+    async byIds(table, ids){ return rows(await db().from(table).select('*').in('id', ids)); },
+    // Rows the server keeps because its copy is newer are left out of the answer (trigger in 0001_init.sql)
+    async upsert(table, list){ return rows(await db().from(table).upsert(list, {onConflict:'id', defaultToNull:false}).select('id')); },
+    async markDeleted(table, items){ return rows(await db().from(table).upsert(items.map(x=>({id:x.id, deleted:x.ts, modified:x.ts})), {onConflict:'id', defaultToNull:false}).select('id')); },
+    subscribe(uid, onRow, onStatus){ const c=db(); const ch=c.channel('tareas-'+uid);
+      T.forEach(t=>ch.on('postgres_changes', {event:'*', schema:'public', table:t, filter:'owner_id=eq.'+uid}, p=>{ if(p&&p.new&&p.new.id) onRow(t, p.new); }));
+      ch.subscribe((st, err)=>onStatus(st, err)); return ()=>{ try{ c.removeChannel(ch); }catch(e){} }; }
+  };
+}
+
+/* ---------- Merge ---------- */
+// The initial spaces get a real id: the server's space with the same name (accents and case ignored) or a new one.
+// pool: the server's spaces on a first connection; otherwise the local ones that already have a real id (a restored old copy)
+function syncRemapSpaces(W, pool){ const out=[], used=new Set();
+  INITIAL_SPACES.forEach(old=>{ const sp=W.spaces.find(s=>s.id===old); if(!sp) return;
+    const match=(pool||W.spaces.filter(s=>!INITIAL_SPACES.includes(s.id))).find(r=>!used.has(r.id) && norm(r.name).trim()===norm(sp.name).trim());
+    const nid=match?match.id:uid(); used.add(nid);
+    if(match && W.spaces.some(s=>s!==sp && s.id===nid)) W.spaces.splice(W.spaces.indexOf(sp),1); // already here: the copy goes
+    else if(match) Object.assign(sp, match); // the server's space as it is there: same id, name and order
+    else { sp.id=nid; if(!sp.modified) sp.modified=sp.created||new Date().toISOString(); }
+    W.projects.forEach(p=>{ if(p.spaceId===old) p.spaceId=nid; }); W.tasks.forEach(x=>{ if(x.spaceId===old) x.spaceId=nid; });
+    if(W.settings && W.settings.activeSpace===old) W.settings.activeSpace=nid;
+    out.push({from:old, to:nid, name:sp.name, found:!!match}); });
+  return out; }
+// Server rows into the working copy W, newest modified first; st.known learns what the server holds. Returns what changed here
+function syncMerge(W, st, table, rows, stats){
+  const list=SYNC_TABLES.find(t=>t.table===table).list, known=st.known[table], dels=st.del[table];
+  const at=new Map(); W[list].forEach((r,i)=>{ if(r&&r.id!=null) at.set(r.id,i); });
+  let removed=false;
+  rows.forEach(row=>{ if(!row||row.id==null||syncDemoId(row.id)) return; const id=row.id;
+    const remote=row.deleted?null:syncFromRow(table,row), rsig=remote?syncSig(syncToRow(table,remote)):'x';
+    const i=at.has(id)?at.get(id):-1, local=i>=0?W[list][i]:null;
+    if(!local){
+      if(remote){ // known and missing here: deleted on this device and not yet sent. The later of the two wins
+        const pend=known[id]!==undefined && known[id]!=='x', d=pend?(dels[id]=dels[id]||new Date().toISOString()):null;
+        if(pend && syncTime(row.modified)<=syncTime(d)){ known[id]=rsig; return; }
+        W[list].push(remote); at.set(id, W[list].length-1); delete dels[id]; stats.added++; }
+      known[id]=rsig; return; }
+    const lrow=syncToRow(table,local), lsig=syncSig(lrow);
+    if(lsig===rsig){ known[id]=rsig; return; }
+    const dirty=lsig!==known[id], rm=syncTime(row.modified), lm=syncTime(lrow.modified);
+    const takeRemote = rm>lm || (rm===lm && !dirty);
+    if(dirty) stats.conflicts.push({table, id, won:takeRemote?'servidor':'local'});
+    known[id]=rsig; // what the server holds now: a local copy that stays different goes up afterwards
+    if(!takeRemote) return;
+    if(!remote){ W[list][i]=null; removed=true; stats.removed++;
+      if(table==='tasks') W.voiceNotes.forEach((v,j)=>{ if(v&&v.taskId===id){ W.voiceNotes[j]=null; } }); return; }
+    const keep={}; Object.keys(local).forEach(k=>{ if(!(k in lrow) && !SYNC_FIELDS[table].some(f=>f[0]===k)) keep[k]=local[k]; }); // fields this model does not sync stay
+    W[list][i]=Object.assign(keep, remote); stats.updated++; });
+  if(removed) SYNC_TABLES.forEach(({list:l})=>{ W[l]=W[l].filter(Boolean); });
+}
+/* Applies server rows to the data, in one synchronous step so no tap can land in between. The result is written to storage and
+   taken in by reloadFromStorage: open sheets, a focused field and typing waiting for its save are kept, and the screens redraw.
+   pulled: {table: rows}; o.cursor moves the tables' cursors (a pull; realtime events do not); o.pool runs the space matching */
+function syncApply(pulled, o){ o=o||{};
+  const st=syncState(), stats={added:0, updated:0, removed:0, conflicts:[], remaps:[]};
+  const W={spaces:DB.spaces.map(x=>Object.assign({},x)), projects:DB.projects.map(x=>Object.assign({},x)), tasks:DB.tasks.map(x=>Object.assign({},x)), voiceNotes:DB.voiceNotes.map(x=>Object.assign({},x)), settings:Object.assign({}, DB.settings)};
+  if(o.pool || W.spaces.some(s=>INITIAL_SPACES.includes(s.id))) stats.remaps=syncRemapSpaces(W, o.pool||null);
+  SYNC_TABLES.forEach(({table})=>{ const rows=pulled[table]||[]; if(rows.length) syncMerge(W, st, table, rows, stats);
+    if(o.cursor) rows.forEach(r=>{ if(syncTime(r.server_ts)>syncTime(st.cursor[table])) st.cursor[table]=r.server_ts; }); });
+  const changed=stats.added+stats.updated+stats.removed+stats.remaps.length;
+  if(changed){ const t=todayStr(); W.tasks.forEach(x=>{ if(x.status==='pending'&&x.date&&x.date<t){ x.date=t; x.carried=true; } }); // as rollOver: never overdue, modified untouched
+    if(!W.spaces.length) return stats; // never leave the app without a space (load would put Trabajo and Personal back)
+    const raw=JSON.stringify(Object.assign({}, DB, W));
+    try{ localStorage.setItem(KEY, raw); }catch(e){ log('error','Sincronización: no se pudieron guardar los cambios recibidos: '+(e&&e.message||e)); throw e; }
+    syncWrite(st); reloadFromStorage('sync');
+    stats.conflicts.forEach(c=>log('info','Conflicto resuelto: gana la copia '+(c.won==='servidor'?'del servidor':'local'), {table:c.table, id:c.id}));
+    stats.remaps.forEach(r=>log('info','Espacio '+r.name+(r.found?' unido al de la cuenta':' con identificador nuevo'), r));
+  } else syncWrite(st);
+  return stats; }
+
+/* ---------- Push ---------- */
+// What differs from the server now. dry: only count it (Ajustes), without marking anything
+function syncCollect(dry){ const st=syncState(), now=new Date().toISOString(), up={}, del={}; let n=0, bumped=false;
+  SYNC_TABLES.forEach(({list, table})=>{ const known=st.known[table], dels=st.del[table], here=new Set(); up[table]=[]; del[table]=[];
+    DB[list].forEach(rec=>{ if(!rec||rec.id==null) return; here.add(rec.id); if(syncSkip(table, rec)) return;
+      if(known[rec.id]==='x' && !dry){ rec.modified=now; bumped=true; } // back after its deletion went up: this copy is the newest
+      const row=syncToRow(table, rec), s=syncSig(row); if(s!==known[rec.id]){ up[table].push({row, s}); n++; }
+      if(!dry) delete dels[rec.id]; });
+    Object.keys(known).forEach(id=>{ if(known[id]==='x' || here.has(id) || syncDemoId(id)) return; n++;
+      if(!dry){ if(!dels[id]) dels[id]=now; del[table].push({id, ts:dels[id]}); } }); });
+  if(!dry){ syncWrite(st); if(bumped){ SY.quiet=true; try{ save(); } finally{ SY.quiet=false; } } }
+  return {up, del, count:n}; }
+async function syncPush(c){ const out={pushed:0, deleted:0, kept:0}; const late={};
+  for(const {table} of SYNC_TABLES){
+    for(let i=0;i<c.up[table].length;i+=SYNC_CHUNK){ const part=c.up[table].slice(i,i+SYNC_CHUNK);
+      const ok=new Set((await SY.remote.upsert(table, part.map(x=>x.row))).map(r=>r.id)); const st=syncState();
+      part.forEach(x=>{ if(ok.has(x.row.id)){ st.known[table][x.row.id]=x.s; out.pushed++; } else (late[table]=late[table]||[]).push(x.row.id); }); syncWrite(st); }
+    for(let i=0;i<c.del[table].length;i+=SYNC_CHUNK){ const part=c.del[table].slice(i,i+SYNC_CHUNK);
+      const ok=new Set((await SY.remote.markDeleted(table, part)).map(r=>r.id)); const st=syncState();
+      part.forEach(x=>{ if(ok.has(x.id)){ st.known[table][x.id]='x'; delete st.del[table][x.id]; out.deleted++; } else (late[table]=late[table]||[]).push(x.id); }); syncWrite(st); } }
+  // The server kept a newer copy of these: fetch them so the newest wins here too
+  const got={}; for(const table of Object.keys(late)){ got[table]=[]; for(let i=0;i<late[table].length;i+=100){ got[table].push(...await SY.remote.byIds(table, late[table].slice(i,i+100))); } out.kept+=late[table].length; }
+  if(out.kept) syncApply(got, {});
+  return out; }
+async function syncPull(cursor){ const out={};
+  for(const {table} of SYNC_TABLES){ let after=cursor&&cursor[table]?new Date(syncTime(cursor[table])-SYNC_OVERLAP).toISOString():null; const rows=[];
+    for(;;){ const page=await SY.remote.pull(table, after, SYNC_PAGE); if(page.length<SYNC_PAGE){ rows.push(...page); break; }
+      // A full page: the rows of its last instant may continue on the next one, so they are asked for again from the one before
+      const last=page[page.length-1].server_ts, keep=page.filter(r=>r.server_ts!==last);
+      if(!keep.length){ rows.push(...page); after=last; continue; } rows.push(...keep); after=keep[keep.length-1].server_ts; }
+    out[table]=rows; }
+  return out; }
+
+/* ---------- Runs ---------- */
+function syncPaint(){ if(!SY) return; if(SY.user && !SY.running){ try{ SY.pending=syncCollect(true).count; }catch(e){} }
+  if(onSettings() && !busyEditing() && !touchDrag) render(); }
+function syncStatus(s){ if(!SY||SY.status===s) return; SY.status=s; syncPaint(); }
+// Called by save(): the change goes up a moment after the last one
+function syncChanged(){ if(!SY||!SY.user||SY.quiet) return; clearTimeout(SY.timer); SY.timer=setTimeout(()=>syncRun('cambio'), SYNC_DEBOUNCE); }
+function syncRetry(){ clearTimeout(SY.timer); const ms=Math.min(300e3, 2000*Math.pow(2, SY.retry++)); SY.timer=setTimeout(()=>syncRun('reintento'), ms); }
+// One run: pull, merge, push. Resolves true when it reached the server. Runs one at a time (and one per device with Web Locks)
+function syncRun(reason){
+  if(!SY||!SY.user||!SY.remote) return Promise.resolve(false);
+  if(SY.running){ SY.again=true; return SY.runP; }
+  clearTimeout(SY.timer);
+  if(!SY.ready){ syncInit(); return Promise.resolve(false); }
+  if(!navigator.onLine){ SY.status='offline'; syncPaint(); return Promise.resolve(false); }
+  SY.running=true; SY.again=false; syncStatus('syncing');
+  const body=async()=>{ const t0=Date.now(); const user=SY.user; let st=syncState(); const first=st.owner!==user.id;
+    if(first && st.firstFor!==user.id){ // decision 5: a local copy before anything comes in; the account's known state starts empty
+      try{ flushEdits(); await BK.put(todayStr()); await refreshBackups(); log('info','Copia local antes de la primera sincronización', {tasks:DB.tasks.length, projects:DB.projects.length}); }
+      catch(e){ log('warn','Copia local antes de sincronizar no disponible: '+(e&&e.message||e)); }
+      st=syncState(); st.firstFor=user.id; st.known={}; st.cursor={}; st.del={}; syncWrite(st); st=syncState(); }
+    const pulled=await syncPull(first?null:st.cursor);
+    if(!SY.user || SY.user.id!==user.id) return false; // signed out meanwhile
+    const pool=first?(pulled.spaces||[]).filter(r=>!r.deleted).map(r=>syncFromRow('spaces', r)):null;
+    const a=syncApply(pulled, {cursor:true, pool});
+    const p=await syncPush(syncCollect(false));
+    st=syncState(); if(first){ st.owner=user.id; log('info','Primera conexión completada', {spaces:DB.spaces.length, projects:DB.projects.length, tasks:DB.tasks.length, remaps:a.remaps.length}); }
+    st.lastSync=new Date().toISOString(); syncWrite(st); SY.lastSync=st.lastSync; SY.retry=0;
+    log('info','Sincronización ('+reason+')', {recibidas:a.added+a.updated, eliminadas:a.removed, conflictos:a.conflicts.length, enviadas:p.pushed, borradas:p.deleted, mantenidas:p.kept, ms:Date.now()-t0});
+    return true; };
+  const locked=()=>(navigator.locks&&navigator.locks.request) ? navigator.locks.request('tareas-sync', body) : body();
+  SY.runP=locked().then(ok=>{ SY.running=false; if(ok){ SY.status='ok'; SY.error=''; } syncPaint(); if(SY.again) syncChanged(); return !!ok; }, e=>{
+    SY.running=false; const off=syncOffline(e); SY.status=off?'offline':'error'; SY.error=String(e&&(e.message||e.code)||e);
+    log(off?'warn':'error', 'Sincronización falló ('+reason+'): '+SY.error); syncRetry(); syncPaint(); return false; });
+  return SY.runP; }
+function syncSubscribe(){ if(SY.unsub||!SY.user||!SY.remote.subscribe) return;
+  let was=false; SY.unsub=SY.remote.subscribe(SY.user.id, (table,row)=>{ SY.rt.push([table,row]); clearTimeout(SY.rtT); SY.rtT=setTimeout(syncRealtime, 250); }, (st, err)=>{
+    if(st==='SUBSCRIBED'){ if(was) syncRun('tiempo real'); was=true; } // back after a cut: catch up with what came meanwhile
+    else if(st==='CHANNEL_ERROR'||st==='TIMED_OUT') log('warn','Tiempo real: '+st+(err?' '+(err.message||err):'')); }); }
+// Changes from another device, a few at a time, through the same merge
+function syncRealtime(){ const ev=SY.rt.splice(0); if(!ev.length||!SY.user) return; const pulled={}; ev.forEach(([t,row])=>{ (pulled[t]=pulled[t]||[]).push(row); });
+  try{ const a=syncApply(pulled, {}); const n=a.added+a.updated+a.removed; if(n) log('info','Cambios recibidos en tiempo real', {recibidas:a.added+a.updated, eliminadas:a.removed, conflictos:a.conflicts.length}); if(n||a.conflicts.length) syncChanged(); }
+  catch(e){ log('error','Tiempo real: '+(e&&e.message||e)); } }
+function syncSetUser(user, why){
+  const st=syncState();
+  if(user){ const changed=!SY.user||SY.user.id!==user.id; SY.user={id:user.id, email:user.email||''}; st.user=SY.user; syncWrite(st);
+    if(changed) log('info','Sesión iniciada', SY.user.email);
+    syncSubscribe(); if(changed || why==='inicio') syncRun(why==='inicio'?'inicio':'sesión'); }
+  else if(SY.user){ log('info', why==='SIGNED_OUT'?'Sesión cerrada':'Sesión no válida: se deja de sincronizar'); SY.user=null; st.user=null; syncWrite(st);
+    if(SY.unsub){ SY.unsub(); SY.unsub=null; } clearTimeout(SY.timer); SY.status='idle'; }
+  syncPaint(); }
+// Loads the client and reads the session. Offline at start a known session is kept: it is checked when the connection returns
+function syncInit(){ if(!SY||!SY.remote||SY.initP) return; SY.initP=SY.remote.init().then(user=>{ SY.ready=true;
+    if(!SY.authBound){ SY.authBound=true; SY.remote.onAuth((u, ev)=>syncSetUser(u, ev)); }
+    if(user) syncSetUser(user, 'inicio'); else if(SY.user && !navigator.onLine) syncStatus('offline'); else syncSetUser(null, 'inicio'); }, e=>{
+    log('warn','Sincronización no disponible: '+(e&&e.message||e)); SY.status=syncOffline(e)?'offline':'error'; syncPaint(); })
+  .finally(()=>{ SY.initP=null; }); }
+function syncBoot(){
+  const cfg=window.TAREAS_CONFIG, fake=window.__tareasRemote; // __tareasRemote: a test's stand-in for the server
+  const remote=fake||(cfg&&cfg.url&&cfg.anonKey?supabaseRemote(cfg):null); if(!remote) return; // no config: local only, as before
+  const st=syncState();
+  SY={remote, user:st.user||null, status:'idle', error:'', ready:false, running:false, again:false, runP:null, timer:0, retry:0, pending:0, unsub:null, rt:[], rtT:0, quiet:false, lastSync:st.lastSync||null, initP:null, authBound:false};
+  window.addEventListener('online', ()=>{ SY.retry=0; if(!SY.ready) syncInit(); else syncRun('conexión'); });
+  window.addEventListener('offline', ()=>syncStatus('offline'));
+  document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible' && SY.user) syncRun('vuelta'); });
+  setInterval(()=>{ if(onSettings() && SY.user && !busyEditing()) render(); }, 6e4); // "hace 3 min" stays true
+  syncInit(); if(onSettings()) render(); }
+async function syncSignIn(){ if(!SY) return; if(!navigator.onLine){ toast('Sin conexión'); return; }
+  try{ if(!SY.ready){ syncInit(); await SY.initP; } flushHeld(true); flushEdits(); log('info','Inicio de sesión con Google'); await SY.remote.signIn(); }
+  catch(e){ log('error','Inicio de sesión falló: '+(e&&e.message||e)); toast('No se pudo iniciar sesión'); } }
+function syncSignOutSheet(){ const dev=UI.wide?'este dispositivo':'este iPhone';
+  confirmSheet('Cerrar sesión', 'Los datos se quedan en '+dev+' y dejan de sincronizarse.', async()=>{ try{ await SY.remote.signOut(); }catch(e){ log('warn','Cerrar sesión: '+(e&&e.message||e)); } syncSetUser(null, 'SIGNED_OUT'); toast('Sesión cerrada'); }); }
+
+/* ---------- Ajustes, Cuenta ---------- */
+function syncAgo(iso){ const t=syncTime(iso); if(!t) return ''; const m=Math.floor((Date.now()-t)/6e4);
+  if(m<1) return 'hace un momento'; if(m<60) return 'hace '+m+' min';
+  const d=localDay(iso); if(d===todayStr()) return 'hoy a las '+fmtTime(iso); if(d===addDays(todayStr(),-1)) return 'ayer a las '+fmtTime(iso);
+  const x=new Date(iso); return 'el '+x.getDate()+' '+MESES[x.getMonth()]+' a las '+fmtTime(iso); }
+function syncLine(){ if(!SY||!SY.user) return '';
+  if(SY.status==='offline') return 'Sin conexión. Se sincronizará al volver';
+  if(SY.status==='syncing') return 'Sincronizando';
+  if(SY.status==='error') return 'No se pudo sincronizar. Se volverá a intentar';
+  return SY.lastSync?'Sincronizado '+syncAgo(SY.lastSync):'Pendiente de la primera sincronización'; }
+function syncAccountHTML(dev){
+  if(!SY) return '<div class="group-title">Cuenta</div><div class="group"><div class="cell"><span class="lbl">Sincronización</span><span class="val">Solo en '+dev+'</span></div></div>'+
+    '<div class="footnote">Sincronización no disponible en esta versión.</div>';
+  if(!SY.user) return '<div class="group-title">Cuenta</div><div class="group"><button class="cell link" data-act="signIn"><span class="lbl">Iniciar sesión con Google</span></button></div>'+
+    '<div class="footnote">'+(SY.status==='offline'?'Sin conexión. ':'')+'Al iniciar sesión, tus tareas se guardan en tu cuenta y llegan a tus otros dispositivos. Lo que ya hay en '+dev+' se conserva.</div>';
+  const n=SY.pending||0, line=syncLine();
+  return '<div class="group-title">Cuenta</div><div class="group sync-acc"><div class="cell"><span class="lbl">Cuenta</span><span class="val">'+esc(SY.user.email||'Google')+'</span></div>'+
+    '<div class="cell"><span class="lbl sync-line'+(SY.status==='error'||SY.status==='offline'?' warn':'')+'">'+esc(line)+'</span></div>'+
+    '<div class="cell"><span class="lbl">Cambios pendientes</span><span class="val">'+(n?n:'Ninguno')+'</span></div>'+
+    '<button class="cell link" data-act="syncNow"'+(SY.status==='syncing'?' disabled':'')+'><span class="lbl">Sincronizar ahora</span></button>'+
+    '<button class="cell" data-act="signOut"><span class="lbl" style="color:var(--red)">Cerrar sesión</span></button></div>'+
+    '<div class="footnote">Al cerrar sesión, los datos se quedan en '+dev+' y dejan de sincronizarse.</div>'; }
+
+/* ---------- Pull to refresh (iPhone: Tareas and a project) ---------- */
+const SPIN='<svg viewBox="0 0 24 24" aria-hidden="true">'+[0,1,2,3,4,5,6,7].map(i=>'<rect x="11" y="2" width="2" height="6" rx="1" fill="currentColor" opacity="'+(0.25+i*0.107).toFixed(2)+'" transform="rotate('+(i*45)+' 12 12)"/>').join('')+'</svg>';
+function bindPullRefresh(){
+  const el=document.createElement('div'); el.className='ptr'; el.setAttribute('aria-hidden','true'); el.innerHTML='<span class="ptr-spin">'+SPIN+'</span><span class="ptr-text"></span>'; document.body.appendChild(el);
+  const TH=110; let mode=null, x0=0, y0=0, sc=null, scr=null, dist=0, busy=false;
+  const target=t=>{ if(UI.wide||!SY||!SY.user||UI.select||busy) return null; const s=t.closest&&t.closest('.screen'); if(!s) return null;
+    const top=UI.stack.length?UI.stack[UI.stack.length-1]:null;
+    const ok=top ? (top.kind==='project' && top.el===s) : (s.classList.contains('root') && s.dataset.root==='tareas' && UI.tab==='tareas');
+    const c=ok&&t.closest('.scroll'); return c&&s.contains(c)?{s,c}:null; };
+  const place=()=>{ const h=scr.querySelector('.nav'); el.style.setProperty('--ptr-y', ((h?h.getBoundingClientRect().bottom:0)+12)+'px'); };
+  const show=f=>{ el.style.opacity=String(f); el.querySelector('.ptr-spin').style.transform='rotate('+Math.round(f*270)+'deg)'; };
+  const hide=()=>{ el.classList.remove('on','spin','done'); el.style.opacity='0'; const s=scr; if(s&&s.classList.contains('ptr-hold')){ s.classList.remove('ptr-hold'); setTimeout(()=>s.classList.remove('ptr-anim'), 450); } };
+  app.addEventListener('touchstart', e=>{ mode=null; if(e.touches.length!==1) return; const h=target(e.target); if(!h||h.c.scrollTop>0) return;
+    scr=h.s; sc=h.c; x0=e.touches[0].clientX; y0=e.touches[0].clientY; dist=0; mode='pending'; }, {passive:true});
+  app.addEventListener('touchmove', e=>{ if(!mode) return; const t=e.touches[0], dx=t.clientX-x0, dy=t.clientY-y0;
+    if(mode==='pending'){ if(Math.abs(dx)>10&&Math.abs(dx)>Math.abs(dy)){ mode=null; return; } if(dy<-4||sc.scrollTop>0){ mode=null; return; } if(dy<12) return;
+      mode='pull'; place(); el.querySelector('.ptr-text').textContent=''; el.classList.add('on'); }
+    dist=Math.max(0, dy); show(Math.min(1, dist/TH)); if(dist>=TH && !el.dataset.armed){ el.dataset.armed='1'; haptic(8); } else if(dist<TH) delete el.dataset.armed; }, {passive:true});
+  const end=()=>{ const m=mode; mode=null; delete el.dataset.armed; if(m!=='pull') return; if(dist<TH){ hide(); return; }
+    busy=true; el.classList.add('spin'); show(1); scr.classList.add('ptr-anim','ptr-hold'); const t0=Date.now(), held=scr;
+    syncRun('tirar').then(ok=>{ setTimeout(()=>{ el.classList.remove('spin'); el.classList.add('done');
+      el.querySelector('.ptr-text').textContent = ok ? 'Sincronizado a las '+fmtTime(SY.lastSync) : SY.status==='offline' ? 'Sin conexión' : 'No se pudo sincronizar';
+      setTimeout(()=>{ scr=held; hide(); busy=false; }, 1400); }, Math.max(0, 600-(Date.now()-t0))); }); };
+  app.addEventListener('touchend', end, {passive:true}); app.addEventListener('touchcancel', ()=>{ if(mode==='pull') hide(); mode=null; }, {passive:true}); }
+
 /* Log sheet */
 function logSheet(){
   openSheet('<h2>Registro</h2><div class="hint">'+LOG.length+' entradas. Cópialo y pégalo en el chat.</div><textarea readonly style="min-height:260px;font-size:12px;line-height:1.35;font-family:ui-monospace,Menlo,monospace">'+esc(logText())+'</textarea><div class="sheet-actions"><button class="btn" data-x="clear">Borrar</button><button class="btn primary" data-x="copy">Copiar</button></div>'+(navigator.share?'<div class="sheet-actions" style="margin-top:10px"><button class="btn" data-x="share">Compartir</button></div>':''), s=>{
@@ -2958,7 +3277,7 @@ function adoptList(cur, next){ const m=new Map(); cur.forEach(o=>{ if(o&&o.id!=n
 // The desktop add bar and search keep their focus and caret across a redraw (renderDesktop); any other field or open sheet would lose it
 const holdRedraw=()=>{ const ae=document.activeElement||{}; return sheet.classList.contains('on')||asheet.classList.contains('on')||menuOpen()||(/^(INPUT|TEXTAREA)$/.test(ae.tagName||'') && !(UI.wide && /^(addbar|search)$/.test((ae.dataset&&ae.dataset.role)||''))); };
 function flushStale(){ if(!staleView || holdRedraw()) return; if(app.classList.contains('navigating')){ setTimeout(flushStale, 400); return; } render(); } // a screen sliding in is drawn after its slide
-function reloadFromStorage(){
+function reloadFromStorage(src){ // src 'sync': the data came from the server (block 8), which logs it on its own
   const keep={activeSpace:DB.settings.activeSpace, filter:DB.settings.filter}; // what this window is showing stays put
   const ep=editPatch, f=load();
   Object.keys(f).forEach(k=>{ const a=DB[k], b=f[k];
@@ -2974,7 +3293,7 @@ function reloadFromStorage(){
   UI.stack=UI.stack.filter(s=>{ const ok=s.kind==='detail'?!!task(s.id):(s.id==='none'||!!proj(s.id)); if(!ok) s.el.remove(); return ok; });
   if(UI.select) UI.select.ids.forEach(id=>{ if(!task(id)) UI.select.ids.delete(id); });
   if(UI.projFilter && UI.projFilter!=='none' && !proj(UI.projFilter)) UI.projFilter=null;
-  if(Date.now()-reloadLoggedAt>6e4){ reloadLoggedAt=Date.now(); log('info','Datos recargados: otra ventana los ha cambiado'); }
+  if(src!=='sync' && Date.now()-reloadLoggedAt>6e4){ reloadLoggedAt=Date.now(); log('info','Datos recargados: otra ventana los ha cambiado'); }
   // A screen whose task or project the other window removed goes at once; otherwise an open sheet and a focused field are kept
   if(UI.stack.length===n && !(UI.wide&&UI.deskDetail&&!task(UI.deskDetail)) && holdRedraw()){ staleView=true; return; }
   render();
@@ -3481,6 +3800,7 @@ document.addEventListener('keydown', e=>{ if(!UI.wide) return; const tag=(e.targ
 // A project group header (R13) is a div with the button role: Enter and Space act on it as on a button
 document.addEventListener('keydown', e=>{ if((e.key==='Enter'||e.key===' ')&&e.target.classList&&e.target.classList.contains('gtap')){ e.preventDefault(); e.target.click(); } });
 wideMQ.addEventListener('change', applyWide); // first applied at start, before the first render
+syncBoot(); if(SY) bindPullRefresh(); // block 8: nothing happens without config.js
 
 /* ---------- Service worker: offline cache and update notice ---------- */
 function applyUpdate(){ if(!pendingSW) return; updateRequested=true; toast('Actualizando'); log('info','Actualización aplicada por el usuario'); pendingSW.postMessage({type:'SKIP_WAITING'}); }

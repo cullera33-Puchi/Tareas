@@ -1,5 +1,5 @@
 # Publishes the static app to GitHub Pages on every push to main.
-# No build step: the repository root is uploaded as is.
+# No build step: the repository root is uploaded as is, plus config.js written from the secrets.
 name: Deploy to GitHub Pages
 
 on:
@@ -27,6 +27,20 @@ jobs:
       - uses: actions/configure-pages@v5
         with:
           enablement: true
+      # Block 8: config.js for the sync, from the repository secrets (never committed; .gitignore keeps it out).
+      # Without the secrets it holds nulls and the app runs local only. JSON.stringify quotes the values safely.
+      - name: Write config.js
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          node -e '
+            const url = (process.env.SUPABASE_URL || "").trim() || null;
+            const anonKey = (process.env.SUPABASE_ANON_KEY || "").trim() || null;
+            const cfg = url && anonKey ? { url, anonKey } : { url: null, anonKey: null };
+            require("fs").writeFileSync("config.js", "window.TAREAS_CONFIG = " + JSON.stringify(cfg) + ";\n");
+            console.log(url && anonKey ? "config.js written for " + url.replace(/^https?:\/\//, "").split("/")[0] : "config.js written without keys: local only");
+          '
       - uses: actions/upload-pages-artifact@v3
         with:
           path: .

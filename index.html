@@ -1294,15 +1294,30 @@ function addTask(data){
   if(x.projectId){ const p=proj(x.projectId); if(p) x.spaceId=p.spaceId; }
   DB.tasks.push(x); save(); return x;
 }
-function updTask(id, patch){ const x=task(id); if(!x) return; if('date' in patch && !('carried' in patch)) patch.carried=false; Object.assign(x, patch, {modified:new Date().toISOString()}); save(); }
+function updTask(id, patch){ const x=task(id); if(!x) return; if('date' in patch && !('carried' in patch)) patch.carried=false;
+  // Block 9: a reminder that changes notifies once more (reminderSent cleared), unless it is already past: then it is marked as sent and never notifies
+  if('reminder' in patch && !('reminderSent' in patch) && (patch.reminder||null)!==(x.reminder||null)) patch.reminderSent=sentStamp(patch.reminder);
+  Object.assign(x, patch, {modified:new Date().toISOString()}); save(); }
+/* Decision 25: a task that changes day through rollOver, Aplazar, Pasar lo pendiente a mañana, the reviews, planning, the desktop quick dates
+   or a calendar drag takes a reminder set on its old day to the new day, at the same time. If that time has already passed (yesterday's
+   tasks rolled over to today), the reminder stays but is marked as sent, so it never notifies. The one helper every one of those paths uses;
+   'extra' joins the patch (carried, status). The Fecha and Recordatorio sheets are manual edits and do not use it */
+const sentStamp = iso => iso && Date.parse(iso)<=Date.now() ? new Date().toISOString() : null;
+function dayPatch(x, date, extra){ const p=Object.assign({date}, extra||{});
+  if(x && x.reminder && x.date && date && date!==x.date && localDay(x.reminder)===x.date){ const r=new Date(x.reminder), d=new Date(date+'T00:00:00');
+    d.setHours(r.getHours(), r.getMinutes(), r.getSeconds(), r.getMilliseconds()); p.reminder=d.toISOString(); p.reminderSent=sentStamp(p.reminder); }
+  return p; }
+// What Deshacer needs to put a task back on its day: the date, the Aplazada mark and the reminder (updTask works out reminderSent again)
+const daySnap = x => ({id:x.id, date:x.date, carried:x.carried, reminder:x.reminder||null});
+const undoDay = o => updTask(o.id, {date:o.date, carried:o.carried, reminder:o.reminder});
 /* Roll over: pending tasks dated before today move to today and are flagged as carried.
    Runs at start and whenever the app comes back to the foreground (the day may have changed). */
 // It leaves 'modified' alone: every device repeats it, so it must not beat a real edit in an import ('newer wins').
-function rollOver(){ const t=todayStr(); let n=0; if(DB.settings.summaryDay!==t){ DB.settings.summaryDay=t; UI.summaryFirst=true; save(); } DB.tasks.forEach(x=>{ if(x.status==='pending'&&x.date&&x.date<t){ x.date=t; x.carried=true; n++; } }); if(n) save(); return n; }
+function rollOver(){ const t=todayStr(); let n=0; if(DB.settings.summaryDay!==t){ DB.settings.summaryDay=t; UI.summaryFirst=true; save(); } DB.tasks.forEach(x=>{ if(x.status==='pending'&&x.date&&x.date<t){ Object.assign(x, dayPatch(x, t, {carried:true})); n++; } }); if(n) save(); return n; }
 // The data side of completing or reopening, with no feedback
 function applyDone(id, done){ const x=task(id); if(!x||(x.status==='done')===done) return;
   if(done) updTask(id,{status:'done', completed:new Date().toISOString()});
-  else { const t=todayStr(); updTask(id, x.date&&x.date<t ? {status:'pending', completed:null, date:t, carried:true} : {status:'pending', completed:null}); } } // a reopened task never comes back overdue (decision 8.5)
+  else { const t=todayStr(); updTask(id, x.date&&x.date<t ? dayPatch(x, t, {status:'pending', completed:null, carried:true}) : {status:'pending', completed:null}); } } // a reopened task never comes back overdue (decision 8.5), as rollOver
 function completeTask(id, silent){
   const x=task(id); if(!x) return;
   const was = x.status; applyDone(id, was==='pending');
@@ -1331,8 +1346,8 @@ function flushHeld(quiet){ clearTimeout(heldT); heldT=null; if(!HELD.size) retur
     if(n) toast(n===1?'Tarea completada':n+' tareas completadas', ()=>batch(()=>prev.forEach(o=>{ if(task(o.id)) updTask(o.id,{status:o.status, completed:o.completed, date:o.date, carried:o.carried}); }))); }
   if(quiet||!items.length){ render(); return; }
   items.forEach(([id])=>leaveRows(id)); setTimeout(renderAnimated, 240); }
-function rescheduleTask(id, date, label){ const x=task(id); if(!x) return; const old=x.date, oldC=x.carried; updTask(id,{date}); haptic(10); toast('Aplazada a '+label, ()=>updTask(id,{date:old, carried:oldC})); } // undo gives back the Aplazadas mark too
-function tomorrowTask(id){ const x=task(id); if(!x) return; const old=x.date, oldC=x.carried; updTask(id,{date:addDays(todayStr(),1)}); haptic(10); toast('Aplazada a mañana', ()=>updTask(id,{date:old, carried:oldC})); }
+function rescheduleTask(id, date, label){ const x=task(id); if(!x) return; const old=daySnap(x); updTask(id, dayPatch(x, date)); haptic(10); toast('Aplazada a '+label, ()=>undoDay(old)); } // undo gives back the Aplazadas mark and the reminder too
+function tomorrowTask(id){ const x=task(id); if(!x) return; const old=daySnap(x); updTask(id, dayPatch(x, addDays(todayStr(),1))); haptic(10); toast('Aplazada a mañana', ()=>undoDay(old)); }
 function deleteTask(id){
   const i=DB.tasks.findIndex(t=>t.id===id); if(i<0) return;
   const [x]=DB.tasks.splice(i,1); const vn=DB.voiceNotes.filter(v=>v.taskId===id); DB.voiceNotes=DB.voiceNotes.filter(v=>v.taskId!==id); save(); haptic(14);
@@ -2405,8 +2420,8 @@ const dateItem = (l, d, fn) => ({label:l, sub:l==='Mañana'||!d?'':fmtDate(d), i
 function postponeMenu(id){ const t=todayStr(); const opts=uniqueBy([['Mañana',addDays(t,1)],['Fin de semana',weekendDay()],['Próxima semana',nextWeekday(1,true)]], o=>o[1]);
   return {title:'Aplazar', groups:[opts.map(([l,d])=>dateItem(l, d, ()=>{ leaveRows(id); setTimeout(()=>{ rescheduleTask(id,d,l.toLowerCase()); renderAnimated(); },200); })), [{label:'Elegir fecha', icon:MI.calPick, key:'F', fn:()=>dateSheet(id)}]]}; }
 // R17: a date chosen from a desktop menu, with Deshacer; choosing the date it already has confirms a carried task for today
-function setTaskDate(id, d){ const x=task(id); if(!x||(x.date===d&&!x.carried)) return; releaseHold(id); const old=x.date, oldC=x.carried; updTask(id,{date:d}); haptic(8); renderAnimated();
-  toast(d?'Movida a '+fmtDate(d).toLowerCase():'Sin fecha', ()=>updTask(id,{date:old, carried:oldC})); }
+function setTaskDate(id, d){ const x=task(id); if(!x||(x.date===d&&!x.carried)) return; releaseHold(id); const old=daySnap(x); updTask(id, dayPatch(x, d)); haptic(8); renderAnimated();
+  toast(d?'Movida a '+fmtDate(d).toLowerCase():'Sin fecha', ()=>undoDay(old)); }
 // R17: the Fecha submenu of the desktop: the quick dates with their keys (H, M, V, S), Sin fecha and the calendar popover (F)
 function dateMenu(id){ const x=task(id); if(!x) return null; const t=todayStr();
   const ds=uniqueBy([['Hoy',t,'H'],['Mañana',addDays(t,1),'M'],['Viernes',nextWeekday(5,true),'V'],['Próxima semana',nextWeekday(1,true),'S']], o=>o[1]);
@@ -2443,13 +2458,13 @@ function selSet(){ return UI.wide ? (deskMulti()?UI.dsel.ids:null) : UI.select ?
 function selectedTasks(){ const s=selSet(); return s ? [...s].map(task).filter(Boolean) : []; } // empty once selection mode has ended
 function bulkComplete(){ const xs=selectedTasks(); if(!xs.length) return; const prev=xs.map(x=>({id:x.id, status:x.status, completed:x.completed})); const now=new Date().toISOString(); batch(()=>xs.forEach(x=>{ if(x.status==='pending') updTask(x.id,{status:'done', completed:now}); })); const n=prev.filter(p=>p.status==='pending').length; log('info','Completadas en bloque: '+n); endSelect(); toast(n+(n===1?' tarea completada':' tareas completadas'), ()=>batch(()=>prev.forEach(p=>updTask(p.id,{status:p.status, completed:p.completed})))); }
 function bulkDelete(){ const xs=selectedTasks(); if(!xs.length) return; confirmSheet('Eliminar '+xs.length+(xs.length===1?' tarea':' tareas'), 'Podrás deshacerlo durante unos segundos.', ()=>{ const ids=new Set(xs.map(x=>x.id)); const removedT=DB.tasks.filter(x=>ids.has(x.id)), removedV=DB.voiceNotes.filter(v=>ids.has(v.taskId)); DB.tasks=DB.tasks.filter(x=>!ids.has(x.id)); DB.voiceNotes=DB.voiceNotes.filter(v=>!ids.has(v.taskId)); save(); log('info','Eliminadas en bloque: '+removedT.length); endSelect(); haptic(14); toast(removedT.length+(removedT.length===1?' tarea eliminada':' tareas eliminadas'), ()=>{ DB.tasks.push(...removedT); DB.voiceNotes.push(...removedV); save(); }); }); }
-function bulkReschedule(date, label){ const xs=selectedTasks(); if(!xs.length) return; const prev=xs.map(x=>({id:x.id, date:x.date, carried:x.carried})); batch(()=>xs.forEach(x=>updTask(x.id,{date}))); endSelect(); toast(xs.length+(xs.length===1?' tarea aplazada a ':' tareas aplazadas a ')+label, ()=>batch(()=>prev.forEach(p=>updTask(p.id,{date:p.date, carried:p.carried})))); }
+function bulkReschedule(date, label){ const xs=selectedTasks(); if(!xs.length) return; const prev=xs.map(daySnap); batch(()=>xs.forEach(x=>updTask(x.id, dayPatch(x, date)))); endSelect(); toast(xs.length+(xs.length===1?' tarea aplazada a ':' tareas aplazadas a ')+label, ()=>batch(()=>prev.forEach(undoDay))); }
 function bulkPostponeSheet(src){ const sel=selSet(); if(!sel||!sel.size) return; const t=todayStr(); const opts=uniqueBy([['Mañana',addDays(t,1)],['Fin de semana',weekendDay()],['Próxima semana',nextWeekday(1,true)],['En una semana',addDays(t,7)]], o=>o[1]);
   popMenu({anchor:src, align:UI.wide?'left':undefined, title:'Aplazar '+sel.size+(sel.size===1?' tarea':' tareas'), groups:[opts.map(([l,d])=>dateItem(l, d, ()=>bulkReschedule(d,l.toLowerCase()))), [dateItem('Sin fecha', null, ()=>bulkReschedule(null,'sin fecha'))]]}); }
 function bulkMoveSheet(src){ const sel=selSet(); if(!sel||!sel.size) return; const ps=activeProjects(); const n=sel.size;
   const dot=c=>'<span class="pm-dot" style="background:'+c+'"></span>'; popMenu({anchor:src, align:UI.wide?'left':undefined, title:'Mover '+n+(n===1?' tarea':' tareas'), groups:[[{label:'Sin proyecto', icon:dot('var(--ink3)'), fn:()=>bulkMove(null)}].concat(ps.map(p=>({label:p.name, icon:dot(p.color), fn:()=>bulkMove(p.id)})))]}); }
 function bulkMove(projectId){ const xs=selectedTasks(); if(!xs.length) return; const prev=xs.map(x=>({id:x.id, projectId:x.projectId})); batch(()=>xs.forEach(x=>updTask(x.id,{projectId}))); const p=projectId?proj(projectId):null; endSelect(); toast(xs.length+(xs.length===1?' tarea movida a ':' tareas movidas a ')+(p?p.name:'Sin proyecto'), ()=>batch(()=>prev.forEach(q=>updTask(q.id,{projectId:q.projectId})))); }
-function rescheduleMany(xs, date, label){ if(!xs.length) return; const prev=xs.map(x=>({id:x.id, date:x.date, carried:x.carried})); batch(()=>xs.forEach(x=>updTask(x.id,{date}))); renderAnimated(); haptic(8); log('info','Aplazadas en bloque: '+xs.length+' a '+date); toast(xs.length+(xs.length===1?' tarea ':' tareas ')+(date?(xs.length===1?'pasada a ':'pasadas a ')+label:'sin fecha'), ()=>batch(()=>prev.forEach(p=>updTask(p.id,{date:p.date, carried:p.carried})))); }
+function rescheduleMany(xs, date, label){ if(!xs.length) return; const prev=xs.map(daySnap); batch(()=>xs.forEach(x=>updTask(x.id, dayPatch(x, date)))); renderAnimated(); haptic(8); log('info','Aplazadas en bloque: '+xs.length+' a '+date); toast(xs.length+(xs.length===1?' tarea ':' tareas ')+(date?(xs.length===1?'pasada a ':'pasadas a ')+label:'sin fecha'), ()=>batch(()=>prev.forEach(undoDay))); }
 // What tomorrow starts with, in the active space: "Mañana empieza con 6 tareas, 2 prioritarias"
 function tomorrowLine(){ const tm=addDays(todayStr(),1), xs=spaceTasks().filter(x=>x.status==='pending'&&x.date===tm), p=xs.filter(x=>x.priority==='high').length;
   return xs.length ? 'Mañana empieza con '+xs.length+(xs.length===1?' tarea':' tareas')+(p?', '+p+(p===1?' prioritaria':' prioritarias'):'')+'.' : 'Mañana empieza sin tareas.'; }
@@ -2483,14 +2498,14 @@ function reviewStep(ids, i, st){
   const x=task(ids[i]); if(!x||x.status!=='pending'){ reviewStep(ids, i+1, st); return; } // completed or removed meanwhile
   const t=todayStr(); const opts=uniqueBy([['hoy',t,'Hoy'],['man',addDays(t,1),'Mañana'],['vie',nextWeekday(5,true),'Viernes'],['nsem',nextWeekday(1,true),'Próxima semana']], o=>o[1]).concat([['none',null,'Sin fecha']]);
   const p=x.projectId?proj(x.projectId):null; const tally=k=>{ st.tally[k]=(st.tally[k]||0)+1; };
-  const keep=()=>{ if(!st.prev.has(x.id)) st.prev.set(x.id, {date:x.date, carried:x.carried, status:x.status, completed:x.completed}); };
+  const keep=()=>{ if(!st.prev.has(x.id)) st.prev.set(x.id, {date:x.date, carried:x.carried, reminder:x.reminder||null, status:x.status, completed:x.completed}); };
   const next=()=>{ haptic(6); render(); reviewStep(ids, i+1, st); };
   openSheet('<h2>'+(st.kind==='close'?'Cerrar el día':'Repasar aplazadas')+'</h2><div class="hint" style="margin-top:-6px">'+(i+1)+' de '+ids.length+(p?', '+esc(p.name):'')+'</div><div class="plan-title">'+esc(x.title||'Sin título')+'</div>'+
     '<div class="chips rvchips">'+opts.map(o=>'<button class="chip" data-rv="'+o[0]+'">'+o[2]+'</button>').join('')+'</div>'+
     '<div class="sheet-actions"><button class="btn" data-x="done">'+I.check+'Completar</button><button class="btn redtext" data-x="del">'+I.trash+'Eliminar</button></div>'+
     '<div class="sheet-actions" style="margin-top:10px"><button class="btn" data-x="skip">Saltar</button><button class="btn" data-x="end">Terminar</button></div>', s=>{
     sheetOnClose=()=>{ st.tally.skip=(st.tally.skip||0)+ids.length-i; reviewEnd(st, false); }; // closed with a tap outside or a drag: as Terminar, the balance as a toast
-    s.onclick=e=>{ const c=e.target.closest('[data-rv]'); if(c){ const o=opts.find(q=>q[0]===c.dataset.rv); keep(); updTask(x.id,{date:o[1], carried:false}); tally(o[0]); next(); return; } // Hoy confirms the task and clears its Aplazada mark
+    s.onclick=e=>{ const c=e.target.closest('[data-rv]'); if(c){ const o=opts.find(q=>q[0]===c.dataset.rv); keep(); updTask(x.id, dayPatch(x, o[1], {carried:false})); tally(o[0]); next(); return; } // Hoy confirms the task and clears its Aplazada mark
       const b=e.target.closest('[data-x]'); if(!b) return; const k=b.dataset.x;
       if(k==='done'){ keep(); applyDone(x.id, true); tally('done'); next(); }
       else if(k==='del'){ const j=DB.tasks.indexOf(x); if(j>=0){ DB.tasks.splice(j,1); const vn=DB.voiceNotes.filter(v=>v.taskId===x.id); DB.voiceNotes=DB.voiceNotes.filter(v=>v.taskId!==x.id); st.removed.push({x, vn}); save(); } tally('del'); haptic(10); next(); }
@@ -2717,7 +2732,7 @@ function planStep(ids, i, st){
   openSheet('<h2>Planificar</h2><div class="hint" style="margin-top:-6px">'+(i+1)+' de '+ids.length+(p?', '+esc(p.name):'')+'</div><div class="plan-title">'+esc(x.title)+'</div><div class="chips" style="margin-top:0">'+uniqueBy(chips, c=>c[0]).map(c=>'<button class="chip" data-d="'+c[0]+'">'+c[1]+'</button>').join('')+'</div><div id="calwrap">'+calendarHTML(ym, null)+'</div><div class="sheet-actions"><button class="btn" data-x="skip">Saltar</button><button class="btn" data-x="end">Terminar</button></div>', s=>{
     sheetOnClose=()=>{ st.skipped+=ids.length-i; planEnd(st); }; // closed with a tap outside or a drag: as Terminar
     s.onclick=e=>{ const nav=e.target.closest('[data-cal]'); if(nav){ ym=shiftMonth(ym,+nav.dataset.cal); $('#calwrap',s).innerHTML=calendarHTML(ym, null); return; }
-      const d=e.target.closest('[data-d]'); if(d){ updTask(x.id,{date:d.dataset.d}); st.done++; haptic(6); render(); planStep(ids, i+1, st); return; } // the list behind stays current
+      const d=e.target.closest('[data-d]'); if(d){ updTask(x.id, dayPatch(x, d.dataset.d)); st.done++; haptic(6); render(); planStep(ids, i+1, st); return; } // the list behind stays current
       const b=e.target.closest('[data-x]'); if(!b) return; if(b.dataset.x==='skip'){ st.skipped++; planStep(ids, i+1, st); } else { st.skipped+=ids.length-i; planStep(ids, ids.length, st); } }; });
 }
 
@@ -2908,18 +2923,20 @@ const SYNC_KEY='tareas-sync', SUPABASE_JS='vendor/supabase-js-2.117.3.umd.js';
 const SYNC_PAGE=1000, SYNC_CHUNK=200, SYNC_OVERLAP=30e3, SYNC_DEBOUNCE=1500, EPOCH='1970-01-01T00:00:00.000Z';
 const SYNC_TABLES=[{list:'spaces', table:'spaces'},{list:'projects', table:'projects'},{list:'tasks', table:'tasks'},{list:'voiceNotes', table:'voice_notes'}];
 const INITIAL_SPACES=['trabajo','personal'];
-// Local field, column and kind; id, created and modified are common to all
+// Local field, column and kind; id, created and modified are common to all.
+// tsOpt (block 9, reminder_sent): sent only when set, so the tasks' signatures from before block 9 stay the same and nothing is sent again;
+// the database clears it when the reminder changes and keeps the server's value when an unchanged reminder comes without it (0002_push.sql)
 const SYNC_FIELDS={
   spaces:[['name','name','text'],['order','sort_order','int']],
   projects:[['spaceId','space_id','id'],['name','name','text'],['color','color','id'],['order','sort_order','int'],['archived','archived','bool']],
-  tasks:[['spaceId','space_id','id'],['projectId','project_id','id'],['title','title','text'],['date','date','day'],['reminder','reminder','ts'],['priority','priority','pri'],['status','status','status'],['notes','notes','text'],['carried','carried','bool'],['completed','completed','ts']],
+  tasks:[['spaceId','space_id','id'],['projectId','project_id','id'],['title','title','text'],['date','date','day'],['reminder','reminder','ts'],['priority','priority','pri'],['status','status','status'],['notes','notes','text'],['carried','carried','bool'],['completed','completed','ts'],['reminderSent','reminder_sent','tsOpt']],
   voice_notes:[['taskId','task_id','id'],['text','text','text']] };
 const syncTs = v => { if(!v) return null; const d=new Date(v); return isNaN(d) ? null : d.toISOString(); };
 const SYNC_TO={ id:v=>v==null||v===''?null:String(v), text:v=>v==null?'':String(v), int:v=>v==null||v===''||isNaN(+v)?null:Math.round(+v), bool:v=>!!v,
-  day:v=>/^\d{4}-\d{2}-\d{2}$/.test(String(v||''))?v:null, ts:syncTs, pri:v=>['high','mid','none'].includes(v)?v:'none', status:v=>['pending','done'].includes(v)?v:'pending' };
+  day:v=>/^\d{4}-\d{2}-\d{2}$/.test(String(v||''))?v:null, ts:syncTs, tsOpt:syncTs, pri:v=>['high','mid','none'].includes(v)?v:'none', status:v=>['pending','done'].includes(v)?v:'pending' };
 // A local record as a row: always the same keys in the same order, so the signature only changes with the content
 function syncToRow(table, rec){ const row={id:String(rec.id), created:syncTs(rec.created)};
-  SYNC_FIELDS[table].forEach(([f,c,k])=>{ row[c]=SYNC_TO[k](rec[f]); });
+  SYNC_FIELDS[table].forEach(([f,c,k])=>{ const v=SYNC_TO[k](rec[f]); if(k!=='tsOpt'||v!==null) row[c]=v; });
   row.modified=syncTs(rec.modified)||row.created||EPOCH;
   row.deleted=null; // sent every time: a record back after its deletion clears the server's mark
   return row; }
@@ -2954,6 +2971,7 @@ function supabaseRemote(cfg){
   const db=()=>{ if(!client) throw new Error('Cliente de Supabase no cargado'); return client; };
   const rows=({data,error})=>{ if(error) throw error; return data||[]; };
   const user=u=>u?{id:u.id, email:u.email||''}:null;
+  let noSent=false; const stripSent=r=>{ if(!('reminder_sent' in r)) return r; const c=Object.assign({}, r); delete c.reminder_sent; return c; };
   return {
     async init(){
       if(!client){ if(!window.supabase) await loadScript(SUPABASE_JS);
@@ -2970,7 +2988,11 @@ function supabaseRemote(cfg){
     async pull(table, after, limit){ let q=db().from(table).select('*').order('server_ts',{ascending:true}).order('id',{ascending:true}).limit(limit); if(after) q=q.gt('server_ts', after); return rows(await q); },
     async byIds(table, ids){ return rows(await db().from(table).select('*').in('id', ids)); },
     // Rows the server keeps because its copy is newer are left out of the answer (trigger in 0001_init.sql)
-    async upsert(table, list){ return rows(await db().from(table).upsert(list, {onConflict:'id', defaultToNull:false}).select('id')); },
+    async upsert(table, list){ const send=l=>db().from(table).upsert(l, {onConflict:'id', defaultToNull:false}).select('id');
+      let res=await send(noSent?list.map(stripSent):list);
+      // Block 9 published before 0002_push.sql ran: without the reminder_sent column the rows go without it (the reminders then may notify once more)
+      if(res.error && table==='tasks' && /reminder_sent/.test(res.error.message||'')){ if(!noSent) log('warn','La base de datos no tiene todavía la columna reminder_sent: falta 0002_push.sql'); noSent=true; res=await send(list.map(stripSent)); }
+      return rows(res); },
     async markDeleted(table, items){ return rows(await db().from(table).upsert(items.map(x=>({id:x.id, deleted:x.ts, modified:x.ts})), {onConflict:'id', defaultToNull:false}).select('id')); },
     subscribe(uid, onRow, onStatus){ const c=db(); const ch=c.channel('tareas-'+uid);
       T.forEach(t=>ch.on('postgres_changes', {event:'*', schema:'public', table:t, filter:'owner_id=eq.'+uid}, p=>{ if(p&&p.new&&p.new.id) onRow(t, p.new); }));
@@ -3030,7 +3052,7 @@ function syncApply(pulled, o){ o=o||{};
   SYNC_TABLES.forEach(({table})=>{ const rows=pulled[table]||[]; if(rows.length) syncMerge(W, st, table, rows, stats);
     if(o.cursor) rows.forEach(r=>{ if(syncTime(r.server_ts)>syncTime(st.cursor[table])) st.cursor[table]=r.server_ts; }); });
   const changed=stats.added+stats.updated+stats.removed+stats.remaps.length;
-  if(changed){ const t=todayStr(); W.tasks.forEach(x=>{ if(x.status==='pending'&&x.date&&x.date<t){ x.date=t; x.carried=true; } }); // as rollOver: never overdue, modified untouched
+  if(changed){ const t=todayStr(); W.tasks.forEach(x=>{ if(x.status==='pending'&&x.date&&x.date<t) Object.assign(x, dayPatch(x, t, {carried:true})); }); // as rollOver: never overdue, the reminder goes along (decision 25), modified untouched
     if(!W.spaces.length) return stats; // never leave the app without a space (load would put Trabajo and Personal back)
     const raw=JSON.stringify(Object.assign({}, DB, W));
     try{ localStorage.setItem(KEY, raw); }catch(e){ log('error','Sincronización: no se pudieron guardar los cambios recibidos: '+(e&&e.message||e)); throw e; }
@@ -3474,8 +3496,8 @@ function dropToProject(ids, pid){ const xs=ids.map(task).filter(x=>x&&(x.project
 function dropMany(ids, z){ if(ids.length===1) return dropTask(ids[0], z); const xs=ids.map(task).filter(Boolean); if(!xs.length) return;
   const prev=xs.map(x=>({id:x.id, date:x.date, carried:x.carried, reminder:x.reminder})); let patch, msg;
   if(z.dataset.slot){ const [day,hm]=z.dataset.slot.split('T'), iso=new Date(day+'T'+hm+':00').toISOString(); patch=()=>({date:day, reminder:iso}); msg=' movidas a '+fmtDate(day).toLowerCase()+' a las '+fmtTime(iso); }
-  else if(z.dataset.allday){ const day=z.dataset.day; patch=x=>remMin(x)!==null?{date:day, reminder:null}:{date:day}; msg=' movidas a '+fmtDate(day).toLowerCase(); }
-  else { const day=z.dataset.day||null; patch=()=>({date:day}); msg=day?' movidas a '+fmtDate(day).toLowerCase():' sin fecha'; }
+  else if(z.dataset.allday){ const day=z.dataset.day; patch=x=>remMin(x)!==null?{date:day, reminder:null}:dayPatch(x, day); msg=' movidas a '+fmtDate(day).toLowerCase(); }
+  else { const day=z.dataset.day||null; patch=x=>dayPatch(x, day); msg=day?' movidas a '+fmtDate(day).toLowerCase():' sin fecha'; }
   xs.forEach(x=>releaseHold(x.id)); batch(()=>xs.forEach(x=>updTask(x.id, patch(x)))); haptic(6); renderAnimated(); log('info','Tareas arrastradas a una fecha', {n:xs.length, date:z.dataset.day||z.dataset.slot||null});
   toast(bulkN(xs.length)+msg, ()=>batch(()=>prev.forEach(o=>updTask(o.id,{date:o.date, carried:o.carried, reminder:o.reminder})))); }
 function applyWide(){ const w=wideMQ.matches; if(w===UI.wide) return; closeMenu(true); UI.wide=w; document.documentElement.classList.toggle('wide', w); document.body.classList.toggle('desktop', w); app.classList.toggle('desktop', w);
@@ -3735,14 +3757,14 @@ function bindPasteBox(d, refocus){ const pb=$('.pastebox',d), base=()=>{ const a
     const ls=UI.addPaste.slice(); UI.addPaste=null; const ids=addMany(ls, base()); renderAnimated(); log('info','Tareas creadas desde una lista', {n:ids.length}); toast(ids.length===1?'1 tarea creada':ids.length+' tareas creadas', ()=>removeTasks(ids)); refocus(); }); }
 }
 // A dropped card: a slot sets the date and a reminder at that time; "Todo el día" keeps the date and drops the time; a day or the mini month
-// set only the date (a reminder stays as it was); "Sin fecha" clears the date. All with Deshacer
+// set the date and take a reminder on the old day along (decision 25, dayPatch); "Sin fecha" clears the date. All with Deshacer
 function dropTask(id, z){ const x=task(id); if(!x) return; const old={date:x.date, carried:x.carried, reminder:x.reminder}; let patch, msg;
   if(z.dataset.slot){ const [day,hm]=z.dataset.slot.split('T'); const dt=new Date(day+'T'+hm+':00'), iso=dt.toISOString();
     if(x.date===day&&x.reminder&&new Date(x.reminder).getTime()===dt.getTime()){ render(); return; }
     patch={date:day, reminder:iso}; msg=(x.date===day?'A las ':'Movida a '+fmtDate(day).toLowerCase()+' a las ')+fmtTime(iso); }
   else if(z.dataset.allday){ const day=z.dataset.day, timed=remMin(x)!==null; if(x.date===day&&!timed){ render(); return; }
-    patch={date:day}; if(timed) patch.reminder=null; msg=x.date===day?'Sin hora':'Movida a '+fmtDate(day).toLowerCase()+(timed?', sin hora':''); }
-  else { const day=z.dataset.day||null; if(x.date===day){ render(); return; } patch={date:day}; msg=day?'Movida a '+fmtDate(day).toLowerCase():'Sin fecha'; }
+    patch=timed?{date:day, reminder:null}:dayPatch(x, day); msg=x.date===day?'Sin hora':'Movida a '+fmtDate(day).toLowerCase()+(timed?', sin hora':''); }
+  else { const day=z.dataset.day||null; if(x.date===day){ render(); return; } patch=dayPatch(x, day); msg=day?'Movida a '+fmtDate(day).toLowerCase():'Sin fecha'; }
   releaseHold(id); updTask(id, patch); haptic(6); renderAnimated(); log('info','Tarea movida en el calendario', {date:patch.date, time:!!patch.reminder});
   toast(msg, ()=>updTask(id, old)); }
 function bindDeskEvents(d){

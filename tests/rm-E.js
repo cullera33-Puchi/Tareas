@@ -191,7 +191,7 @@ const rowSel = id => '#desk .main .group .row[data-id="'+id+'"]';
   const tid = await page.evaluate(()=>{ const x=pendingFor('hoy').find(x=>!x.carried&&x.priority==='none'&&x.projectId); return x.id; });
   await page.click('#desk .main .row[data-id="'+tid+'"] .row-title'); await page.waitForTimeout(350);
   r.insp = await page.evaluate(()=>({close:!!document.querySelector('#desk .pane .ihead .ix[data-act=back]'), seg:[...document.querySelectorAll('#desk .pane .iseg button')].map(b=>b.textContent+(b.classList.contains('on')?'*':'')), pops:[...document.querySelectorAll('#desk .pane .ipop')].map(b=>b.dataset.act), foot:document.querySelector('#desk .pane .ifoot').textContent, w:Math.round(document.querySelector('#desk .pane').getBoundingClientRect().width), grip:!!document.querySelector('#desk .pane .igrip')}));
-  check('R17_inspector', r.insp.close && JSON.stringify(r.insp.seg)===JSON.stringify(['Ninguna*','!!Media','!!!Alta']) && r.insp.pops.join()==='pickProject,pickDate,pickReminder' && /Creada .*Modificada /.test(r.insp.foot) && r.insp.w===400 && r.insp.grip, r.insp);
+  check('R17_inspector', r.insp.close && JSON.stringify(r.insp.seg)===JSON.stringify(['Ninguna*','!!Media','!!!Alta']) && r.insp.pops.join()==='pickProject,pickDate,pickReminder,pickRepeat' && /Creada .*Modificada /.test(r.insp.foot) && r.insp.w===400 && r.insp.grip, r.insp);
   await page.screenshot({path:OUT+'/e-light-inspector.png'});
   await page.click('#desk .pane .iseg [data-pr=mid]'); await page.waitForTimeout(300);
   check('R17_segment', await page.evaluate(id=>task(id).priority==='mid' && document.querySelector('#desk .pane .iseg .on').dataset.pr==='mid', tid));
@@ -252,7 +252,7 @@ check('R17_reminderPopover', await page.evaluate(()=>!!document.querySelector('#
   await page.keyboard.press('Escape'); await page.waitForTimeout(300);
   check('R17_weekEscMenuFirst', await page.evaluate(()=>!menuOpen() && !!document.querySelector('#desk .pane.wpop')));
   // A press outside closes it; a press on the same card closes it too (toggle)
-  await page.mouse.click(700, 760); await page.waitForTimeout(300);
+  await page.mouse.click(300, 785); await page.waitForTimeout(300); // updated by decision 38: the inspector's Repetir row makes the popover taller, down to about 770 px
   check('R17_weekOutside', await page.evaluate(()=>!document.querySelector('#desk .pane.wpop') && !UI.deskDetail));
   await page.click('#desk .wcard[data-id="'+card+'"] .t'); await page.waitForTimeout(300);
   await page.click('#desk .wcard[data-id="'+card+'"] .t'); await page.waitForTimeout(300);

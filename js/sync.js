@@ -172,8 +172,8 @@ function syncMerge(W, st, table, rows, stats){
       if(table==='tasks'){ W.voiceNotes.forEach((v,j)=>{ if(v&&v.taskId===id){ W.voiceNotes[j]=null; } }); W.attachments.forEach((a,j)=>{ if(a&&a.taskId===id){ W.attachments[j]=null; } }); } return; }
     const keep={}; Object.keys(local).forEach(k=>{ if(!(k in lrow) && !SYNC_FIELDS[table].some(f=>f[0]===k)) keep[k]=local[k]; }); // fields this model does not sync stay
     SYNC_FIELDS[table].forEach(([f,c,k])=>{ if(syncNullable(k)&&!(c in row)&&local[f]!=null) keep[f]=local[f]; }); // and a column the server lacks keeps the device's value
-    if(table==='tasks'&&syncNoCol(table,'status:waiting')&&local.status==='waiting'&&remote.status==='pending'){ keep.status='waiting'; if(local.waitingFor) keep.waitingFor=local.waitingFor; } // so does a status it cannot hold
-    W[list][i]=Object.assign(keep, remote); stats.updated++; });
+    W[list][i]=Object.assign(keep, remote); stats.updated++;
+    if(table==='tasks'&&syncNoCol(table,'status:waiting')&&local.status==='waiting'&&remote.status==='pending'){ W[list][i].status='waiting'; if(local.waitingFor&&!W[list][i].waitingFor) W[list][i].waitingFor=local.waitingFor; } }); // so does a status it cannot hold (decision 41)
   if(removed) SYNC_TABLES.forEach(({list:l})=>{ W[l]=W[l].filter(Boolean); });
 }
 /* Applies server rows to the data, in one synchronous step so no tap can land in between. The result is written to storage and

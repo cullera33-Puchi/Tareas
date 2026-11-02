@@ -158,7 +158,7 @@ const rowHidden = (page, title) => page.$eval(rowSel(title), e=>getComputedStyle
   const D='.pushed-screen.detail';
   await page.tap(D+' [data-act=menu]'); await page.waitForTimeout(450);
   m = await menuState(page);
-  check('detail_menu', m.open && JSON.stringify(m.items)===JSON.stringify(['Marcar completada','Mover a otro espacio','Duplicar','Eliminar tarea']) && m.box.right<=m.vw-8, m);
+  check('detail_menu', m.open && JSON.stringify(m.items)===JSON.stringify(['Marcar completada','Por confirmar','Mover a otro espacio','Duplicar','Eliminar tarea']) && m.box.right<=m.vw-8, m);
   await page.screenshot({path:OUT+'/d-light-detailmenu.png'});
   await tapItem(page, 'Mover a otro espacio');
   m = await menuState(page);

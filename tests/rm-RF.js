@@ -1,5 +1,5 @@
 require('./lib/out.js'); // outputs (screenshots, downloads) go to tests/out
-// Decisions 38 (tasks that repeat) and 39 (Ahora), port 10100. Screenshots in tests/out/rf.
+// Decisions 38 (tasks that repeat), 39 (Ahora) and 41 (Por confirmar), port 10100. Screenshots in tests/out/rf.
 //  1. SQL: supabase/migrations/0004_repeat_focus.sql run twice in PGlite after 0001 to 0003 (stand-ins for auth, pg_cron, pg_net and Storage):
 //     the two columns, the write trigger still "newest modified wins" with them, the rules by owner.
 //  2. The rule engine in the page: parse, dates of the series (weeks every 2, months, the k-th and last weekday, 31 and 29 February), words.
@@ -10,6 +10,8 @@ require('./lib/out.js'); // outputs (screenshots, downloads) go to tests/out
 //     completing and deleting take tasks out, a new day empties it, the star in the list rows.
 //  4. Desktop: the inspector's Repetir (Mac menu and popover), the key A, the context menu, drags onto the sidebar entry and onto the block,
 //     the Ahora view with the keys, the three-button alert on Supr, C on a repeating task, the calendar card's icon.
+//  3 and 4 also cover Por confirmar: marking it from the menus (sheet and popover), the folded block, the sidebar view, Revisar on the review day,
+//     rollOver leaving it, Ahora refused, completing (also in a series) and Volver a pendiente with Deshacer, search, share and CSV.
 //  5. Sync with rm-S's fake server, two devices: both fields go up and come down, a task without them keeps its signature, a cleared value
 //     is cleared on the server, only the device that completes a task of a series creates the next, and a database without the columns
 //     (0004 not run) is tolerated: logged once per column, the values stay on the device, nothing loops.
@@ -57,6 +59,9 @@ async function sqlTests(){
   const tryq = async (sql, params) => { try { return {rows: await q(sql, params)}; } catch(e){ return {error: e.message}; } };
   const cols = await q(`select column_name, data_type from information_schema.columns where table_schema='public' and table_name='tasks' and column_name in ('repeat','focus') order by column_name`);
   check('sql_columns', cols.map(c=>c.column_name+':'+c.data_type).join()==='focus:timestamp with time zone,repeat:text', cols);
+  const wf = await q(`select data_type from information_schema.columns where table_schema='public' and table_name='tasks' and column_name='waiting_for'`);
+  const cons = await q(`select conname from pg_constraint where conrelid='public.tasks'::regclass and contype='c'`);
+  check('sql_waiting_for', wf.length===1 && wf[0].data_type==='text' && cons.filter(c=>/status/.test(c.conname)).length===1, {wf, cons});
   const A = '00000000-0000-4000-8000-00000000000a', Bu = '00000000-0000-4000-8000-00000000000b';
   await db.exec(`insert into auth.users values ('${A}'), ('${Bu}')`);
   const as = async (uid, fn) => { await db.exec(`set test.uid = '${uid}'; set role authenticated;`); try { return await fn(); } finally { await db.exec(`reset role; reset test.uid;`); } };
@@ -66,6 +71,9 @@ async function sqlTests(){
   const newer = await as(A, () => tryq(`update public.tasks set focus = null, modified = '2026-11-04T10:00:00Z' where id = 't1' returning id`));
   const t1 = (await q(`select repeat, focus from public.tasks where id = 't1'`))[0];
   check('sql_newest_wins', older.rows && !older.rows.length && newer.rows && newer.rows.length===1 && t1.repeat==='W2:MO,TH@2026-11-02#abc' && t1.focus===null, {older, newer, t1});
+  const wOk = await as(A, () => tryq(`insert into public.tasks (id, title, status, waiting_for, modified) values ('t2', 'Firmar', 'waiting', 'Ramiro', now()) returning status, waiting_for`));
+  const wBad = await as(A, () => tryq(`insert into public.tasks (id, title, status, modified) values ('t3', 'Mal', 'later', now())`));
+  check('sql_waiting_status', wOk.rows && wOk.rows[0].status==='waiting' && wOk.rows[0].waiting_for==='Ramiro' && !!wBad.error && /check constraint/.test(wBad.error), {wOk, wBad});
   const seenB = await as(Bu, () => tryq(`select id from public.tasks`));
   check('sql_rls', seenB.rows && seenB.rows.length===0, seenB);
   await db.close();
@@ -220,7 +228,48 @@ async function iphone(browser){
   // Share text and CSV
   x = await ev(page, ()=>({share:shareText('r1'), csv:csvText()}));
   const head = x.csv.split('\r\n')[0];
-  check('share_csv', /\nSe repite: cada 2 semanas, lunes y jueves\n/.test(x.share) && /"Recordatorio";"Se repite";"Aplazada"/.test(head) && x.csv.includes('"Cada 2 semanas, lunes y jueves"') && x.csv.includes('"Cada mes, el día 1"'), {share:x.share, head});
+  check('share_csv', /\nSe repite: cada 2 semanas, lunes y jueves\n/.test(x.share) && /"Recordatorio";"Se repite";"Esperando a";"Aplazada"/.test(head) && x.csv.includes('"Cada 2 semanas, lunes y jueves"') && x.csv.includes('"Cada mes, el día 1"'), {share:x.share, head});
+
+  // 3c bis. Por confirmar (decision 41)
+  await ev(page, ()=>rowMenu('a6')); await sleep(600); await menuItem(page, 'Por confirmar').tap(); await sleep(700);
+  x = await ev(page, ()=>({on:document.querySelector('#sheet').classList.contains('on'), chips:[...document.querySelectorAll('#sheet .wchips .chip')].map(c=>c.textContent+(c.classList.contains('on')?'*':'')), line:document.querySelector('#sheet .wline').textContent}));
+  check('wait_sheet', x.on && x.chips.join()==='Mañana*,En 3 días,Próxima semana,Sin fecha' && x.line==='Vuelve a Hoy mañana, marcada Revisar.', x);
+  await page.fill('#sheet [data-role=waitfor]', 'Ramiro'); await page.tap('#sheet [data-wd="3d"]'); await sleep(200); await shot(page, 'm12-waiting-sheet');
+  await page.tap('#sheet [data-x=ok]'); await sleep(700);
+  x = await ev(page, L=>({st:task('a6').status, who:task('a6').waitingFor, d:task('a6').date, t:document.querySelector('#toastText').textContent, inList:!!document.querySelector(L+' .row[data-id=a6]'), hoy:pendingFor('hoy').some(x=>x.id==='a6'), btn:(document.querySelector(L+' .wblock .cell')||{}).textContent}), L);
+  check('wait_mark', x.st==='waiting' && x.who==='Ramiro' && x.d==='2026-11-07' && x.t==='Por confirmar, esperando a Ramiro, revisar el sábado 7' && !x.inList && !x.hoy && x.btn==='Por confirmar (1)', x);
+  await page.tap(L+' .wblock .cell'); await sleep(400);
+  x = await ev(page, L=>{ const r=document.querySelector(L+' .gsec[data-waiting] .row[data-id=a6]'); return r&&{meta:r.querySelector('.row-meta').textContent, half:r.querySelector('.check').classList.contains('waiting')}; }, L);
+  await ev(page, L=>{ const e=document.querySelector(L+' .gsec[data-waiting]'); e&&e.scrollIntoView({block:'center'}); }, L); await ev(page, ()=>document.querySelector('#toast').classList.remove('on')); await sleep(200); await shot(page, 'm13-waiting-block');
+  check('wait_block', x && x.meta==='SábadoEsperando a Ramiro' && x.half, x);
+  // Its review day: back in Hoy, marked Revisar, counted; rollOver never carries it
+  x = await ev(page, L=>{ updTask('a6', {date:'2026-11-02'}); task('a6').status='waiting'; DB.settings.summaryDay='2026-11-03'; save(); rollOver(); render(); const r=document.querySelector(L+' .row[data-id=a6]:not(.first .row)');
+    return {d:task('a6').date, c:task('a6').carried, st:task('a6').status, hoy:pendingFor('hoy').some(x=>x.id==='a6'), meta:r&&r.querySelector('.row-meta').textContent, block:!!document.querySelector(L+' .wblock')}; }, L);
+  check('wait_review_day', x.d==='2026-11-02' && !x.c && x.st==='waiting' && x.hoy && x.meta==='RevisarEsperando a Ramiro' && !x.block, x);
+  await ev(page, ()=>updTask('a6', {date:'2026-11-07'}));
+  // Not in Ahora; marking a task in Ahora takes it out, Deshacer puts it back
+  x = await ev(page, ()=>{ const no=toggleFocus('a6'); toggleFocus('a1'); setWaiting('a1', '', undefined); const mid={st:task('a1').status, f:task('a1').focus||null}; undoFn(); return {no, mid, st:task('a1').status, f:!!task('a1').focus}; });
+  check('wait_ahora', x.no===false && x.mid.st==='waiting' && !x.mid.f && x.st==='pending' && x.f, x);
+  await ev(page, ()=>toggleFocus('a1'));
+  // Completing it with the circle (R1 hold), with Deshacer back to waiting; in a series the next one comes as usual
+  await page.tap(L+' .gsec[data-waiting] .row[data-id=a6] .check'); await sleep(2300);
+  x = await ev(page, ()=>task('a6').status); await page.tap('#toastBtn'); await sleep(400);
+  check('wait_complete', x==='done' && await ev(page, ()=>task('a6').status==='waiting'), x);
+  x = await ev(page, ()=>{ setWaiting('r3', 'Banco', '2026-11-05'); completeTask('r3'); const xs=DB.tasks.filter(o=>repSeries(o.repeat)==='ser3').map(o=>o.status+':'+o.date).sort(); undoFn(); return {xs, after:DB.tasks.filter(o=>repSeries(o.repeat)==='ser3').map(o=>o.status)}; });
+  check('wait_series', x.xs.join()==='done:2026-11-05,pending:2026-12-01' && x.after.join()==='waiting', x);
+  // Search finds it by who it waits for; share and CSV say it
+  x = await ev(page, ()=>{ UI.query='ramiro'; const h=listHTML('todas'); UI.query=''; return {found:h.includes('data-id="a6"'), share:shareText('a6'), csv:csvText().split('\r\n').find(l=>l.includes('Ordenar carpeta'))}; });
+  check('wait_search_share_csv', x.found && /\nEstado: por confirmar, esperando a Ramiro\n/.test(x.share) && /"Por confirmar";.*"Ramiro"/.test(x.csv), x);
+  // The detail shows it; Volver a pendiente from the row menu
+  await ev(page, ()=>openDetail('a6')); await sleep(800);
+  x = await ev(page, ()=>{ const c=document.querySelector('.pushed-screen.detail [data-act=pickWaiting]'); return c&&c.textContent; }); await shot(page, 'm14-waiting-detail');
+  await page.tap('.pushed-screen.detail [data-act=back]'); await sleep(700);
+  check('wait_detail', x==='Por confirmarEsperando a Ramiro', x);
+  await ev(page, ()=>rowMenu('a6')); await sleep(600); const wm = await ev(page, ()=>[...document.querySelectorAll('#pmenu .pm-it .pm-l')].map(e=>e.textContent));
+  await menuItem(page, 'Volver a pendiente').tap(); await sleep(500);
+  x = await ev(page, ()=>({st:task('a6').status, who:task('a6').waitingFor, t:document.querySelector('#toastText').textContent}));
+  check('wait_back_pending', wm.includes('Volver a pendiente') && wm.includes('Cambiar Por confirmar') && !wm.includes('Ahora') && x.st==='pending' && !x.who && x.t==='Vuelve a pendiente', {wm, x});
+  await page.tap('#toastBtn'); await sleep(300); await ev(page, ()=>unWait('a6')); await sleep(200);
 
   // 3d. Ahora
   await ev(page, ()=>rowMenu('a1')); await sleep(600);
@@ -337,6 +386,19 @@ async function desktop(browser){
   await page.keyboard.press('Enter'); await sleep(600); // Intro: the default button, only this one
   x = await ev(page, ()=>task('r3')&&task('r3').date);
   check('desk_delete_alert', al.join('|')==='Eliminar solo esta|Eliminar la serie|Cancelar' && x==='2026-12-01', {al, x});
+  // Por confirmar from the context menu: a popover, Intro saves; the block, the sidebar view, C and Deshacer
+  await page.click('#desk .main .row[data-id=a6]:not(.first .row) .row-title', {button:'right'}); await sleep(400); await menuItem(page, 'Por confirmar…').click(); await sleep(400);
+  await page.keyboard.type('Ramiro'); await shot(page, 'd10-waiting-popover'); await page.keyboard.press('Enter'); await sleep(500);
+  x = await ev(page, ()=>({st:task('a6').status, who:task('a6').waitingFor, d:task('a6').date, blk:(document.querySelector('#desk .main .wblock .cell')||{}).textContent, n:document.querySelector('#desk .side [data-view=waiting] .n').textContent}));
+  check('desk_wait_mark', x.st==='waiting' && x.who==='Ramiro' && x.d==='2026-11-05' && x.blk==='Por confirmar (1)' && x.n==='1', x);
+  await page.click('#desk .side [data-view=waiting]'); await sleep(400);
+  x = await ev(page, ()=>{ const r=document.querySelector('#desk .main .row[data-id=a6]'); return {title:document.querySelector('#desk .mhead h1').textContent, tag:r&&r.querySelector('.wtag').textContent, date:r&&r.querySelector('.rc-date').textContent, half:r&&r.querySelector('.check.waiting')!==null}; });
+  await ev(page, ()=>document.querySelector('#toast').classList.remove('on')); await sleep(100); await shot(page, 'd11-waiting-view');
+  check('desk_wait_view', x.title==='Por confirmar' && x.tag==='Ramiro' && x.date==='Mañana' && x.half, x);
+  await page.click('#desk .main .row[data-id=a6] .row-title'); await sleep(300); await page.keyboard.press('Escape'); await sleep(200); await page.keyboard.press('c'); await sleep(700);
+  const wc = await ev(page, ()=>task('a6').status); await page.keyboard.press('Control+z'); await sleep(400);
+  check('desk_wait_complete', wc==='done' && await ev(page, ()=>task('a6').status==='waiting'), wc);
+  await ev(page, ()=>setDeskView('hoy')); await sleep(200);
   // The week's cards
   await ev(page, ()=>{ updTask('r3', {date:'2026-11-06'}); setDeskView('week'); }); await sleep(500);
   x = await ev(page, ()=>({rep:!!document.querySelector('#desk .wcard[data-id=r3] .cic.irp'), star:!!document.querySelector('#desk .wcard[data-id=a1] .cic.ist'), no:!document.querySelector('#desk .wcard[data-id=a6] .cic')}));
@@ -351,16 +413,18 @@ async function desktop(browser){
 /* ======================= 5. Sync ======================= */
 const TABLES = ['spaces','projects','tasks','voice_notes','attachments'];
 const COLS = { spaces:['name','sort_order','members'], projects:['space_id','name','color','sort_order','archived'],
-  tasks:['space_id','project_id','title','date','reminder','priority','status','notes','carried','assignees','completed','repeat','focus'], voice_notes:['task_id','text'],
+  tasks:['space_id','project_id','title','date','reminder','priority','status','notes','carried','assignees','completed','repeat','focus','waiting_for'], voice_notes:['task_id','text'],
   attachments:['task_id','kind','path','mime','size','width','height','duration_ms','purged'] };
 // rm-S's in-memory server (0001's trigger and RLS), plus the columns of 0004. noCol: a database where 0004 has not run; an upload naming one of
 // its columns is refused whole, with PostgREST's message, one column at a time
+const NEWCOLS=['repeat','focus','waiting_for'];
 class Fake {
   constructor(noCol){ this.noCol=!!noCol; this.t={}; TABLES.forEach(x=>this.t[x]=new Map()); this.last=0; this.subs=new Map(); this.down=new Set(); this.calls=[]; this.ups=[]; }
   ts(){ this.last=Math.max(Date.now(), this.last+1); return new Date(this.last).toISOString(); }
-  cols(table){ return COLS[table].filter(c=>!(this.noCol&&table==='tasks'&&(c==='repeat'||c==='focus'))); }
+  cols(table){ return COLS[table].filter(c=>!(this.noCol&&table==='tasks'&&NEWCOLS.includes(c))); }
   write(owner, table, rows){ if(!owner) throw new Error('JWT required'); const ts=this.ts(), out=[], changed=[], m=this.t[table];
-    if(this.noCol&&table==='tasks'){ for(const c of ['repeat','focus']) if(rows.some(r=>c in r)) throw new Error("Could not find the '"+c+"' column of 'tasks' in the schema cache"); }
+    if(this.noCol&&table==='tasks'){ for(const c of NEWCOLS) if(rows.some(r=>c in r)) throw new Error("Could not find the '"+c+"' column of 'tasks' in the schema cache");
+      if(rows.some(r=>r.status==='waiting')) throw new Error('new row for relation "tasks" violates check constraint "tasks_status_check"'); } // 0001's check: pending or done
     rows.forEach(r=>{ if(!r.id) throw new Error('null id'); if(!r.modified) throw new Error('null value in column "modified"'); });
     rows.forEach(r=>{ const ex=m.get(r.id);
       if(!ex){ const row={id:r.id, owner_id:owner}; this.cols(table).forEach(c=>row[c]=(c==='members'||c==='assignees')?[]:null); Object.assign(row,{created:null, deleted:null}, r, {owner_id:owner, server_ts:ts}); m.set(r.id,row); out.push({id:r.id}); changed.push(row); return; }
@@ -407,8 +471,8 @@ async function syncTests(browser){
   const fake = new Fake(false); let x;
   const A = await open(browser, {tag:'SA', fake, seed, clock:false}), B = await open(browser, {tag:'SB', fake, seed:Object.assign({}, seed, {tasks:[]}), clock:false, desk:true});
   // A task without the new fields keeps the signature it had before them: no new keys in its row
-  const sig = await ev(A.page, ()=>{ const row=syncToRow('tasks', task('s1')); return {keys:Object.keys(row).join(), sent:Object.keys(syncSendRow('tasks', row)).slice(-2).join()}; });
-  check('sync_signature_unchanged', sig.keys==='id,created,space_id,project_id,title,date,reminder,priority,status,notes,carried,completed,modified,deleted' && sig.sent==='repeat,focus', sig);
+  const sig = await ev(A.page, ()=>{ const row=syncToRow('tasks', task('s1')); return {keys:Object.keys(row).join(), sent:Object.keys(syncSendRow('tasks', row)).slice(-3).join()}; });
+  check('sync_signature_unchanged', sig.keys==='id,created,space_id,project_id,title,date,reminder,priority,status,notes,carried,completed,modified,deleted' && sig.sent==='repeat,focus,waiting_for', sig);
   await ev(A.page, ()=>syncSignIn()); check('sync_A_first', await synced(A.page));
   await ev(B.page, ()=>syncSignIn()); check('sync_B_first', await synced(B.page));
   // Both fields go up and come down
@@ -419,6 +483,10 @@ async function syncTests(browser){
   // Cleared on one device, cleared on the server and on the other
   await ev(B.page, ()=>{ removeFromAhora(['s2']); }); check('sync_B_up', await synced(B.page));
   check('sync_cleared', fake.t.tasks.get('s2').focus===null && await until(A.page, ()=>!task('s2').focus), fake.t.tasks.get('s2').focus);
+  // Por confirmar goes up and comes down (decision 41)
+  await ev(A.page, ()=>setWaiting('s1', 'Ramiro', undefined)); check('sync_A_wait', await synced(A.page));
+  check('sync_wait_server', fake.t.tasks.get('s1').status==='waiting' && fake.t.tasks.get('s1').waiting_for==='Ramiro', {st:fake.t.tasks.get('s1').status, w:fake.t.tasks.get('s1').waiting_for});
+  check('sync_wait_B', await until(B.page, ()=>task('s1').status==='waiting' && task('s1').waitingFor==='Ramiro'));
   // Only the device that completes creates the next one; the other receives it and creates nothing
   const ups0 = fake.ups.filter(u=>u.page===B.page).length;
   await ev(A.page, ()=>completeTask('s2')); check('sync_A_complete', await synced(A.page));
@@ -437,20 +505,21 @@ async function syncTests(browser){
   // A database without the columns: logged once per column, the values stay on the device, nothing goes up again and again
   const nf = new Fake(true);
   const C = await open(browser, {tag:'SC', fake:nf, seed, clock:false});
-  await ev(C.page, ()=>{ setRepeat('s2', 'W1:MO'); toggleFocus('s2'); syncSignIn(); });
+  await ev(C.page, ()=>{ setRepeat('s2', 'W1:MO'); toggleFocus('s2'); setWaiting('s1', 'Ramiro', undefined); syncSignIn(); });
   check('nocol_synced', await synced(C.page), await ev(C.page, ()=>({st:SY&&SY.status, err:SY&&SY.error})));
   await ev(C.page, ()=>updTask('s1', {title:'Sin repetir (editada)'})); await synced(C.page);
   const n1 = nf.ups.length; await sleep(3500); await synced(C.page);
-  x = await ev(C.page, ()=>({rep:task('s2').repeat, focus:!!task('s2').focus, warns:LOG.filter(e=>/0004_repeat_focus/.test(e.m)).map(e=>e.m), errs:LOG.filter(e=>e.l==='error').map(e=>e.m), pend:syncCollect(true).count}));
-  const s2row = nf.t.tasks.get('s2');
-  check('nocol_tolerated', /^W1:MO@/.test(x.rep||'') && x.focus && x.warns.length===2 && x.warns.some(m=>/tasks\.repeat/.test(m)) && x.warns.some(m=>/tasks\.focus/.test(m)) && !x.errs.length && x.pend===0
-    && s2row && !('repeat' in s2row) && !('focus' in s2row) && nf.t.tasks.get('s1').title==='Sin repetir (editada)', {x, s2row});
+  x = await ev(C.page, ()=>({rep:task('s2').repeat, focus:!!task('s2').focus, st:task('s1').status, who:task('s1').waitingFor, warns:LOG.filter(e=>/0004_repeat_focus/.test(e.m)).map(e=>e.m), errs:LOG.filter(e=>e.l==='error').map(e=>e.m), pend:syncCollect(true).count}));
+  const s2row = nf.t.tasks.get('s2'), s1row = nf.t.tasks.get('s1');
+  check('nocol_tolerated', /^W1:MO@/.test(x.rep||'') && x.focus && x.st==='waiting' && x.who==='Ramiro' && x.warns.length===4 && ['tasks\\.repeat','tasks\\.focus','tasks\\.waiting_for','Por confirmar'].every(w=>x.warns.some(m=>new RegExp(w).test(m))) && !x.errs.length && x.pend===0
+    && s2row && !('repeat' in s2row) && !('focus' in s2row) && s1row.status==='pending' && !('waiting_for' in s1row) && s1row.title==='Sin repetir (editada)', {x, s2row, s1row});
   check('nocol_no_loop', nf.ups.length===n1, {before:n1, after:nf.ups.length});
   // A change from the server (another device on the old version) keeps the device's rule and Ahora
-  const row = nf.t.tasks.get('s2'); nf.write(USER.uid, 'tasks', [Object.assign({}, row, {title:'Copia de seguridad (servidor)', modified:new Date(Date.now()+1000).toISOString()})]);
-  await until(C.page, ()=>task('s2').title==='Copia de seguridad (servidor)');
-  x = await ev(C.page, ()=>({t:task('s2').title, rep:task('s2').repeat, focus:!!task('s2').focus}));
-  check('nocol_merge_keeps', x.t==='Copia de seguridad (servidor)' && /^W1:MO@/.test(x.rep||'') && x.focus, x);
+  const row = nf.t.tasks.get('s2'), row1 = nf.t.tasks.get('s1'), later=new Date(Date.now()+1000).toISOString();
+  nf.write(USER.uid, 'tasks', [Object.assign({}, row, {title:'Copia de seguridad (servidor)', modified:later}), Object.assign({}, row1, {title:'Sin repetir (servidor)', modified:later})]);
+  await until(C.page, ()=>task('s2').title==='Copia de seguridad (servidor)' && task('s1').title==='Sin repetir (servidor)');
+  x = await ev(C.page, ()=>({t:task('s2').title, rep:task('s2').repeat, focus:!!task('s2').focus, st:task('s1').status, who:task('s1').waitingFor}));
+  check('nocol_merge_keeps', x.t==='Copia de seguridad (servidor)' && /^W1:MO@/.test(x.rep||'') && x.focus && x.st==='waiting' && x.who==='Ramiro', x);
   await C.ctx.close();
 }
 

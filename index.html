@@ -1360,8 +1360,17 @@ function deleteTask(id){
   toast('Tarea eliminada', ()=>{ DB.tasks.push(x); DB.voiceNotes.push(...vn); save(); });
 }
 function addSpace(name){ const t=new Date().toISOString(); const sp={id:uid(), name, order:DB.spaces.length, created:t, modified:t}; DB.spaces.push(sp); save(); return sp; }
-const spaceIsEmpty = id => !DB.projects.some(p=>p.spaceId===id) && !DB.tasks.some(x=>x.spaceId===id);
-function deleteSpace(id){ if(DB.spaces.length<2||!spaceIsEmpty(id)) return false; DB.spaces=DB.spaces.filter(sp=>sp.id!==id); if(DB.settings.activeSpace===id){ DB.settings.activeSpace=DB.spaces[0].id; resetListState(); } save(); return true; }
+/* Decision 28a: a space goes with everything in it: its projects (archived too), its tasks (completed long ago too) and their voice notes.
+   spaceLoad lists them; deleteSpace takes them out in one save and returns what puts them back (null for the only space) */
+function spaceLoad(id){ const ps=DB.projects.filter(p=>p.spaceId===id), pids=new Set(ps.map(p=>p.id)); const ts=DB.tasks.filter(x=>x.spaceId===id||(x.projectId&&pids.has(x.projectId))), tids=new Set(ts.map(x=>x.id));
+  return {ps, ts, vs:DB.voiceNotes.filter(v=>tids.has(v.taskId))}; }
+function deleteSpace(id){ const i=DB.spaces.findIndex(sp=>sp.id===id); if(DB.spaces.length<2||i<0) return null;
+  const sp=DB.spaces[i], L=spaceLoad(id), was=DB.settings.activeSpace===id, P=new Set(L.ps), T=new Set(L.ts), V=new Set(L.vs);
+  DB.spaces.splice(i,1); DB.projects=DB.projects.filter(p=>!P.has(p)); DB.tasks=DB.tasks.filter(x=>!T.has(x)); DB.voiceNotes=DB.voiceNotes.filter(v=>!V.has(v));
+  L.ts.forEach(x=>HELD.delete(x.id)); if(was){ DB.settings.activeSpace=DB.spaces.slice().sort((a,b)=>a.order-b.order)[0].id; resetListState(); } save();
+  return ()=>{ if(DB.spaces.some(x=>x.id===id)) return; DB.spaces.splice(Math.min(i, DB.spaces.length), 0, sp);
+    const has=(list, o)=>list.some(x=>x.id===o.id); L.ps.forEach(p=>{ if(!has(DB.projects,p)) DB.projects.push(p); }); L.ts.forEach(x=>{ if(!has(DB.tasks,x)) DB.tasks.push(x); }); L.vs.forEach(v=>{ if(!has(DB.voiceNotes,v)) DB.voiceNotes.push(v); });
+    if(was){ DB.settings.activeSpace=id; resetListState(); } save(); }; }
 function addProject(name, color){ const t=new Date().toISOString(); const p={id:uid(), spaceId:space().id, name, color, order:DB.projects.length, archived:false, created:t, modified:t}; DB.projects.push(p); save(); return p; }
 
 /* ---------- Root render ---------- */
@@ -2191,6 +2200,10 @@ function bindLongPress(el, fn){ if(el._lpb) return; el._lpb=1; let t=null, x0=0,
 /* ---------- Sheets ---------- */
 const sheet=$('#sheet'), scrim=$('#scrim'), asheet=$('#asheet');
 const dimApp = on => app.classList.toggle('sheet-open', !!on);
+/* Decision 28b: sheetGuard, set by a sheet with text that can be lost (Nueva tarea, Nota de voz), returns null when it may close or
+   {title, label, field} to ask first. The closes a person makes (a drag down, the backdrop, Cancelar or Descartar, Escape) go through
+   requestCloseSheet; saving calls closeSheet directly */
+let sheetGuard=null;
 let sheetOnClose=null; // one shot, set by the sheet's owner: runs however the sheet closes (a button, the scrim, a drag down, Escape)
 // A sheet just opened ignores a stray tap on the backdrop (a repeated or ghost tap from the same touch on iOS), and an early close is logged with its caller
 let sheetOpenedAt=0; const sheetFresh=()=>performance.now()-sheetOpenedAt<450;
@@ -2202,14 +2215,19 @@ const ghostClick = e => UI.wide ? e.detail>1&&menuFresh() : menuFresh();
 const pickFresh = e => UI.wide ? e.detail>1&&menuFresh() : sheetFresh();
 const ghostSheet = e => UI.wide ? !!e&&e.detail>1&&sheetFresh() : sheetFresh(); // the sheets' own guard follows the same rule on the desktop (centred dialogs)
 function noteEarlyClose(kind){ const ms=Math.round(performance.now()-sheetOpenedAt); if(sheetOpenedAt&&ms<800) log('warn','Hoja cerrada a los '+ms+' ms ('+kind+')', String((new Error()).stack||'').split('\n').slice(2,5).map(l=>l.trim().slice(0,90)).join(' | ')); }
-function openSheet(html, onOpen){ sheetOpenedAt=performance.now(); sheetOnClose=null; sheet.classList.remove('addsheet','keysheet'); sheet.innerHTML='<div class="handle"></div>'+html; sheet.classList.add('on'); scrim.classList.add('on'); dimApp(true); bindSheetDrag(); onOpen&&onOpen(sheet); }
-function closeSheet(){ if(sheet.classList.contains('on')||asheet.classList.contains('on')) noteEarlyClose('cerrar'); closeMenu(true); sheet.classList.remove('on','drag','top'); sheet.style.transform=''; asheet.classList.remove('on'); asheet.onclick=null; scrim.classList.remove('on'); dimApp(false); try{ stopRec&&stopRec(); }catch(e){} setTimeout(()=>{ if(!sheet.classList.contains('on')) sheet.innerHTML=''; if(!asheet.classList.contains('on')) asheet.innerHTML=''; },520); const oc=sheetOnClose; sheetOnClose=null; if(oc) oc(); if(staleView) setTimeout(flushStale, 0); } // a closed menu keeps no buttons or handler that a stray click could fire; data reloaded meanwhile is drawn now, unless the caller already redrew
+function openSheet(html, onOpen){ sheetOpenedAt=performance.now(); sheetOnClose=null; sheetGuard=null; sheet.classList.remove('addsheet','keysheet'); sheet.innerHTML='<div class="handle"></div>'+html; sheet.classList.add('on'); scrim.classList.add('on'); dimApp(true); bindSheetDrag(); onOpen&&onOpen(sheet); }
+function closeSheet(){ if(sheet.classList.contains('on')||asheet.classList.contains('on')) noteEarlyClose('cerrar'); sheetGuard=null; closeMenu(true); sheet.classList.remove('on','drag','top'); sheet.style.transform=''; asheet.classList.remove('on'); asheet.onclick=null; scrim.classList.remove('on'); dimApp(false); try{ stopRec&&stopRec(); }catch(e){} setTimeout(()=>{ if(!sheet.classList.contains('on')) sheet.innerHTML=''; if(!asheet.classList.contains('on')) asheet.innerHTML=''; },520); const oc=sheetOnClose; sheetOnClose=null; if(oc) oc(); if(staleView) setTimeout(flushStale, 0); } // a closed menu keeps no buttons or handler that a stray click could fire; data reloaded meanwhile is drawn now, unless the caller already redrew
+function requestCloseSheet(){ const g=sheet.classList.contains('on')&&sheetGuard&&sheetGuard(); if(!g){ closeSheet(); return; }
+  const back=()=>{ const f=g.field; if(f&&f.isConnected){ f.focus(); if(f.setSelectionRange){ const l=f.value.length; f.setSelectionRange(l,l); } } }; // inside the tap that chose it: iOS opens the keyboard again
+  const go=()=>{ log('info','Hoja descartada con texto', g.label); if(g.discard) g.discard(); closeSheet(); };
+  if(UI.wide) macAlert({title:g.title, text:g.text||'', ok:g.label, cancel:'Seguir editando', fn:go, onCancel:back});
+  else actionSheet(g.title, [{label:g.label, red:true, fn:go}], back, 'Seguir editando'); }
 /* An action menu opened over an open sheet (the Proyecto and Prioridad chips of Nueva tarea) is nested:
    Cancelar, a tap outside or Escape close only the menu and give the sheet back with what was typed */
 let asheetNested=false, asheetCancel=null;
 function closeAction(){ asheet.classList.remove('on'); asheet.onclick=null; setTimeout(()=>{ if(!asheet.classList.contains('on')) asheet.innerHTML=''; },480); }
 function cancelAction(){ if(asheetNested&&sheet.classList.contains('on')){ const f=asheetCancel; asheetCancel=null; closeAction(); f&&f(); } else closeSheet(); }
-scrim.addEventListener('click', e=>{ if(ghostSheet(e)){ log('warn','Toque en el fondo ignorado justo al abrir una hoja'); return; } if(asheet.classList.contains('on')) cancelAction(); else closeSheet(); });
+scrim.addEventListener('click', e=>{ if(ghostSheet(e)){ log('warn','Toque en el fondo ignorado justo al abrir una hoja'); return; } if(asheet.classList.contains('on')) cancelAction(); else requestCloseSheet(); });
 function bindSheetDrag(){ const h=sheet; let y0=0,dy=0,drag=false,inner=null,lastY=0,lastT=0,vy=0,hh=1;
   // A scrolled inner box (a long textarea, the log) keeps the finger until it is back at its top; only then does the sheet follow it down
   const scroller=t=>{ for(let el=t; el&&el!==h; el=el.parentElement){ if(el.scrollHeight>el.clientHeight+1){ const o=getComputedStyle(el).overflowY; if(el.tagName==='TEXTAREA'||o==='auto'||o==='scroll') return el; } } return null; };
@@ -2225,7 +2243,7 @@ function bindSheetDrag(){ const h=sheet; let y0=0,dy=0,drag=false,inner=null,las
     const now=e.timeStamp; if(now>lastT){ vy=0.6*(y-lastY)/(now-lastT)+0.4*vy; lastY=y; lastT=now; }
     dy=Math.max(0,y-y0); if(dy>0){ h.classList.add('drag'); h.style.transform='translate3d(0,calc('+dy+'px - var(--kb)),0)'; follow(Math.min(1,dy/hh)); } }; // keeps the keyboard offset of .sheet.on
   // R4: it closes past 110 px or on a quick flick down (a finger that stopped before lifting has no speed left)
-  h.ontouchend=e=>{ inner=null; if(!drag) return; drag=false; h.classList.remove('drag'); unfollow(); const v=e.timeStamp-lastT>80?0:vy; if(dy>110||(v>FLICK&&dy>30)) closeSheet(); else h.style.transform=''; };
+  h.ontouchend=e=>{ inner=null; if(!drag) return; drag=false; h.classList.remove('drag'); unfollow(); const v=e.timeStamp-lastT>80?0:vy; if(dy>110||(v>FLICK&&dy>30)){ if(sheetGuard&&sheetGuard()){ h.style.transform=''; requestCloseSheet(); } else closeSheet(); } else h.style.transform=''; }; // with text to lose, the sheet goes back up and asks
   h.ontouchcancel=()=>{ inner=null; if(!drag) return; drag=false; reset(); }; }
 function actionSheet(title, items, onCancel){ sheetOpenedAt=performance.now(); asheetNested=sheet.classList.contains('on'); asheetCancel=onCancel||null; asheet.innerHTML='<div class="grp">'+(title?'<div class="t">'+esc(title)+'</div>':'')+items.map((it,i)=>'<button class="it'+(it.red?' red':'')+'" data-i="'+i+'">'+esc(it.label)+'</button>').join('')+'</div><div class="grp"><button class="it cancel" data-i="-1">Cancelar</button></div>'; asheet.classList.add('on'); scrim.classList.add('on'); dimApp(true); asheet.onclick=e=>{ const b=e.target.closest('[data-i]'); if(!b) return; if(ghostSheet(e)){ log('warn','Toque en el menú ignorado justo al abrir'); return; } const i=+b.dataset.i; if(i<0){ cancelAction(); return; } if(asheetNested&&sheet.classList.contains('on')) closeAction(); else closeSheet(); items[i].fn(); }; }
 function confirmSheet(title, text, fn){ actionSheet(text, [{label:title, red:true, fn}]); }
@@ -2699,20 +2717,26 @@ function projectSheet(id){
   });
 }
 /* New or edited space */
-// What keeps a space from being deleted, in words: archived projects and tasks completed long ago count too, though no list shows them
-function spaceContents(id){ const lim=Date.now()-30*864e5, ts=DB.tasks.filter(x=>x.spaceId===id), ps=DB.projects.filter(p=>p.spaceId===id); const n=(k,one,many)=>k?k+' '+(k===1?one:many):'';
-  const done=ts.filter(x=>x.status==='done'), old=done.filter(x=>!(x.completed&&new Date(x.completed).getTime()>lim)).length, arch=ps.filter(p=>p.archived).length;
-  const parts=[n(ts.length-done.length,'tarea pendiente','tareas pendientes'), n(done.length-old,'tarea completada','tareas completadas'), n(old,'tarea completada hace más de 30 días','tareas completadas hace más de 30 días'), n(ps.length-arch,'proyecto','proyectos'), n(arch,'proyecto archivado','proyectos archivados')].filter(Boolean);
+// What goes with a space, in words: "3 proyectos, 42 tareas y 5 notas de voz" (archived projects and old completed tasks count too)
+function spaceLoadText(L){ const n=(k,one,many)=>k?k+' '+(k===1?one:many):''; const parts=[n(L.ps.length,'proyecto','proyectos'), n(L.ts.length,'tarea','tareas'), n(L.vs.length,'nota de voz','notas de voz')].filter(Boolean);
   return parts.length>1 ? parts.slice(0,-1).join(', ')+' y '+parts[parts.length-1] : parts.join(''); }
+// Decision 28a: confirmation with what goes, a local copy first (as before the first sync), then one Deshacer for everything
+function confirmDeleteSpace(sp){ const L=spaceLoad(sp.id), n=L.ps.length+L.ts.length+L.vs.length;
+  const text = n ? 'Se '+(n===1?'eliminará ':'eliminarán ')+spaceLoadText(L)+' del espacio "'+sp.name+'". Podrás deshacerlo durante unos segundos.' : 'El espacio "'+sp.name+'" está vacío.';
+  confirmSheet('Eliminar espacio', text, async()=>{ flushEdits();
+    try{ await Promise.race([BK.put(todayStr()), new Promise((_,rej)=>setTimeout(()=>rej(new Error('tiempo agotado')), 4000))]); await refreshBackups(); log('info','Copia local antes de eliminar un espacio', {space:sp.name, tasks:DB.tasks.length}); }
+    catch(e){ log('warn','Copia local antes de eliminar un espacio no disponible: '+(e&&e.message||e)); }
+    const undo=deleteSpace(sp.id); if(!undo) return; log('info','Espacio eliminado', {projects:L.ps.length, tasks:L.ts.length, voiceNotes:L.vs.length});
+    haptic(10); if(UI.wide) UI.deskDetail=null; render(); toast('Espacio eliminado', ()=>{ undo(); log('info','Espacio recuperado'); }); }); }
 function spaceSheet(id){
-  const sp=id?DB.spaces.find(x=>x.id===id):null; const canDelete=sp&&DB.spaces.length>1&&spaceIsEmpty(sp.id);
+  const sp=id?DB.spaces.find(x=>x.id===id):null; const canDelete=sp&&DB.spaces.length>1;
   openSheet(sheadHTML(sp?'Editar espacio':'Nuevo espacio','Cancelar',sp?'Guardar':'Crear')+'<input class="titlein" placeholder="Nombre" value="'+(sp?esc(sp.name):'')+'" autocomplete="off" enterkeyhint="done">'+
-    (sp&&!canDelete?'<div class="hint" style="margin-top:10px">'+(DB.spaces.length>1?'Para eliminarlo tiene que estar vacío. Ahora tiene '+esc(spaceContents(sp.id))+'.':'Es el único espacio; no se puede eliminar.')+'</div>':'')+
+    (sp&&!canDelete?'<div class="hint" style="margin-top:10px">Es el único espacio; no se puede eliminar.</div>':'')+
     (canDelete?'<div class="sheet-actions" style="margin-top:10px"><button class="btn red" data-x="del">Eliminar espacio</button></div>':''), s=>{
     const inp=$('.titlein',s); inp.focus();
     s.onclick=e=>{ const b=e.target.closest('[data-x]'); if(!b) return;
       if(b.dataset.x==='cancel'){ closeSheet(); return; }
-      if(b.dataset.x==='del'){ closeSheet(); confirmSheet('Eliminar espacio', 'Se elimina el espacio "'+sp.name+'". Está vacío, no se pierden tareas.', ()=>{ deleteSpace(sp.id); haptic(10); render(); toast('Espacio eliminado'); }); return; }
+      if(b.dataset.x==='del'){ closeSheet(); confirmDeleteSpace(sp); return; }
       const n=inp.value.trim(); if(!n){ inp.focus(); return; }
       if(sp){ sp.name=n; sp.modified=new Date().toISOString(); save(); } else { const ns=addSpace(n); DB.settings.activeSpace=ns.id; save(); resetListState(); }
       closeSheet(); render(); };
@@ -4021,7 +4045,7 @@ document.addEventListener('keydown', e=>{ if(!UI.wide) return; const tag=(e.targ
   if(e.target.dataset&&e.target.dataset.role==='rowedit'){ const ed=UI.dsel.edit, id=ed&&ed.id;
     if(e.key==='Enter'&&!e.isComposing){ e.preventDefault(); endRowEdit(true); render(); revealRow(id); }
     else if(e.key==='Escape'){ e.preventDefault(); endRowEdit(false); revealRow(id); } return; }
-  if(e.key==='Escape'){ if(menuOpen()){ closeMenu(); return; } if(modal){ if(asheet.classList.contains('on')) cancelAction(); else closeSheet(); return; } // a menu over a sheet closes alone
+  if(e.key==='Escape'){ if(menuOpen()){ closeMenu(); return; } if(modal){ if(asheet.classList.contains('on')) cancelAction(); else requestCloseSheet(); return; } // a menu over a sheet closes alone
     if(typing && e.target.dataset.role==='search' && UI.query){ e.preventDefault(); UI.query=''; UI.searchDone=false; render(); return; } // Escape in the search clears it first; render keeps the focus there
     if(deskMulti()||UI.dsel.ids.size){ endSelect(); revealRow(UI.dsel.cur); return; } // R16: the multiple selection goes first
     if(UI.deskDetail){ const f=!typing; pop(); if(f) revealRow(UI.dsel.cur); } else if(UI.query){ UI.query=''; UI.searchDone=false; render(); } return; }

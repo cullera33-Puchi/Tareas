@@ -142,6 +142,7 @@ function onClick(e){
     case 'demoClear': clearDemo(); break;
     case 'log': logSheet(); break;
     case 'logCopy': copyText(logText(),'Registro copiado'); break;
+    case 'logClear': logClearAsk(); break;
     case 'update': applyUpdate(); break;
     case 'signIn': syncSignIn(); break;
     case 'syncNow': syncRun('manual'); break;

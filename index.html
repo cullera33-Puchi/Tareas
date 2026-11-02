@@ -2909,7 +2909,9 @@ const SYNC_TO={ id:v=>v==null||v===''?null:String(v), text:v=>v==null?'':String(
 // A local record as a row: always the same keys in the same order, so the signature only changes with the content
 function syncToRow(table, rec){ const row={id:String(rec.id), created:syncTs(rec.created)};
   SYNC_FIELDS[table].forEach(([f,c,k])=>{ row[c]=SYNC_TO[k](rec[f]); });
-  row.modified=syncTs(rec.modified)||row.created||EPOCH; return row; }
+  row.modified=syncTs(rec.modified)||row.created||EPOCH;
+  row.deleted=null; // sent every time: a record back after its deletion clears the server's mark
+  return row; }
 // A row as a local record. A voice note keeps no modified until it is edited (decision 19)
 function syncFromRow(table, row){ const rec={id:row.id, created:syncTs(row.created)};
   SYNC_FIELDS[table].forEach(([f,c,k])=>{ rec[f]=SYNC_TO[k](row[c]); });
@@ -2945,8 +2947,11 @@ function supabaseRemote(cfg){
     async init(){
       if(!client){ if(!window.supabase) await loadScript(SUPABASE_JS);
         client=window.supabase.createClient(cfg.url, cfg.anonKey, {auth:{flowType:'pkce', detectSessionInUrl:true, persistSession:true, autoRefreshToken:true, storageKey:'tareas-auth'}}); }
+      const back=new URLSearchParams(location.search).has('code'); // back from Google: getSession exchanges the code first
       const {data, error}=await client.auth.getSession(); cleanAuthUrl(); if(error) throw error;
-      return user(data&&data.session&&data.session.user); },
+      const u=user(data&&data.session&&data.session.user);
+      if(back && !u){ log('error','Inicio de sesión no completado: la vuelta de Google no trajo sesión'); toast('No se pudo iniciar sesión'); }
+      return u; },
     // The callback runs outside the auth lock: calling the client from inside it can wait for ever
     onAuth(cb){ db().auth.onAuthStateChange((ev, session)=>{ if(ev==='SIGNED_IN'||ev==='SIGNED_OUT'||ev==='USER_UPDATED') setTimeout(()=>cb(user(session&&session.user), ev), 0); }); },
     async signIn(){ const {error}=await db().auth.signInWithOAuth({provider:'google', options:{redirectTo:location.origin+location.pathname}}); if(error) throw error; },
@@ -2993,8 +2998,9 @@ function syncMerge(W, st, table, rows, stats){
     const lrow=syncToRow(table,local), lsig=syncSig(lrow);
     if(lsig===rsig){ known[id]=rsig; return; }
     const dirty=lsig!==known[id], rm=syncTime(row.modified), lm=syncTime(lrow.modified);
-    const takeRemote = rm>lm || (rm===lm && !dirty);
-    if(dirty) stats.conflicts.push({table, id, won:takeRemote?'servidor':'local'});
+    // Back here after its deletion went up (Deshacer, a restored copy): that deletion is older than the return, which wins
+    const takeRemote = !(known[id]==='x' && !remote) && (rm>lm || (rm===lm && !dirty));
+    if(dirty && known[id]!=='x') stats.conflicts.push({table, id, won:takeRemote?'servidor':'local'});
     known[id]=rsig; // what the server holds now: a local copy that stays different goes up afterwards
     if(!takeRemote) return;
     if(!remote){ W[list][i]=null; removed=true; stats.removed++;
@@ -3095,7 +3101,9 @@ function syncSubscribe(){ if(SY.unsub||!SY.user||!SY.remote.subscribe) return;
     if(st==='SUBSCRIBED'){ if(was) syncRun('tiempo real'); was=true; } // back after a cut: catch up with what came meanwhile
     else if(st==='CHANNEL_ERROR'||st==='TIMED_OUT') log('warn','Tiempo real: '+st+(err?' '+(err.message||err):'')); }); }
 // Changes from another device, a few at a time, through the same merge
-function syncRealtime(){ const ev=SY.rt.splice(0); if(!ev.length||!SY.user) return; const pulled={}; ev.forEach(([t,row])=>{ (pulled[t]=pulled[t]||[]).push(row); });
+function syncRealtime(){ const ev=SY.rt.splice(0); if(!ev.length||!SY.user) return;
+  if(syncState().owner!==SY.user.id){ SY.again=true; return; } // the first connection is still matching the spaces: a run afterwards picks these up
+  const pulled={}; ev.forEach(([t,row])=>{ (pulled[t]=pulled[t]||[]).push(row); });
   try{ const a=syncApply(pulled, {}); const n=a.added+a.updated+a.removed; if(n) log('info','Cambios recibidos en tiempo real', {recibidas:a.added+a.updated, eliminadas:a.removed, conflictos:a.conflicts.length}); if(n||a.conflicts.length) syncChanged(); }
   catch(e){ log('error','Tiempo real: '+(e&&e.message||e)); } }
 function syncSetUser(user, why){

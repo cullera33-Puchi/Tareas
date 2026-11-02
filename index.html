@@ -945,6 +945,12 @@ body.resizing,body.resizing *{cursor:col-resize !important;-webkit-user-select:n
 .sync-acc .sync-line{white-space:normal;}
 .sync-acc .sync-line.warn{color:var(--orange);}
 .sync-acc button.cell[disabled]{opacity:.4;}
+/* Block 9: Notificaciones in Ajustes (a device row ends with its Revocar button) and the line under Recordatorio */
+.push-acc button.cell[disabled]{opacity:.4;}
+.push-acc .val.warn{color:var(--orange);}
+.push-acc .rvk{flex:none;color:var(--red);min-height:44px;margin:-11px 0;padding:0 0 0 4px;display:flex;align-items:center;}
+.app.desktop .push-acc .rvk{min-height:28px;margin:0;}
+.ifoot .push-note{display:block;margin-top:6px;}
 .ptr{position:fixed;left:50%;top:0;z-index:9;pointer-events:none;opacity:0;display:flex;align-items:center;gap:8px;color:var(--ink2);font-size:.8125rem;transform:translate3d(-50%,var(--ptr-y,0px),0);}
 .ptr:not(.on){visibility:hidden;}
 .ptr-spin{display:block;width:24px;height:24px;}
@@ -987,7 +993,7 @@ body.resizing,body.resizing *{cursor:col-resize !important;-webkit-user-select:n
 <script src="config.js"></script>
 <script>
 'use strict';
-const APP_VERSION = '0.16.3';
+const APP_VERSION = '0.17.0';
 let pendingSW = null; // service worker installed and waiting to take over
 let updateRequested = false; // the user asked for the waiting worker to take over
 
@@ -1824,7 +1830,7 @@ function viewAjustes(){
   const th=DB.settings.theme||'auto'; const dev=UI.wide?'este dispositivo':'este iPhone'; // the desktop reuses this view
   return '<header class="nav"><div class="nav-row"><div class="title">Ajustes</div></div></header>'+
    '<div class="scroll">'+
-   syncAccountHTML(dev)+
+   syncAccountHTML(dev)+pushSectionHTML(dev)+
    '<div class="group-title">Espacios</div><div class="group">'+DB.spaces.slice().sort((a,b)=>a.order-b.order).map(sp=>'<button class="cell" data-edit-space="'+sp.id+'"><span class="lbl">'+esc(sp.name)+'</span>'+(sp.id===space().id?'<span class="val">Activo</span>':'')+I.chev.replace('<svg','<svg class="chev"')+'</button>').join('')+'<button class="cell link" data-act="newSpace">'+I.plus.replace('<svg','<svg style="width:18px;height:18px"')+'<span class="lbl">Nuevo espacio</span></button></div>'+
    '<div class="footnote">Un espacio solo se elimina si está vacío.</div>'+
    '<div class="group-title">Datos</div><div class="group"><button class="cell" data-act="exportFile"><span class="lbl">Exportar a archivo</span><span class="val">JSON</span></button><button class="cell" data-act="exportCSV"><span class="lbl">Exportar a Excel</span><span class="val">CSV</span></button><button class="cell" data-act="importFile"><span class="lbl">Importar desde archivo</span><span class="val">JSON</span></button><button class="cell" data-act="import"><span class="lbl">Importar pegando texto</span></button></div>'+
@@ -1856,7 +1862,7 @@ function viewDetail(id){
    '<button class="cell" data-act="pickDate"><span class="lbl">Fecha</span><span class="val">'+(x.date?fmtDate(x.date):'Sin fecha')+'</span>'+chev+'</button>'+
    '<button class="cell" data-act="pickReminder"><span class="lbl">Recordatorio</span><span class="val">'+(x.reminder?fmtDateTime(x.reminder):'Ninguno')+'</span>'+chev+'</button>'+
    '<button class="cell" data-act="pickPriority"><span class="lbl">Prioridad</span><span class="val '+(x.priority==='none'?'':x.priority)+'">'+pl+'</span>'+chev+'</button></div>'+
-   '<div class="footnote">La notificación en el iPhone llega con la sincronización.</div>'+
+   (pushNote(x)?'<div class="footnote push-note">'+pushNote(x)+'</div>':'')+
    '<div class="group-title">Notas de voz</div><div class="group">'+vns.map(vnHTML).join('')+'<button class="cell link" data-act="voice">'+I.mic.replace('<svg','<svg style="width:18px;height:18px"')+'<span class="lbl">Añadir nota de voz</span></button></div>'+
    '</div>';
 }
@@ -1876,7 +1882,7 @@ function inspectorHTML(x, p, vns, links){
    '<span class="ilbl">Recordatorio</span>'+pop('pickReminder', x.reminder?fmtDateTime(x.reminder):'Ninguno', !x.reminder, I.bell)+
    '<span class="ilbl">Prioridad</span><div class="seg iseg" role="radiogroup" aria-label="Prioridad">'+seg+'</div></div>'+
    '<div class="group-title">Notas de voz</div><div class="group">'+vns.map(vnHTML).join('')+'<button class="cell link" data-act="voice">'+I.mic.replace('<svg','<svg style="width:16px;height:16px"')+'<span class="lbl">Añadir nota de voz</span></button></div>'+
-   '<div class="ifoot">'+[['Creada',x.created],['Modificada',x.modified],['Completada',x.status==='done'&&x.completed]].filter(o=>o[1]).map(o=>{ const w=fmtDateTime(o[1]); return o[0]+' '+w[0].toLowerCase()+w.slice(1)+'<br>'; }).join('')+'La notificación en el iPhone llega con la sincronización.</div>'+
+   '<div class="ifoot">'+[['Creada',x.created],['Modificada',x.modified],['Completada',x.status==='done'&&x.completed]].filter(o=>o[1]).map(o=>{ const w=fmtDateTime(o[1]); return o[0]+' '+w[0].toLowerCase()+w.slice(1)+'<br>'; }).join('')+(pushNote(x)?'<span class="push-note">'+pushNote(x)+'</span>':'')+'</div>'+
    '</div>';
 }
 const detailLinks = notes => extractLinks(notes).slice(0,6);
@@ -1970,6 +1976,7 @@ function onClick(e){
   const wa=e.target.closest('[data-add-date]'); if(wa){ addSheet(wa.dataset.project||null,'',{date:wa.dataset.addDate}); return; } // R14: a day header in a project adds to that project
   const es=e.target.closest('[data-edit-space]'); if(es){ spaceSheet(es.dataset.editSpace); return; }
   const rb=e.target.closest('[data-restore]'); if(rb){ restoreBackup(rb.dataset.restore); return; }
+  const pr=e.target.closest('[data-push-revoke]'); if(pr){ pushRevokeSheet(pr.dataset.pushRevoke); return; }
   const ua=e.target.closest('[data-unarchive]'); if(ua){ const p=proj(ua.dataset.unarchive); p.archived=false; p.modified=new Date().toISOString(); save(); render(); return; }
   const pf=e.target.closest('[data-pf]'); if(pf){ const v=pf.dataset.pf; UI.projFilter=(v===''||UI.projFilter===v)?null:v; haptic(4); render(); return; }
   const va=e.target.closest('[data-vact]'); if(va){ const el=va.closest('.vn'); const vid=el&&el.dataset.vn; closeVn(el); if(va.dataset.vact==='del') deleteVoiceNote(vid); else editVoiceNote(vid); return; }
@@ -2037,6 +2044,8 @@ function onClick(e){
     case 'signIn': syncSignIn(); break;
     case 'syncNow': syncRun('manual'); break;
     case 'signOut': syncSignOutSheet(); break;
+    case 'pushEnable': pushEnable(); break; // block 9: inside the tap, so iOS shows the permission prompt
+    case 'pushTest': pushTest(); break;
   }
 }
 
@@ -2718,8 +2727,8 @@ function reminderSheet(id, src){ const x=task(id); if(!x) return; const t=todayS
     inp.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); $('[data-x=ok]',s).click(); } }); // Enter in the time saves
     s.onclick=e=>{ const nav=e.target.closest('[data-cal]'); if(nav){ ym=shiftMonth(ym,+nav.dataset.cal); $('#calwrap',s).innerHTML=calendarHTML(ym, day); return; }
       const d=e.target.closest('[data-d]'); if(d){ day=d.dataset.d; ym=day.slice(0,7); $('#calwrap',s).innerHTML=calendarHTML(ym, day); unwarn(); haptic(4); return; }
-      const c=e.target.closest('[data-r]'); if(c){ if(pickFresh(e)){ log('warn','Toque en el recordatorio ignorado justo al abrir'); return; } updTask(id,{reminder:c.dataset.r||null}); closeSheet(); render(); return; }
-      if(e.target.closest('[data-x=ok]')){ const [hh,mi]=(inp.value||time).split(':').map(Number); const dt=new Date(day+'T00:00:00'); dt.setHours(hh||0, mi||0, 0, 0); if(dt.getTime()<=Date.now()){ let w=$('.hint.warn',s); if(!w){ w=document.createElement('div'); w.className='hint warn'; $('.timerow',s).after(w); } w.textContent='Esa hora ya ha pasado'; haptic(10); return; } updTask(id,{reminder:dt.toISOString()}); closeSheet(); render(); } }; }); } // a past reminder could never notify: the sheet stays open, with a line above Guardar (a toast would cover the time field)
+      const c=e.target.closest('[data-r]'); if(c){ if(pickFresh(e)){ log('warn','Toque en el recordatorio ignorado justo al abrir'); return; } updTask(id,{reminder:c.dataset.r||null}); closeSheet(); render(); if(c.dataset.r) pushOfferSoon(); return; }
+      if(e.target.closest('[data-x=ok]')){ const [hh,mi]=(inp.value||time).split(':').map(Number); const dt=new Date(day+'T00:00:00'); dt.setHours(hh||0, mi||0, 0, 0); if(dt.getTime()<=Date.now()){ let w=$('.hint.warn',s); if(!w){ w=document.createElement('div'); w.className='hint warn'; $('.timerow',s).after(w); } w.textContent='Esa hora ya ha pasado'; haptic(10); return; } updTask(id,{reminder:dt.toISOString()}); closeSheet(); render(); pushOfferSoon(); } }; }); } // a past reminder could never notify: the sheet stays open, with a line above Guardar (a toast would cover the time field)
 
 /* Plan the undated tasks one by one */
 function planStart(){ let ids=pendingFor('todas').filter(x=>!x.date); if(UI.projFilter!==null) ids=ids.filter(x=> UI.projFilter==='none' ? !x.projectId : x.projectId===UI.projFilter); ids=ids.map(x=>x.id); if(!ids.length) return; planStep(ids, 0, {done:0, skipped:0}); }
@@ -2967,7 +2976,7 @@ function cleanAuthUrl(){ try{ const u=new URL(location.href); const err=u.search
   if(n) history.replaceState(history.state, '', u.pathname+(u.searchParams.toString()?'?'+u.searchParams:'')+u.hash);
   if(err){ log('error','Inicio de sesión rechazado: '+err); toast('No se pudo iniciar sesión'); } }catch(e){} }
 function supabaseRemote(cfg){
-  let client=null; const T=SYNC_TABLES.map(t=>t.table);
+  let client=null; const T=SYNC_TABLES.map(t=>t.table); const fnUrl=cfg.url+'/functions/v1/send-reminders';
   const db=()=>{ if(!client) throw new Error('Cliente de Supabase no cargado'); return client; };
   const rows=({data,error})=>{ if(error) throw error; return data||[]; };
   const user=u=>u?{id:u.id, email:u.email||''}:null;
@@ -2996,7 +3005,16 @@ function supabaseRemote(cfg){
     async markDeleted(table, items){ return rows(await db().from(table).upsert(items.map(x=>({id:x.id, deleted:x.ts, modified:x.ts})), {onConflict:'id', defaultToNull:false}).select('id')); },
     subscribe(uid, onRow, onStatus){ const c=db(); const ch=c.channel('tareas-'+uid);
       T.forEach(t=>ch.on('postgres_changes', {event:'*', schema:'public', table:t, filter:'owner_id=eq.'+uid}, p=>{ if(p&&p.new&&p.new.id) onRow(t, p.new); }));
-      ch.subscribe((st, err)=>onStatus(st, err)); return ()=>{ try{ c.removeChannel(ch); }catch(e){} }; }
+      ch.subscribe((st, err)=>onStatus(st, err)); return ()=>{ try{ c.removeChannel(ch); }catch(e){} }; },
+    // Block 9: the Edge Function's public key, this device's subscription (0002_push.sql) and the account's devices
+    async pushKey(){ const r=await fetch(fnUrl+'?publicKey', {headers:{apikey:cfg.anonKey}}); const j=await r.json().catch(()=>({}));
+      if(!r.ok) throw new Error('Función de notificaciones: '+(j.error||'HTTP '+r.status)); return j.publicKey; },
+    async pushSave(s){ const {error}=await db().rpc('tareas_push_subscribe', {p_id:s.id, p_endpoint:s.endpoint, p_p256dh:s.p256dh, p_auth:s.auth, p_device:s.device}); if(error) throw error; },
+    async pushList(){ return rows(await db().from('push_subscriptions').select('id,device,created').is('deleted', null).order('created', {ascending:true})); },
+    async pushRevoke(id){ const ts=new Date().toISOString(); return rows(await db().from('push_subscriptions').update({deleted:ts, modified:ts}).eq('id', id).select('id')); },
+    async pushTest(id){ const {data}=await db().auth.getSession(); const tok=data&&data.session&&data.session.access_token; if(!tok) throw new Error('Sin sesión');
+      const r=await fetch(fnUrl, {method:'POST', headers:{apikey:cfg.anonKey, Authorization:'Bearer '+tok, 'Content-Type':'application/json'}, body:JSON.stringify({test:true, id})});
+      const j=await r.json().catch(()=>({})); if(!r.ok) throw new Error('Función de notificaciones: '+(j.error||'HTTP '+r.status)); return j; }
   };
 }
 
@@ -3125,7 +3143,7 @@ function syncRun(reason){
     log('info','Sincronización ('+reason+')', {recibidas:a.added+a.updated, eliminadas:a.removed, conflictos:a.conflicts.length, enviadas:p.pushed, borradas:p.deleted, mantenidas:p.kept, ms:Date.now()-t0});
     return true; };
   const locked=()=>(navigator.locks&&navigator.locks.request) ? navigator.locks.request('tareas-sync', body) : body();
-  SY.runP=locked().then(ok=>{ SY.running=false; if(ok){ SY.status='ok'; SY.error=''; } syncPaint(); if(SY.again) syncChanged(); return !!ok; }, e=>{
+  SY.runP=locked().then(ok=>{ SY.running=false; if(ok){ SY.status='ok'; SY.error=''; pushFlush(); } syncPaint(); if(SY.again) syncChanged(); return !!ok; }, e=>{
     SY.running=false; const off=syncOffline(e); SY.status=off?'offline':'error'; SY.error=String(e&&(e.message||e.code)||e);
     log(off?'warn':'error', 'Sincronización falló ('+reason+'): '+SY.error); syncRetry(); syncPaint(); return false; });
   return SY.runP; }
@@ -3174,7 +3192,7 @@ async function syncSignIn(){ if(!SY) return; if(!navigator.onLine){ toast('Sin c
   try{ if(!SY.ready){ syncInit(); await SY.initP; } flushHeld(true); flushEdits(); log('info','Inicio de sesión con Google'); await SY.remote.signIn(); }
   catch(e){ log('error','Inicio de sesión falló: '+(e&&e.message||e)); toast('No se pudo iniciar sesión'); } }
 function syncSignOutSheet(){ const dev=UI.wide?'este dispositivo':'este iPhone';
-  confirmSheet('Cerrar sesión', 'Los datos se quedan en '+dev+' y dejan de sincronizarse.', async()=>{ try{ await SY.remote.signOut(); }catch(e){ log('warn','Cerrar sesión: '+(e&&e.message||e)); } syncSetUser(null, 'SIGNED_OUT'); toast('Sesión cerrada'); }); }
+  confirmSheet('Cerrar sesión', 'Los datos se quedan en '+dev+' y dejan de sincronizarse.', async()=>{ await pushSignOut(); try{ await SY.remote.signOut(); }catch(e){ log('warn','Cerrar sesión: '+(e&&e.message||e)); } syncSetUser(null, 'SIGNED_OUT'); toast('Sesión cerrada'); }); }
 
 /* ---------- Ajustes, Cuenta ---------- */
 function syncAgo(iso){ const t=syncTime(iso); if(!t) return ''; const m=Math.floor((Date.now()-t)/6e4);
@@ -3198,6 +3216,155 @@ function syncAccountHTML(dev){
     '<button class="cell link" data-act="syncNow"'+(SY.status==='syncing'?' disabled':'')+'><span class="lbl">Sincronizar ahora</span></button>'+
     '<button class="cell" data-act="signOut"><span class="lbl" style="color:var(--red)">Cerrar sesión</span></button></div>'+
     '<div class="footnote">Al cerrar sesión, los datos se quedan en '+dev+' y dejan de sincronizarse.</div>'; }
+
+/* ======================= PUSH (block 9): reminders as notifications =======================
+   The server sends them: supabase/functions/send-reminders, called every minute by pg_cron, sends each due reminder once to every
+   device of its owner. This block only gets this device ready and shows the state; nothing here blocks a tap.
+   - The permission is asked inside a tap (iOS asks only then): the first time a reminder is set (pushOfferSoon, a short sheet that
+     says why) or from Ajustes, Notificaciones (Activar notificaciones).
+   - The subscription is made with the function's VAPID public key and saved for the account through SY.remote.pushSave. Offline,
+     or before the first sync, it waits in 'tareas-push' (this device only, never synced or exported) and goes up after the next sync
+     run (pushFlush).
+   - On the iPhone, Web Push exists only in the app installed on the home screen (iOS 16.4 or later): a Safari tab explains it.
+     Signed out there is no account to receive for, so that is explained too. Signing out takes this device off the account.
+   - Ajustes, Notificaciones: the state, Activar, Probar notificación, and the account's devices with Revocar (a soft delete).
+   - A tap on a notification opens the task (sw.js: a message to the open app, or ?task=id when it starts). */
+const PUSH_KEY='tareas-push';
+const PS=(()=>{ let s=null; try{ s=JSON.parse(localStorage.getItem(PUSH_KEY)||'null'); }catch(e){} s=s&&typeof s==='object'?s:{};
+  return {id:s.id||null, sub:s.sub||null, savedFor:s.savedFor||null, asked:!!s.asked, key:s.key||null, devices:null, devFor:null, devAt:0, devLoading:false, busy:false, testing:false, flushing:false}; })();
+function pushWrite(){ try{ localStorage.setItem(PUSH_KEY, JSON.stringify({id:PS.id, sub:PS.sub, savedFor:PS.savedFor, asked:PS.asked, key:PS.key})); }catch(e){} }
+const isIOS = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
+const pushCapable = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+function pushPerm(){ try{ return Notification.permission; }catch(e){ return 'default'; } }
+// unsupported, notInstalled (an iPhone in a Safari tab), noSync (no config.js), signedOut, denied, off (not asked yet, or no subscription), on
+function pushStatus(){
+  if(isIOS() && !isStandalone()) return 'notInstalled';
+  if(!pushCapable()) return 'unsupported';
+  if(!SY) return 'noSync';
+  if(!SY.user) return 'signedOut';
+  const p=pushPerm(); if(p==='denied') return 'denied';
+  return p==='granted' && PS.sub ? 'on' : 'off'; }
+// The name shown in the list of devices: iPhone or iPad in the installed app, otherwise the computer and its browser
+function deviceName(){ const ua=navigator.userAgent;
+  const dev=/iPhone/.test(ua)?'iPhone':(/iPad/.test(ua)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1))?'iPad':/Android/.test(ua)?'Android':/Macintosh|Mac OS X/.test(ua)?'Mac':/Windows/.test(ua)?'Windows':/Linux|CrOS/.test(ua)?'Linux':'';
+  if((dev==='iPhone'||dev==='iPad') && isStandalone()) return dev;
+  const br=/Edg\//.test(ua)?'Edge':/Firefox\//.test(ua)?'Firefox':/Chrome\//.test(ua)?'Chrome':/Safari\//.test(ua)?'Safari':'';
+  return dev ? (br?dev+' con '+br:dev) : (br||'Navegador'); }
+const b64uBytes = s => { const t=atob(String(s).replace(/-/g,'+').replace(/_/g,'/')+'='.repeat((4-String(s).length%4)%4)); const u=new Uint8Array(t.length); for(let i=0;i<t.length;i++) u[i]=t.charCodeAt(i); return u; };
+const bytesB64u = b => { const u=new Uint8Array(b); let s=''; for(let i=0;i<u.length;i++) s+=String.fromCharCode(u[i]); return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); };
+function pushPaint(){ if(busyEditing() || touchDrag) return; if(onSettings() || detailTaskId()) render(); }
+
+/* ---------- Turning it on ---------- */
+// After a reminder is set in Recordatorio: the first time only, once its sheet or popover has gone
+function pushOfferSoon(){ if(PS.asked || ['on','unsupported','noSync','denied'].includes(pushStatus())) return;
+  setTimeout(()=>{ if(sheet.classList.contains('on') || asheet.classList.contains('on') || menuOpen()) return; pushOffer(); }, 560); }
+function pushOffer(){ const st=pushStatus(); if(PS.asked || ['on','unsupported','noSync','denied'].includes(st)) return;
+  PS.asked=true; pushWrite(); const dev=UI.wide?'este dispositivo':'este iPhone';
+  const info=(text)=>openSheet('<h2>Notificaciones</h2><div class="hint">'+text+'</div><div class="sheet-actions"><span style="flex:1"></span><button class="btn primary" data-x="ok">Entendido</button></div>', s=>{ s.onclick=e=>{ if(e.target.closest('[data-x]')&&!ghostSheet(e)) closeSheet(); }; });
+  log('info','Notificaciones: explicación mostrada', {estado:st});
+  if(st==='notInstalled'){ info('Los recordatorios solo avisan con Tareas instalada en la pantalla de inicio. En Safari, toca Compartir y Añadir a pantalla de inicio, y abre la app desde allí.'); return; }
+  if(st==='signedOut'){ info('Los recordatorios avisan a través de tu cuenta. Inicia sesión en Ajustes para recibirlos en '+dev+'.'); return; }
+  openSheet('<h2>Notificaciones</h2><div class="hint">Para avisarte a la hora de cada recordatorio, aunque la app esté cerrada, Tareas necesita permiso para enviar notificaciones a '+dev+'.</div>'+
+    '<div class="sheet-actions"><button class="btn" data-x="no">Ahora no</button><button class="btn primary" data-x="yes">Permitir</button></div>', s=>{
+    s.onclick=e=>{ const b=e.target.closest('[data-x]'); if(!b||ghostSheet(e)) return; closeSheet(); if(b.dataset.x==='yes') pushEnable(); else log('info','Notificaciones: ahora no'); }; }); }
+// Inside a tap: the permission prompt, then the subscription in the background
+function pushEnable(){ if(pushStatus()!=='off' || PS.busy) return;
+  if(!navigator.onLine && !PS.key){ toast('Sin conexión'); return; }
+  let req; try{ req=Notification.requestPermission(); }catch(e){ req=Promise.reject(e); }
+  PS.busy=true; pushPaint();
+  Promise.resolve(req).then(p=>{ log('info','Permiso de notificaciones: '+p);
+    if(p!=='granted'){ toast(p==='denied'?'Sin permiso de notificaciones':'Notificaciones sin activar'); return; }
+    return pushSubscribe().then(()=>toast('Notificaciones activadas'));
+  }).catch(e=>{ log('error','Notificaciones: no se pudieron activar: '+(e&&e.message||e)); toast(syncOffline(e)?'Sin conexión':'No se pudieron activar las notificaciones'); })
+  .finally(()=>{ PS.busy=false; pushPaint(); }); }
+// The function's public key; kept, so a later subscription works offline
+async function pushPublicKey(){
+  try{ const k=await SY.remote.pushKey(); if(!k) throw new Error('sin clave pública'); if(k!==PS.key){ PS.key=k; pushWrite(); } }
+  catch(e){ if(!PS.key) throw e; log('warn','Clave pública de notificaciones no disponible, se usa la guardada: '+(e&&e.message||e)); }
+  return PS.key; }
+async function pushSubscribe(){ const reg=await navigator.serviceWorker.ready; const key=await pushPublicKey();
+  let sub=await reg.pushManager.getSubscription();
+  const k=sub&&sub.options&&sub.options.applicationServerKey; if(sub && k && bytesB64u(k)!==key){ log('info','Suscripción con otra clave: se renueva'); await sub.unsubscribe().catch(()=>{}); sub=null; }
+  if(!sub){ try{ sub=await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:b64uBytes(key)}); }
+    catch(e){ log('error','Suscripción a notificaciones fallida: '+(e&&e.message||e)); throw e; } }
+  pushAdopt(sub, 'creada'); await pushFlush(); }
+function pushAdopt(sub, how){ const j=sub.toJSON(), was=PS.sub&&PS.sub.endpoint;
+  if(!PS.id) PS.id=uid(); PS.sub={endpoint:j.endpoint, p256dh:j.keys&&j.keys.p256dh, auth:j.keys&&j.keys.auth}; if(was!==j.endpoint) PS.savedFor=null; pushWrite();
+  log('info','Suscripción a notificaciones '+how, {device:deviceName(), host:(()=>{ try{ return new URL(j.endpoint).host; }catch(e){ return ''; } })()}); }
+// This device's subscription to the account; called after each sync run, so one made offline goes up later
+async function pushFlush(){ if(!SY||!SY.user||!SY.remote.pushSave||!PS.sub||PS.savedFor===SY.user.id||PS.flushing||!navigator.onLine) return;
+  PS.flushing=true; const user=SY.user.id;
+  try{ await SY.remote.pushSave({id:PS.id, endpoint:PS.sub.endpoint, p256dh:PS.sub.p256dh, auth:PS.sub.auth, device:deviceName()}); PS.savedFor=user; pushWrite(); log('info','Suscripción guardada en la cuenta'); pushDevices(true); }
+  catch(e){ log(syncOffline(e)?'warn':'error','Suscripción no guardada en la cuenta: '+(e&&e.message||e)); }
+  finally{ PS.flushing=false; pushPaint(); } }
+// This device no longer receives: the browser's subscription goes too, so turning it on again starts clean
+function pushDrop(){ PS.sub=null; PS.savedFor=null; pushWrite();
+  if('serviceWorker' in navigator) navigator.serviceWorker.ready.then(r=>r.pushManager&&r.pushManager.getSubscription()).then(s=>s&&s.unsubscribe()).catch(()=>{}); }
+// At start: the browser may have renewed or dropped the subscription meanwhile
+function pushCheck(){ if(pushStatus()!=='on') return;
+  navigator.serviceWorker.ready.then(reg=>reg.pushManager.getSubscription()).then(sub=>{
+    if(!sub){ log('warn','La suscripción a notificaciones ya no está en el navegador: se crea otra');
+      return pushSubscribe().catch(e=>{ log('warn','No se pudo renovar la suscripción: '+(e&&e.message||e)); pushDrop(); pushPaint(); }); } // Ajustes offers Activar again, inside a tap
+    if(sub.endpoint!==PS.sub.endpoint) pushAdopt(sub, 'renovada');
+    return pushFlush(); }).catch(e=>log('warn','Comprobación de notificaciones: '+(e&&e.message||e))); }
+async function pushSignOut(){ if(!PS.sub) return;
+  try{ if(SY&&SY.user&&PS.savedFor===SY.user.id&&navigator.onLine) await SY.remote.pushRevoke(PS.id); log('info','Notificaciones de este dispositivo desactivadas al cerrar sesión'); }
+  catch(e){ log('warn','Al cerrar sesión no se pudo quitar este dispositivo de la cuenta: '+(e&&e.message||e)); }
+  pushDrop(); PS.devices=null; PS.devFor=null; }
+
+/* ---------- Devices, revoke and test ---------- */
+function pushDevices(force){ if(!SY||!SY.user||!SY.remote.pushList||!navigator.onLine||PS.devLoading) return; if(!force && Date.now()-PS.devAt<60e3) return;
+  PS.devLoading=true; PS.devAt=Date.now(); const user=SY.user.id;
+  SY.remote.pushList().then(list=>{ if(!SY.user||SY.user.id!==user) return; PS.devices=list||[]; PS.devFor=user;
+    // Revoked from another device, or removed by the server because its push service no longer knows it
+    if(PS.sub && PS.savedFor===user && !PS.flushing && !PS.devices.some(d=>d.id===PS.id)){ log('info','Este dispositivo ya no está en la cuenta: notificaciones desactivadas'); pushDrop(); } })
+  .catch(e=>log('warn','Dispositivos con notificaciones no disponibles: '+(e&&e.message||e))).finally(()=>{ PS.devLoading=false; pushPaint(); }); }
+function pushRevokeSheet(id){ const d=(PS.devices||[]).find(x=>x.id===id); if(!d) return; const me=id===PS.id;
+  confirmSheet('Revocar', (me?'Este dispositivo':(d.device||'Ese dispositivo'))+' dejará de recibir notificaciones.', async()=>{
+    try{ await SY.remote.pushRevoke(id); log('info','Dispositivo revocado', {device:d.device||'', este:me}); if(me) pushDrop(); PS.devices=(PS.devices||[]).filter(x=>x.id!==id); toast('Dispositivo revocado'); }
+    catch(e){ log('error','No se pudo revocar el dispositivo: '+(e&&e.message||e)); toast(syncOffline(e)?'Sin conexión':'No se pudo revocar'); }
+    pushPaint(); }); }
+async function pushTest(){ if(PS.testing) return; PS.testing=true; pushPaint();
+  try{ await pushFlush(); const r=await SY.remote.pushTest(PS.id)||{}, gone=!r.sent&&(!r.devices||r.gone);
+    log(r.sent?'info':'error','Notificación de prueba', r); // the function's counts: devices, sent, failed, gone
+    toast(r.sent?'Notificación de prueba enviada':gone?'Este dispositivo ya no está en la cuenta':'No se pudo enviar la prueba');
+    if(gone) pushDevices(true); }
+  catch(e){ log('error','Notificación de prueba: '+(e&&e.message||e)); toast(syncOffline(e)?'Sin conexión':'No se pudo enviar la prueba'); }
+  finally{ PS.testing=false; pushPaint(); } }
+
+/* ---------- Ajustes, Notificaciones, and the line under Recordatorio ---------- */
+function pushSectionHTML(dev){ const st=pushStatus();
+  const g=(cells, foot)=>'<div class="group-title">Notificaciones</div><div class="group push-acc">'+cells+'</div>'+(foot?'<div class="footnote">'+foot+'</div>':'');
+  const cell=(l,v,warn)=>'<div class="cell"><span class="lbl">'+l+'</span><span class="val'+(warn?' warn':'')+'">'+v+'</span></div>';
+  const btn=(act,l,dis)=>'<button class="cell link" data-act="'+act+'"'+(dis?' disabled':'')+'><span class="lbl">'+l+'</span></button>';
+  if(st==='unsupported') return g(cell('Notificaciones','No disponibles'), 'Este navegador no puede recibir notificaciones.');
+  if(st==='notInstalled') return g(cell('Notificaciones','Sin instalar'), 'Los recordatorios solo avisan con Tareas instalada en la pantalla de inicio. En Safari, toca Compartir y Añadir a pantalla de inicio, y abre la app desde allí.');
+  if(st==='noSync') return g(cell('Notificaciones','No disponibles'), 'Los recordatorios avisan a través de la cuenta, que no está disponible en esta versión.');
+  if(st==='signedOut') return g(cell('Notificaciones','Sin cuenta'), 'Inicia sesión para que los recordatorios avisen en '+dev+'. Las notificaciones llegan a través de tu cuenta.');
+  if(st==='denied') return g(cell('Permiso','Denegado',true), UI.wide?'Para recibirlas, permite las notificaciones de esta página en los ajustes del navegador.':'Para recibirlas, activa las notificaciones de Tareas en la app Ajustes del iPhone, en Notificaciones.')+pushDevicesHTML();
+  if(st==='off') return g(cell('Permiso', pushPerm()==='granted'?'Concedido':'Sin pedir')+btn('pushEnable', PS.busy?'Activando':'Activar notificaciones', PS.busy), 'Avisan a la hora de cada recordatorio, aunque la app esté cerrada.')+pushDevicesHTML();
+  const pend=PS.savedFor!==SY.user.id;
+  return g(cell('Permiso','Concedido')+cell('Este dispositivo', esc(deviceName()))+btn('pushTest', PS.testing?'Enviando':'Probar notificación', PS.testing||pend),
+    pend?'Este dispositivo se añadirá a tu cuenta al sincronizar.':'Avisan a la hora de cada recordatorio, aunque la app esté cerrada.')+pushDevicesHTML(); }
+function pushDevicesHTML(){ if(!SY||!SY.user) return ''; setTimeout(()=>pushDevices(false), 0); // fetched while Ajustes is on screen, at most once a minute
+  const l=PS.devFor===SY.user.id?PS.devices:null; if(!l||!l.length) return ''; // none yet: nothing to list or revoke
+  return '<div class="group-title">Dispositivos con notificaciones</div><div class="group push-acc">'+(l.length?l.map(d=>'<div class="cell"><span class="lbl">'+esc(d.device||'Dispositivo')+'</span><span class="val">'+(d.id===PS.id?'Este':d.created?pushSince(d.created):'')+'</span><button class="rvk" data-push-revoke="'+esc(d.id)+'">Revocar</button></div>').join('')
+    :'<div class="cell"><span class="lbl" style="color:var(--ink2)">Ninguno</span></div>')+'</div>'; }
+const pushSince = iso => { const f=fmtDate(localDay(iso)); return /^\d/.test(f)?'Desde el '+f:'Desde '+f.toLowerCase(); }; // Desde hoy, Desde ayer, Desde el 28 oct
+// Under Recordatorio, when this device will not notify. Empty when it will, or without a reminder
+function pushNote(x){ if(!x||!x.reminder||x.status==='done') return ''; const dev=UI.wide?'este dispositivo':'este iPhone';
+  return {unsupported:'Este navegador no recibe notificaciones: el recordatorio no avisará aquí.', notInstalled:'El recordatorio solo avisa con Tareas instalada en la pantalla de inicio.',
+    signedOut:'Inicia sesión en Ajustes para que el recordatorio avise.', denied:'Sin permiso de notificaciones: el recordatorio no avisará en '+dev+'.', off:'Activa las notificaciones en Ajustes para que el recordatorio avise.'}[pushStatus()]||''; }
+
+/* ---------- A tap on a notification ---------- */
+function openTaskFromPush(id, how){ if(!id) return; log('info','Notificación abierta', {how}); hiddenAt=0; // a tap on a notification is no return after hours away
+  const go=()=>{ if(!task(id)) return false; closeSheet(); closeMenu(true); if(UI.select) endSelect();
+    if(detailTaskId()===id){ render(); return true; }
+    if(UI.wide && UI.deskView==='settings') setDeskView('hoy');
+    openDetail(id); return true; };
+  if(go()) return;
+  // Made on another device and not here yet: after a sync
+  if(SY&&SY.user) syncRun('notificación').then(()=>{ if(!go()) toast('La tarea ya no existe'); }); else toast('La tarea ya no existe'); }
 
 /* ---------- Pull to refresh (iPhone: Tareas and a project) ---------- */
 const SPIN='<svg viewBox="0 0 24 24" aria-hidden="true">'+[0,1,2,3,4,5,6,7].map(i=>'<rect x="11" y="2" width="2" height="6" rx="1" fill="currentColor" opacity="'+(0.25+i*0.107).toFixed(2)+'" transform="rotate('+(i*45)+' 12 12)"/>').join('')+'</svg>';
@@ -3299,6 +3466,7 @@ function tipsSheet(){ // the desktop has no swipes or long presses: it explains 
     : '<h2>Tres gestos</h2><div class="tips"><p><b>Desliza una tarea</b> a la derecha para completarla y a la izquierda para aplazarla o eliminarla.</p><p><b>Mantén pulsada</b> una tarea para cambiar prioridad, fecha o proyecto sin abrirla.</p>';
   openSheet(how+'<p><b>Escribe la fecha al final</b> del título al crear una tarea: "Llamar a Marta mañana", "Enviar acta el 12", "Revisar SOW viernes".</p></div><div class="sheet-actions"><button class="btn primary" data-x="ok">Entendido</button></div>', s=>{ s.onclick=e=>{ if(e.target.closest('[data-x=ok]')){ DB.settings.tipsSeen=true; save(); closeSheet(); } }; }); }
 (function(){ // Entry from the iOS Shortcut: ?add=texto opens the new-task sheet with the text
+  try{ const tk=new URLSearchParams(location.search).get('task'); if(tk){ history.replaceState(null,'',location.pathname); setTimeout(()=>openTaskFromPush(tk,'inicio'),300); return; } }catch(e){} // block 9: a notification tapped with the app closed (sw.js)
   try{ const q=new URLSearchParams(location.search); const add=q.get('add'); if(add!==null){ history.replaceState(null,'',location.pathname); log('info','Entrada por URL', add.slice(0,80)); setTimeout(()=>addSheet(null, add.trim()),250); return; } }catch(e){}
   if(!DB.settings.tipsSeen) setTimeout(tipsSheet, 400);
 })();
@@ -3849,6 +4017,7 @@ document.addEventListener('keydown', e=>{ if(!UI.wide) return; const tag=(e.targ
 document.addEventListener('keydown', e=>{ if((e.key==='Enter'||e.key===' ')&&e.target.classList&&e.target.classList.contains('gtap')){ e.preventDefault(); e.target.click(); } });
 wideMQ.addEventListener('change', applyWide); // first applied at start, before the first render
 syncBoot(); if(SY) bindPullRefresh(); // block 8: nothing happens without config.js
+pushCheck(); // block 9: a subscription the browser renewed or dropped while the app was closed
 
 /* ---------- Service worker: offline cache and update notice ---------- */
 function applyUpdate(){ if(!pendingSW) return; updateRequested=true; toast('Actualizando'); log('info','Actualización aplicada por el usuario'); pendingSW.postMessage({type:'SKIP_WAITING'}); }
@@ -3868,6 +4037,10 @@ if('serviceWorker' in navigator){
   }).catch(e=>log('error','Service worker no registrado: '+(e&&e.message||e)));
   // Reload only on an update: the first install also fires controllerchange (clients.claim) and must not flash the page.
   // Only that first claim is skipped; a later update, or any the user asked for, reloads.
+  // Block 9: a tap on a notification while the app is open, and every push received (sw.js)
+  navigator.serviceWorker.addEventListener('message', e=>{ const d=e.data||{};
+    if(d.type==='openTask') openTaskFromPush(d.taskId, 'app abierta');
+    else if(d.type==='push') log('info','Notificación recibida', {tarea:!!d.taskId, prueba:!!d.test}); });
   let hadController = !!navigator.serviceWorker.controller;
   navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(reloading) return; if(!hadController && !updateRequested){ hadController=true; return; } reloading=true; location.reload(); });
 }

@@ -1,5 +1,13 @@
 # Registro de cambios
 
+## v0.17.0. Bloque 9: recordatorios con notificación en el iPhone (2 de noviembre de 2026)
+
+- A la hora del recordatorio llega una notificación con el título de la tarea y el proyecto, aunque la app esté cerrada. Tocarla abre la tarea. Las tareas completadas o eliminadas no avisan.
+- La primera vez que se pone un recordatorio, una hoja explica en una frase para qué se pide el permiso. Ajustes tiene la sección Notificaciones: estado del permiso, «Activar notificaciones», «Probar notificación» y los dispositivos de la cuenta con «Revocar».
+- Bajo Recordatorio, el detalle avisa cuando ese dispositivo no recibirá la notificación (permiso denegado, app no instalada, sin sesión).
+- Recordatorio al aplazar (decisión de Enric): si la tarea cambia de día al pasar a hoy, al aplazar, al pasar lo pendiente a mañana, al repasar, al planificar o al arrastrarla en el calendario, el recordatorio se va con ella a la misma hora, con Deshacer. Si esa hora ya ha pasado, se conserva sin avisar.
+- Supabase: tabla de dispositivos, marca de recordatorio enviado, tarea programada cada minuto y la función `send-reminders`, que envía cada recordatorio una sola vez. Un recordatorio que llega con más de una hora de retraso no avisa.
+
 ## v0.16.3. Escritorio: «Lo primero» sin tareas repetidas (2 de noviembre de 2026)
 
 - En Hoy, en escritorio, «Lo primero» repetía las tareas prioritarias justo encima de la lista y con el mismo aspecto, así que parecían duplicadas. Con 8 tareas o menos para hoy ya no se muestra, porque todas se ven a la primera. Con más, va en un bloque gris con su título «Lo primero», separado de la lista.

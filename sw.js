@@ -1,6 +1,6 @@
 /* Service worker: app shell cache and update notice.
    Bump CACHE on every release so installed devices pick up the new version. */
-const CACHE = 'tareas-v0.16.3';
+const CACHE = 'tareas-v0.17.0';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png', './vendor/supabase-js-2.117.3.umd.js'];
 // Written at deploy time from the repository secrets (block 8). Cached when present; a copy without it (404) still installs and runs local only.
 const OPTIONAL = ['./config.js'];
@@ -51,4 +51,35 @@ self.addEventListener('fetch', e => {
     if (res.ok) { const copy = res.clone(); caches.open(CACHE).then(c => c.put(req, copy)); }
     return res;
   })));
+});
+
+/* Block 9: reminders as notifications. The server (supabase/functions/send-reminders) sends {title, body, tag, badge, data:{taskId, url}};
+   a push is always shown (userVisibleOnly). A tap opens that task: the open app gets a message, a closed one starts with ?task=id. */
+self.addEventListener('push', e => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch (err) { d = { body: e.data ? e.data.text() : '' }; }
+  const data = d.data && typeof d.data === 'object' ? d.data : {};
+  const icon = new URL('icons/icon-192.png', self.registration.scope).href;
+  const shown = self.registration.showNotification(d.title || 'Tareas', { body: d.body || '', icon, badge: icon, tag: d.tag || data.taskId || 'tareas', data, timestamp: Date.now() });
+  // The icon's count, worked out by the server when it sent the reminder (the app sets it again when it opens)
+  const badged = typeof d.badge === 'number' && self.navigator && self.navigator.setAppBadge
+    ? (d.badge > 0 ? self.navigator.setAppBadge(d.badge) : self.navigator.clearAppBadge()).catch(() => {}) : Promise.resolve();
+  // An open app writes it in its log
+  const told = self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+    .then(list => list.forEach(c => c.postMessage({ type: 'push', taskId: data.taskId || null, test: !!data.test })));
+  e.waitUntil(Promise.all([shown, badged, told]));
+});
+
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  const data = e.notification.data || {}, id = data.taskId || null, scope = self.registration.scope;
+  const target = new URL(id ? './?task=' + encodeURIComponent(id) : './', scope).href;
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+    const c = list.find(w => w.url.startsWith(scope));
+    if (c) {
+      if (id) c.postMessage({ type: 'openTask', taskId: id });
+      return c.focus ? c.focus().catch(() => self.clients.openWindow(target)) : self.clients.openWindow(target);
+    }
+    return self.clients.openWindow(target);
+  }));
 });

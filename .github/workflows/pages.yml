@@ -1,5 +1,5 @@
-# Publishes the static app to GitHub Pages on every push to main.
-# No build step: the repository root is uploaded as is, plus config.js written from the secrets.
+# Tests the app, then publishes it to GitHub Pages, on every push to main (and by hand).
+# No build step: the app files are copied as they are into _site, plus config.js written from the secrets.
 name: Deploy to GitHub Pages
 
 on:
@@ -17,7 +17,34 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # The regression suite (tests/run.sh): Playwright with Chromium for the app, PGlite for the SQL migrations,
+  # Deno for the Edge Function. A failing test is retried once; a second failure stops the deploy.
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.9.6
+      - name: Run the tests
+        run: npm test
+      # Screenshots and the full output of every test, to look at when something fails
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-output
+          path: tests/out/
+          retention-days: 7
+
   deploy:
+    needs: test
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -57,8 +84,15 @@ jobs:
             console.log("SUPABASE_URL as stored:", JSON.stringify(shape));
             console.log(url && anonKey ? "config.js written with a valid project URL" : "config.js written without keys: local only (url " + (url ? "ok" : "missing or invalid") + ", key " + (anonKey ? "ok" : "missing") + ")");
           '
+      # Only the app is published: no tests, supabase, documents or package files
+      - name: Assemble the site
+        run: |
+          mkdir _site
+          cp index.html manifest.webmanifest sw.js config.js _site/
+          cp -R icons vendor css js _site/
+          ls -R _site
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: .
+          path: _site
       - id: deployment
         uses: actions/deploy-pages@v4

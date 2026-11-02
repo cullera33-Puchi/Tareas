@@ -24,5 +24,9 @@ const srv = http.createServer((req,res)=>{ let p = decodeURIComponent(req.url.sp
   await page.waitForFunction(()=>typeof APP_VERSION!=='undefined' && APP_VERSION==='B', null, {timeout:8000}).catch(()=>{});
   await page.waitForTimeout(800);
   r.v2 = await page.evaluate(()=>APP_VERSION); r.cacheNames = await page.evaluate(()=>caches.keys());
+  // Assertions (the summary reads the errors array): the waiting worker is offered and applied, and only the new cache stays
+  if(r.v1!=='A'||!r.controlled) errors.push('first version not served by the service worker: '+r.v1+' '+r.controlled);
+  if(r.toast!=='Nueva versión disponible'||r.settingsRow!=='Nueva versión disponible') errors.push('update not offered: '+r.toast+' / '+r.settingsRow);
+  if(r.v2!=='B'||JSON.stringify(r.cacheNames)!=='["tareas-B"]') errors.push('update not applied: '+r.v2+' '+JSON.stringify(r.cacheNames));
   r.errors=errors; console.log(JSON.stringify(r)); await browser.close(); srv.close();
 })().catch(e=>{ console.error(e); process.exit(1); });

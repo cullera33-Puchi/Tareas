@@ -33,6 +33,7 @@ const srv = http.createServer((req,res)=>{ let p = decodeURIComponent(req.url.sp
   await page.waitForTimeout(500); await ctx.setOffline(true);
   let offline='failed'; try{ await page.reload({waitUntil:'load'}); offline = await page.$eval('.nav .title', e=>e.textContent.trim()); }catch(e){ offline='failed: '+e.message.split('\n')[0]; }
   await ctx.setOffline(false);
+  if(offline!=='Trabajo') errors.push('offline start failed: '+offline); // the service worker serves the whole app without network
   console.log(JSON.stringify({sw, manifest, icon, rows, detailTitle, ver, offline, errors}, null, 1));
   await browser.close(); srv.close();
 })().catch(e=>{ console.error(e); process.exit(1); });

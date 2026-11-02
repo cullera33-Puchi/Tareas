@@ -757,7 +757,7 @@ body.desktop .sheet.keysheet{width:min(680px, calc(100% - 48px));}
 .wgrid{flex:1;min-width:0;display:grid;gap:8px;grid-template-rows:minmax(0,1fr);}
 .wday{display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--dgroup);border-radius:10px;border:1.5px solid transparent;transition:border-color .15s,background .15s;}
 .wday.today{border-color:var(--blue);}
-.wday.over,.wtray.over,.hallday.over,.mday.over,.hs.over{background:var(--fill);border-color:var(--blue);}
+.wday.over,.wtray.over,.hallday.over,.mday.over,.hs.over,.wkd.over,.mwk.over{background:var(--fill);border-color:var(--blue);}
 .wday .wl,.wtray .wl{flex:1;min-height:0;overflow-y:auto;padding:0 6px 6px;overscroll-behavior:contain;}
 /* A day's header: name and date, counts and the load bar */
 .dh{flex:none;padding:6px 8px 6px;}
@@ -1155,6 +1155,22 @@ body.resizing,body.resizing *{cursor:col-resize !important;-webkit-user-select:n
 .bk-del svg{width:15px;height:15px;}
 .wide .bk:hover .bk-del,.wide .bk-del:focus-visible{opacity:1;} .wide .bk-del:hover{background:var(--dhov);}
 .wide .bk .vn-c:hover{background:none;}
+/* Decision 35: the narrow "Fin de semana" column of Semana (Lista and Horas) and the weekend cell of each week in Mes */
+.wwkd{flex:none;width:150px;display:flex;flex-direction:column;gap:6px;min-height:0;background:var(--dgroup);border-radius:10px;padding:0 0 6px;}
+.wwkd .wkh{flex:none;display:flex;align-items:center;gap:6px;height:36px;padding:0 10px;font-size:13px;font-weight:600;}
+.wwkd .wkh .l{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;} .wwkd .wkh .n{font-size:11px;font-weight:400;color:var(--ink2);}
+.wkd{flex:1;min-height:56px;display:flex;flex-direction:column;margin:0 6px;border-radius:8px;border:1.5px solid transparent;transition:border-color .15s,background .15s;}
+.wkd .wkdl{flex:none;font-size:11px;font-weight:600;color:var(--ink2);padding:2px 4px 4px;}
+.wkd.today .wkdl{color:var(--red);}
+.wkd .wl{flex:1;min-height:0;overflow-y:auto;padding:0 0 4px;overscroll-behavior:contain;}
+@media (max-width:1180px){ .wwkd{width:120px;} }
+.month.workweek .mwkd{min-width:0;min-height:0;display:flex;flex-direction:column;border-right:.5px solid var(--dline);border-bottom:.5px solid var(--dline);background:var(--dgroup);}
+.mwk{flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;gap:2px;padding:2px 4px;outline:1.5px solid transparent;outline-offset:-1.5px;}
+.mwk + .mwk{border-top:.5px solid var(--dline);}
+.mwk .mnum{align-self:flex-start;font-size:11px;color:var(--ink2);padding:0 2px;border-radius:4px;}
+.mwk.today .mnum{color:var(--red);font-weight:600;} .mwk.other{opacity:.6;}
+.mwk.over{background:var(--fill);outline-color:var(--blue);}
+.mwk .mmore{align-self:flex-start;font-size:11px;color:var(--ink2);}
 </style>
 </head>
 <body>
@@ -3767,6 +3783,7 @@ function syncRemapSpaces(W, pool){ const out=[], used=new Set();
     else { sp.id=nid; if(!sp.modified) sp.modified=sp.created||new Date().toISOString(); }
     W.projects.forEach(p=>{ if(p.spaceId===old) p.spaceId=nid; }); W.tasks.forEach(x=>{ if(x.spaceId===old) x.spaceId=nid; });
     if(W.settings && W.settings.activeSpace===old) W.settings.activeSpace=nid;
+    if(W.settings && W.settings.workWeek && old in W.settings.workWeek){ const w=Object.assign({}, W.settings.workWeek); w[nid]=w[old]; delete w[old]; W.settings.workWeek=w; } // decision 35: the space's calendar option follows its new id
     out.push({from:old, to:nid, name:sp.name, found:!!match}); });
   return out; }
 // Server rows into the working copy W, newest modified first; st.known learns what the server holds. Returns what changed here
@@ -4469,21 +4486,36 @@ function deskMain(){
 function isCalView(v){ return CAL_VIEWS.includes(v); }
 function calMode(){ return DB.settings.calMode==='hours'?'hours':'list'; } // view preferences, as hoyGroup
 function weekMode(){ return DB.settings.weekMode==='monday'?'monday':'next7'; }
+/* Decision 35: "Solo de lunes a viernes", per space (a device preference in settings.workWeek, by space id). Unset, it is on for the space
+   called Trabajo and off for the rest. On, Semana shows five working days (from today, or Monday to Friday), Día skips the weekend and Mes
+   has five columns; tasks dated on a Saturday or Sunday of the range show in a narrow "Fin de semana" column, which takes drops too */
+function workWeekOn(){ const sp=space(), w=DB.settings.workWeek; if(w&&typeof w==='object'&&typeof w[sp.id]==='boolean') return w[sp.id]; return norm(sp.name||'').trim()==='trabajo'; }
+function isWeekend(d){ const g=new Date(d+'T00:00:00').getDay(); return g===0||g===6; }
+function setWorkWeek(on){ const id=space().id; DB.settings.workWeek=Object.assign({}, DB.settings.workWeek, {[id]:!!on}); save(); log('info','Calendario: '+(on?'solo de lunes a viernes':'toda la semana'), {space:space().name});
+  if(on&&UI.calDay&&isWeekend(UI.calDay)){ let d=UI.calDay; while(isWeekend(d)) d=addDays(d,1); UI.calDay=d===todayStr()?null:d; } render(); }
 // The first day of the week that holds d: its Monday, or in "Siete días desde hoy" a multiple of seven days from today
 function weekStartFor(d){ const t=todayStr(); if(weekMode()==='monday') return mondayOf(d); const k=Math.floor(Math.round((new Date(d+'T00:00:00')-new Date(t+'T00:00:00'))/864e5)/7); return addDays(t, 7*k); }
 function calStart(){ return UI.weekStart||weekStartFor(todayStr()); } // null follows today, also when the day changes with the app open
-function calDays(){ const v=UI.deskView; if(v==='day') return [UI.calDay||todayStr()]; const s=calStart(); return [...Array(7)].map((_,i)=>addDays(s,i)); }
+function calDays(){ const v=UI.deskView; if(v==='day') return [UI.calDay||todayStr()]; const s=calStart(), all=[...Array(7)].map((_,i)=>addDays(s,i)); return workWeekOn()?all.filter(d=>!isWeekend(d)):all; } // decision 35: seven days always hold exactly five working days
 // The day the sidebar's mini month starts from: the one the calendar shows, or today
 function calAnchor(){ const v=UI.deskView; return v==='week'?calStart() : v==='day'?(UI.calDay||todayStr()) : v==='month'?(UI.calMonth||todayStr().slice(0,7))+'-01' : todayStr(); }
 function calNav(dir){ const v=UI.deskView, today=dir==='today';
   if(v==='month') UI.calMonth=today?null:shiftMonth(UI.calMonth||todayStr().slice(0,7), +dir);
-  else if(v==='day'){ const d=today?null:addDays(UI.calDay||todayStr(), +dir); UI.calDay=d===todayStr()?null:d; }
+  else if(v==='day'){ let d=today?null:addDays(UI.calDay||todayStr(), +dir); if(d&&workWeekOn()) while(isWeekend(d)) d=addDays(d, +dir); UI.calDay=d===todayStr()?null:d; } // decision 35: Día skips the weekend
   else { const s=today?null:addDays(calStart(), 7*dir); UI.weekStart=s===weekStartFor(todayStr())?null:s; }
   UI.miniYM=null; render(); }
 function openCalWeek(d){ const s=weekStartFor(d); UI.weekStart=s===weekStartFor(todayStr())?null:s; UI.miniYM=null; setDeskView('week'); }
 function openCalDay(d){ UI.calDay=d===todayStr()?null:d; UI.miniYM=null; setDeskView('day'); }
 function setWeekMode(m){ if(weekMode()===m) return; const a=UI.weekStart; DB.settings.weekMode=m; save(); UI.weekStart=a?weekStartFor(a):null; if(UI.weekStart===weekStartFor(todayStr())) UI.weekStart=null; log('info','Semana: '+(m==='monday'?'de lunes a domingo':'siete días desde hoy')); render(); }
-function weekModeMenu(src){ popMenu({anchor:src, align:'right', groups:[[{label:'Siete días desde hoy', on:weekMode()==='next7', fn:()=>setWeekMode('next7')}, {label:'De lunes a domingo', on:weekMode()==='monday', fn:()=>setWeekMode('monday')}]]}); }
+function weekModeMenu(src){ const ww=workWeekOn(), g=[[{label:'Solo de lunes a viernes', on:ww, fn:()=>setWorkWeek(!ww)}]];
+  if(UI.deskView==='week') g.unshift([{label:ww?'Cinco días laborables desde hoy':'Siete días desde hoy', on:weekMode()==='next7', fn:()=>setWeekMode('next7')}, {label:ww?'De lunes a viernes':'De lunes a domingo', on:weekMode()==='monday', fn:()=>setWeekMode('monday')}]);
+  popMenu({anchor:src, align:'right', groups:g}); }
+function calModeLabel(){ const ww=workWeekOn(); if(UI.deskView!=='week') return ww?'De lunes a viernes':'Toda la semana'; return weekMode()==='monday'?(ww?'De lunes a viernes':'De lunes a domingo'):(ww?'Cinco días laborables':'Siete días desde hoy'); }
+// Decision 35: the weekend days of the shown range that have tasks, in a narrow column beside the working days; each day takes a drop
+function weekendHTML(start, end){ if(!workWeekOn()) return ''; const wk=[]; for(let d=start; d<=end; d=addDays(d,1)) if(isWeekend(d)) wk.push(d);
+  const xs=calTasks(start, end).filter(x=>wk.includes(x.date)); if(!xs.length) return '';
+  return '<aside class="wwkd" aria-label="Fin de semana"><div class="wkh"><span class="l">Fin de semana</span><span class="n">'+xs.length+'</span></div>'+wk.map(d=>{ const l=calSort(xs.filter(x=>x.date===d)), dd=new Date(d+'T00:00:00');
+    return '<div class="wkd'+dayCls(d)+'" data-day="'+d+'"><div class="wkdl">'+DIAS_FULL[dd.getDay()]+' '+dd.getDate()+'</div><div class="wl" data-keep="wk'+d+'">'+l.map(x=>calCardHTML(x,'')).join('')+'</div></div>'; }).join('')+'</aside>'; }
 // As in the lists, a search ignores the project filter
 function calFilter(){ if(UI.query) return queryMatcher(UI.query); if(UI.projFilter!==null) return x=> UI.projFilter==='none' ? !x.projectId : x.projectId===UI.projFilter; return ()=>true; }
 // The tasks dated from start to end: pending ones, and done ones completed in that span
@@ -4543,18 +4575,24 @@ function trayHTML(){ const pf=calFilter(), u=orderTasks(spaceTasks().filter(x=>x
     (open?'<div class="wl" data-keep="tray">'+(u.length?u.map(x=>calCardHTML(x,'')).join(''):'')+'<p class="trhint">Arrastra aquí para quitar la fecha</p></div>':'')+'</aside>'; }
 // R19: Mes. Six weeks from the Monday before the 1st; up to four tasks a day and, in the day's head, "N más", which opens the day
 function monthHTML(){ const t=todayStr(), ym=UI.calMonth||t.slice(0,7), start=mondayOf(ym+'-01'), days=[...Array(42)].map((_,i)=>addDays(start,i)), xs=calTasks(days[0], days[41]);
-  return '<div class="month"><div class="mdow">'+['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'].map(d=>'<span>'+d+'</span>').join('')+'</div><div class="mgrid">'+days.map(d=>{ const l=calSort(xs.filter(x=>x.date===d)), more=l.length-4, dd=new Date(d+'T00:00:00');
-    return '<div class="mday'+(d.slice(0,7)!==ym?' other':'')+dayCls(d)+'" data-day="'+d+'"><div class="mh">'+(more>0?'<button class="mmore" data-open-day="'+d+'" title="Abrir el día">'+more+' más</button>':'')+'<button class="mnum" data-open-week="'+d+'" title="Abrir la semana">'+dd.getDate()+(dd.getDate()===1?' '+MESES[dd.getMonth()]:'')+'</button></div>'+l.slice(0,4).map(x=>calCardHTML(x,'mc')).join('')+'</div>'; }).join('')+'</div></div>'; }
+  const cell=d=>{ const l=calSort(xs.filter(x=>x.date===d)), more=l.length-4, dd=new Date(d+'T00:00:00');
+    return '<div class="mday'+(d.slice(0,7)!==ym?' other':'')+dayCls(d)+'" data-day="'+d+'"><div class="mh">'+(more>0?'<button class="mmore" data-open-day="'+d+'" title="Abrir el día">'+more+' más</button>':'')+'<button class="mnum" data-open-week="'+d+'" title="Abrir la semana">'+dd.getDate()+(dd.getDate()===1?' '+MESES[dd.getMonth()]:'')+'</button></div>'+l.slice(0,4).map(x=>calCardHTML(x,'mc')).join('')+'</div>'; };
+  if(!workWeekOn()) return '<div class="month"><div class="mdow">'+['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'].map(d=>'<span>'+d+'</span>').join('')+'</div><div class="mgrid">'+days.map(cell).join('')+'</div></div>';
+  // Decision 35: five columns; a narrow "Fin de semana" cell per week when some weekend of these six weeks has tasks, its two days each taking drops
+  const wk=xs.some(x=>isWeekend(x.date)), cols='repeat(5,minmax(0,1fr))'+(wk?' minmax(70px,.45fr)':''), rows=[];
+  for(let w=0; w<6; w++){ const wd=days.slice(w*7, w*7+7); rows.push(wd.slice(0,5).map(cell).join('')+(wk?'<div class="mwkd">'+wd.slice(5).map(d=>{ const l=calSort(xs.filter(x=>x.date===d)), dd=new Date(d+'T00:00:00'), more=l.length-2;
+    return '<div class="mwk'+(d.slice(0,7)!==ym?' other':'')+dayCls(d)+'" data-day="'+d+'"><button class="mnum" data-open-day="'+d+'" title="Abrir el día">'+DIAS_FULL[dd.getDay()].slice(0,3)+' '+dd.getDate()+'</button>'+l.slice(0,2).map(x=>calCardHTML(x,'mc')).join('')+(more>0?'<button class="mmore" data-open-day="'+d+'">'+more+' más</button>':'')+'</div>'; }).join('')+'</div>':'')); }
+  return '<div class="month workweek"><div class="mdow" style="grid-template-columns:'+cols+'">'+['Lun','Mar','Mié','Jue','Vie'].concat(wk?['Fin de semana']:[]).map(d=>'<span>'+d+'</span>').join('')+'</div><div class="mgrid" style="grid-template-columns:'+cols+'">'+rows.join('')+'</div></div>'; }
 // The calendar column: its head (period, navigation, week option, Lista or Horas, Día, Semana or Mes) and the chosen view
 function weekHTML(){ const v=UI.deskView, days=calDays(), start=days[0], end=days[days.length-1], mode=calMode(); let label, body;
   if(v==='month'){ const ym=UI.calMonth||todayStr().slice(0,7), n=MESES_FULL[+ym.slice(5,7)-1]; label=n[0].toUpperCase()+n.slice(1)+' de '+ym.slice(0,4); body=monthHTML(); }
   else { if(v==='day'){ const dd=new Date(start+'T00:00:00'); label=DIAS_FULL[dd.getDay()]+', '+dd.getDate()+' de '+MESES_FULL[dd.getMonth()]; }
     else { const sm=new Date(start+'T00:00:00'), em=new Date(end+'T00:00:00'); label='Semana del '+(sm.getMonth()===em.getMonth()? sm.getDate()+' al '+em.getDate()+' de '+MESES_FULL[em.getMonth()] : sm.getDate()+' de '+MESES_FULL[sm.getMonth()]+' al '+em.getDate()+' de '+MESES_FULL[em.getMonth()]); }
-    body='<div class="wbody">'+(mode==='hours'?hoursHTML(days):weekListHTML(days))+trayHTML()+'</div>'; }
+    body='<div class="wbody">'+(mode==='hours'?hoursHTML(days):weekListHTML(days))+(v==='week'?weekendHTML(calStart(), addDays(calStart(),6)):'')+trayHTML()+'</div>'; }
   const seg=(attr, opts, cur)=>'<div class="seg cseg" role="group">'+opts.map(([k,l])=>'<button data-'+attr+'="'+k+'"'+(k===cur?' class="on" aria-pressed="true"':' aria-pressed="false"')+'>'+l+'</button>').join('')+'</div>';
   const nav=v==='month'?['Mes anterior','Mes siguiente']:v==='day'?['Día anterior','Día siguiente']:['Semana anterior','Semana siguiente'];
   return '<div class="week cal-'+v+(v!=='month'?' mode-'+mode:'')+'"><div class="whead"><h2>'+label+'</h2><button class="nav-b" data-week="-1" aria-label="'+nav[0]+'" title="'+nav[0]+'">'+I.back+'</button><button class="today-b" data-week="today">Hoy</button><button class="nav-b" data-week="1" aria-label="'+nav[1]+'" title="'+nav[1]+'">'+I.chev+'</button><span class="grow"></span>'+
-    (v==='week'?'<button class="pfdrop wmode" data-act="weekModeMenu" aria-haspopup="menu"><span class="l">'+(weekMode()==='monday'?'De lunes a domingo':'Siete días desde hoy')+'</span>'+I.chevD+'</button>':'')+
+    '<button class="pfdrop wmode" data-act="weekModeMenu" aria-haspopup="menu"><span class="l">'+calModeLabel()+'</span>'+I.chevD+'</button>'+ // decision 35: in Día and Mes too, for Solo de lunes a viernes
     (v!=='month'?seg('cal-mode', [['list','Lista'],['hours','Horas']], mode):'')+seg('cal-view', [['day','Día'],['week','Semana'],['month','Mes']], v)+'</div>'+body+'</div>'; }
 // R19: the sidebar's mini month under Semana: dots on days with pending tasks, a click opens that day's week, a dropped task takes that date
 function miniMonthHTML(){ const ym=UI.miniYM||calAnchor().slice(0,7), v=UI.deskView, s=v==='week'?calStart():v==='day'?calAnchor():null;

@@ -238,17 +238,26 @@ Salen de una revisión de usabilidad, fluidez y diseño sobre la v0.13.1 en móv
 
 ## 11. Roadmap de mejoras (propuestas del 2 de noviembre)
 
-Orden acordado con Enric: primero las subtareas (punto 46 de la sección 8, hecho en v0.23.0), después Siri y el Atajo de iOS, las notas de proyecto (punto 47) (decisión pendiente 1) y Responsable con «Enviar recordatorio»; después estas mejoras; luego la fase 2 de tareas compartidas (punto 43 de la sección 8) y, al final, Outlook (punto 44). Las que añaden campos u opciones se diseñan y se acuerdan antes de construir (regla 6).
+Orden fijado por Enric el 2 de noviembre (subtareas, punto 46, ya hechas en v0.23.0). Esfuerzo orientativo hasta tener la versión probada y publicada, sin contar las pruebas de Enric en el iPhone; la última columna es el nivel de razonamiento con el que se lanza Opus para construirlo (en alto o más, con revisión independiente al terminar). Las que añaden campos u opciones se diseñan y se acuerdan antes de construir (regla 6).
 
-| Código | Mejora | Coste |
-| --- | --- | --- |
-| M4 | Resumen de estado para compartir: texto por proyecto con lo hecho en la semana, en curso, por confirmar y próximos pasos, para Teams, correo o Claude | bajo |
-| M2 | Fecha límite aparte de la fecha de trabajo, en rojo al acercarse aunque la tarea se aplace | bajo o medio, campo nuevo |
-| M1 | Plantillas de tareas con fechas relativas (preparar SteerCo, workshop, cierre de mes, go-live) | medio, dato nuevo |
-| M5 | Bloqueo con Face ID o Touch ID al abrir la app tras un tiempo sin usarla | bajo o medio |
-| M3 | Revisión semanal guiada el viernes: completado, pendiente por proyecto, por confirmar, sin fecha y la semana siguiente | bajo |
-| M6 | Filtros guardados («Prioritarias de OCA esta semana», «Esperando al cliente») | medio |
-| M7 | Transcribir los audios grabados y proponer tareas a partir de ellos | por definir |
+| Orden | Mejora | Esfuerzo | Opus |
+| --- | --- | --- | --- |
+| 1 | Notas de proyecto (punto 47 de la sección 8) | medio o alto, 4 a 5 h | alto |
+| 2 | M2. Fecha límite aparte de la fecha de trabajo, en rojo al acercarse aunque la tarea se aplace | medio, 3 h | alto |
+| 3 | M3. Revisión semanal guiada el viernes: completado, pendiente por proyecto, por confirmar, sin fecha y la semana siguiente | bajo o medio, 2 a 3 h | medio |
+| 4 | Responsable y «Enviar recordatorio» por la hoja de compartir (punto 16) | bajo, 2 h | medio |
+| 5 | Siri y Atajo de iOS (decisión pendiente 1) | bajo o medio, 2 a 3 h | alto |
+| 6 | M4. Resumen de estado para compartir: texto por proyecto con lo hecho en la semana, en curso, por confirmar y próximos pasos, para Teams, correo o Claude | bajo, 1 a 2 h | medio |
+| 7 | M1. Plantillas de tareas con fechas relativas y pasos (preparar SteerCo, workshop, cierre de mes, go-live) | medio o alto, 4 a 5 h | alto |
+| 8 | M5. Bloqueo con Face ID o Touch ID al abrir la app tras un tiempo sin usarla | medio, 3 h | alto |
+| 9 | M6. Filtros guardados («Prioritarias de OCA esta semana», «Esperando al cliente») | medio, 3 h | medio |
+| 10 | M7. Transcribir los audios grabados en el propio dispositivo, sin coste | alto, 6 a 8 h | muy alto |
+| 11 | Fotos y audios en las notas de proyecto (segunda fase del punto 47) | bajo o medio, 2 h | medio |
+| 12 | «Aplazada desde» en las aplazadas (campo nuevo, parte de R9) | bajo, 1 h | medio |
+| 13 | Duración de los bloques en la vista por horas (campo nuevo, parte de R20) | medio, 3 h | alto |
+| 14 | Fase 2, tareas compartidas entre personas (punto 43, diseño cerrado) | muy alto, 2 a 3 días | máximo |
+| 15 | Outlook de Deloitte (punto 44), sujeto a la política de Deloitte | bajo o medio, 2 a 3 h | medio |
+| 16 | App aparte o evolución para gestión de proyectos con el equipo (ver abajo) | muy alto, semanas | máximo, por fases |
 
 M7, condición de Enric: **sin ningún coste**. Se descartan los servicios de pago. Vía propuesta: transcripción en el propio dispositivo con un modelo Whisper que se ejecuta en el navegador (gratis y sin que el audio salga del equipo, lo que además encaja con la política de datos de clientes), primero en el ordenador y en el iPhone si el rendimiento lo permite; la descarga del modelo pesa entre 40 y 250 MB según la calidad. Se diseña con Enric antes de construir.
 

@@ -982,7 +982,7 @@ body.resizing,body.resizing *{cursor:col-resize !important;-webkit-user-select:n
 <script src="config.js"></script>
 <script>
 'use strict';
-const APP_VERSION = '0.16.0';
+const APP_VERSION = '0.16.1';
 let pendingSW = null; // service worker installed and waiting to take over
 let updateRequested = false; // the user asked for the waiting worker to take over
 
@@ -3124,9 +3124,16 @@ function syncInit(){ if(!SY||!SY.remote||SY.initP) return; SY.initP=SY.remote.in
     if(user) syncSetUser(user, 'inicio'); else if(SY.user && !navigator.onLine) syncStatus('offline'); else syncSetUser(null, 'inicio'); }, e=>{
     log('warn','Sincronización no disponible: '+(e&&e.message||e)); SY.status=syncOffline(e)?'offline':'error'; syncPaint(); })
   .finally(()=>{ SY.initP=null; }); }
+// The project URL as stored in the repository secret, written in any usual form: the full URL, without https://, with a path
+// such as /auth/v1/callback or /rest/v1, in quotes, or only the project ref. Returns the origin or null.
+function normSupabaseUrl(v){ let u=String(v||'').trim().replace(/^["']|["']$/g,'').trim(); if(!u) return null;
+  if(!/^https?:\/\//i.test(u)) u=/^[a-z0-9]{15,30}$/i.test(u)?'https://'+u+'.supabase.co':'https://'+u;
+  try{ const x=new URL(u); return /\./.test(x.hostname)?x.origin:null; }catch(e){ return null; } }
 function syncBoot(){
   const cfg=window.TAREAS_CONFIG, fake=window.__tareasRemote; // __tareasRemote: a test's stand-in for the server
-  const remote=fake||(cfg&&cfg.url&&cfg.anonKey?supabaseRemote(cfg):null); if(!remote) return; // no config: local only, as before
+  const url=cfg&&normSupabaseUrl(cfg.url), key=cfg&&cfg.anonKey&&String(cfg.anonKey).trim().replace(/^["']|["']$/g,'');
+  if(cfg&&cfg.url&&!url) log('warn','La dirección de Supabase guardada no es válida', {length:String(cfg.url).length});
+  const remote=fake||(url&&key?supabaseRemote({url, anonKey:key}):null); if(!remote) return; // no config: local only, as before
   const st=syncState();
   SY={remote, user:st.user||null, status:'idle', error:'', ready:false, running:false, again:false, runP:null, timer:0, retry:0, pending:0, unsub:null, rt:[], rtT:0, quiet:false, lastSync:st.lastSync||null, initP:null, authBound:false};
   window.addEventListener('online', ()=>{ SY.retry=0; if(!SY.ready) syncInit(); else syncRun('conexión'); });

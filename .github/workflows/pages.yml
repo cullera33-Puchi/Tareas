@@ -35,11 +35,17 @@ jobs:
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
           node -e '
-            const url = (process.env.SUPABASE_URL || "").trim() || null;
-            const anonKey = (process.env.SUPABASE_ANON_KEY || "").trim() || null;
+            // Accept the project URL in any usual form (full, without https://, with a path, in quotes, or only the ref)
+            const clean = v => String(v || "").trim().replace(/^["\x27]|["\x27]$/g, "").trim();
+            let url = clean(process.env.SUPABASE_URL);
+            const shape = { length: url.length, https: /^https:\/\//i.test(url), supabaseCo: /supabase\.co/i.test(url), path: /\.co\/./i.test(url) };
+            if (url && !/^https?:\/\//i.test(url)) url = /^[a-z0-9]{15,30}$/i.test(url) ? "https://" + url + ".supabase.co" : "https://" + url;
+            try { const x = new URL(url); url = /\./.test(x.hostname) ? x.origin : null; } catch (e) { url = null; }
+            const anonKey = clean(process.env.SUPABASE_ANON_KEY) || null;
             const cfg = url && anonKey ? { url, anonKey } : { url: null, anonKey: null };
             require("fs").writeFileSync("config.js", "window.TAREAS_CONFIG = " + JSON.stringify(cfg) + ";\n");
-            console.log(url && anonKey ? "config.js written for " + url.replace(/^https?:\/\//, "").split("/")[0] : "config.js written without keys: local only");
+            console.log("SUPABASE_URL as stored:", JSON.stringify(shape));
+            console.log(url && anonKey ? "config.js written with a valid project URL" : "config.js written without keys: local only (url " + (url ? "ok" : "missing or invalid") + ", key " + (anonKey ? "ok" : "missing") + ")");
           '
       - uses: actions/upload-pages-artifact@v3
         with:

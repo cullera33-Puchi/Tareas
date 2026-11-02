@@ -1,5 +1,10 @@
 # Registro de cambios
 
+## v0.16.1. Dirección de Supabase escrita de cualquier forma (2 de noviembre de 2026)
+
+- El inicio de sesión fallaba con «Cliente de Supabase no cargado»: la dirección guardada en los secretos de GitHub no tenía la forma completa (`https://xxxx.supabase.co`). La app y la publicación aceptan ahora la dirección sin `https://`, con una ruta detrás (como `/auth/v1/callback`), entre comillas o solo el identificador del proyecto.
+- La publicación anota en su registro si la dirección guardada es válida, sin mostrarla.
+
 ## v0.16.0. Bloque 8: cuenta y sincronización con Supabase (2 de noviembre de 2026)
 
 - Ajustes tiene una sección Cuenta: «Iniciar sesión con Google», el correo, cuándo se sincronizó por última vez, los cambios pendientes, «Sincronizar ahora» y «Cerrar sesión». Cerrar sesión deja los datos en el dispositivo y deja de sincronizar.

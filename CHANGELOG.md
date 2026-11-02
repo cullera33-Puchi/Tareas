@@ -1,5 +1,22 @@
 # Registro de cambios
 
+## v0.18.0. Decisiones del 2 de noviembre y orden de proyectos en escritorio (2 de noviembre de 2026)
+
+Ajustes rápidos
+- Cambiar la fecha a mano desde la fila Fecha también mueve el recordatorio al nuevo día a la misma hora, con Deshacer.
+- Con Hoy a la vista, el + y «Añadir tarea» proponen la fecha de hoy y el proyecto del filtro activo; se pueden quitar con un toque. La barra de alta del escritorio también recoge el filtro.
+- iPhone: con los botones de una fila a la vista, el primer toque en otro sitio solo cierra la fila, como en iOS. Igual con las notas de voz.
+- iPhone: la línea gris de cada fila separa sus datos con espacio, sin punto medio.
+
+Decisiones menores
+- Eliminar un espacio borra también sus proyectos, tareas y notas de voz, tras una confirmación que dice cuánto se borra. Antes se hace una copia local y hay Deshacer. El único espacio que quede no se puede eliminar.
+- Cerrar la hoja de nota de voz o la de Nueva tarea con texto sin guardar pregunta «Descartar» o «Seguir editando».
+- Escritorio: las confirmaciones de borrado son una alerta de Mac centrada; Intro confirma y Esc cancela.
+- Vista por horas: la franja «Todo el día» muestra hasta tres tareas y «N más», que abre la vista Día.
+
+Escritorio
+- Los proyectos de la barra lateral se ordenan arrastrándolos arriba o abajo, con una línea que marca dónde caen y Deshacer. También con Alt y las flechas. El orden se sincroniza y se ve igual en el iPhone.
+
 ## v0.17.0. Bloque 9: recordatorios con notificación en el iPhone (2 de noviembre de 2026)
 
 - A la hora del recordatorio llega una notificación con el título de la tarea y el proyecto, aunque la app esté cerrada. Tocarla abre la tarea. Las tareas completadas o eliminadas no avisan.

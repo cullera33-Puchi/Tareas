@@ -586,6 +586,11 @@ html.wide{font-size:14px;}
 .app.desktop .side .sp:hover{color:var(--ink2);}
 .app.desktop .side .sec{font-size:11px;text-transform:none;letter-spacing:0;padding:12px 8px 4px;}
 .app.desktop .side .it{height:28px;gap:8px;padding:0 8px;border-radius:6px;font-size:13px;}
+/* A project dragged in the sidebar: the row fades and a blue line shows where it goes (moved with transform) */
+.app.desktop .side .it.pdrag{opacity:.45;}
+.pline{position:fixed;top:0;left:0;height:2px;border-radius:1px;background:var(--blue);z-index:30;pointer-events:none;box-shadow:0 0 0 1px var(--dmain,#fff);}
+.pline::before{content:'';position:absolute;left:-4px;top:-3px;width:8px;height:8px;border-radius:50%;border:2px solid var(--blue);background:var(--dmain,#fff);box-sizing:border-box;}
+body.pdragging,body.pdragging *{cursor:grabbing !important;user-select:none;-webkit-user-select:none;}
 .app.desktop .side .it svg{width:16px;height:16px;color:var(--blue);}
 .app.desktop .side .it:hover{background:var(--dhov);}
 .app.desktop .side .it.on{background:var(--dsel);color:var(--ink);}
@@ -1009,7 +1014,7 @@ body.resizing,body.resizing *{cursor:col-resize !important;-webkit-user-select:n
 <script src="config.js"></script>
 <script>
 'use strict';
-const APP_VERSION = '0.17.0';
+const APP_VERSION = '0.18.0';
 let pendingSW = null; // service worker installed and waiting to take over
 let updateRequested = false; // the user asked for the waiting worker to take over
 
@@ -2641,6 +2646,14 @@ function rowMenu(id, src){ const x=task(id); if(!x) return; releaseHold(id);
       [{label:x.status==='done'?'Marcar pendiente':'Completar', icon:x.status==='done'?MI.undo:MI.done, fn:()=>{ leaveRows(id); setTimeout(()=>{ completeTask(id); renderAnimated(); },200); }},
        {label:'Duplicar', icon:MI.dup, fn:()=>duplicateTask(id)}, {label:'Seleccionar', icon:MI.select, fn:()=>startSelect(id)}],
       [{label:'Eliminar', icon:MI.trash, red:true, fn:()=>confirmDelete(id)}] ]}); } }
+/* Desktop sidebar: a project dragged to another place (or moved with Alt and an arrow). The space's projects are numbered again from 0,
+   active ones first in their new order, archived ones after; only those whose number changes get a new 'modified', so the order syncs */
+function renumberProjects(ps){ const now=new Date().toISOString(), arch=DB.projects.filter(p=>p.spaceId===space().id&&p.archived).sort((a,b)=>a.order-b.order);
+  ps.concat(arch).forEach((q,k)=>{ if(q.order!==k){ q.order=k; q.modified=now; } }); }
+function reorderProject(id, to){ const ps=activeProjects(), i=ps.findIndex(p=>p.id===id); if(i<0) return false; to=Math.max(0, Math.min(ps.length-1, to)); if(to===i) return false;
+  const prev=DB.projects.filter(p=>p.spaceId===space().id).map(p=>({id:p.id, order:p.order}));
+  const [p]=ps.splice(i,1); ps.splice(to,0,p); renumberProjects(ps); save(); haptic(6); render(); log('info','Proyecto movido', {name:p.name, from:i, to});
+  toast('Proyecto movido', ()=>{ const now=new Date().toISOString(); prev.forEach(o=>{ const q=proj(o.id); if(q&&q.order!==o.order){ q.order=o.order; q.modified=now; } }); save(); }); return true; }
 function moveProject(id, dir){ const ps=activeProjects(); ps.forEach((p,i)=>p.order=i); const i=ps.findIndex(p=>p.id===id), j=i+dir; if(i<0||j<0||j>=ps.length) return; ps[i].order=j; ps[j].order=i; ps[i].modified=ps[j].modified=new Date().toISOString(); save(); haptic(6); renderAnimated(); }
 function projectMenu(id, src){ const p=proj(id); if(!p) return; const ps=activeProjects(); const i=ps.findIndex(x=>x.id===id);
   const archive=()=>{ p.archived=true; p.modified=new Date().toISOString(); save(); render(); toast('Proyecto archivado', ()=>{p.archived=false; p.modified=new Date().toISOString(); save();}); };
@@ -3789,7 +3802,7 @@ function deskSide(){
   const it=(view,ic,label,n,on,attr)=>'<button class="it'+(on?' on':'')+'" data-view="'+view+'"'+(attr||'')+'>'+ic+'<span>'+label+'</span>'+(n!==undefined?'<span class="n">'+n+'</span>':'')+'</button>';
   return '<aside class="side"><button class="sp" data-act="spaceMenu">'+esc(space().name)+I.chevD+'</button>'+
     it('hoy',I.list,'Hoy',pendingFor('hoy').length,v==='hoy',' data-day="'+todayStr()+'"')+it('todas',I.inbox.replace('viewBox="0 0 48 48"','viewBox="0 0 48 48" stroke-width="3"'),'Todas',pendingFor('todas').length,v==='todas')+it('week',I.cal,'Semana',undefined,isCalView(v))+miniMonthHTML()+
-    '<div class="sec">Proyectos</div>'+ps.map(p=>'<button class="it'+(v==='project:'+p.id?' on':'')+'" data-view="project:'+p.id+'" data-drop-project="'+p.id+'"><span class="dot" style="background:'+p.color+'"></span><span>'+esc(p.name)+'</span><span class="n">'+cnt(p.id)+'</span></button>').join('')+
+    '<div class="sec">Proyectos</div>'+ps.map(p=>'<button class="it'+(v==='project:'+p.id?' on':'')+'" data-view="project:'+p.id+'" data-drop-project="'+p.id+'" aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown"><span class="dot" style="background:'+p.color+'"></span><span>'+esc(p.name)+'</span><span class="n">'+cnt(p.id)+'</span></button>').join('')+
     '<button class="it'+(v==='project:none'?' on':'')+'" data-view="project:none" data-drop-project=""><span class="dot" style="background:var(--ink3)"></span><span>Sin proyecto</span><span class="n">'+cnt(null)+'</span></button>'+
     '<button class="it add" data-act="newProject">'+I.plus+'<span>Nuevo proyecto</span></button>'+
     '<div class="grow"></div>'+it('settings',I.gear,'Ajustes',undefined,v==='settings')+'</aside>';
@@ -4057,6 +4070,28 @@ function bindDeskEvents(d){
       if(w!==w0){ DB.settings.paneWidth=w; save(); log('info','Ancho del panel de detalle', {w}); } };
     g.addEventListener('pointermove', mv); g.addEventListener('pointerup', up); g.addEventListener('pointercancel', up); });
   d.addEventListener('dblclick', e=>{ if(!e.target.closest('.igrip')) return; DB.settings.paneWidth=400; save(); d.style.setProperty('--panew', paneWidth(400)+'px'); }); // back to the usual width
+  /* The sidebar's projects reorder with a drag up or down. It uses pointer events, not the HTML5 drag of the tasks: a task dropped on a
+     project (data-drop-project, R16) keeps its own drag and highlight, and a project drag shows only the line where it will go.
+     Sin proyecto and archived projects do not move; near the edges the list scrolls; Esc cancels; Alt and an arrow do it from the keyboard */
+  d.addEventListener('pointerdown', e=>{ const it=e.target.closest('.side .it[data-drop-project]'); if(!it||e.button!==0||!it.dataset.dropProject||e.pointerType==='touch') return;
+    const side=it.closest('.side'), id=it.dataset.dropProject, y0=e.clientY, pid=e.pointerId; let on=false, to=null, lastY=y0, raf=0, line=null;
+    const others=()=>[...side.querySelectorAll('.it[data-drop-project]')].filter(r=>r.dataset.dropProject&&r!==it);
+    const place=()=>{ const os=others(); let k=os.findIndex(r=>{ const b=r.getBoundingClientRect(); return lastY<b.top+b.height/2; }); if(k<0) k=os.length; to=k;
+      const sb=side.getBoundingClientRect(), y=k<os.length?os[k].getBoundingClientRect().top:(os.length?os[os.length-1].getBoundingClientRect().bottom:it.getBoundingClientRect().top);
+      line.style.left=(sb.left+10)+'px'; line.style.width=(sb.width-20)+'px'; line.style.transform='translate3d(0,'+Math.round(Math.max(sb.top, Math.min(sb.bottom, y))-1)+'px,0)'; };
+    const tick=()=>{ if(!on) return; const sb=side.getBoundingClientRect(), edge=36; let v=0; if(lastY<sb.top+edge) v=-Math.ceil((sb.top+edge-lastY)/4); else if(lastY>sb.bottom-edge) v=Math.ceil((lastY-sb.bottom+edge)/4);
+      if(v){ side.scrollTop+=v; place(); } raf=requestAnimationFrame(tick); };
+    const end=apply=>{ it.removeEventListener('pointermove', mv); it.removeEventListener('pointerup', up); it.removeEventListener('pointercancel', cancel); it.removeEventListener('lostpointercapture', cancel); window.removeEventListener('keydown', esc, true);
+      try{ it.releasePointerCapture(pid); }catch(err){} cancelAnimationFrame(raf); const was=on; on=false; if(line) line.remove(); it.classList.remove('pdrag'); document.body.classList.remove('pdragging');
+      if(!was) return; const swallow=ev=>{ ev.stopPropagation(); ev.preventDefault(); }; d.addEventListener('click', swallow, true); setTimeout(()=>d.removeEventListener('click', swallow, true), 0); // the click after a drag opens nothing
+      if(apply&&to!==null) reorderProject(id, to); };
+    const mv=ev=>{ lastY=ev.clientY; if(!on){ if(Math.abs(ev.clientY-y0)<5) return; on=true; it.classList.add('pdrag'); document.body.classList.add('pdragging'); line=document.createElement('div'); line.className='pline'; document.body.appendChild(line); raf=requestAnimationFrame(tick); }
+      place(); };
+    const up=()=>end(true), cancel=()=>end(false), esc=ev=>{ if(ev.key!=='Escape') return; ev.preventDefault(); ev.stopPropagation(); end(false); };
+    try{ it.setPointerCapture(pid); }catch(err){} it.addEventListener('pointermove', mv); it.addEventListener('pointerup', up); it.addEventListener('pointercancel', cancel); it.addEventListener('lostpointercapture', cancel); window.addEventListener('keydown', esc, true); }); // a redraw that replaces the row ends the drag
+  d.addEventListener('keydown', e=>{ if(!e.altKey||e.metaKey||e.ctrlKey||e.shiftKey||(e.key!=='ArrowUp'&&e.key!=='ArrowDown')) return; const it=e.target.closest&&e.target.closest('.side .it[data-drop-project]'); if(!it||!it.dataset.dropProject) return;
+    e.preventDefault(); const id=it.dataset.dropProject, i=activeProjects().findIndex(p=>p.id===id);
+    if(reorderProject(id, i+(e.key==='ArrowUp'?-1:1))){ const n=document.querySelector('#desk .side .it[data-drop-project="'+CSS.escape(id)+'"]'); if(n) n.focus(); } });
   // Calendar (Día, Semana, Mes, the mini month, the agenda of Hoy): drag a card onto a day, a half-hour slot, "Todo el día" or "Sin fecha"
   // Only a card drag moves a task: any other drag (a link, a file) clears dragId, so a cancelled card drag never carries over
   let dragId=null, dropped=false, refusal=null;

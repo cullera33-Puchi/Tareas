@@ -626,7 +626,12 @@ html.wide{font-size:14px;}
 .app.desktop .dsum .summary-head .sumclose:hover,.app.desktop .dsum .summary-head .sumfold:hover{background:var(--dhov);}
 .dsum .sumfold svg{width:9px;height:9px;transition:transform .2s;}
 .app.desktop .summary.collapsed .sumfold svg{transform:rotate(-90deg);}
-.app.desktop .dsum .first{margin:4px 0 0;}
+.app.desktop .dsum .first{margin:6px 0 10px;padding:2px 0 4px;background:var(--fill);border-radius:8px;}
+.app.desktop .dsum .first .row,.app.desktop .dsum .first .row-content{background:transparent;}
+.app.desktop .dsum .first .row + .row .row-content::before{display:none;}
+.dsum .firsthead{font-size:11px;font-weight:600;color:var(--ink2);padding:6px 12px 2px;letter-spacing:.2px;}
+.firsthead{display:none;}
+.app.desktop .firsthead{display:block;}
 .app.desktop .dsum .first .row-content{padding:0 8px 0 12px;min-height:32px;}
 /* Rows: one line; the circle keeps a 32 px click area */
 .app.desktop .row-content{gap:10px;padding:0 8px 0 12px;min-height:32px;}
@@ -982,7 +987,7 @@ body.resizing,body.resizing *{cursor:col-resize !important;-webkit-user-select:n
 <script src="config.js"></script>
 <script>
 'use strict';
-const APP_VERSION = '0.16.2';
+const APP_VERSION = '0.16.3';
 let pendingSW = null; // service worker installed and waiting to take over
 let updateRequested = false; // the user asked for the waiting worker to take over
 
@@ -1685,10 +1690,12 @@ function summaryHTML(){
     const num=(k,n,l,c)=>'<button class="num'+(c&&n?' '+c:'')+((k==='all'?!UI.sumFilter:UI.sumFilter===k)?' on':'')+'" data-sum="'+k+'"><b>'+n+'</b><span>'+l+'</span></button>';
     const mid = soon ? '<span class="soonl" title="Recordatorio a las '+fmtTime(soon.x.reminder)+'">'+I.bell+'<span>'+fmtTime(soon.x.reminder)+' '+esc(soon.x.title)+'</span></span>'
       : !hoy.length&&doneToday ? '<span class="soonl ok">'+I.check+'<span>Todo hecho por hoy: '+doneToday+(doneToday===1?' tarea completada':' tareas completadas')+'</span></span>' : '<span class="soonl"></span>';
+    // With a short Hoy every task is already on screen right below: "Lo primero" would only repeat them, so it shows from 9 tasks on, in its own block
+    const firstD = hoy.length>8 ? first : [];
     return '<section class="summary dsum'+(folded?' collapsed':'')+'"><div class="summary-head">'+num('all',deHoy,'para hoy')+num('carried',carried,carried===1?'aplazada':'aplazadas','orange')+num('high',prio,prio===1?'prioritaria':'prioritarias','red')+mid+
       (late&&!UI.select?'<button class="sumclose" data-act="closeDay">Cerrar el día</button>':'')+
-      (first.length?'<button class="sumfold" data-act="toggleSummary" aria-expanded="'+!folded+'" title="'+(folded?'Mostrar':'Plegar')+' lo primero">Lo primero'+I.chevD+'</button>':'')+'</div>'+
-      (first.length?'<div class="summary-body"><div class="first">'+first.map(x=>rowHTML(x,{simple:true,noToday:true})).join('')+'</div></div>':'')+'</section>'; }
+      (firstD.length?'<button class="sumfold" data-act="toggleSummary" aria-expanded="'+!folded+'" title="'+(folded?'Mostrar':'Plegar')+' lo primero">Lo primero'+I.chevD+'</button>':'')+'</div>'+
+      (firstD.length?'<div class="summary-body"><div class="first"><div class="firsthead">Lo primero</div>'+firstD.map(x=>rowHTML(x,{simple:true,noToday:true})).join('')+'</div></div>':'')+'</section>'; }
   // R8: from 19:00 "Cerrar el día" shows in the folded summary too, so a loaded day never hides it
   return '<section class="summary'+(folded?' collapsed':'')+'"><div class="summary-head"><h3>Resumen del día</h3>'+(folded&&late&&!UI.select?'<button class="sumclose" data-act="closeDay">Cerrar el día</button>':'')+'<button data-act="toggleSummary" aria-label="Plegar">'+I.chevD+'</button></div>'+
    '<div class="summary-body"><div class="nums"><button class="num" data-sum="all"><b>'+deHoy+'</b><span>para hoy</span></button><button class="num'+(carried?' orange':'')+(UI.sumFilter==='carried'?' on':'')+'" data-sum="carried"><b>'+carried+'</b><span>aplazadas</span></button><button class="num'+(prio?' red':'')+(UI.sumFilter==='high'?' on':'')+'" data-sum="high"><b>'+prio+'</b><span>prioritarias</span></button></div>'+

@@ -1,5 +1,10 @@
 # Registro de cambios
 
+## v0.16.3. Escritorio: «Lo primero» sin tareas repetidas (2 de noviembre de 2026)
+
+- En Hoy, en escritorio, «Lo primero» repetía las tareas prioritarias justo encima de la lista y con el mismo aspecto, así que parecían duplicadas. Con 8 tareas o menos para hoy ya no se muestra, porque todas se ven a la primera. Con más, va en un bloque gris con su título «Lo primero», separado de la lista.
+- Sincronización probada por Enric entre iPhone y ordenador, también en modo avión: bloque 8 cerrado.
+
 ## v0.16.2. Configuración de Supabase que se corrige sin nueva versión (2 de noviembre de 2026)
 
 - El archivo de configuración con la dirección y la clave pública de Supabase se pide siempre a la red y solo se usa la copia guardada sin conexión. Si se corrigen los secretos en GitHub, basta con volver a publicar; los iPhone instalados lo recogen sin esperar a otra versión.

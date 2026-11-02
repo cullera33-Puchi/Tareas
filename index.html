@@ -3601,7 +3601,9 @@ function reloadFromStorage(src){ // src 'sync': the data came from the server (b
   // Typing still waiting for its save is put back and saved as planned. Not saved here: a second write from the other window
   // may already be on its way, and this one would cover it
   if(ep){ if(task(ep.id)) Object.assign(task(ep.id), ep.patch); else { clearTimeout(editSaveT); editSaveT=null; editPatch=null; } }
-  if(DB.spaces.some(sp=>sp.id===keep.activeSpace)) DB.settings.activeSpace=keep.activeSpace; DB.settings.filter=keep.filter;
+  if(DB.spaces.some(sp=>sp.id===keep.activeSpace)) DB.settings.activeSpace=keep.activeSpace;
+  else if(DB.spaces.length&&!DB.spaces.some(sp=>sp.id===DB.settings.activeSpace)){ DB.settings.activeSpace=DB.spaces.slice().sort((a,b)=>a.order-b.order)[0].id; resetListState(); } // decision 28a: the space on screen was deleted elsewhere
+  DB.settings.filter=keep.filter;
   const n=UI.stack.length;
   UI.stack=UI.stack.filter(s=>{ const ok=s.kind==='detail'?!!task(s.id):(s.id==='none'||!!proj(s.id)); if(!ok) s.el.remove(); return ok; });
   if(UI.select) UI.select.ids.forEach(id=>{ if(!task(id)) UI.select.ids.delete(id); });

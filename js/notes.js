@@ -27,14 +27,15 @@ function notesOf(pid){ return DB.projectNotes.filter(n=>n&&n.projectId===pid).so
 const projTab = pid => UI.projTab[pid]==='notes'?'notes':'tasks';
 // The desktop column shows a project's notes
 function deskNotesOn(){ if(!UI.wide) return false; const v=UI.deskView||''; if(!v.startsWith('project:')) return false; const id=v.slice(8); return id!=='none'&&projTab(id)==='notes'&&!!proj(id); }
-function addNote(pid){ const t=new Date().toISOString(), n={id:uid(), projectId:pid, title:'', body:'', pinned:false, created:t, modified:t}; DB.projectNotes.push(n); save(); log('info','Nota de proyecto creada'); return n; }
+const NOTE_MINE=new Set(); // notes created here in this session: only these are discarded when left empty (another device may still be writing its own)
+function addNote(pid){ const t=new Date().toISOString(), n={id:uid(), projectId:pid, title:'', body:'', pinned:false, created:t, modified:t}; DB.projectNotes.push(n); NOTE_MINE.add(n.id); save(); log('info','Nota de proyecto creada'); return n; }
 // Typing is saved a moment after the last key; editPatch lets a reload from another window put it back (reloadFromStorage)
 function saveNoteEdit(n, patch){ Object.assign(n, patch, {modified:new Date().toISOString()}); dataVer++;
   editPatch={id:n.id, note:true, patch:Object.assign(editPatch&&editPatch.id===n.id?editPatch.patch:{}, patch, {modified:n.modified})};
   clearTimeout(editSaveT); editSaveT=setTimeout(save, 400); }
 const noteEmpty = n => !String(n.title||'').trim() && !String(n.body||'').trim();
 // A note left with nothing written goes quietly. Returns true when it went
-function noteLeft(id){ const n=id&&noteRec(id); if(!n) return false; flushEdits(); if(!noteEmpty(n)) return false;
+function noteLeft(id){ const n=id&&noteRec(id); if(!n||!NOTE_MINE.has(id)) return false; flushEdits(); if(!noteEmpty(n)) return false;
   DB.projectNotes=DB.projectNotes.filter(x=>x!==n); if(UI.noteOpen===id) UI.noteOpen=null; if(UI.noteEdit===id) UI.noteEdit=null; save(); log('info','Nota vacía descartada'); return true; }
 // A space deleted takes the notes of its projects; what is cut comes back with Deshacer
 function cutNotes(pids){ const out=DB.projectNotes.filter(n=>n&&pids.has(n.projectId)); if(out.length) DB.projectNotes=DB.projectNotes.filter(n=>!n||!pids.has(n.projectId)); return out; }
@@ -108,8 +109,8 @@ function deskNotesHTML(p){ const all=notesOf(p.id), q=UI.query, list=q?noteHits(
   if(!cur||cur.projectId!==p.id||(q&&!list.includes(cur))) cur=list[0]||null; UI.noteOpen=cur?cur.id:null;
   const pin=list.filter(n=>n.pinned), rest=list.filter(n=>!n.pinned), R=n=>noteRowHTML(n, {on:cur===n, q});
   const items=list.length?(pin.length?'<div class="ngt">Fijadas</div>'+pin.map(R).join('')+(rest.length?'<div class="ngt">Notas</div>':''):'')+rest.map(R).join(''):'<div class="nlempty">'+(q?'Sin resultados':'Todavía ninguna')+'</div>';
-  return '<div class="nsplit"><div class="nlist" data-keep="nlist" role="listbox" aria-label="Notas de '+esc(p.name)+'"><button class="nnew" data-act="newNote" data-project="'+esc(p.id)+'" title="Nueva nota ('+MODK+' N)">'+I.plus+'<span>Nueva nota</span><span class="kbd">N</span></button>'+items+'</div>'+
-    '<div class="ned" data-keep="ned:'+(cur?esc(cur.id):'')+'">'+(cur?noteEditorHTML(cur):'<div class="empty">'+I.note+'<b>Sin notas</b>Crea una con Nueva nota o con '+MODK+' N.</div>')+'</div></div>'; }
+  return '<div class="nsplit"><div class="nlist" data-keep="nlist" role="listbox" aria-label="Notas de '+esc(p.name)+'"><button class="nnew" data-act="newNote" data-project="'+esc(p.id)+'" title="Nueva nota (N)">'+I.plus+'<span>Nueva nota</span><span class="kbd">N</span></button>'+items+'</div>'+
+    '<div class="ned" data-keep="ned:'+(cur?esc(cur.id):'')+'">'+(cur?noteEditorHTML(cur):'<div class="empty">'+I.note+'<b>Sin notas</b>Crea una con Nueva nota o con la tecla N.</div>')+'</div></div>'; }
 
 /* ---------- Repainting in place while typing (the field keeps its focus and the iPhone keyboard stays) ---------- */
 // The rows of a note in any list on screen, its date line and its Crear tareas; the order follows on the next drawing
@@ -256,4 +257,4 @@ document.addEventListener('keydown', e=>{ if(!UI.wide||!deskNotesOn()) return; i
   if(k==='n'||k==='N'){ stop(); newNote(pid); return; }
   if(k==='ArrowDown'||k==='ArrowUp'||k==='j'||k==='k'){ stop(); noteStep(k==='ArrowDown'||k==='j'?1:-1); return; }
   if(k==='Enter'){ if(t.closest&&t.closest('button,a,[role=button]')) return; const ed=document.querySelector('#desk .ned .nedit'); if(ed){ stop(); noteEditAt(ed, null); } return; }
-  if((k==='Delete'||k==='Backspace')&&UI.noteOpen){ stop(); deleteNote(UI.noteOpen); } });
+  if((k==='Delete'||k==='Backspace')&&UI.noteOpen){ stop(); const id=UI.noteOpen, n=noteRec(id); confirmSheet('Eliminar nota', '"'+((n&&n.title)||'Nota sin título')+'" se eliminará. Podrás deshacerlo durante unos segundos.', ()=>deleteNote(id)); } });

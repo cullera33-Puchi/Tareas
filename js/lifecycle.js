@@ -97,6 +97,7 @@ function tipsSheet(){ // the desktop has no swipes or long presses: it explains 
   openSheet(how+'<p><b>Escribe la fecha al final</b> del título al crear una tarea: "Llamar a Marta mañana", "Enviar acta el 12", "Revisar SOW viernes".</p></div><div class="sheet-actions"><button class="btn primary" data-x="ok">Entendido</button></div>', s=>{ s.onclick=e=>{ if(e.target.closest('[data-x=ok]')){ DB.settings.tipsSeen=true; save(); closeSheet(); } }; }); }
 let hiddenAt=0;
 function returnHome(){
+  UI.stack.forEach(s=>{ if(s.kind==='note') noteLeft(s.id); }); // an empty note left open goes, as when its screen is closed
   if(UI.select){ UI.select=null; app.classList.remove('selecting'); } openRow=null; UI.projFilter=null; UI.searchDone=false; // back to Hoy as on a fresh start
   if(UI.wide){ closeSheet(); setDeskView('hoy'); log('info','Vuelta a Hoy tras más de dos horas fuera'); return; } // the desktop returns through its own view; it has no iPhone stack
   UI.stack.forEach(s=>s.el.remove()); UI.stack=[]; UI.tab='tareas'; UI.query=''; UI.sumFilter=null; DB.settings.filter='hoy'; save(); closeSheet(); render(); const sc=rootScreen('tareas').querySelector('.scroll'); if(sc) sc.scrollTop=0; log('info','Vuelta a Hoy tras más de dos horas fuera'); }
@@ -138,7 +139,7 @@ function reloadFromStorage(src){ // src 'sync': the data came from the server (b
   if(UI.projFilter && UI.projFilter!=='none' && !proj(UI.projFilter)) UI.projFilter=null;
   if(src!=='sync' && Date.now()-reloadLoggedAt>6e4){ reloadLoggedAt=Date.now(); log('info','Datos recargados: otra ventana los ha cambiado'); }
   // A screen whose task or project the other window removed goes at once; otherwise an open sheet and a focused field are kept
-  if(UI.stack.length===n && !(UI.wide&&UI.deskDetail&&!task(UI.deskDetail)) && holdRedraw()){ staleView=true; return; }
+  if(UI.stack.length===n && !(UI.wide&&UI.deskDetail&&!task(UI.deskDetail)) && !(UI.wide&&UI.noteOpen&&!noteRec(UI.noteOpen)) && holdRedraw()){ staleView=true; return; }
   render();
 }
 document.addEventListener('focusout', ()=>{ if(staleView) setTimeout(flushStale, 300); }); // after the click that took the focus, which usually redraws anyway

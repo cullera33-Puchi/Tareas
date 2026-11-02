@@ -281,6 +281,18 @@ async function desktop(browser){
   check('d_control_n', x.n===6 && x.role==='ntitle' && x.first===x.open && n2===7 && await ev(page, ()=>DB.projectNotes.length===7 && DB.projectNotes.some(n=>n.title==='Plan de pruebas'&&n.body==='[ ] Escenarios')), {x, n2});
   await page.keyboard.press('Escape'); await page.click('#desk .nlist [data-pn=n1]'); await calm(page);
   check('d_empty_goes', await ev(page, ()=>DB.projectNotes.length===6));
+  // An empty note that came from another device is not discarded here when left (it may still be being written there)
+  await ev(page, ()=>{ const t=new Date().toISOString(); DB.projectNotes.push({id:'nx', projectId:noteRec('n1').projectId, title:'', body:'', pinned:false, created:t, modified:t}); save(); render(); });
+  await page.click('#desk .nlist [data-pn=nx]'); await calm(page); await page.click('#desk .nlist [data-pn=n1]'); await calm(page);
+  check('d_foreign_empty_kept', await ev(page, ()=>!!noteRec('nx')));
+  await ev(page, ()=>{ DB.projectNotes=DB.projectNotes.filter(n=>n.id!=='nx'); save(); render(); }); await calm(page);
+  // A new note made from another view stays (going to its own project is not leaving it)
+  { const pid = await ev(page, ()=>noteRec('n1').projectId);
+    await ev(page, ()=>setDeskView('hoy')); await calm(page);
+    const nn = await ev(page, pid=>{ const n=newNote(pid); return n&&n.id; }, pid); await calm(page);
+    check('d_new_from_other_view', await ev(page, id=>!!noteRec(id) && UI.noteOpen===id && UI.deskView.startsWith('project:'), nn));
+    await page.click('#desk .nlist [data-pn=n1]'); await calm(page);
+    check('d_new_from_other_view_left', await ev(page, id=>!noteRec(id) && DB.projectNotes.length===6, nn)); }
   // The right button: the note's menu at the pointer
   await page.click('#desk .nlist [data-pn=n3]', {button:'right'}); await until(page, ()=>!!document.querySelector('#pmenu .pm-it'));
   const items = await menuLabels(page); await shot(page, 'd3-menu');
@@ -294,9 +306,11 @@ async function desktop(browser){
   // Supr deletes the open note (the next one opens), Control Z gives it back
   await ev(page, ()=>document.activeElement&&document.activeElement.blur());
   await page.keyboard.press('Delete'); await sleep(250);
-  x = {gone:await ev(page, ()=>!noteRec('n1')), open:await ev(page, ()=>UI.noteOpen), t:await toastOn(page)};
+  const askd = await ev(page, ()=>({alert:asheet.classList.contains('on'), kept:!!noteRec('n1')}));
+  await page.keyboard.press('Enter'); await sleep(350);
+  x = {askd, gone:await ev(page, ()=>!noteRec('n1')), open:await ev(page, ()=>UI.noteOpen), t:await toastOn(page)};
   await page.keyboard.press('Control+z'); await sleep(250);
-  check('d_delete_undo', x.gone && x.open && x.open!=='n1' && x.t && x.t.t==='Nota eliminada' && await ev(page, ()=>!!noteRec('n1') && UI.noteOpen==='n1'), x);
+  check('d_delete_undo', x.askd.alert && x.askd.kept && x.gone && x.open && x.open!=='n1' && x.t && x.t.t==='Nota eliminada' && await ev(page, ()=>!!noteRec('n1') && UI.noteOpen==='n1'), x);
   // Search in Todas: the notes found under the tasks; a click opens the note in its project
   await ev(page, ()=>setDeskView('todas')); await calm(page);
   await page.click('#desk [data-role=search]'); await page.keyboard.type('sow');

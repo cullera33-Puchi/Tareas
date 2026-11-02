@@ -216,7 +216,7 @@ function renderTabbar(){
   const b=(id,ic,icF,l)=>'<button data-tab="'+id+'" class="'+(UI.tab===id?'on':'')+'">'+(UI.tab===id?icF:ic)+'<span>'+l+'</span></button>';
   tabbarEl.innerHTML = b('tareas',I.list,I.listF,'Tareas')+b('proyectos',I.folder,I.folderF,'Proyectos')+b('ajustes',I.gear,I.gearF,'Ajustes');
 }
-function resetListState(){ UI.query=''; UI.searchDone=false; UI.sumFilter=null; UI.projFilter=null; } // a space change starts its list with no search or filter
+function resetListState(){ if(UI.noteOpen) noteLeft(UI.noteOpen); UI.query=''; UI.searchDone=false; UI.sumFilter=null; UI.projFilter=null; } // a space change starts its list with no search or filter
 function switchTab(tab){ if(UI.select){ UI.select=null; app.classList.remove('selecting'); }
   if(UI.tab===tab){ const r=rootScreen(tab); if(!UI.stack.length&&r.classList.contains('hidden-tab')){ render(); return; } const sc=r.querySelector('.scroll'); sc&&sc.scrollTo({top:0,behavior:'smooth'}); return; } UI.tab=tab; UI.query=''; UI.sumFilter=null; render(); } // a current tab that does not show is drawn, never only scrolled
 tabbarEl.addEventListener('click', e=>{ const b=e.target.closest('[data-tab]'); if(b) switchTab(b.dataset.tab); });

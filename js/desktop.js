@@ -4,7 +4,7 @@
    listeners run at load; the start itself (first screen, timers, sync, service worker) is in boot.js, the last file. */
 /* ---------- Desktop layout ---------- */
 function mondayOf(d){ const x=new Date(d+'T00:00:00'); return addDays(d, -((x.getDay()+6)%7)); }
-function setDeskView(v){ if(v==='project:none') v='project:none'; if(UI.noteOpen&&v!==UI.deskView) noteLeft(UI.noteOpen); UI.deskView=v; UI.deskDetail=null; UI.dsel.ids.clear(); UI.dsel.mode=false; UI.dsel.edit=null; UI.query=''; UI.searchDone=false; UI.sumFilter=null; if(v==='hoy'||v==='todas'){ DB.settings.filter=v; save(); } render(); } // another list starts with nothing selected (R16)
+function setDeskView(v){ if(v==='project:none') v='project:none'; if(UI.noteOpen&&v!==UI.deskView&&v!=='project:'+((noteRec(UI.noteOpen)||{}).projectId)) noteLeft(UI.noteOpen); UI.deskView=v; UI.deskDetail=null; UI.dsel.ids.clear(); UI.dsel.mode=false; UI.dsel.edit=null; UI.query=''; UI.searchDone=false; UI.sumFilter=null; if(v==='hoy'||v==='todas'){ DB.settings.filter=v; save(); } render(); } // another list starts with nothing selected (R16)
 /* ---------- R15, R16: the desktop lists' selected row, keyboard and multiple selection ----------
    UI.dsel.cur is the selected row, apart from the hover (the inspector, when open, shows it); arrows or J and K move it and the inspector
    follows, as in Mail. ids is the multiple selection (Comando clic, Mayúsculas clic, Comando A, Mayúsculas y flechas): it counts from two

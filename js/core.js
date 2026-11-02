@@ -384,9 +384,9 @@ function setRepeat(id, freq){ const x=task(id); if(!x) return; const cur=repPars
   const r=repParse(freq); if(!r) return; if(cur&&repFreq(cur)===repFreq(r)) return;
   const t=todayStr(); let date=x.date;
   if(!date) date=repFirst(Object.assign({}, r, {n:1, anchor:t}), t); // the first matching day from today; the rhythm then counts from it
-  if(!date) return; r.anchor=date; r.series=cur&&cur.series||repSeriesId();
-  updTask(id, Object.assign({repeat:repString(r)}, x.date?{}:{date, carried:false})); haptic(8); render(); log('info','Repetición', {rule:repFreq(r)});
-  toast('Se repite: '+repSummary(r).replace(/^./, c=>c.toLowerCase())+(x.date?'':', desde '+dayWords(date)), ()=>updTask(id, old)); }
+  if(!date) return; r.anchor=date; r.series=cur&&cur.series||repSeriesId(); const dated=!x.date;
+  updTask(id, Object.assign({repeat:repString(r)}, dated?{date, carried:false}:{})); haptic(8); render(); log('info','Repetición', {rule:repFreq(r)});
+  toast('Se repite: '+repSummary(r).replace(/^./, c=>c.toLowerCase())+(dated?', desde '+dayWords(date):''), ()=>updTask(id, old)); }
 /* Completing a task of a series creates the next one: the first date of the series after today (after its own date when that is later),
    with its title, project, priority, notes and the reminder's time on the new date; voice notes and attachments stay with the completed one.
    Only the device that completes it does this (a completion that arrives by sync creates nothing), and never a second pending one */

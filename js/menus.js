@@ -246,12 +246,12 @@ function confirmDelete(id, after){ const x=task(id); if(!x) return; releaseHold(
   if(x.status==='pending'&&repParse(x.repeat)){ askRepeatDelete({n:1, title:x.title}, go(()=>skipOccurrence(id)), go(()=>deleteTask(id))); return; } // decision 38
   confirmSheet('Eliminar tarea', '"'+x.title+'" se eliminará. Podrás deshacerlo durante unos segundos.', go(()=>deleteTask(id))); }
 /* Decision 38: a task that repeats (or a selection with some) asks how far the deletion goes: only this one, which moves to the next date of
-   its series, or the series. The bottom action sheet on the iPhone, a macOS alert with three buttons on the desktop. o: {n, rep, title} */
+   its series, or the series. The bottom action sheet on the iPhone, a macOS alert with three buttons on the desktop (Intro: only this one). o: {n, rep, title} */
 function askRepeatDelete(o, onlyFn, seriesFn){ const one=o.n===1, k=o.rep||1;
   const only=one?'Eliminar solo esta':'Eliminar solo estas', all=one||k===1?'Eliminar la serie':'Eliminar las series';
   const text=one ? '"'+o.title+'" se repite. Si eliminas solo esta, pasa a su siguiente fecha. Podrás deshacerlo durante unos segundos.'
     : (k===1?'Una de las '+o.n+' tareas se repite.':k+' de las '+o.n+' tareas se repiten.')+' Si eliminas solo estas, las que se repiten pasan a su siguiente fecha y las demás se eliminan. Podrás deshacerlo durante unos segundos.';
-  if(UI.wide){ macAlert({title:one?'Eliminar tarea que se repite':'Eliminar '+o.n+' tareas', text, ok:all, fn:seriesFn, more:[{label:only, red:true, fn:onlyFn}]}); return; }
+  if(UI.wide){ macAlert({title:one?'Eliminar tarea que se repite':'Eliminar '+o.n+' tareas', text, ok:only, fn:onlyFn, more:[{label:all, red:true, fn:seriesFn}]}); return; } // Intro takes the smaller step
   actionSheet(text, [{label:only, red:true, fn:onlyFn}, {label:all, red:true, fn:seriesFn}]); }
 function detailMenu(id, src){ const x=task(id); if(!x) return;
   popMenu({anchor:src, align:'right', groups:[

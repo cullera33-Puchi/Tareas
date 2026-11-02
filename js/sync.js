@@ -23,25 +23,35 @@ const INITIAL_SPACES=['trabajo','personal'];
 // Local field, column and kind; id, created and modified are common to all.
 // tsOpt (block 9, reminder_sent): sent only when set, so the tasks' signatures from before block 9 stay the same and nothing is sent again;
 // the database clears it when the reminder changes and keeps the server's value when an unchanged reminder comes without it (0002_push.sql)
+// textN, tsN (decisions 38 and 39, repeat and focus): left out of the signature while null, so the tasks from before them keep theirs and
+// nothing is sent again; but sent as null when cleared (syncSendRow). A database without the column (0004_repeat_focus.sql not run yet)
+// is found on the first upload that names it: from then on, in this session, the column is left out both ways and the value stays on the device
 const SYNC_FIELDS={
   spaces:[['name','name','text'],['order','sort_order','int']],
   projects:[['spaceId','space_id','id'],['name','name','text'],['color','color','id'],['order','sort_order','int'],['archived','archived','bool']],
-  tasks:[['spaceId','space_id','id'],['projectId','project_id','id'],['title','title','text'],['date','date','day'],['reminder','reminder','ts'],['priority','priority','pri'],['status','status','status'],['notes','notes','text'],['carried','carried','bool'],['completed','completed','ts'],['reminderSent','reminder_sent','tsOpt']],
+  tasks:[['spaceId','space_id','id'],['projectId','project_id','id'],['title','title','text'],['date','date','day'],['reminder','reminder','ts'],['priority','priority','pri'],['status','status','status'],['notes','notes','text'],['carried','carried','bool'],['completed','completed','ts'],['reminderSent','reminder_sent','tsOpt'],['repeat','repeat','textN'],['focus','focus','tsN']],
   voice_notes:[['taskId','task_id','id'],['text','text','text']],
   // Decision 29 (0003_attachments.sql): the record of a photo or a recording; its file goes to Storage first (attFlush)
   attachments:[['taskId','task_id','id'],['kind','kind','kind'],['path','path','id'],['mime','mime','id'],['size','size','int'],['width','width','int'],['height','height','int'],['durationMs','duration_ms','int']] };
 const syncTs = v => { if(!v) return null; const d=new Date(v); return isNaN(d) ? null : d.toISOString(); };
 const SYNC_TO={ id:v=>v==null||v===''?null:String(v), text:v=>v==null?'':String(v), int:v=>v==null||v===''||isNaN(+v)?null:Math.round(+v), bool:v=>!!v,
-  day:v=>/^\d{4}-\d{2}-\d{2}$/.test(String(v||''))?v:null, ts:syncTs, tsOpt:syncTs, pri:v=>['high','mid','none'].includes(v)?v:'none', status:v=>['pending','done'].includes(v)?v:'pending', kind:v=>['photo','audio'].includes(v)?v:null };
+  day:v=>/^\d{4}-\d{2}-\d{2}$/.test(String(v||''))?v:null, ts:syncTs, tsOpt:syncTs, tsN:syncTs, textN:v=>v==null||v===''?null:String(v), pri:v=>['high','mid','none'].includes(v)?v:'none', status:v=>['pending','done'].includes(v)?v:'pending', kind:v=>['photo','audio'].includes(v)?v:null };
+const syncNullable = k => k==='textN'||k==='tsN';
+// Columns the database turned out not to have (table.column), for this session: 0004_repeat_focus.sql not run yet
+const SYNC_NOCOL=new Set();
+const syncNoCol = (table, c) => SYNC_NOCOL.has(table+'.'+c);
 // A local record as a row: always the same keys in the same order, so the signature only changes with the content
 function syncToRow(table, rec){ const row={id:String(rec.id), created:syncTs(rec.created)};
-  SYNC_FIELDS[table].forEach(([f,c,k])=>{ const v=SYNC_TO[k](rec[f]); if(k!=='tsOpt'||v!==null) row[c]=v; });
+  SYNC_FIELDS[table].forEach(([f,c,k])=>{ const v=SYNC_TO[k](rec[f]); if(syncNullable(k)){ if(v!==null&&!syncNoCol(table,c)) row[c]=v; } else if(k!=='tsOpt'||v!==null) row[c]=v; });
   row.modified=syncTs(rec.modified)||row.created||EPOCH;
   row.deleted=null; // sent every time: a record back after its deletion clears the server's mark
   return row; }
-// A row as a local record. A voice note keeps no modified until it is edited (decision 19)
+// The row that goes up: a nullable column the signature left out goes as null, so a value cleared here is cleared there too
+function syncSendRow(table, row){ let out=row; SYNC_FIELDS[table].forEach(([f,c,k])=>{ if(syncNullable(k)&&!(c in row)&&!syncNoCol(table,c)){ if(out===row) out=Object.assign({}, row); out[c]=null; } }); return out; }
+// A row as a local record. A voice note keeps no modified until it is edited (decision 19). A nullable column the row lacks (a database
+// without it) is left out, and the merge keeps the device's value
 function syncFromRow(table, row){ const rec={id:row.id, created:syncTs(row.created)};
-  SYNC_FIELDS[table].forEach(([f,c,k])=>{ rec[f]=SYNC_TO[k](row[c]); });
+  SYNC_FIELDS[table].forEach(([f,c,k])=>{ if(syncNullable(k)&&!(c in row)) return; rec[f]=SYNC_TO[k](row[c]); });
   const m=syncTs(row.modified); if(table!=='voice_notes' || (m && m!==rec.created)) rec.modified=m; return rec; }
 // A short hash of the row text (cyrb53): the signature kept for each record
 function syncHash(str){ let h1=0xdeadbeef, h2=0x41c6ce57; for(let i=0;i<str.length;i++){ const c=str.charCodeAt(i); h1=Math.imul(h1^c,2654435761); h2=Math.imul(h2^c,1597334677); }
@@ -160,6 +170,7 @@ function syncMerge(W, st, table, rows, stats){
     if(!remote){ W[list][i]=null; removed=true; stats.removed++;
       if(table==='tasks'){ W.voiceNotes.forEach((v,j)=>{ if(v&&v.taskId===id){ W.voiceNotes[j]=null; } }); W.attachments.forEach((a,j)=>{ if(a&&a.taskId===id){ W.attachments[j]=null; } }); } return; }
     const keep={}; Object.keys(local).forEach(k=>{ if(!(k in lrow) && !SYNC_FIELDS[table].some(f=>f[0]===k)) keep[k]=local[k]; }); // fields this model does not sync stay
+    SYNC_FIELDS[table].forEach(([f,c,k])=>{ if(syncNullable(k)&&!(c in row)&&local[f]!=null) keep[f]=local[f]; }); // and a column the server lacks keeps the device's value
     W[list][i]=Object.assign(keep, remote); stats.updated++; });
   if(removed) SYNC_TABLES.forEach(({list:l})=>{ W[l]=W[l].filter(Boolean); });
 }
@@ -173,7 +184,7 @@ function syncApply(pulled, o){ o=o||{};
   SYNC_TABLES.forEach(({table})=>{ const rows=pulled[table]||[]; if(rows.length) syncMerge(W, st, table, rows, stats);
     if(o.cursor) rows.forEach(r=>{ if(syncTime(r.server_ts)>syncTime(st.cursor[table])) st.cursor[table]=r.server_ts; }); });
   const changed=stats.added+stats.updated+stats.removed+stats.remaps.length;
-  if(changed){ const t=todayStr(); W.tasks.forEach(x=>{ if(x.status==='pending'&&x.date&&x.date<t) Object.assign(x, dayPatch(x, t, {carried:true})); }); // as rollOver: never overdue, the reminder goes along (decision 25), modified untouched
+  if(changed){ const t=todayStr(); W.tasks.forEach(x=>{ if(x.status==='pending'&&x.date&&x.date<t) Object.assign(x, dayPatch(x, t, {carried:true})); if(x.focus&&localDay(x.focus)<t) x.focus=null; }); // as rollOver: never overdue, the reminder goes along (decision 25), Ahora of an earlier day emptied (decision 39), modified untouched
     if(!W.spaces.length) return stats; // never leave the app without a space (load would put Trabajo and Personal back)
     const raw=JSON.stringify(Object.assign({}, DB, W));
     try{ localStorage.setItem(KEY, raw); }catch(e){ log('error','Sincronización: no se pudieron guardar los cambios recibidos: '+(e&&e.message||e)); throw e; }
@@ -189,16 +200,24 @@ function syncCollect(dry){ const st=syncState(), now=new Date().toISOString(), u
   SYNC_TABLES.forEach(({list, table})=>{ const known=st.known[table], dels=st.del[table], here=new Set(); up[table]=[]; del[table]=[]; if(syncMissing(table)) return;
     DB[list].forEach(rec=>{ if(!rec||rec.id==null) return; here.add(rec.id); if(syncSkip(table, rec)) return;
       if(known[rec.id]==='x' && !dry){ rec.modified=now; bumped=true; } // back after its deletion went up: this copy is the newest
-      const row=syncToRow(table, rec), s=syncSig(row); if(s!==known[rec.id]){ up[table].push({row, s}); n++; }
+      const row=syncToRow(table, rec), s=syncSig(row); if(s!==known[rec.id]){ up[table].push({row:syncSendRow(table, row), s}); n++; }
       if(!dry) delete dels[rec.id]; });
     Object.keys(known).forEach(id=>{ if(known[id]==='x' || here.has(id) || syncDemoId(id)) return; n++;
       if(!dry){ if(!dels[id]) dels[id]=now; del[table].push({id, ts:dels[id]}); } }); });
   if(!dry){ syncWrite(st); if(bumped){ SY.quiet=true; try{ save(); } finally{ SY.quiet=false; } } }
   return {up, del, count:n}; }
+/* An upload that names a column the database lacks (repeat or focus before 0004_repeat_focus.sql) is refused whole: the column is noted
+   once, logged, and the same rows go again without it. Any other error goes on as before */
+const SYNC_NULLCOLS = table => SYNC_FIELDS[table].filter(([,,k])=>syncNullable(k)).map(([,c])=>c);
+function syncColRefused(table, e){ const m=String(e&&(e.message||e.details||e)||'')+' '+String(e&&e.code||'');
+  if(!/PGRST204|42703|column|schema cache/i.test(m)) return null; return SYNC_NULLCOLS(table).find(c=>!syncNoCol(table,c)&&new RegExp('(^|\\W)'+c+'(\\W|$)').test(m))||null; }
+async function syncUpsert(table, rows){ for(;;){ const send=rows.map(r=>{ let o=r; SYNC_NULLCOLS(table).forEach(c=>{ if(syncNoCol(table,c)&&c in o){ if(o===r) o=Object.assign({}, r); delete o[c]; } }); return o; });
+    try{ return await SY.remote.upsert(table, send); }
+    catch(e){ const c=syncColRefused(table, e); if(!c) throw e; SYNC_NOCOL.add(table+'.'+c); log('warn','La base de datos no tiene todavía la columna '+table+'.'+c+': falta 0004_repeat_focus.sql. '+(c==='repeat'?'La repetición':'Ahora')+' se queda en este dispositivo'); } } }
 async function syncPush(c){ const out={pushed:0, deleted:0, kept:0}; const late={};
   for(const {table} of SYNC_TABLES){
     for(let i=0;i<c.up[table].length;i+=SYNC_CHUNK){ const part=c.up[table].slice(i,i+SYNC_CHUNK);
-      const ok=new Set((await SY.remote.upsert(table, part.map(x=>x.row))).map(r=>r.id)); const st=syncState();
+      const ok=new Set((await syncUpsert(table, part.map(x=>x.row))).map(r=>r.id)); const st=syncState();
       part.forEach(x=>{ if(ok.has(x.row.id)){ st.known[table][x.row.id]=x.s; out.pushed++; } else (late[table]=late[table]||[]).push(x.row.id); }); syncWrite(st); }
     for(let i=0;i<c.del[table].length;i+=SYNC_CHUNK){ const part=c.del[table].slice(i,i+SYNC_CHUNK);
       const ok=new Set((await SY.remote.markDeleted(table, part)).map(r=>r.id)); const st=syncState();

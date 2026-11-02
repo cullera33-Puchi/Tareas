@@ -12,7 +12,7 @@ function setDeskView(v){ if(v==='project:none') v='project:none'; UI.deskView=v;
    order and idx remember the list as last drawn, so a row that leaves it (done, moved, deleted) hands the selection to its neighbour.
    The iPhone keeps its own selection mode (UI.select) */
 function deskMulti(){ return UI.wide && (UI.dsel.mode || UI.dsel.ids.size>1); }
-function deskListView(){ const v=UI.deskView; return v==='hoy'||v==='todas'||v.startsWith('project:'); }
+function deskListView(){ const v=UI.deskView; return v==='hoy'||v==='todas'||v==='ahora'||v.startsWith('project:'); } // decision 39: Ahora is a list too
 // The rows of the visible list in order, with the placeholders of a long one; "Lo primero" repeats rows and is left out
 function deskOrder(){ return [...document.querySelectorAll('#desk .main .mbody .row[data-id], #desk .main .mbody .rph[data-id]')].filter(r=>!r.closest('.first')).map(r=>r.dataset.id); }
 function deskRow(id){ return id?document.querySelector('#desk .main .mbody .row[data-id="'+CSS.escape(id)+'"]:not(.first .row)'):null; }
@@ -90,9 +90,10 @@ function endRowEdit(keep){ const ds=UI.dsel, ed=ds.edit; if(!ed) return false; d
 function deskShortcut(k){ const t=todayStr(), dates={h:t, m:addDays(t,1), v:nextWeekday(5,true), s:nextWeekday(1,true)}, pr={'1':'high','2':'mid','0':'none'};
   const del=k==='Delete'||k==='Backspace'; k=k.length===1?k.toLowerCase():k;
   if(deskMulti()){ if(!UI.dsel.ids.size) return false; const btn=a=>document.querySelector('#desk .pane.multi [data-act='+a+']');
-    if(k==='c') bulkComplete(); else if(k in pr) bulkPriority(pr[k]); else if(k in dates) bulkDate(dates[k]); else if(k==='f') bulkDateMenu(btn('bulkDate')); else if(k==='p') bulkMoveSheet(btn('bulkMove')); else if(del) bulkDelete(); else return false; return true; }
+    if(k==='c') bulkComplete(); else if(k==='a') bulkFocus(); else if(k in pr) bulkPriority(pr[k]); else if(k in dates) bulkDate(dates[k]); else if(k==='f') bulkDateMenu(btn('bulkDate')); else if(k==='p') bulkMoveSheet(btn('bulkMove')); else if(del) bulkDelete(); else return false; return true; }
   const id=keyTarget(); if(!id) return false; const x=task(id);
   if(k==='c'){ releaseHold(id); leaveRows(id); setTimeout(()=>{ if(!task(id)) return; followAct(()=>{ completeTask(id); renderAnimated(); }); revealRow(UI.dsel.cur); }, 200); }
+  else if(k==='a'){ if(x.status==='pending'||x.focus) followAct(()=>toggleFocus(id)); } // decision 39
   else if(k in pr) setPriority(id, pr[k]);
   else if(k in dates){ followAct(()=>setTaskDate(id, dates[k])); revealRow(UI.dsel.cur); }
   else if(k==='f') dateSheet(id);
@@ -104,7 +105,7 @@ function shortcutsSheet(){ const k=(a,b)=>'<div class="kr"><span class="kk">'+a.
   openSheet('<h2>Atajos de teclado</h2><div class="keys">'+
     g('Lista', [k(['Arriba','Abajo'],'Tarea anterior o siguiente'), k(['J','K'],'Lo mismo'), k(['Mayúsculas','Abajo'],'Ampliar la selección'), k(['Espacio'],'Abrir o cerrar el detalle'), k(['Intro'],'Cambiar el título, también con doble clic'), k(['N'],'Nueva tarea'), k(['/'],'Buscar'), k(['Esc'],'Cerrar o quitar la selección')])+
     g('Varias tareas', [k([MODK,'clic'],'Añadir o quitar una'), k(['Mayúsculas','clic'],'Seleccionar un tramo'), k([MODK,'A'],'Seleccionar todas'), k(['Arrastrar'],'A un proyecto, a Hoy o a un día')])+
-    g('Tarea seleccionada', [k(['C'],'Completar'), k(['1','2','0'],'Prioridad alta, media o ninguna'), k(['H','M'],'Hoy o mañana'), k(['V','S'],'Viernes o la próxima semana'), k(['F'],'Elegir fecha'), k(['P'],'Elegir proyecto'), k(['Supr'],'Eliminar')])+
+    g('Tarea seleccionada', [k(['C'],'Completar'), k(['A'],'Poner en Ahora o quitarla'), k(['1','2','0'],'Prioridad alta, media o ninguna'), k(['H','M'],'Hoy o mañana'), k(['V','S'],'Viernes o la próxima semana'), k(['F'],'Elegir fecha'), k(['P'],'Elegir proyecto'), k(['Supr'],'Eliminar')])+
     g('General', [k([MODK,'Z'],'Deshacer'), k(['?'],'Estos atajos')])+
     '</div><div class="sheet-actions"><span style="flex:1"></span><button class="btn primary" data-close>Hecho</button></div>', s=>{ s.classList.add('keysheet'); s.onclick=e=>{ if(e.target.closest('[data-close]')) closeSheet(); }; }); }
 /* R16: the pane with several tasks selected: how many, which, and the iPhone's bulk actions plus Fecha, Prioridad and Mover a espacio */
@@ -116,6 +117,8 @@ function multiPaneHTML(){ const ds=UI.dsel, xs=[...ds.ids].map(task).filter(Bool
     (ds.mode?'<p class="mhint">Haz clic en las tareas para añadirlas o quitarlas. Con Mayúsculas y clic, un tramo.</p>':'')+
     '<div class="mgroup">'+b('bulkComplete',MI.done,'Completar','C')+b('bulkPostpone',MI.postpone,'Aplazar')+b('bulkDate',MI.cal,'Fecha','F')+b('bulkMove',MI.folder,'Proyecto','P')+b('bulkPriority',MI.p3,'Prioridad')+(DB.spaces.length>1?b('bulkSpace',MI.space,'Mover a espacio'):'')+'</div>'+
     '<div class="mgroup">'+b('bulkDelete',MI.trash,'Eliminar','Supr',true)+'</div></div></div></section>'; }
+// Decision 39: A with several rows selected puts them all in Ahora (none if they do not fit) or, when all are already there, takes them out
+function bulkFocus(){ const xs=selectedTasks(); if(!xs.length) return; const ids=xs.map(x=>x.id); if(xs.every(x=>x.focus)) removeFromAhora(ids); else addToAhora(ids); }
 // The desktop bulk actions the iPhone does not have; they end the selection and give one Deshacer, as the others
 function bulkPriority(pr){ const xs=selectedTasks().filter(x=>x.priority!==pr), n=UI.dsel.ids.size; if(!n) return; const prev=xs.map(x=>({id:x.id, priority:x.priority}));
   batch(()=>xs.forEach(x=>updTask(x.id,{priority:pr}))); haptic(8); log('info','Prioridad en bloque: '+xs.length); endSelect();
@@ -176,6 +179,7 @@ function deskSide(){
   // R16: Hoy takes dropped rows and cards as today (data-day), a project or Sin proyecto as that project (data-drop-project)
   const it=(view,ic,label,n,on,attr)=>'<button class="it'+(on?' on':'')+'" data-view="'+view+'"'+(attr||'')+'>'+ic+'<span>'+label+'</span>'+(n!==undefined?'<span class="n">'+n+'</span>':'')+'</button>';
   return '<aside class="side"><button class="sp" data-act="spaceMenu">'+esc(space().name)+I.chevD+'</button>'+
+    it('ahora',I.star,'Ahora',ahoraTasks().length,v==='ahora',' data-drop-ahora=""')+ // decision 39: above Hoy, and rows dropped on it go into Ahora
     it('hoy',I.list,'Hoy',pendingFor('hoy').length,v==='hoy',' data-day="'+todayStr()+'"')+it('todas',I.inbox.replace('viewBox="0 0 48 48"','viewBox="0 0 48 48" stroke-width="3"'),'Todas',pendingFor('todas').length,v==='todas')+it('week',I.cal,'Semana',undefined,isCalView(v))+miniMonthHTML()+
     '<div class="sec">Proyectos</div>'+ps.map(p=>'<button class="it'+(v==='project:'+p.id?' on':'')+'" data-view="project:'+p.id+'" data-drop-project="'+p.id+'" aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown"><span class="dot" style="background:'+p.color+'"></span><span>'+esc(p.name)+'</span><span class="n">'+cnt(p.id)+'</span></button>').join('')+
     '<button class="it'+(v==='project:none'?' on':'')+'" data-view="project:none" data-drop-project=""><span class="dot" style="background:var(--ink3)"></span><span>Sin proyecto</span><span class="n">'+cnt(null)+'</span></button>'+
@@ -199,8 +203,9 @@ function projFilterMenu(src){ const dot=c=>'<span class="pm-dot" style="backgrou
 function deskMain(){
   const v=UI.deskView; let title='', body='', search=true, pf=false;
   if(v==='hoy'||v==='todas'){ const f=v; title=f==='hoy'?'Hoy':'Todas'; pf=true;
-    body = addBarHTML(null)+(f==='hoy'&&!UI.query?summaryHTML():'')+
+    body = addBarHTML(null)+(UI.query?'':ahoraHTML())+(f==='hoy'&&!UI.query?summaryHTML():'')+
       listHTML(UI.query?'todas':f); }
+  else if(v==='ahora'){ title='Ahora'; body=ahoraViewHTML(); } // decision 39
   else if(isCalView(v)){ title={day:'Día',week:'Semana',month:'Mes'}[v]; pf=true; body=weekHTML(); } // the project filter applies here too, so it stays visible and clearable
   else if(v.startsWith('project:')){ const id=v.slice(8); const p=id==='none'?null:proj(id); if(id!=='none'&&(!p||p.archived||p.spaceId!==space().id)){ UI.deskView=DB.settings.filter||'hoy'; return deskMain(); } /* gone, archived or in another space */ title=p?p.name:'Sin proyecto'; body=addBarHTML(p?p.id:null)+listHTML('todas', p?p.id:null); }
   else if(v==='settings'){ title='Ajustes'; search=false; const h=viewAjustes(); body=h.slice(h.indexOf('<div class="scroll">')); }

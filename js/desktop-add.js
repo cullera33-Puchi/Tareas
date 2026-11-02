@@ -194,14 +194,14 @@ function bindDeskEvents(d){
   // Only a card drag moves a task: any other drag (a link, a file) clears dragId, so a cancelled card drag never carries over
   let dragId=null, dropped=false, refusal=null;
   let dragIds=null; // R16: the rows of a multiple selection dragged together
-  const zoneOf=t=>t.closest('[data-slot],[data-day],[data-drop-project],[data-gday],[data-gproj]');
+  const zoneOf=t=>t.closest('[data-slot],[data-day],[data-drop-project],[data-gday],[data-gproj],[data-drop-ahora]'); // decision 39: Ahora (its block, its view, its sidebar entry)
   // Decision 36: a day or project group of the lists. Its key; the elements lit with it (a gsec, or the Hoy block's title and rows); the group a drag started in
   const gkey=z=>z?(z.dataset.gday!==undefined?'d:'+z.dataset.gday:z.dataset.gproj!==undefined?'p:'+z.dataset.gproj:null):null;
   const lit=z=>{ const k=gkey(z); if(!k||z.classList.contains('gsec')) return [z]; return [...d.querySelectorAll(k[0]==='d'?'[data-gday="'+CSS.escape(z.dataset.gday)+'"]':'[data-gproj="'+CSS.escape(z.dataset.gproj)+'"]')]; };
   let dragFrom=null;
   // Why a zone takes no drop: a past day (no task is ever overdue) or a past half hour (a reminder must be ahead, as in Recordatorio)
   const refuse=z=>{ if(z.dataset.slot){ const [dy,hm]=z.dataset.slot.split('T'), dt=new Date(dy+'T'+hm+':00'); return dt.getTime()<=Date.now()?(dy<todayStr()?'No se puede mover a un día pasado':'Esa hora ya ha pasado'):null; }
-    if(z.dataset.dropProject!==undefined) return null;
+    if(z.dataset.dropProject!==undefined||z.dataset.dropAhora!==undefined) return null;
     if(z.dataset.gday!==undefined) return z.dataset.gday&&z.dataset.gday<todayStr()?'No se puede mover a un día pasado':null;
     return z.dataset.day&&z.dataset.day<todayStr()?'No se puede mover a un día pasado':null; };
   d.addEventListener('dragstart', e=>{ const c=e.target.closest&&e.target.closest('[draggable="true"][data-id]'); dragId=c?c.dataset.id:null; dragIds=null; dropped=false; refusal=null; if(!c) return; dragFrom=gkey(c.closest('[data-gday],[data-gproj]')); c.classList.add('dragging'); try{ e.dataTransfer.setData('text/plain', dragId); e.dataTransfer.effectAllowed='move'; }catch(err){}
@@ -215,6 +215,7 @@ function bindDeskEvents(d){
     e.preventDefault(); e.dataTransfer.dropEffect='move'; const L=lit(z); d.querySelectorAll('.over').forEach(x=>{ if(!L.includes(x)) x.classList.remove('over'); }); L.forEach(x=>x.classList.add('over')); });
   d.addEventListener('dragleave', e=>{ const z=zoneOf(e.target); if(z && !lit(z).some(x=>x.contains(e.relatedTarget))) lit(z).forEach(x=>x.classList.remove('over')); });
   d.addEventListener('drop', e=>{ const z=zoneOf(e.target); if(!z||!dragId||e.dataTransfer.getData('text/plain')!==dragId||refuse(z)||(dragFrom&&gkey(z)===dragFrom)) return; e.preventDefault(); dropped=true; const id=dragId, ids=dragIds||[id]; dragId=null; dragIds=null;
+    if(z.dataset.dropAhora!==undefined){ addToAhora(ids); return; } // decision 39
     if(z.dataset.gday!==undefined){ dropToDay(ids, z.dataset.gday||null); return; } // decision 36: a day group of a list, or Sin fecha
     if(z.dataset.gproj!==undefined){ dropToProject(ids, z.dataset.gproj==='none'?null:z.dataset.gproj); return; } // a project group
     if(z.dataset.dropProject!==undefined) dropToProject(ids, z.dataset.dropProject||null); else dropMany(ids, z); }); // R16: a project of the sidebar, or a date
@@ -257,6 +258,6 @@ document.addEventListener('keydown', e=>{ if(!UI.wide) return; const tag=(e.targ
   if(k===' '){ if(!deskListView()&&!UI.deskDetail) return; e.preventDefault(); togglePane(); return; }
   if(k==='Enter'){ const id=UI.dsel.cur; if(id&&deskRow(id)&&!deskMulti()){ e.preventDefault(); startRowEdit(id); } return; }
   if(e.shiftKey&&k.length===1&&!/[A-Z]/.test(k)) return; // a shifted symbol is not one of the keys
-  if(/^[chmvsfp120]$/i.test(k)||k==='Delete'||k==='Backspace'){ if(deskShortcut(k)) e.preventDefault(); } });
+  if(/^[chmvsfpa120]$/i.test(k)||k==='Delete'||k==='Backspace'){ if(deskShortcut(k)) e.preventDefault(); } }); // A: Ahora (decision 39)
 // A project group header (R13) is a div with the button role: Enter and Space act on it as on a button
 document.addEventListener('keydown', e=>{ if((e.key==='Enter'||e.key===' ')&&e.target.classList&&e.target.classList.contains('gtap')){ e.preventDefault(); e.target.click(); } });

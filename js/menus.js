@@ -36,6 +36,9 @@ const MI = {
   down:mi('<path d="M12 5v14M6 13l6 6 6-6"/>'),
   archive:mi('<rect x="3" y="4" width="18" height="5" rx="1.5"/><path d="M5 9v9a2 2 0 002 2h10a2 2 0 002-2V9M10 13h4"/>'),
   check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5l5 5L19.5 6.5"/></svg>',
+  star:mi('<path d="M12 3.2l2.7 5.5 6 .9-4.35 4.25 1.03 6L12 17l-5.38 2.85 1.03-6L3.3 9.6l6-.9z"/>'),
+  starOff:mi('<path d="M12 3.2l2.7 5.5 6 .9-4.35 4.25 1.03 6L12 17l-5.38 2.85 1.03-6L3.3 9.6l6-.9z"/><path d="M4 4l16 16"/>'),
+  repeat:mi('<path d="M17 3l3 3-3 3M4 11.5V10a4 4 0 014-4h12M7 21l-3-3 3-3M20 12.5V14a4 4 0 01-4 4H4"/>'),
 };
 const pmEl=$('#pmenu');
 const pmHide=document.createElement('style'); document.head.appendChild(pmHide); // hides the lifted row while its copy is up, also once a render has replaced it
@@ -232,13 +235,24 @@ function dateMenu(id){ const x=task(id); if(!x) return null; const t=todayStr();
    on the current value, Mover a otro espacio, Duplicar and Eliminar, each with the key that acts on the selected row (R15) */
 function deskTaskMenu(id){ const x=task(id); if(!x) return null; const done=x.status==='done';
   return {groups:[
-    [{label:done?'Marcar pendiente':'Completar', key:'C', fn:()=>{ releaseHold(id); leaveRows(id); setTimeout(()=>{ completeTask(id); renderAnimated(); },200); }}],
+    [{label:done?'Marcar pendiente':'Completar', key:'C', fn:()=>{ releaseHold(id); leaveRows(id); setTimeout(()=>{ completeTask(id); renderAnimated(); },200); }}].concat(done?[]:[{label:x.focus?'Quitar de Ahora':'Ahora', key:'A', fn:()=>toggleFocus(id)}]), // decision 39
     [{label:'Fecha', menu:()=>dateMenu(id)}, {label:'Prioridad', menu:()=>({title:'Prioridad', groups:[prioItems(x, id)]})}, {label:'Proyecto', key:'P', menu:()=>projectPickMenu(id)}].concat(DB.spaces.length>1?[{label:'Mover a otro espacio', menu:()=>spaceMoveMenu(id)}]:[]),
     [{label:'Duplicar', fn:()=>duplicateTask(id)}],
     [{label:'Eliminar', key:'Supr', red:true, fn:()=>confirmDelete(id)}] ]}; }
 function duplicateTask(id){ const x=task(id); if(!x) return; const n=addTask({title:x.title, projectId:x.projectId, priority:x.priority, notes:x.notes, spaceId:x.spaceId}); haptic(8); renderAnimated(); toast('Tarea duplicada'); openDetail(n.id); }
 function leaveRows(id){ document.querySelectorAll('.row[data-id="'+id+'"]').forEach(r=>r.classList.add('leaving')); }
-function confirmDelete(id, after){ const x=task(id); if(!x) return; releaseHold(id); confirmSheet('Eliminar tarea', '"'+x.title+'" se eliminará. Podrás deshacerlo durante unos segundos.', ()=>{ leaveRows(id); setTimeout(()=>{ deleteTask(id); after?after():renderAnimated(); },200); }); }
+function confirmDelete(id, after){ const x=task(id); if(!x) return; releaseHold(id);
+  const go=fn=>()=>{ leaveRows(id); setTimeout(()=>{ fn(); after?after():renderAnimated(); },200); };
+  if(x.status==='pending'&&repParse(x.repeat)){ askRepeatDelete({n:1, title:x.title}, go(()=>skipOccurrence(id)), go(()=>deleteTask(id))); return; } // decision 38
+  confirmSheet('Eliminar tarea', '"'+x.title+'" se eliminará. Podrás deshacerlo durante unos segundos.', go(()=>deleteTask(id))); }
+/* Decision 38: a task that repeats (or a selection with some) asks how far the deletion goes: only this one, which moves to the next date of
+   its series, or the series. The bottom action sheet on the iPhone, a macOS alert with three buttons on the desktop. o: {n, rep, title} */
+function askRepeatDelete(o, onlyFn, seriesFn){ const one=o.n===1, k=o.rep||1;
+  const only=one?'Eliminar solo esta':'Eliminar solo estas', all=one||k===1?'Eliminar la serie':'Eliminar las series';
+  const text=one ? '"'+o.title+'" se repite. Si eliminas solo esta, pasa a su siguiente fecha. Podrás deshacerlo durante unos segundos.'
+    : (k===1?'Una de las '+o.n+' tareas se repite.':k+' de las '+o.n+' tareas se repiten.')+' Si eliminas solo estas, las que se repiten pasan a su siguiente fecha y las demás se eliminan. Podrás deshacerlo durante unos segundos.';
+  if(UI.wide){ macAlert({title:one?'Eliminar tarea que se repite':'Eliminar '+o.n+' tareas', text, ok:all, fn:seriesFn, more:[{label:only, red:true, fn:onlyFn}]}); return; }
+  actionSheet(text, [{label:only, red:true, fn:onlyFn}, {label:all, red:true, fn:seriesFn}]); }
 function detailMenu(id, src){ const x=task(id); if(!x) return;
   popMenu({anchor:src, align:'right', groups:[
     [{label:x.status==='done'?'Marcar pendiente':'Marcar completada', icon:x.status==='done'?MI.undo:MI.done, key:'C', fn:()=>{ completeTask(id,true); render(); }}],
@@ -247,3 +261,39 @@ function detailMenu(id, src){ const x=task(id); if(!x) return;
 // After a delete from the detail, close that task's detail only if it is still the one showing: Atrás may have been tapped meanwhile
 const closeDetailOf = id => ()=>{ if(detailTaskId()===id) pop(); else renderAnimated(); };
 function postponeSheet(id, src){ releaseHold(id); const m=postponeMenu(id); if(m) popMenu(Object.assign(m, src?{anchor:src, align:'right'}:taskAnchor(id)||{})); }
+
+/* ---------- Decision 38: Repetir ----------
+   The Repetir row of the detail (iPhone) and of the inspector (desktop): an anchored menu (a Mac menu on the desktop) with Nunca, the usual
+   rules and Personalizada, which opens a sheet on the iPhone and a popover on the desktop (pickerPanel) */
+function repeatMenu(id, src){ const x=task(id); if(!x) return; const k=x.repeat?repPresetOf(x.repeat):'none', b=x.date||todayStr();
+  const it=(key, label)=>({label, on:k===key, fn:()=>setRepeat(id, key==='none'?null:repPreset(key, b))});
+  const at=src?{anchor:src, align:UI.wide?'left':'right'}:taskAnchor(id, 'pickRepeat')||{};
+  popMenu(Object.assign(at, {groups:[[it('none','Nunca')], [it('daily','Cada día'), it('work','Cada día laborable'), it('week','Cada semana'), it('week2','Cada 2 semanas'), it('month','Cada mes'), it('year','Cada año')],
+    [{label:UI.wide?'Personalizada…':'Personalizada', on:k==='custom', fn:()=>repeatCustom(id, src)}]]})); }
+const RP_WD=[1,2,3,4,5,6,0], RP_WL=['L','M','X','J','V','S','D'];
+// The state of Personalizada, from the current rule or from the task's date: every n days, weeks or months; the weekdays; day d or the k-th weekday
+function rpState(x){ const b=x.date||todayStr(), bd=new Date(b+'T00:00:00'), r=repParse(x.repeat);
+  const st={u:'W', n:1, days:new Set([bd.getDay()]), mm:'day', md:bd.getDate(), nth:Math.min(4, Math.ceil(bd.getDate()/7)), wd:bd.getDay()};
+  if(r){ if(r.f==='D'){ st.u='D'; st.n=r.n; } else if(r.f==='WD'){ st.u='W'; st.days=new Set([1,2,3,4,5]); } else if(r.f==='W'){ st.u='W'; st.n=r.n; st.days=new Set(r.days); }
+    else if(r.f==='M'){ st.u='M'; st.n=r.n; if(r.day) st.md=r.day; else { st.mm='nth'; st.nth=r.nth; st.wd=r.wd; } } else if(r.f==='Y'){ st.u='M'; st.n=12*r.n; st.md=r.day; } }
+  return st; }
+function rpFreq(st){ if(st.u==='D') return 'D'+st.n; if(st.u==='W'){ if(!st.days.size) return null; return 'W'+st.n+':'+[...st.days].sort((a,b)=>monFirst(a)-monFirst(b)).map(d=>REP_DAYS[d]).join(','); }
+  return 'M'+st.n+':'+(st.mm==='day'?st.md:(st.nth<0?'L':st.nth)+REP_DAYS[st.wd]); }
+function rpHTML(st){ const f=rpFreq(st), unit={D:['día','días'],W:['semana','semanas'],M:['mes','meses']};
+  const step=(k, v, min, max)=>'<div class="rpstep"><button data-rp="'+k+'-" aria-label="Menos"'+(v<=min?' disabled':'')+'>−</button><b>'+v+'</b><button data-rp="'+k+'+" aria-label="Más"'+(v>=max?' disabled':'')+'>+</button></div>';
+  const days=(sel, k)=>'<div class="rpdays">'+RP_WD.map((d,i)=>'<button class="'+(sel(d)?'on':'')+'" data-rp="'+k+':'+d+'" aria-pressed="'+sel(d)+'" aria-label="'+DIAS_L[d]+'">'+RP_WL[i]+'</button>').join('')+'</div>';
+  let h='<div class="rprow"><span class="rpl">Cada</span>'+step('n', st.n, 1, 99)+'<div class="seg rpseg">'+['D','W','M'].map(u=>'<button data-rp="u:'+u+'" class="'+(st.u===u?'on':'')+'">'+unit[u][st.n===1?0:1]+'</button>').join('')+'</div></div>';
+  if(st.u==='W') h+='<div class="rplbl">Los días</div>'+days(d=>st.days.has(d), 'd');
+  if(st.u==='M'){ h+='<div class="seg rpseg rpmm"><button data-rp="m:day" class="'+(st.mm==='day'?'on':'')+'">Un día del mes</button><button data-rp="m:nth" class="'+(st.mm==='nth'?'on':'')+'">Un día de la semana</button></div>';
+    if(st.mm==='day') h+='<div class="rprow"><span class="rpl">El día</span>'+step('md', st.md, 1, 31)+'</div>'+(st.md>28?'<div class="rplbl">Los meses más cortos, su último día.</div>':'');
+    else h+='<div class="chips rpord">'+[[1,'Primer'],[2,'Segundo'],[3,'Tercer'],[4,'Cuarto'],[-1,'Último']].map(([k,l])=>'<button class="chip'+(st.nth===k?' on':'')+'" data-rp="o:'+k+'">'+l+'</button>').join('')+'</div>'+days(d=>st.wd===d, 'w'); }
+  h+='<div class="rpsum">'+(f?esc(repSummary(f)):'Elige al menos un día')+'</div>';
+  return h+'<div class="sheet-actions"><button class="btn" data-rp="cancel">Cancelar</button><button class="btn primary" data-rp="ok"'+(f?'':' disabled')+'>Guardar</button></div>'; }
+function repeatCustom(id, src){ const x=task(id); if(!x) return; const st=rpState(x);
+  pickerPanel('Repetir', '<div class="rp">'+rpHTML(st)+'</div>', id, src&&src.isConnected?src:null, 'pickRepeat', (s, done)=>{
+    s.onclick=e=>{ const b=e.target.closest('[data-rp]'); if(!b||b.disabled) return; const [k,v]=b.dataset.rp.split(':');
+      if(k==='cancel'){ done(); return; } if(k==='ok'){ const f=rpFreq(st); if(!f) return; done(); setRepeat(id, f); return; }
+      if(k==='n-') st.n=Math.max(1, st.n-1); else if(k==='n+') st.n=Math.min(99, st.n+1); else if(k==='md-') st.md=Math.max(1, st.md-1); else if(k==='md+') st.md=Math.min(31, st.md+1);
+      else if(k==='u') st.u=v; else if(k==='m') st.mm=v; else if(k==='o') st.nth=+v; else if(k==='w') st.wd=+v;
+      else if(k==='d'){ const d=+v; if(st.days.has(d)) st.days.delete(d); else st.days.add(d); }
+      haptic(4); const box=$('.rp', s); if(box) box.innerHTML=rpHTML(st); }; }); }

@@ -13,8 +13,17 @@ function selectAllVisible(){ const ids=visibleRowIds(); if(UI.select.all){ UI.se
 // The selected ids: the iPhone's selection mode or, on the desktop, its multiple selection (R16), which the same bulk actions use
 function selSet(){ return UI.wide ? (deskMulti()?UI.dsel.ids:null) : UI.select ? UI.select.ids : null; }
 function selectedTasks(){ const s=selSet(); return s ? [...s].map(task).filter(Boolean) : []; } // empty once selection mode has ended
-function bulkComplete(){ const xs=selectedTasks(); if(!xs.length) return; const prev=xs.map(x=>({id:x.id, status:x.status, completed:x.completed})); const now=new Date().toISOString(); batch(()=>xs.forEach(x=>{ if(x.status==='pending') updTask(x.id,{status:'done', completed:now}); })); const n=prev.filter(p=>p.status==='pending').length; log('info','Completadas en bloque: '+n); endSelect(); toast(n+(n===1?' tarea completada':' tareas completadas'), ()=>batch(()=>prev.forEach(p=>updTask(p.id,{status:p.status, completed:p.completed})))); }
-function bulkDelete(){ const xs=selectedTasks(); if(!xs.length) return; confirmSheet('Eliminar '+xs.length+(xs.length===1?' tarea':' tareas'), 'Podrás deshacerlo durante unos segundos.', ()=>{ const ids=new Set(xs.map(x=>x.id)); const removedT=DB.tasks.filter(x=>ids.has(x.id)), removedV=DB.voiceNotes.filter(v=>ids.has(v.taskId)); DB.tasks=DB.tasks.filter(x=>!ids.has(x.id)); DB.voiceNotes=DB.voiceNotes.filter(v=>!ids.has(v.taskId)); const removedA=cutAttachments(ids); save(); log('info','Eliminadas en bloque: '+removedT.length); endSelect(); haptic(14); toast(removedT.length+(removedT.length===1?' tarea eliminada':' tareas eliminadas'), ()=>{ DB.tasks.push(...removedT); DB.voiceNotes.push(...removedV); putAttachments(removedA); save(); }); }); }
+function bulkComplete(){ const xs=selectedTasks(); if(!xs.length) return; const prev=xs.filter(x=>x.status==='pending').map(doneSnap); let nx=null; batch(()=>xs.forEach(x=>{ const r=applyDone(x.id, true); if(r) nx=r; })); const n=prev.length; log('info','Completadas en bloque: '+n); endSelect(); toast(doneText(n, nx), ()=>batch(()=>prev.forEach(undoDone))); } // decision 38: applyDone makes the next task of each series
+/* Decision 38: deleting tasks that repeat asks first (askRepeatDelete): "solo estas" move each one to the next date of its series and delete
+   the others; "las series" delete them all. One Deshacer for everything */
+function bulkDelete(){ const xs=selectedTasks(); if(!xs.length) return; const rep=xs.filter(x=>x.status==='pending'&&repParse(x.repeat));
+  const run=only=>{ const skip=only?rep:[], ids=new Set(xs.filter(x=>!skip.includes(x)).map(x=>x.id)); let undoS=[], removedT=[], removedV=[], removedA=[];
+    batch(()=>{ undoS=skip.map(x=>skipOccurrence(x.id, true)).filter(Boolean); removedT=DB.tasks.filter(x=>ids.has(x.id)); removedV=DB.voiceNotes.filter(v=>ids.has(v.taskId)); DB.tasks=DB.tasks.filter(x=>!ids.has(x.id)); DB.voiceNotes=DB.voiceNotes.filter(v=>!ids.has(v.taskId)); removedA=cutAttachments(ids); save(); });
+    log('info','Eliminadas en bloque: '+removedT.length+(undoS.length?', '+undoS.length+' pasadas a su siguiente fecha':'')); endSelect(); haptic(14);
+    const parts=[]; if(removedT.length) parts.push(removedT.length+(removedT.length===1?' tarea eliminada':' tareas eliminadas')); if(undoS.length) parts.push(undoS.length+(undoS.length===1?' pasada a su siguiente fecha':' pasadas a su siguiente fecha'));
+    toast(parts.join(', '), ()=>batch(()=>{ undoS.forEach(u=>u()); DB.tasks.push(...removedT); DB.voiceNotes.push(...removedV); putAttachments(removedA); save(); })); };
+  if(rep.length){ askRepeatDelete({n:xs.length, rep:rep.length}, ()=>run(true), ()=>run(false)); return; }
+  confirmSheet('Eliminar '+xs.length+(xs.length===1?' tarea':' tareas'), 'Podrás deshacerlo durante unos segundos.', ()=>run(false)); }
 function bulkReschedule(date, label){ const xs=selectedTasks(); if(!xs.length) return; const prev=xs.map(daySnap); batch(()=>xs.forEach(x=>updTask(x.id, dayPatch(x, date)))); endSelect(); toast(xs.length+(xs.length===1?' tarea aplazada a ':' tareas aplazadas a ')+label, ()=>batch(()=>prev.forEach(undoDay))); }
 function bulkPostponeSheet(src){ const sel=selSet(); if(!sel||!sel.size) return; const t=todayStr(); const opts=uniqueBy([['Mañana',addDays(t,1)],['Fin de semana',weekendDay()],['Próxima semana',nextWeekday(1,true)],['En una semana',addDays(t,7)]], o=>o[1]);
   popMenu({anchor:src, align:UI.wide?'left':undefined, title:'Aplazar '+sel.size+(sel.size===1?' tarea':' tareas'), groups:[opts.map(([l,d])=>dateItem(l, d, ()=>bulkReschedule(d,l.toLowerCase()))), [dateItem('Sin fecha', null, ()=>bulkReschedule(null,'sin fecha'))]]}); }
@@ -55,7 +64,7 @@ function reviewStep(ids, i, st){
   const x=task(ids[i]); if(!x||x.status!=='pending'){ reviewStep(ids, i+1, st); return; } // completed or removed meanwhile
   const t=todayStr(); const opts=uniqueBy([['hoy',t,'Hoy'],['man',addDays(t,1),'Mañana'],['vie',nextWeekday(5,true),'Viernes'],['nsem',nextWeekday(1,true),'Próxima semana']], o=>o[1]).concat([['none',null,'Sin fecha']]);
   const p=x.projectId?proj(x.projectId):null; const tally=k=>{ st.tally[k]=(st.tally[k]||0)+1; };
-  const keep=()=>{ if(!st.prev.has(x.id)) st.prev.set(x.id, {date:x.date, carried:x.carried, reminder:x.reminder||null, status:x.status, completed:x.completed}); };
+  const keep=()=>{ if(!st.prev.has(x.id)) st.prev.set(x.id, {date:x.date, carried:x.carried, reminder:x.reminder||null, status:x.status, completed:x.completed, focus:x.focus||null}); };
   const next=()=>{ haptic(6); render(); reviewStep(ids, i+1, st); };
   openSheet('<h2>'+(st.kind==='close'?'Cerrar el día':'Repasar aplazadas')+'</h2><div class="hint" style="margin-top:-6px">'+(i+1)+' de '+ids.length+(p?', '+esc(p.name):'')+'</div><div class="plan-title">'+esc(x.title||'Sin título')+'</div>'+
     '<div class="chips rvchips">'+opts.map(o=>'<button class="chip" data-rv="'+o[0]+'">'+o[2]+'</button>').join('')+'</div>'+
@@ -65,12 +74,14 @@ function reviewStep(ids, i, st){
     s.onclick=e=>{ const c=e.target.closest('[data-rv]'); if(c){ const o=opts.find(q=>q[0]===c.dataset.rv); keep(); updTask(x.id, dayPatch(x, o[1], {carried:false})); tally(o[0]); next(); return; } // Hoy confirms the task and clears its Aplazada mark
       const b=e.target.closest('[data-x]'); if(!b) return; const k=b.dataset.x;
       if(k==='done'){ keep(); applyDone(x.id, true); tally('done'); next(); }
-      else if(k==='del'){ const j=DB.tasks.indexOf(x); if(j>=0){ DB.tasks.splice(j,1); const vn=DB.voiceNotes.filter(v=>v.taskId===x.id); DB.voiceNotes=DB.voiceNotes.filter(v=>v.taskId!==x.id); st.removed.push({x, vn, at:cutAttachments(new Set([x.id]))}); save(); } tally('del'); haptic(10); next(); }
+      else if(k==='del'){ const go=()=>{ const j=DB.tasks.indexOf(x); if(j>=0){ DB.tasks.splice(j,1); const vn=DB.voiceNotes.filter(v=>v.taskId===x.id); DB.voiceNotes=DB.voiceNotes.filter(v=>v.taskId!==x.id); st.removed.push({x, vn, at:cutAttachments(new Set([x.id]))}); save(); } tally('del'); haptic(10); next(); };
+        if(repParse(x.repeat)) askRepeatDelete({n:1, title:x.title}, ()=>{ keep(); skipOccurrence(x.id, true); tally('del'); haptic(10); next(); }, go); else go(); } // decision 38: only this one, or the series
       else if(k==='skip'){ tally('skip'); reviewStep(ids, i+1, st); }
       else { st.tally.skip=(st.tally.skip||0)+ids.length-i; sheetOnClose=null; reviewEnd(st, true); } }; });
 }
+// Deshacer of a review: a task completed in it takes back the next one of its series (decision 38)
 function reviewEnd(st, asSheet){ const T=st.tally, decided=Object.keys(T).some(k=>k!=='skip'&&T[k]);
-  const undo=()=>batch(()=>{ st.prev.forEach((o,id)=>{ if(task(id)) updTask(id, o); }); st.removed.forEach(r=>{ if(!task(r.x.id)){ DB.tasks.push(r.x); DB.voiceNotes.push(...r.vn); putAttachments(r.at); } }); save(); });
+  const undo=()=>batch(()=>{ st.prev.forEach((o,id)=>{ const x=task(id); if(!x) return; if(x.status==='done'&&o.status==='pending') dropNext(x); updTask(id, o); }); st.removed.forEach(r=>{ if(!task(r.x.id)){ DB.tasks.push(r.x); DB.voiceNotes.push(...r.vn); putAttachments(r.at); } }); save(); });
   const parts=REVIEW_OUT.filter(o=>T[o[0]]).map(o=>T[o[0]]+' '+(T[o[0]]===1?o[1]:o[2]));
   log('info', st.kind==='carried'?'Repaso de aplazadas':'Día cerrado una a una', T);
   if(!decided){ if(asSheet) closeSheet(); renderAnimated(); return; }
@@ -112,8 +123,9 @@ function rowMenu(id, src){ const x=task(id); if(!x) return; releaseHold(id);
     const row=src&&src.row||visibleRow(id), b=row&&row.getBoundingClientRect();
     return popMenu({lift:row, x:src&&src.x||(b?b.left+b.width/2:0), y:src&&src.y||0, prio:{cur:x.priority, fn:pr=>setPriority(id,pr)}, groups:[
       [{label:'Aplazar', icon:MI.postpone, menu:()=>postponeMenu(id)}, {label:'Mover a proyecto', icon:MI.folder, menu:()=>projectPickMenu(id)}].concat(DB.spaces.length>1?[{label:'Mover a otro espacio', icon:MI.space, menu:()=>spaceMoveMenu(id)}]:[]),
-      [{label:x.status==='done'?'Marcar pendiente':'Completar', icon:x.status==='done'?MI.undo:MI.done, fn:()=>{ leaveRows(id); setTimeout(()=>{ completeTask(id); renderAnimated(); },200); }},
-       {label:'Duplicar', icon:MI.dup, fn:()=>duplicateTask(id)}, {label:'Seleccionar', icon:MI.select, fn:()=>startSelect(id)}],
+      [{label:x.status==='done'?'Marcar pendiente':'Completar', icon:x.status==='done'?MI.undo:MI.done, fn:()=>{ leaveRows(id); setTimeout(()=>{ completeTask(id); renderAnimated(); },200); }}]
+       .concat(x.status==='done'?[]:[{label:x.focus?'Quitar de Ahora':'Ahora', icon:x.focus?MI.starOff:MI.star, fn:()=>toggleFocus(id)}]) // decision 39
+       .concat([{label:'Duplicar', icon:MI.dup, fn:()=>duplicateTask(id)}, {label:'Seleccionar', icon:MI.select, fn:()=>startSelect(id)}]),
       [{label:'Eliminar', icon:MI.trash, red:true, fn:()=>confirmDelete(id)}] ]}); } }
 /* Desktop sidebar: a project dragged to another place (or moved with Alt and an arrow). The space's projects are numbered again from 0,
    active ones first in their new order, archived ones after; only those whose number changes get a new 'modified', so the order syncs */
@@ -372,6 +384,7 @@ function shareText(id){ const x=task(id); if(!x) return ''; const p=x.projectId?
   const d = x.date? new Date(x.date+'T00:00:00').toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'}) : 'sin fecha';
   const sp=DB.spaces.find(o=>o.id===x.spaceId)||space(); // the task's own space, not the one on screen
   let t='Tarea: '+x.title+'\nEspacio: '+sp.name+'\nProyecto: '+(p?p.name:'ninguno')+'\nFecha: '+d+'\nPrioridad: '+(x.priority==='high'?'alta':x.priority==='mid'?'media':'ninguna')+'\n';
+  if(repParse(x.repeat)) t+='Se repite: '+repSummary(x.repeat).replace(/^./, c=>c.toLowerCase())+'\n'; // decision 38
   if(x.notes&&x.notes.trim()) t+='\nNotas:\n'+x.notes.trim()+'\n';
   const stamp=iso=>{ const dt=new Date(iso); return String(dt.getDate()).padStart(2,'0')+'/'+String(dt.getMonth()+1).padStart(2,'0')+' '+fmtTime(iso); }; // absolute, as "31/10 09:15": the text is often read on another day
   if(vns.length) t+='\nNotas de voz:\n'+vns.map(v=>'- '+stamp(v.created)+': '+v.text).join('\n')+'\n';
@@ -439,9 +452,9 @@ function exportJSON(){ const t=JSON.stringify(exportData(),null,2); if(navigator
 // CSV for Excel in Spanish locales: semicolon separated, UTF-8 with BOM, one row per task.
 // A cell that starts with = + - or @ gets a leading apostrophe: Excel runs it as a formula even when quoted.
 function csvText(){ const q=v=>{ let s=String(v==null?'':v).replace(/"/g,'""').replace(/\r?\n/g,' '); if(/^[=+\-@\t\r]/.test(s)) s="'"+s; return '"'+s+'"'; }; const sp=Object.fromEntries(DB.spaces.map(s=>[s.id,s.name])); const pr={high:'Alta',mid:'Media',none:''};
-  const head=['Espacio','Proyecto','Título','Fecha','Prioridad','Estado','Completada','Recordatorio','Aplazada','Notas','Notas de voz','Creada'];
+  const head=['Espacio','Proyecto','Título','Fecha','Prioridad','Estado','Completada','Recordatorio','Se repite','Aplazada','Notas','Notas de voz','Creada']; // decision 38: Se repite, the rule in words
   const rows=DB.tasks.slice().sort((a,b)=>(a.spaceId+(a.date||'9999')+a.created)<(b.spaceId+(b.date||'9999')+b.created)?-1:1).map(x=>{ const p=x.projectId?proj(x.projectId):null; const vn=DB.voiceNotes.filter(v=>v.taskId===x.id).map(v=>v.text).join(' | ');
-    return [sp[x.spaceId]||'', p?p.name:'', x.title, x.date||'', pr[x.priority]||'', x.status==='done'?'Hecha':'Pendiente', x.completed?localDay(x.completed)+' '+fmtTime(x.completed):'', x.reminder?localDay(x.reminder)+' '+fmtTime(x.reminder):'', x.carried?'Sí':'', x.notes||'', vn, localDay(x.created)].map(q).join(';'); });
+    return [sp[x.spaceId]||'', p?p.name:'', x.title, x.date||'', pr[x.priority]||'', x.status==='done'?'Hecha':'Pendiente', x.completed?localDay(x.completed)+' '+fmtTime(x.completed):'', x.reminder?localDay(x.reminder)+' '+fmtTime(x.reminder):'', repSummary(x.repeat), x.carried?'Sí':'', x.notes||'', vn, localDay(x.created)].map(q).join(';'); });
   return '﻿'+head.map(q).join(';')+'\r\n'+rows.join('\r\n')+'\r\n'; }
 async function exportCSV(){
   const name='tareas-'+todayStr()+'.csv'; const blob=new Blob([csvText()],{type:'text/csv;charset=utf-8'});

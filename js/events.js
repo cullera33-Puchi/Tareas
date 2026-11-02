@@ -122,6 +122,8 @@ function onClick(e){
     case 'postpone': closeRow(row); postponeSheet(row.dataset.id, row); break;
     case 'pickDate': dateSheet(detailId, act); break; // on the desktop a popover anchored to the control (R17)
     case 'pickReminder': reminderSheet(detailId, act); break;
+    case 'pickRepeat': if(detailId) repeatMenu(detailId, UI.wide?act:act.querySelector('.val')||act); break; // decision 38
+    case 'focus': if(detailId) toggleFocus(detailId); break; // decision 39: the star of the detail and of the inspector
     case 'voice': voiceSheet(detailId); break;
     case 'attPhoto': if(detailId) pickPhotos(detailId); break; // decision 29: inside the tap, so iOS offers the camera or the library
     case 'attAudio': if(detailId) recordSheet(detailId); break;
@@ -341,12 +343,14 @@ function asheetDone(){ if(asheetNested&&sheet.classList.contains('on')) closeAct
 /* Decision 28c: on the desktop a confirmation is a macOS alert: a small centred panel with the app icon, a bold title, the text and two
    buttons, Cancelar and the action on the right (red when it destroys). Intro runs the action and Esc cancels; Tab stays between the two
    buttons; the backdrop dims a little. It reuses the action sheet's element, so the modal rules (Escape, the backdrop) apply as they are.
-   o: {title, text, ok, cancel, red (default true), fn, onCancel} */
+   o: {title, text, ok, cancel, red (default true), fn, onCancel, more}. more (decision 38): other actions, [{label, fn, red}]; with them the
+   buttons stack as in a macOS alert with three choices: the action first, the others, Cancelar last */
 let alertFocus=null;
-function macAlert(o){ sheetOpenedAt=performance.now(); asheetNested=sheet.classList.contains('on'); asheetCancel=o.onCancel||null; alertFocus=document.activeElement;
+function macAlert(o){ sheetOpenedAt=performance.now(); asheetNested=sheet.classList.contains('on'); asheetCancel=o.onCancel||null; alertFocus=document.activeElement; const more=o.more||[];
+  const def='<button class="al-btn def'+(o.red===false?'':' red')+'" data-i="0">'+esc(o.ok)+'</button>', cancel='<button class="al-btn" data-i="-1">'+esc(o.cancel||'Cancelar')+'</button>';
   asheet.classList.add('alert'); asheet.innerHTML='<div class="al" role="alertdialog" aria-modal="true" aria-labelledby="alT"'+(o.text?' aria-describedby="alX"':'')+'><img class="al-icon" src="icons/icon-192.png" alt=""><div class="al-t" id="alT">'+esc(o.title)+'</div>'+(o.text?'<div class="al-x" id="alX">'+esc(o.text)+'</div>':'')+
-    '<div class="al-b"><button class="al-btn" data-i="-1">'+esc(o.cancel||'Cancelar')+'</button><button class="al-btn def'+(o.red===false?'':' red')+'" data-i="0">'+esc(o.ok)+'</button></div></div>';
-  asheet.classList.add('on'); scrim.classList.add('on','light'); dimApp(true); asheet.onclick=asheetClick([{fn:o.fn}]);
+    (more.length?'<div class="al-b al-v">'+def+more.map((m,i)=>'<button class="al-btn'+(m.red?' red':'')+'" data-i="'+(i+1)+'">'+esc(m.label)+'</button>').join('')+cancel+'</div>':'<div class="al-b">'+cancel+def+'</div>')+'</div>';
+  asheet.classList.add('on'); scrim.classList.add('on','light'); dimApp(true); asheet.onclick=asheetClick([{fn:o.fn}].concat(more));
   const d=$('.al-btn.def', asheet); if(d) d.focus({preventScroll:true}); }
 const alertOn = () => asheet.classList.contains('on') && asheet.classList.contains('alert');
 window.addEventListener('keydown', e=>{ if(!alertOn()) return; const bs=[...asheet.querySelectorAll('.al-btn')];

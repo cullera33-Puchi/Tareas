@@ -1159,3 +1159,63 @@ body.resizing,body.resizing *{cursor:col-resize !important;-webkit-user-select:n
 .app.desktop .gsec.over,.app.desktop .main [data-gday].over{background:color-mix(in srgb,var(--blue) 8%,transparent);border-radius:8px;}
 .app.desktop .gsec.over > .group-title,.app.desktop .main .group-title[data-gday].over{color:var(--blue);background:color-mix(in srgb,var(--blue) 10%,var(--dmain));}
 .app.desktop .gsec.over > .group-title .gl,.app.desktop .main .group-title[data-gday].over .gl{color:var(--blue);}
+/* Decision 39: Ahora. iPhone: a card at the top of Hoy, above the summary, with compact rows; the star is the system orange */
+.ahora{background:var(--card);border-radius:12px;padding:10px 16px 4px;margin:8px 0 12px;}
+.ahead{display:flex;align-items:center;gap:6px;font-size:0.882rem;font-weight:600;color:var(--ink);}
+.ahead svg{width:15px;height:15px;color:var(--orange);flex:none;}
+.ahead .gn{margin-left:2px;font-weight:500;color:var(--ink2);}
+.ahora .first{margin-top:2px;}
+.ahora .first .row-meta{margin-top:1px;}
+.inds .ist,.inds .irp{display:flex;}
+.inds .ist{color:var(--orange);}
+.nav .actions .action.star.on,.ihead .star.on,.ihead .star.on:hover{color:var(--orange);}
+.ihead .star svg{width:16px;height:16px;}
+.app.desktop .ahora{background:var(--fill);border-radius:8px;padding:2px 0 4px;margin:6px 0 10px;}
+.app.desktop .ahead{font-size:11px;padding:6px 12px 2px;color:var(--ink2);letter-spacing:.2px;gap:5px;}
+.app.desktop .ahead svg{width:11px;height:11px;}
+.app.desktop .ahora .first{margin:0;}
+.app.desktop .ahora .first .row,.app.desktop .ahora .first .row-content{background:transparent;}
+.app.desktop .ahora .first .row + .row .row-content::before{display:none;}
+.app.desktop .ahora .first .row-content{padding:0 8px 0 12px;min-height:32px;}
+.app.desktop .ahora.over,.app.desktop .main .ahoralist.over,.app.desktop .main .empty[data-drop-ahora].over{background:color-mix(in srgb,var(--blue) 10%,var(--fill));box-shadow:inset 0 0 0 1.5px var(--blue);}
+.app.desktop .main .empty[data-drop-ahora]{border-radius:10px;margin:12px 0;padding:40px 20px;}
+.app.desktop .main .empty[data-drop-ahora] svg{color:var(--orange);}
+/* Decisions 38 and 39 in the calendar cards: a small repeat arrow and the Ahora star after the title */
+.wcard .cic{flex:none;display:flex;align-items:center;color:var(--ink3);margin-left:3px;}
+.wcard .cic svg{width:10px;height:10px;}
+.wcard .cic.ist{color:var(--orange);}
+/* Decision 38: Personalizada, a sheet on the iPhone and a popover on the desktop */
+.rp{display:flex;flex-direction:column;gap:12px;}
+.rprow{display:flex;align-items:center;gap:10px;}
+.rpl{font-size:0.941rem;color:var(--ink);flex:none;}
+.rpstep{flex:none;display:flex;align-items:center;background:var(--fill);border-radius:9px;height:36px;}
+.rpstep button{width:40px;height:36px;font-size:1.2rem;color:var(--blue);display:flex;align-items:center;justify-content:center;}
+.rpstep button:disabled{color:var(--ink3);}
+.rpstep b{min-width:28px;text-align:center;font-variant-numeric:tabular-nums;font-size:0.941rem;}
+.seg.rpseg{flex:1;margin:0;}
+.seg.rpseg button{height:32px;font-size:0.824rem;}
+.rplbl{font-size:0.765rem;color:var(--ink2);margin:0 0 -4px;}
+.rpdays{display:flex;justify-content:space-between;gap:4px;}
+.rpdays button{width:40px;height:40px;border-radius:50%;background:var(--fill);font-size:0.882rem;font-weight:600;color:var(--ink);}
+.rpdays button.on{background:var(--blue);color:#fff;}
+.chips.rpord{margin:0;}
+.rpsum{font-size:0.882rem;color:var(--ink2);text-align:center;min-height:1.2em;}
+.rp .sheet-actions{margin-top:2px;}
+.rp .btn:disabled{opacity:.4;}
+.pm-pop .rp{gap:10px;}
+.pm-pop .rpl{font-size:13px;}
+.pm-pop .rpstep{height:24px;border-radius:6px;}
+.pm-pop .rpstep button{width:26px;height:24px;font-size:15px;border-radius:6px;}
+.pm-pop .rpstep button:not(:disabled):hover{background:var(--fill2);}
+.pm-pop .rpstep b{min-width:22px;font-size:13px;}
+.pm-pop .seg.rpseg button{height:22px;font-size:12px;}
+.pm-pop .rplbl{font-size:11px;}
+.pm-pop .rpdays button{width:30px;height:30px;font-size:12px;}
+.pm-pop .rpdays button:not(.on):hover{background:var(--fill2);}
+.pm-pop .rpsum{font-size:12px;}
+.pm-pop .chips.rpord{gap:4px;}
+.pm-pop .chips.rpord .chip{padding:0 7px;}
+/* Decision 38: a macOS alert with three choices stacks its buttons, the action first and Cancelar last */
+.asheet .al-b.al-v{flex-direction:column;gap:6px;}
+.asheet .al-b.al-v .al-btn{flex:none;width:100%;}
+.asheet .al-btn.red:not(.def){color:var(--red);}

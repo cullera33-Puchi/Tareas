@@ -259,7 +259,7 @@ body.desktop .toast{left:auto;right:28px;bottom:28px;width:360px;}
 .row.done.byday .row-title{text-decoration:none;} /* R3: the Completadas day groups already say they are done */
 .row-meta{display:block;font-size:0.765rem;color:var(--ink2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .row-meta .dot{display:inline-block;width:8px;height:8px;border-radius:50%;vertical-align:middle;margin-right:5px;position:relative;top:-1px;}
-.row-meta .sep{color:var(--ink3);margin:0 6px;}
+.app:not(.desktop) .row-meta>span+span{margin-left:.75em;} /* decision 27d: the items are kept apart by space, with no middle dot */
 .tag{display:inline-block;padding:1px 7px;border-radius:6px;font-size:0.706rem;font-weight:500;color:var(--tagl,var(--pc));background:var(--tagbg);vertical-align:1px;max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 /* R3: text and background colours of a project capsule come from tagVars, above 4.4:1 in both themes */
 @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .tag{color:var(--tagd,var(--pc));background:var(--tagbgd,var(--tagbg));} }
@@ -1675,7 +1675,7 @@ function rowHTML(x, opts={}){
   return '<div class="row'+(done?' done':'')+(held?' held':'')+(opts.byDay?' byday':'')+(selected?' selected':'')+'" data-id="'+x.id+'"'+(pc?' style="'+tagVars(pc)+'"':'')+'>'+
     (opts.simple||selecting?'':'<div class="row-bg left"><span>'+I.check+'</span></div><div class="row-bg right"><button class="b-tomorrow" data-act="postpone">Aplazar</button><button class="b-delete" data-act="delete">Eliminar</button></div>')+
     '<div class="row-content">'+(selecting?'<span class="selbox">'+I.check+'</span>':'<button class="check'+(shownDone?' done':'')+'" data-act="check" aria-label="Completar">'+I.check+'</button>')+
-    '<div class="row-text"><div class="row-title">'+esc(x.title||'Sin título')+'</div>'+(meta.length?'<div class="row-meta">'+meta.join('<span class="sep">·</span>')+'</div>':'')+'</div>'+(ind?'<span class="inds">'+ind+'</span>':'')+pri+(UI.wide&&!selecting&&!opts.simple?'<button class="rowmore" data-act="rowMenu" aria-label="Más">'+I.more+'</button>':'')+'</div></div>';
+    '<div class="row-text"><div class="row-title">'+esc(x.title||'Sin título')+'</div>'+(meta.length?'<div class="row-meta">'+meta.join('')+'</div>':'')+'</div>'+(ind?'<span class="inds">'+ind+'</span>':'')+pri+(UI.wide&&!selecting&&!opts.simple?'<button class="rowmore" data-act="rowMenu" aria-label="Más">'+I.more+'</button>':'')+'</div></div>';
 }
 /* R11: a desktop row is one line of 32 px: circle, title and project capsule, then right-aligned columns for the notes and voice
    indicators, the date (or "Aplazada", or when it was done), the reminder and the priority. The R3 rules decide what each column says */
@@ -2010,7 +2010,7 @@ function onClick(e){
     case 'searchDone': UI.searchDone=true; render(); break;
     case 'toggleSummary': toggleSummary(); break;
     case 'toggleDone': DB.settings.doneOpen=!DB.settings.doneOpen; save(); render(); break;
-    case 'add': addSheet(act.dataset.project||null); break;
+    case 'add': if(act.dataset.project!==undefined) addSheet(act.dataset.project||null); else addFromList(); break; // a project screen keeps its project
     case 'convertLines': { const id=detailTaskId(); if(id){ flushEdits(); convertNoteLines(id); } break; }
     case 'spaceMenu': spaceMenu(act); break;
     case 'back': pop(); break;
@@ -2156,6 +2156,23 @@ function bindVnGestures(el){ if(el._vnb) return; el._vnb=1; let c=null,x0=0,y0=0
     else if(dx<-50){ c.style.transform='translate3d(-88px,0,0)'; el.dataset.open='l'; openVn=el; }
     else closeVn(el); };
   el.addEventListener('touchend',end); el.addEventListener('touchcancel',()=>{ mode=null; closeVn(el); }); }
+/* Decision 27c: while a row's buttons (or a voice note's) are showing, the first touch anywhere else only closes it, as on iOS. That touch
+   reaches no other handler (no detail, filter, figure, tab, button, long press, row swipe, tab slide or pull to refresh) and its click is
+   dropped; the list may still scroll under it (native scrolling is left alone), but nothing acts on it. The open row's own buttons, and a
+   sheet or menu on top, work as usual */
+const shut={on:false, x:0, y:0, moved:false, t:0};
+function shutOpen(){ if(UI.wide) return null; if(openRow&&!openRow.isConnected) openRow=null; if(openVn&&!openVn.isConnected) openVn=null; return openRow||openVn; }
+window.addEventListener('touchstart', e=>{ shut.t=0; // the click of the last tap, if any, came already
+  if(shut.on){ e.stopPropagation(); return; } // a second finger during that touch
+  const o=shutOpen(); if(!o||o.contains(e.target)) return;
+  if(sheet.classList.contains('on')||asheet.classList.contains('on')||PM) return;
+  const t=e.touches[0]; Object.assign(shut, {on:true, x:t.clientX, y:t.clientY, moved:false});
+  if(o===openRow) closeRow(o); else closeVn(o); e.stopPropagation(); }, {capture:true, passive:true});
+window.addEventListener('touchmove', e=>{ if(!shut.on) return; const t=e.touches[0]; if(t&&Math.hypot(t.clientX-shut.x, t.clientY-shut.y)>10) shut.moved=true; e.stopPropagation(); }, {capture:true, passive:true});
+const shutEnd=e=>{ if(!shut.on) return; e.stopPropagation(); if(e.touches.length) return; shut.on=false;
+  if(e.type==='touchend'&&!shut.moved){ if(e.cancelable) e.preventDefault(); shut.t=performance.now(); } }; // a tap: no click, no focus
+window.addEventListener('touchend', shutEnd, {capture:true, passive:false}); window.addEventListener('touchcancel', shutEnd, {capture:true, passive:true});
+document.addEventListener('click', e=>{ if(shut.t&&performance.now()-shut.t<500){ shut.t=0; e.stopPropagation(); e.preventDefault(); } }, true); // a browser that still sends the click
 function deleteVoiceNote(vid){ const i=DB.voiceNotes.findIndex(v=>v.id===vid); if(i<0) return; const [v]=DB.voiceNotes.splice(i,1); if(task(v.taskId)) updTask(v.taskId,{}); else save(); haptic(14); render(); log('info','Nota de voz eliminada');
   toast('Nota de voz eliminada', ()=>{ if(!DB.voiceNotes.some(x=>x.id===v.id)) DB.voiceNotes.push(v); save(); render(); }); }
 function editVoiceNote(vid){ const v=DB.voiceNotes.find(x=>x.id===vid); if(v) voiceSheet(v.taskId, v.id); }
@@ -2581,6 +2598,12 @@ function sheadHTML(title, cancel, ok){ return '<div class="shead"><button class=
    Each icon opens a strip of options above the bar without taking the focus from the field, so the keyboard stays up and Enter keeps adding.
    What the title says (R7: date, '#proyecto', '!!', 'a las 9') wins over a pick; a value picked by hand stays for the next task.
    Pasting two or more lines (R6) turns the sheet into a list that Añadir creates in one go. A long press on Añadir adds and opens. */
+// The project of the active project filter, if it still exists ('none', Sin proyecto, gives no project)
+const filterProject = () => { const f=UI.projFilter; return f&&f!=='none'&&activeProjects().some(p=>p.id===f)?f:null; };
+/* Decision 27b: on the iPhone, the + and Añadir tarea of the Tareas list showing Hoy (not a search) propose today and the project of the
+   active filter, as removable tokens; Todas proposes nothing */
+function addFromList(){ const hoy=UI.wide?UI.deskView==='hoy':UI.tab==='tareas'&&DB.settings.filter==='hoy';
+  if(!hoy||UI.query){ addSheet(null); return; } addSheet(filterProject(), '', {date:todayStr()}); }
 function addSheet(projectId){
   const prefill=arguments[1]||'', preset=arguments[2]||{};
   const st={date:preset.date||null, projectId:projectId||null, priority:'none', open:null, ym:null, lines:null, added:0, msg:'', warn:false};
@@ -2716,7 +2739,11 @@ function dateSheet(id, src){ const x=task(id); if(!x) return; const t=todayStr()
   let ym=(x.date||t).slice(0,7);
   pickerPanel('Fecha', '<div class="chips" style="margin-top:0">'+uniqueBy(chips, c=>c[0]).map(c=>'<button class="chip'+(x.date===c[0]?' on':'')+'" data-d="'+c[0]+'">'+c[1]+'</button>').join('')+'</div><div id="calwrap">'+calendarHTML(ym, x.date)+'</div>', id, src, 'pickDate', (s, done)=>{
     s.onclick=e=>{ const nav=e.target.closest('[data-cal]'); if(nav){ ym=shiftMonth(ym,+nav.dataset.cal); $('#calwrap',s).innerHTML=calendarHTML(ym, x.date); return; }
-      const c=e.target.closest('[data-d]'); if(c){ if(pickFresh(e)){ log('warn','Toque en el calendario ignorado justo al abrir'); return; } releaseHold(id); updTask(id,{date:c.dataset.d||null}); haptic(6); done(); render(); } }; }); }
+      const c=e.target.closest('[data-d]'); if(c){ if(pickFresh(e)){ log('warn','Toque en el calendario ignorado justo al abrir'); return; } releaseHold(id); setManualDate(id, c.dataset.d||null); haptic(6); done(); render(); } }; }); }
+/* Decision 27a: the Fecha picker (iPhone sheet, desktop popover and inspector) takes a reminder set on the old day to the new day, at the
+   same time, as decision 25, and says so with Deshacer. Sin fecha leaves the reminder alone (dayPatch only moves it to a date) */
+function setManualDate(id, d){ const x=task(id); if(!x) return; const old=daySnap(x), p=dayPatch(x, d); updTask(id, p);
+  if(p.reminder&&p.reminder!==old.reminder){ log('info','Recordatorio movido con la fecha', {from:old.reminder, to:p.reminder}); toast('Movida a '+fmtDate(d).toLowerCase()+', recordatorio a las '+fmtTime(p.reminder), ()=>undoDay(old)); } }
 function reminderSheet(id, src){ const x=task(id); if(!x) return; const t=todayStr(); const pad=n=>String(n).padStart(2,'0');
   const tm=new Date(); tm.setDate(tm.getDate()+1); tm.setHours(9,0,0,0);
   const now=new Date(); const h1=new Date(Math.ceil((now.getTime()+36e5)/3e5)*3e5); const e18=new Date(); e18.setHours(18,0,0,0);
@@ -3697,7 +3724,9 @@ function deskSide(){
 }
 function addBarHTML(projectId){ return '<div class="addbar">'+I.plus+qinHTML('<input type="text" placeholder="Nueva tarea… mañana, a las 9, !! o #proyecto" data-role="addbar"'+(projectId?' data-project="'+projectId+'"':'')+' value="'+esc(UI.addDraft||'')+'" autocomplete="off" spellcheck="false">')+'<span class="kbd">N</span></div><div class="addhint" id="deskSaid"></div>'+pasteBoxHTML(projectId); }
 // The desktop add bar starts from today in Hoy and from the project in a project view; the title can say otherwise (R7)
-function deskAddBase(projectId){ return {date:UI.deskView==='hoy'?todayStr():null, projectId:projectId||null, priority:'none'}; }
+// Decision 27b: in Hoy it also takes the project of the active project filter (the list ignores the filter during a search, so does the bar)
+function deskAddBase(projectId){ const hoy=UI.deskView==='hoy', pf=hoy&&!projectId&&!UI.query?filterProject():null;
+  return {date:hoy?todayStr():null, projectId:projectId||pf, priority:'none'}; }
 // R6: a list pasted into the desktop add bar waits under it until it is created or dropped
 function pasteBoxHTML(projectId){ const ls=UI.addPaste; if(!ls||!ls.length) return ''; const b=deskAddBase(projectId); const n=ls.length+' '+(ls.length===1?'tarea':'tareas');
   return '<div class="pastebox"><div class="plhead"><span>'+n+'</span></div><div class="plist">'+ls.map((l,i)=>{ const r=quickTask(l,b); return '<div class="pl"><span class="t">'+esc(r.title||l)+'</span><span class="m">'+esc(quickMeta(r))+'</span><button class="x" data-paste-rm="'+i+'" aria-label="Quitar">×</button></div>'; }).join('')+'</div><div class="sheet-actions"><button class="btn" data-paste="cancel">Cancelar</button><span style="flex:1"></span><button class="btn primary" data-paste="ok">Crear '+n+'</button></div></div>'; }

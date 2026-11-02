@@ -14,6 +14,8 @@ const srv = http.createServer((req,res)=>{ let p = decodeURIComponent(req.url.sp
   const sw = await page.evaluate(async()=>{ const r=await navigator.serviceWorker.getRegistration(); return r? (r.active?'active':r.installing?'installing':r.waiting?'waiting':'registered'):'none'; });
   const manifest = await page.evaluate(async()=>{ const r=await fetch('manifest.webmanifest'); return r.status+' '+(await r.json()).name; });
   const icon = await page.evaluate(async()=>(await fetch('icons/icon-192.png')).status);
+  // The stylesheet applied (a server sending css/app.css with a wrong type leaves the page unstyled without any script error)
+  if(!(await page.evaluate(()=>[...document.styleSheets].some(s=>{ try{ return s.cssRules.length>100; }catch(e){ return false; } })))) errors.push('stylesheet not applied');
   await page.screenshot({path:'01-home.png'});
   // Add a task via the quick-add sheet
   await page.click('.fab'); await page.waitForTimeout(400);
@@ -33,6 +35,10 @@ const srv = http.createServer((req,res)=>{ let p = decodeURIComponent(req.url.sp
   await page.waitForTimeout(500); await ctx.setOffline(true);
   let offline='failed'; try{ await page.reload({waitUntil:'load'}); offline = await page.$eval('.nav .title', e=>e.textContent.trim()); }catch(e){ offline='failed: '+e.message.split('\n')[0]; }
   await ctx.setOffline(false);
+  // Every stylesheet and script index.html loads (but the optional config.js) is in the service worker's SHELL, or the installed app cannot start offline
+  { const html=fs.readFileSync(path.join(ROOT,'index.html'),'utf8'), sw=fs.readFileSync(path.join(ROOT,'sw.js'),'utf8');
+    const shell=(sw.match(/const SHELL = \[([^\]]*)\]/)||['',''])[1]; const used=[...html.matchAll(/<(?:script[^>]*src|link[^>]*rel="stylesheet"[^>]*href)="([^"]+)"/g)].map(m=>m[1]).filter(u=>u!=='config.js');
+    used.filter(u=>!shell.includes("'./"+u+"'")).forEach(u=>errors.push('not in sw.js SHELL: '+u)); }
   if(offline!=='Trabajo') errors.push('offline start failed: '+offline); // the service worker serves the whole app without network
   console.log(JSON.stringify({sw, manifest, icon, rows, detailTitle, ver, offline, errors}, null, 1));
   await browser.close(); srv.close();

@@ -6,36 +6,59 @@ Instrucciones de trabajo para Claude Code. Léelo entero antes de tocar código.
 
 App web personal de gestión de tareas para iPhone (PWA instalada en pantalla de inicio), con aspecto y comportamiento de app nativa de iOS. Un solo usuario de momento (Enric). Más adelante, versión de escritorio y uso compartido por espacios.
 
-## 2. Estado actual (31 de octubre de 2026)
+## 2. Estado actual (2 de noviembre de 2026)
 
-- Existe una **v0.1 funcional** en un solo archivo, `tareas.html`, construida desde el chat de Claude y publicada como artefacto. Sin dependencias, sin build, datos en `localStorage` del dispositivo.
-- Cubre los bloques 1 a 7 del plan de construcción: espacios Trabajo y Personal, resumen del día, lista única con filtros Hoy y Todas, búsqueda, añadir rápido, detalle (proyecto, fecha, recordatorio, prioridad, notas), gestos de fila, Deshacer, proyectos con color, notas de voz por dictado (Web Speech API con respaldo de teclado), Compartir por Web Share, exportar e importar JSON, tema automático, claro u oscuro.
-- No existe todavía: repositorio, Supabase, inicio de sesión, sincronización, notificaciones push.
-- Ese archivo `tareas.html` es el punto de partida. Conserva su comportamiento y su aspecto; no lo reescribas desde cero.
+- Versión publicada: **v0.20.1**. El repositorio `tareas` está en GitHub y se publica con GitHub Pages desde la rama `main`. Enric la usa instalada en el iPhone (pantalla de inicio) y en el navegador del ordenador.
+- Sigue sin build ni dependencias de interfaz: HTML, CSS y JavaScript que se publican tal cual. El antiguo `index.html` de un solo archivo está repartido en `css/app.css` y en scripts clásicos dentro de `js/`, con el mismo comportamiento y el mismo aspecto.
+- Hecho: bloques 1 a 7 (v0.1), roadmap R1 a R20 (v0.15.0), escritorio a partir de 900 px con barra lateral, inspector, Semana, Día, Mes y vista por horas (v0.13.0 y v0.15.0), sincronización con Supabase e inicio de sesión con Google (bloque 8, v0.16.0), recordatorios con Web Push y la función `send-reminders` (bloque 9, v0.17.0), fotos y audios adjuntos en Supabase Storage (v0.19.0) y el lote de v0.20.0 (puntos 31 a 36 de la sección 8).
+- Datos: `localStorage` del dispositivo (clave `tareas-v1`) como verdad para la interfaz; copias diarias y archivos adjuntos en IndexedDB; Supabase sincroniza cuando hay sesión.
+- Pruebas de regresión en el repositorio (`tests/`), que GitHub Actions ejecuta antes de cada publicación (sección 7 bis).
 
-## 3. Primer encargo (actividad prioritaria)
+## 3. Primer encargo (hecho)
 
-1. Crear el repositorio en GitHub (`tareas`) y activar GitHub Pages desde la rama principal.
-2. Subir `tareas.html` como `index.html` en la raíz, añadir `manifest.webmanifest` (nombre "Tareas", `display: standalone`, iconos 192 y 512, `background_color` #F2F2F7, `theme_color` #F9F9F9) y un `sw.js` mínimo con caché de la app y aviso de nueva versión.
-3. Comprobar en el iPhone, instalada en pantalla de inicio: arranque, gestos, dictado, Compartir, insignia.
-4. Solo cuando lo anterior funcione, continuar con el bloque 8 (Supabase) del plan de construcción.
+Cerrado. Repositorio en GitHub con GitHub Pages, la app en `index.html` en la raíz, `manifest.webmanifest` (nombre "Tareas", `display: standalone`, iconos 192 y 512, `background_color` #F2F2F7, `theme_color` #F9F9F9) y `sw.js` con caché de la app y aviso de nueva versión. Comprobado en el iPhone instalado: arranque, gestos, dictado, Compartir e insignia. Después se hicieron los bloques 8 y 9.
 
-Decisión sobre la migración a Vite y React que menciona el diseño: **no es obligatoria**. Si la app crece y el único archivo se vuelve difícil de mantener, migrar en un bloque propio, manteniendo el CSS y los gestos actuales. Mientras tanto, seguir en HTML, CSS y JavaScript sin build es aceptable y más rápido de desplegar.
+Decisión sobre la migración a Vite y React que menciona el diseño: **no es obligatoria**. Si la app crece y los archivos se vuelven difíciles de mantener, migrar en un bloque propio, manteniendo el CSS y los gestos actuales. Mientras tanto, seguir en HTML, CSS y JavaScript sin build, repartido en archivos por tema, es aceptable y más rápido de desplegar.
 
-## 4. Estructura propuesta del repositorio
+## 4. Estructura del repositorio
 
 ```
 tareas/
-├── index.html          app completa (v0.1 parte de tareas.html)
+├── index.html                 esqueleto de la página: cabecera, contenedores fijos y la carga de css y js
+├── css/app.css                todo el estilo: tokens claro y oscuro, iPhone y escritorio
+├── js/                        la app, en scripts clásicos que index.html carga en este orden
+│   ├── core.js                APP_VERSION, registro, utilidades, datos, estado de la interfaz y acciones
+│   ├── render.js              dibujo de pantallas y repintado parcial
+│   ├── events.js              eventos comunes, búsqueda, navegación, gestos de fila y hojas
+│   ├── menus.js               menús anclados del iPhone y menús de Mac del escritorio
+│   ├── sheets.js              hojas y recorridos: alta, selección, cierre del día, fechas, copias, exportar
+│   ├── attachments.js         fotos y audios adjuntos
+│   ├── sync.js                sincronización con Supabase (bloque 8)
+│   ├── push.js                notificaciones (bloque 9)
+│   ├── lifecycle.js           vida de la app: teclado, insignia, cambio de día, recarga entre ventanas
+│   ├── desktop.js             escritorio: vistas, selección, teclado, barra lateral y columna
+│   ├── desktop-calendar.js    escritorio: Día, Semana, Mes, horas y mini mes
+│   ├── desktop-render.js      escritorio: inspector y renderDesktop
+│   ├── desktop-add.js         escritorio: selector de hora, alta ampliada y eventos
+│   └── boot.js                arranque: primera pantalla, sincronización, service worker
+├── config.js                  URL y clave pública de Supabase; lo escribe la publicación y git lo ignora
 ├── manifest.webmanifest
-├── sw.js               service worker: caché y aviso de actualización
-├── icons/              192 y 512 px
-├── supabase/           migraciones SQL y Edge Functions (bloques 8 y 9)
-├── CLAUDE.md           este archivo
-└── CHANGELOG.md        lo entregado en cada bloque
+├── sw.js                      service worker: caché de la app (SHELL), aviso de actualización y notificaciones
+├── icons/                     192, 512 y apple-touch-icon
+├── vendor/                    supabase-js 2.117.3 (UMD), servida y cacheada con la app
+├── supabase/                  migraciones SQL (0001 a 0003) y la función send-reminders
+├── tests/                     pruebas de regresión con Playwright (sección 7 bis)
+├── package.json               solo para las pruebas; la app no tiene build
+├── .github/workflows/pages.yml   pruebas y publicación
+├── CLAUDE.md                  este archivo
+└── CHANGELOG.md               lo entregado en cada versión
 ```
 
-Si se migra a Vite: `src/` con `app`, `data`, `ui` y `sync`, y `public/` para manifest e iconos. GitHub Pages pasa a desplegar `dist/` con una acción.
+Reglas de la división en archivos:
+
+- Son scripts clásicos (sin módulos ni build) y comparten sus nombres globales; el orden de `index.html` es el orden de carga.
+- Al cargar, cada archivo solo declara funciones, constantes y escuchas. Lo que arranca la app (primera pantalla, `?task` y `?add`, sincronización, notificaciones, service worker) está en `boot.js`, el último, porque necesita el código de todos los demás.
+- Un archivo nuevo en `js/` o `css/` se añade en su sitio en `index.html` y en `SHELL` de `sw.js`; si falta en `SHELL`, la app instalada no arranca sin conexión. Una carpeta nueva se añade además al paso «Assemble the site» de la publicación.
 
 ## 5. Reglas fijas
 
@@ -46,30 +69,50 @@ Si se migra a Vite: `src/` con `app`, `data`, `ui` y `sync`, y `public/` para ma
 5. Cada bloque se cierra probando en el iPhone instalado en pantalla de inicio, y se anota en `CHANGELOG.md`.
 6. Cualquier función no descrita en el diseño, cualquier cambio en el modelo de datos y cualquier opción de configuración nueva se pregunta antes de implementar.
 7. Los datos locales son la verdad para la interfaz. Supabase sincroniza; nunca bloquea la pantalla.
-8. Cada versión publicada sube `APP_VERSION` en `index.html` y la constante `CACHE` en `sw.js`; sin ese cambio los iPhone instalados no reciben el aviso de nueva versión.
+8. Cada versión publicada sube `APP_VERSION` en `js/core.js` y la constante `CACHE` en `sw.js`; sin ese cambio los iPhone instalados no reciben el aviso de nueva versión.
 
 ## 6. Plan de construcción (resumen)
 
 | Bloque | Contenido | Estado |
 | --- | --- | --- |
-| 1 a 7 | Esqueleto, datos locales, resumen del día, detalle y gestos, proyectos, notas de voz, compartir | Hecho en v0.1 (localStorage, sin PWA completa) |
-| 0 bis | Repositorio, GitHub Pages, manifest, service worker | Pendiente, prioritario |
+| 1 a 7 | Esqueleto, datos locales, resumen del día, detalle y gestos, proyectos, notas de voz, compartir | Hecho en v0.1 |
+| 0 bis | Repositorio, GitHub Pages, manifest, service worker | Hecho y probado en el iPhone instalado |
 | 8 | Supabase: tablas, RLS por espacio, Google, sincronización con cola y tiempo real | Hecho en v0.16.0 y probado por Enric en iPhone y ordenador (2 de noviembre) |
 | 9 | Recordatorios con Web Push, Edge Function con pg_cron, insignia | Hecho en v0.17.0 y probado por Enric en el iPhone: prueba y aviso con la app cerrada (2 de noviembre) |
-| 10 | Ajustes: cuenta, notificaciones, exportar, archivados | Parcial (sin cuenta ni notificaciones) |
+| 10 | Ajustes: cuenta, notificaciones, exportar, archivados | Hecho: Cuenta (iniciar y cerrar sesión, estado de la sincronización), Notificaciones (activar, dispositivos, prueba y baja), exportar e importar JSON y CSV, proyectos archivados y versión con aviso de actualización |
 
-## 7. Mapa del código de v0.1 (`tareas.html`)
+## 7. Mapa del código
 
-- CSS: tokens en `:root` (claro) con variantes oscuras por `prefers-color-scheme` y `data-theme`.
-- `DB`: objeto único en `localStorage` bajo la clave `tareas-v1` con `spaces`, `projects`, `tasks`, `voiceNotes` y `settings`.
-- `render()`: pinta la pestaña activa (`viewTareas`, `viewProyectos`, `viewAjustes`) y la pila de pantallas (`viewDetail`, `viewProject`). Cada pestaña conserva su scroll.
-- Navegación: `push`, `pop`, `bindBackSwipe` (volver deslizando desde el borde con seguimiento del dedo).
-- Gestos de fila: `bindRowGestures` (derecha completa, izquierda Mañana y Eliminar, pulsación larga prioridad).
-- Hojas: `openSheet`, `actionSheet`, `addSheet`, `projectSheet`, `dateSheet`, `reminderSheet`, `voiceSheet`, `importSheet`.
-- `shareTask` compone el texto y usa `navigator.share`; `exportJSON` e `importSheet` cubren la portabilidad.
-- `badge()` actualiza la insignia del icono con `navigator.setAppBadge` cuando existe.
+Los datos: `DB` es un objeto único en `localStorage` bajo la clave `tareas-v1` con `spaces`, `projects`, `tasks`, `voiceNotes`, `attachments` y `settings`. En Supabase cada entidad conserva sus campos y añade `owner_id`; `spaceId`, `projectId` y `taskId` pasan a `space_id`, `project_id` y `task_id`.
 
-Al migrar a Supabase, cada entidad conserva sus campos y añade `owner_id`; `spaceId`, `projectId` y `taskId` pasan a `space_id`, `project_id` y `task_id` en las tablas.
+- `index.html`: cabecera (manifest, iconos, `css/app.css`), los contenedores fijos (`#app`, `#scrim`, `#sheet`, `#asheet`, `#pmenu`, `#toast`) y la carga de `config.js` y de `js/` en orden.
+- `css/app.css`: tokens en `:root` (claro) con variantes oscuras por `prefers-color-scheme` y `data-theme`; iPhone primero y escritorio bajo `.app.desktop`.
+- `js/core.js`: `APP_VERSION`; registro (`log`, clave `tareas-log`); fechas y alta escrita (`parseQuickDate`, `parseQuick`, `quickTask`); enlaces (`extractLinks`, `linkify`); datos (`load`, `save`, `batch`, `saveEdit`, `flushEdits`, `orderTasks`, `pendingFor`); estado `UI` y `AX`; `toast` con Deshacer; acciones (`addTask`, `updTask`, `dayPatch`, `rollOver`, `completeTask`, `toggleHold`, `flushHeld`, `deleteTask`, `addSpace`, `deleteSpace`, `addProject`).
+- `js/render.js`: `render`, `renderNow` y `renderPushed`; animaciones `renderAnimated` (FLIP); repintado parcial (`morphInto`, `lazyRows`, `fillRows`); `switchTab` y deslizamiento entre pestañas; filas (`rowHTML`, `deskRowHTML`, `tagVars`); resumen (`summaryHTML`); listas agrupadas (`listHTML`, `dayGroupsHTML`, `projectGroupsHTML`); pantallas (`viewTareas`, `viewProyectos`, `viewProject`, `viewAjustes`, `viewDetail`, `inspectorHTML`, `bindDetail`).
+- `js/events.js`: `onClick` y `bindCommon`; búsqueda (`bindSearch`); pila de pantallas (`push`, `pop`, `openDetail`, `detailTaskId`, `bindBackSwipe`); gestos de fila (`bindRowGestures`, `bindVnGestures`, `shutOpen`, `bindLongPress`); hojas (`openSheet`, `closeSheet`, `requestCloseSheet`, `actionSheet`, `confirmSheet`, `macAlert`).
+- `js/menus.js`: menús anclados del iPhone (`popMenu`, `closeMenu`); menús de Mac (`macMenu`, `pickerPanel`, `deskTaskMenu`); cambios desde menú (`setPriority`, `moveToProject`, `moveToSpace`, `setTaskDate`, `dateMenu`, `postponeMenu`, `duplicateTask`, `confirmDelete`, `detailMenu`).
+- `js/sheets.js`: selección múltiple (`startSelect`, `bulkComplete`, `bulkMove`, `rescheduleMany`); cerrar el día y repasos (`closeDaySheet`, `reviewStart`, `reviewStep`); opciones de vista (`viewMenu`, `spaceMenu`, `rowMenu`, `dayHeadMenu`); proyectos (`reorderProject`, `projectSheet`); alta (`addSheet`, `addMany`); espacios (`spaceSheet`, `confirmDeleteSpace`); calendario y fechas (`calendarHTML`, `dateSheet`, `setManualDate`, `reminderSheet`); planificar (`planStart`, `planStep`); notas de voz (`voiceSheet`); compartir (`shareText`, `shareTask`); copias locales (`BK`, `dailyBackup`, `restoreBackup`, `deleteBackup`); exportar e importar (`exportJSON`, `exportCSV`, `importData`, `importSheet`); datos de prueba (`generateDemo`).
+- `js/attachments.js`: archivos del dispositivo (`FS`, `FILE_CAP`); fotos (`processPhoto`, `addPhotos`); cola de subida (`attFlush`); descarga (`attDownload`); grupo Adjuntos (`attGroupHTML`); reproductor (`AP`); grabación (`recordSheet`); visor (`openViewer`); fotos arrastradas en escritorio (`attBindDrop`).
+- `js/sync.js`: adaptador `supabaseRemote` (sustituible en pruebas con `SY.remote`); `syncMerge`, `syncPull`, `syncPush`, `syncRun`, `syncRealtime`; arranque `syncBoot`; sesión (`syncSignIn`, `syncSignOutSheet`); sección Cuenta (`syncAccountHTML`).
+- `js/push.js`: estado `PS` (clave `tareas-push`); `pushEnable`, `pushSubscribe`, `pushCheck`, `pushRevokeSheet`, `pushTest`, `pushSignOut`; sección Notificaciones (`pushSectionHTML`, `pushDevicesHTML`); apertura desde un aviso (`openTaskFromPush`).
+- `js/lifecycle.js`: tirar para sincronizar (`bindPullRefresh`); agitar para deshacer (`armShake`); teclado (`kbFallback`); insignia (`badge`); cambio de día (`checkDay`, envoltura de `render`); `tipsSheet`; vuelta a Hoy (`returnHome`); varias ventanas (`reloadFromStorage`, `reloadIfChanged`).
+- `js/desktop.js`: vistas (`setDeskView`, `applyWide`); fila seleccionada y teclado (`paintSel`, `deskRowClick`, `moveSel`, `deskShortcut`, `startRowEdit`); selección múltiple (`multiPaneHTML`, `bulkDateMenu`); soltar en grupos (`dropToDay`, `dropToProject`, `dropMany`); barra lateral y columna (`deskSide`, `deskMain`, `addBarHTML`).
+- `js/desktop-calendar.js`: semana laboral (`workWeekOn`); navegación (`calNav`, `calDays`); vistas `weekListHTML`, `hoursHTML`, `monthHTML`, `weekHTML`, `miniMonthHTML`, `agendaHTML`; bandeja Sin fecha (`trayHTML`).
+- `js/desktop-render.js`: `renderDesktop`; panel (`deskPaneHTML`, `putPane`, `paneWidth`); ventana de Semana (`placeWeekPop`); búsqueda (`deskResults`); barra de alta (`bindAddBar`).
+- `js/desktop-add.js`: selector de hora (`timePickHTML`, `bindTimePick`, `parseHM`); alta ampliada (`axOpen`, `axSubmit`, `axVoice`, `axBind`); tarjetas soltadas (`dropTask`); eventos del escritorio (`bindDeskEvents`) y atajos de teclado.
+- `js/boot.js`: arranque (registro de inicio, filtro Hoy, `rollOver` y primera pantalla, copia diaria, entradas `?task` y `?add`, consejos), `syncBoot`, `pushCheck` y el service worker con `applyUpdate`.
+- `sw.js`: `CACHE` y `SHELL` (todos los archivos de la app), `config.js` primero por red, navegación siempre a `index.html` en caché, `push` y `notificationclick`.
+- `supabase/`: `migrations/0001_init.sql` (tablas y reglas), `0002_push.sql` (suscripciones, claves y `pg_cron`), `0003_attachments.sql` (adjuntos y purga) y `functions/send-reminders/index.ts`.
+
+## 7 bis. Cómo probar
+
+- Una vez: `npm ci` y `npx playwright install chromium`. Para `rm-P` y `rm-AT` hace falta Deno: `deno` en el PATH o la variable `DENO` con su ruta.
+- `npm test` ejecuta la batería completa (`tests/run.sh`), una prueba detrás de otra; `bash tests/run.sh smoke rm-S` ejecuta solo las indicadas. Si falta `config.js`, lo crea con valores nulos, como la publicación sin secretos.
+- Cada prueba levanta su propio servidor en un puerto fijo, abre Chromium con Playwright y deja capturas, descargas y su salida completa en `tests/out/` (ignorada por git). Pasa si termina sin error y todas sus listas `errors` y `fails` están vacías. Una prueba que falla se repite una vez y el resumen dice cuáles pasaron al repetir.
+- `settings` lanza a propósito un «Error de prueba» para comprobar el registro: es su resultado esperado y el resumen lo da por bueno.
+- `rm-P` y `rm-AT` prueban también las migraciones SQL con PGlite y la función `send-reminders` con Deno, contra un servidor simulado.
+- En GitHub, cada envío a `main` (y el lanzamiento a mano) pasa primero por el trabajo `test` (Node 22, Chromium, Deno 2.9.6, límite de 45 minutos). Si falla, no se publica y la salida queda como artefacto `test-output`. El trabajo `deploy` copia a `_site` solo la app (`index.html`, `manifest.webmanifest`, `sw.js`, `config.js`, `icons`, `vendor`, `css` y `js`) y publica esa carpeta.
+- Una prueba nueva va en `tests/<nombre>.js` con un puerto propio, imprime un JSON con su lista `errors`, termina con código distinto de cero si falla, y se añade a la lista de `tests/run.sh`.
 
 
 ## 8. Decisiones tomadas tras la v0.1
@@ -116,6 +159,9 @@ Cambios acordados con Enric sobre el diseño de abajo. Mandan sobre el texto del
 35. **Semana laboral por espacio en escritorio (pedido por Enric el 2 de noviembre).** Opción de vista «Solo de lunes a viernes» por espacio, en el menú de vista del calendario: activada de inicio en el espacio Trabajo y desactivada en Personal. Con ella, Semana, Horas y Mes muestran solo lunes a viernes (en «siete días desde hoy», los cinco próximos días laborables). Si hay tareas con fecha en sábado o domingo, aparece una columna estrecha «Fin de semana» con ellas, para no ocultarlas. Preferencia del dispositivo, guardada en `settings` por espacio, sin cambiar el modelo de datos.
 36. **Arrastrar entre grupos de la lista en escritorio (pedido por Enric el 2 de noviembre).** En las listas agrupadas por día (Todas, pantalla de un proyecto, Hoy con Aplazadas), arrastrar una tarea, o la selección, sobre otro grupo de día (cabecera o filas) le pone esa fecha: Hoy, Mañana, cada día con nombre y Sin fecha (quita la fecha). Los grupos por mes no aceptan tareas. Lo mismo en la agrupación por proyecto: soltar en otro grupo cambia el proyecto. El grupo de destino se resalta, el recordatorio se mueve con la fecha (punto 25), hay Deshacer, y no se puede soltar en un día pasado. Sigue sin reordenarse dentro de un mismo grupo.
 37. **v0.20.0.** Implementados los puntos 31 a 36. Notas: en la alta ampliada, tras añadir solo se conservan la fecha y el proyecto elegidos con los botones (lo escrito en el título vale para esa tarea); colores nuevos granate #9B2242, oliva #7D8A2E, azul marino #1F3A8A y coral #FF7A5C; una copia de hoy borrada a mano no se recrea hasta mañana; la opción de semana laboral se traslada al nuevo identificador de Trabajo tras la primera sincronización. Fotos y audios (punto 29) probados por Enric en iPhone y ordenador.
+38. **Tareas que se repiten (aprobado el 2 de noviembre).** Campo nuevo en Tarea `repeat` (texto con la regla; en Supabase `repeat`), nulo si no se repite. (1) La siguiente se crea al completar la tarea, con la primera fecha de la serie posterior a hoy; solo hay una pendiente a la vez; Deshacer al completar borra la siguiente creada. (2) Opciones: Cada día, Cada día laborable, Cada semana, Cada 2 semanas, Cada mes, Cada año y Personalizada (cada N días, semanas o meses; días de la semana; «el primer lunes de cada mes»). (3) La siguiente copia título, proyecto, prioridad, notas de texto y la hora del recordatorio en la nueva fecha; las notas de voz, fotos y audios quedan en la completada. (4) Al eliminar una tarea que se repite se pregunta: «Eliminar solo esta» (pasa a la siguiente fecha) o «Eliminar la serie», con Deshacer. Poner una repetición a una tarea sin fecha le da la primera fecha de la serie.
+39. **Zona «Ahora» (aprobado el 2 de noviembre).** Campo nuevo en Tarea `focus` (fecha y hora en que se marcó; en Supabase `focus`), nulo si no está en la zona. Tareas que se van a hacer ya, sin tocar su fecha ni su sitio en la lista. (1) Nombre «Ahora». (2) Hasta 5 tareas; al intentar añadir la sexta, aviso para quitar una antes. (3) Se vacía al cambiar de día: las no completadas vuelven a su sitio normal (rollOver quita la marca de las marcadas antes de hoy). (4) Sin aviso ni temporizador; la insignia no cambia. Se marca desde el menú de pulsación larga del iPhone y el clic derecho del escritorio, una estrella en el detalle, la tecla A en escritorio y arrastrando al bloque «Ahora». Se muestra arriba de Hoy en el iPhone (encima del resumen) y en escritorio como bloque arriba de la lista y entrada «Ahora» en la barra lateral. Completar una tarea de «Ahora» la quita de la zona.
+40. **Base del proyecto (v0.21.0).** Pruebas automáticas en `tests/` (`npm test`), ejecutadas por GitHub antes de cada publicación: si fallan, no se publica. El código se divide en `css/app.css` y 14 archivos en `js/` cargados en orden, sin cambios visibles. `APP_VERSION` pasa a `js/core.js`.
 
 
 ## 9. Decisiones pendientes de Enric (revisión del 1 de noviembre)

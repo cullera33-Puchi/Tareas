@@ -1,5 +1,13 @@
 # Registro de cambios
 
+## v0.21.0. Base más sólida (2 de noviembre de 2026)
+
+- Sin cambios visibles en la app.
+- Las pruebas automáticas (37 baterías) pasan a estar dentro del repositorio y GitHub las ejecuta antes de cada publicación. Si alguna falla, la versión no se publica y la app instalada sigue con la anterior.
+- El código se divide en una hoja de estilos y 14 archivos por áreas (datos, listas, gestos, hojas, adjuntos, sincronización, notificaciones, escritorio, calendario), lo que reduce el riesgo de que un cambio rompa otra parte.
+- La publicación solo sube los archivos de la app, no las pruebas ni la documentación.
+- CLAUDE.md al día: estado actual, estructura del repositorio, mapa del código por archivo y cómo probar.
+
 ## v0.20.1. Recordatorio en escritorio: elegir día y hora (2 de noviembre de 2026)
 
 - En el ordenador, al elegir el día en la ventana de Recordatorio, la ventana se cerraba antes de poder poner la hora. El calendario se redibuja para marcar el día y el clic se tomaba como hecho fuera. Ahora el día queda marcado, la ventana sigue abierta y Guardar aplica día y hora. Lo mismo para cualquier ventana anclada que se redibuje al hacer clic.

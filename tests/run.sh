@@ -17,7 +17,7 @@ OUT=$ROOT/tests/out; LOGS=$OUT/logs; mkdir -p "$LOGS"
 ALL="smoke voice swipe roll spaces settings rowbg update features batch34 batch5 batch6 swiperight links multi four desk mock rm-A rm-B rm-C rm-D rm-E rm-F rm-G rm-H rm-I-vn rm-I-kb2 rm-I-guard rm-I-repro rm-J rm-S rm-P rm-Q rm-Q2 rm-AT rm-R"
 TESTS=${*:-$ALL}
 LIMIT=${TEST_TIMEOUT:-300}
-if ! command -v "${DENO:-deno}" >/dev/null 2>&1; then echo "Warning: Deno not found (set DENO or put deno on PATH): rm-P and rm-AT will fail"; fi
+if [[ " $TESTS " =~ " rm-P "|" rm-AT " ]] && ! command -v "${DENO:-deno}" >/dev/null 2>&1; then echo "Warning: Deno not found (set DENO or put deno on PATH): rm-P and rm-AT will fail"; fi
 pass=0; failed=(); retried=(); start=$(date +%s)
 for t in $TESTS; do
   if [ ! -f "$ROOT/tests/$t.js" ]; then echo "$t: FAIL no such test"; failed+=("$t"); continue; fi

@@ -3,7 +3,7 @@ require('./out.js'); // outputs (screenshots, downloads) go to tests/out
 // Desktop: the voice note menu is a Mac menu (R17) instead of the action sheet. Added: no back swipe from a note, bound once, R4 back swipe still works.
 const { chromium } = require('playwright'); const http=require('http'),fs=require('fs'),path=require('path');
 const ROOT=process.argv[2]||path.resolve(__dirname, '..', '..'), PORT=+(process.argv[3]||9411), OUT=process.argv[4]||path.join(__dirname, '..', 'out', 'I'); require('fs').mkdirSync(OUT,{recursive:true});
-const srv=http.createServer((q,s)=>{let p=decodeURIComponent(q.url.split('?')[0]); if(p==='/')p='/index.html'; const f=path.join(ROOT,p); if(!fs.existsSync(f)||fs.statSync(f).isDirectory()){s.writeHead(404);s.end();return;} s.writeHead(200,{'Content-Type':p.endsWith('.js')?'text/javascript':'text/html'}); s.end(fs.readFileSync(f));});
+const srv=http.createServer((q,s)=>{let p=decodeURIComponent(q.url.split('?')[0]); if(p==='/')p='/index.html'; const f=path.join(ROOT,p); if(!fs.existsSync(f)||fs.statSync(f).isDirectory()){s.writeHead(404);s.end();return;} s.writeHead(200,{'Content-Type':p.endsWith('.js')?'text/javascript':p.endsWith('.css')?'text/css':'text/html'}); s.end(fs.readFileSync(f));});
 const errors=[]; const ok=(c,m)=>{ if(!c) errors.push(m); };
 async function swipe(page, sel, dx){ const b=await page.locator(sel).boundingBox(); const x=b.x+b.width/2, y=b.y+b.height/2;
   const cdp=await page.context().newCDPSession(page);

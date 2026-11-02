@@ -678,7 +678,7 @@ body.pdragging,body.pdragging *{cursor:grabbing !important;user-select:none;-web
 .rc-date{width:84px;}
 .rc-rem{width:100px;}
 .rc-rem svg{width:11px;height:11px;margin-right:3px;vertical-align:-1px;}
-.app.desktop .inds{width:34px;justify-content:flex-end;gap:4px;}
+.app.desktop .inds{width:auto;min-width:34px;justify-content:flex-end;gap:4px;} /* up to three icons: notes, voice, paperclip (decision 29); right-aligned, so the columns after them stay put */
 .app.desktop .inds svg{width:12px;height:12px;}
 .app.desktop .pri{width:22px;font-size:13px;}
 .app.desktop .rowmore{width:24px;height:24px;border-radius:5px;}
@@ -998,6 +998,95 @@ body.resizing,body.resizing *{cursor:col-resize !important;-webkit-user-select:n
  .pm-list.swap{animation:pmFade .2s;}
 }
 @keyframes pmFade{from{opacity:0;}}
+/* Decision 29: Adjuntos in the detail. Photos in a grid of square thumbnails (3 columns on the iPhone, 4 in the inspector),
+   recordings as rows like the voice notes (swipe left to delete), then Añadir foto and Grabar audio */
+.att-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;padding:12px 16px;}
+.att-grid + .vn,.att-grid + .cell,.att-group .vn + .cell{border-top:.5px solid var(--sep);}
+.att-ph{position:relative;display:block;width:100%;padding:0;aspect-ratio:1/1;border-radius:6px;overflow:hidden;background:var(--fill);-webkit-touch-callout:none;}
+.att-ph img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;opacity:1;transition:opacity .25s;}
+.att-ph img:not([src]){opacity:0;}
+.att-ph:active img{opacity:.7;}
+.att-ph.wait::after{content:'';position:absolute;left:50%;top:50%;width:18px;height:18px;margin:-9px 0 0 -9px;border-radius:50%;border:2px solid var(--ink3);border-top-color:transparent;animation:attSpin .8s linear infinite;}
+.att-ph.miss::after{animation:none;border:0;width:22px;height:22px;margin:-11px 0 0 -11px;background:var(--ink3);-webkit-mask:var(--att-miss) center/contain no-repeat;mask:var(--att-miss) center/contain no-repeat;}
+.att-ph{--att-miss:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round'%3E%3Crect x='3' y='5' width='18' height='14' rx='2.5'/%3E%3Cpath d='M3 3l18 18'/%3E%3C/svg%3E");}
+@keyframes attSpin{to{transform:rotate(360deg);}}
+.att-group .cell.link svg{width:18px;height:18px;flex:none;}
+.att-au .au-c{display:flex;align-items:center;gap:12px;white-space:normal;padding:8px 16px;}
+.au-play{flex:none;width:36px;height:36px;border-radius:50%;background:var(--fill);color:var(--blue);display:flex;align-items:center;justify-content:center;position:relative;}
+.au-play::before{content:'';position:absolute;inset:-4px;} /* 44 pt to the finger */
+.au-play svg{width:16px;height:16px;display:block;}
+.au-play .ic-pause,.att-au.playing .au-play .ic-play{display:none;}
+.att-au.playing .au-play .ic-pause{display:block;}
+.att-au.loading .au-play svg{opacity:.3;}
+.au-body{flex:1;min-width:0;}
+.au-top{display:flex;justify-content:space-between;gap:8px;font-size:0.765rem;color:var(--ink2);margin-bottom:6px;white-space:nowrap;}
+.au-name{overflow:hidden;text-overflow:ellipsis;color:var(--ink);font-size:0.882rem;}
+.au-t{font-variant-numeric:tabular-nums;}
+.au-bar{position:relative;height:4px;border-radius:2px;background:var(--fill);overflow:hidden;}
+.au-bar::before{content:'';position:absolute;left:0;right:0;top:-12px;bottom:-12px;} /* a taller strip to tap and seek */
+.au-bar i{position:absolute;inset:0;background:var(--blue);transform:scaleX(0);transform-origin:0 50%;border-radius:2px;}
+.att-note{margin-top:-8px;}
+.app.desktop .pane .att-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;padding:8px 12px;}
+.app.desktop .pane .att-ph{border-radius:4px;cursor:zoom-in;}
+.app.desktop .pane .att-au .au-c{padding:6px 12px;gap:10px;cursor:default;}
+.app.desktop .pane .au-play{width:26px;height:26px;cursor:pointer;}
+.app.desktop .pane .au-play::before{inset:0;}
+.app.desktop .pane .au-play svg{width:12px;height:12px;}
+.app.desktop .pane .au-name{font-size:13px;}
+.app.desktop .pane .au-top{font-size:11px;margin-bottom:4px;}
+.app.desktop .pane .au-bar{cursor:pointer;}
+.app.desktop .pane .att-group .cell.link svg{width:16px;height:16px;}
+.app.desktop .pane .att-note{margin-top:-6px;padding:0 0 12px;}
+/* A photo dragged from the computer onto the inspector */
+.app.desktop .pane.filedrop::after{content:'Suelta las fotos para añadirlas';position:absolute;inset:6px;border:2px dashed var(--blue);border-radius:10px;background:color-mix(in srgb,var(--blue) 10%,transparent);display:flex;align-items:center;justify-content:center;color:var(--blue);font-size:13px;font-weight:600;pointer-events:none;z-index:5;}
+/* The recorder sheet: elapsed time, a big record button that turns into a stop square, the hint, then the recording to listen to */
+.recw{display:flex;flex-direction:column;align-items:center;padding:4px 0 6px;}
+.rec-time{font-size:2.6rem;font-weight:300;font-variant-numeric:tabular-nums;letter-spacing:.02em;margin:4px 0 10px;}
+.recbtn{position:relative;width:76px;height:76px;border-radius:50%;border:4px solid var(--fill2);display:flex;align-items:center;justify-content:center;margin-bottom:12px;}
+.recbtn span{position:absolute;left:50%;top:50%;background:var(--red);transition:transform .35s cubic-bezier(.32,.72,0,1),opacity .25s;}
+.recbtn .c{width:58px;height:58px;margin:-29px 0 0 -29px;border-radius:50%;}
+.recbtn .s{width:28px;height:28px;margin:-14px 0 0 -14px;border-radius:6px;opacity:0;transform:scale(.6);}
+.recbtn.on .c{opacity:0;transform:scale(.5);} .recbtn.on .s{opacity:1;transform:none;}
+.recbtn::after{content:'';position:absolute;inset:-4px;border-radius:50%;border:3px solid var(--red);opacity:0;pointer-events:none;}
+.recbtn.on::after{animation:recRing 1.4s ease-out infinite;}
+@keyframes recRing{from{transform:scale(1);opacity:.5;}to{transform:scale(1.3);opacity:0;}}
+.recbtn:disabled{opacity:.4;}
+.hbtn:disabled{opacity:.3;}
+.rec-prev{width:100%;background:var(--bg);border-radius:12px;margin-top:4px;}
+.rec-prev[hidden]{display:none;}
+.rec-prev .au-c{display:flex;align-items:center;gap:12px;padding:10px 14px;}
+.rec-prev .au-bar{background:var(--fill2);}
+.rec-prev.playing .au-play .ic-play{display:none;} .rec-prev.playing .au-play .ic-pause{display:block;}
+/* The photo viewer: black, over everything but the toast; the photos side by side on a track that follows the finger */
+.viewer{position:fixed;inset:0;z-index:25;touch-action:none;user-select:none;-webkit-user-select:none;opacity:0;transition:opacity .3s ease;color:#fff;}
+.viewer.on{opacity:1;}
+.vw-bg{position:absolute;inset:0;background:#000;}
+.vw-track{position:absolute;inset:0;will-change:transform;}
+.vw-track.anim{transition:transform .4s cubic-bezier(.32,.72,0,1);}
+.vw-slide{position:absolute;top:0;left:0;width:100%;height:100%;overflow:hidden;}
+.vw-img{position:absolute;display:block;max-width:none;transform-origin:50% 50%;will-change:transform;-webkit-user-drag:none;}
+.vw-img.anim{transition:transform .35s cubic-bezier(.32,.72,0,1);}
+.viewer .vw-slide.wait::after{content:'';position:absolute;left:50%;top:50%;width:24px;height:24px;margin:-12px 0 0 -12px;border-radius:50%;border:2px solid rgba(255,255,255,.6);border-top-color:transparent;animation:attSpin .8s linear infinite;}
+.vw-stage{position:absolute;inset:0;transform:scale(.94);transition:transform .3s cubic-bezier(.32,.72,0,1);}
+.viewer.on .vw-stage{transform:none;}
+.vw-bar{position:absolute;left:0;right:0;top:0;display:flex;align-items:center;gap:8px;padding:calc(env(safe-area-inset-top,0px) + 4px) max(8px,env(safe-area-inset-right,0px)) 4px max(8px,env(safe-area-inset-left,0px));background:linear-gradient(rgba(0,0,0,.55),rgba(0,0,0,0));transition:opacity .25s;}
+.viewer.bare .vw-bar,.viewer.bare .vw-nav{opacity:0;pointer-events:none;}
+.vw-n{flex:1;text-align:center;font-size:1rem;font-weight:600;}
+.vw-r{display:flex;gap:4px;}
+.vw-b{width:44px;height:44px;display:flex;align-items:center;justify-content:center;color:#fff;border-radius:22px;}
+.vw-b svg{width:22px;height:22px;}
+.vw-b:active{opacity:.5;}
+.vw-nav{position:absolute;top:50%;width:44px;height:44px;margin-top:-22px;border-radius:22px;background:rgba(40,40,40,.6);color:#fff;display:flex;align-items:center;justify-content:center;transition:opacity .25s;}
+.vw-nav svg{width:18px;height:18px;}
+.vw-nav.l{left:16px;} .vw-nav.r{right:16px;}
+.vw-nav[disabled]{opacity:0;pointer-events:none;}
+.wide .vw-b{width:32px;height:32px;} .wide .vw-b svg{width:18px;height:18px;} .wide .vw-n{font-size:13px;}
+.wide .vw-b:hover,.wide .vw-nav:hover{background:rgba(255,255,255,.15);}
+@media (prefers-reduced-motion: reduce){
+ .vw-track.anim,.vw-img.anim{transition:none;}
+ .vw-stage{transform:none;transition:none;}
+ .recbtn span{transition:opacity .2s;} .recbtn .s,.recbtn.on .c{transform:none;} .recbtn.on::after{animation:none;opacity:.4;}
+}
 </style>
 </head>
 <body>
@@ -1032,7 +1121,7 @@ window.addEventListener('unhandledrejection', e => log('error', 'Promesa rechaza
 const _consoleError = console.error.bind(console);
 console.error = (...a) => { log('error', a.map(x=>x&&x.message||String(x)).join(' ')); _consoleError(...a); };
 function logText(){
-  const d = (typeof DB!=='undefined'&&DB) ? ' | espacios '+DB.spaces.length+', proyectos '+DB.projects.length+', tareas '+DB.tasks.length+', notas de voz '+DB.voiceNotes.length : '';
+  const d = (typeof DB!=='undefined'&&DB) ? ' | espacios '+DB.spaces.length+', proyectos '+DB.projects.length+', tareas '+DB.tasks.length+', notas de voz '+DB.voiceNotes.length+', adjuntos '+(DB.attachments||[]).length : '';
   let st='?'; try{ st = (navigator.standalone===true||matchMedia('(display-mode: standalone)').matches)?'instalada':'navegador'; }catch(e){}
   const head = 'Tareas v'+APP_VERSION+' | '+st+' | '+navigator.userAgent+' | '+new Date().toString()+d;
   const lines = LOG.map(e=>{ const t=e.t.replace('T',' ').slice(5,19); return t+' ['+e.l+'] '+e.m+(e.x?' | '+e.x:''); });
@@ -1187,6 +1276,14 @@ const I = {
   copy:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a2 2 0 00-2-2H5a2 2 0 00-2 2v9a2 2 0 002 2h3"/></svg>',
   listF:'<svg viewBox="0 0 26 26" fill="currentColor" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="6" cy="7" r="2.4" stroke="none"/><circle cx="6" cy="13" r="2.4" stroke="none"/><circle cx="6" cy="19" r="2.4" stroke="none"/><path d="M11 7h10M11 13h10M11 19h10" fill="none"/></svg>',
   folderF:'<svg viewBox="0 0 26 26" fill="currentColor"><path d="M3 7a2 2 0 012-2h5l2 3h9a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>',
+  clip:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 11.5l-8.2 8.2a5 5 0 01-7.1-7.1l8.6-8.6a3.4 3.4 0 014.8 4.8l-8.6 8.6a1.7 1.7 0 01-2.4-2.4l7.9-7.9"/></svg>',
+  photo:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2.5"/><circle cx="8.5" cy="10" r="1.6"/><path d="M21 15.5l-5-5L6 19"/></svg>',
+  wave:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 10v4M8 7v10M12 4v16M16 8v8M20 11v2"/></svg>',
+  play:'<svg class="ic-play" viewBox="0 0 24 24" fill="currentColor"><path d="M7.5 4.8v14.4a.8.8 0 001.2.7l11.6-7.2a.8.8 0 000-1.4L8.7 4.1a.8.8 0 00-1.2.7z"/></svg>',
+  pause:'<svg class="ic-pause" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4.5" width="4" height="15" rx="1"/><rect x="14" y="4.5" width="4" height="15" rx="1"/></svg>',
+  download:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13M7 11l5 5 5-5M5 20h14"/></svg>',
+  chevL:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>',
+  chevR:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>',
   gearF:'<svg viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><circle cx="13" cy="13" r="4.5" fill="currentColor" stroke="none"/><path d="M13 3v3M13 20v3M3 13h3M20 13h3M6 6l2 2M18 18l2 2M6 20l2-2M18 8l2-2"/></svg>',
 };
 
@@ -1195,14 +1292,14 @@ const KEY = 'tareas-v1';
 let DB = null;
 function blank(){
   const t=new Date().toISOString();
-  return { spaces:[{id:'trabajo',name:'Trabajo',order:0,created:t},{id:'personal',name:'Personal',order:1,created:t}], projects:[], tasks:[], voiceNotes:[], settings:{activeSpace:'trabajo', summaryState:'auto', filter:'hoy', doneOpen:false, theme:'auto', tipsSeen:false, shakeUndo:false, allGroup:'date', hoyGroup:'date'} };
+  return { spaces:[{id:'trabajo',name:'Trabajo',order:0,created:t},{id:'personal',name:'Personal',order:1,created:t}], projects:[], tasks:[], voiceNotes:[], attachments:[], settings:{activeSpace:'trabajo', summaryState:'auto', filter:'hoy', doneOpen:false, theme:'auto', tipsSeen:false, shakeUndo:false, allGroup:'date', hoyGroup:'date'} };
 }
 let lastRaw = null; // the stored text this window last read or wrote; another window may have changed it since
 function load(){
   let raw=null; try{ raw=localStorage.getItem(KEY); }catch(e){ log('error','No se pudieron leer los datos: '+(e&&e.message||e)); }
   lastRaw=raw; if(!raw) return blank();
   let d=null; try{ d=JSON.parse(raw); }catch(e){}
-  const b=blank(), lists=['spaces','projects','tasks','voiceNotes'];
+  const b=blank(), lists=['spaces','projects','tasks','voiceNotes','attachments'];
   if(!d || typeof d!=='object' || Array.isArray(d) || !lists.some(k=>Array.isArray(d[k]))){
     // Unreadable data: keep the raw text aside before the first save replaces it
     try{ localStorage.setItem(KEY+'-corrupt', raw); }catch(e){}
@@ -1377,20 +1474,20 @@ function rescheduleTask(id, date, label){ const x=task(id); if(!x) return; const
 function tomorrowTask(id){ const x=task(id); if(!x) return; const old=daySnap(x); updTask(id, dayPatch(x, addDays(todayStr(),1))); haptic(10); toast('Aplazada a mañana', ()=>undoDay(old)); }
 function deleteTask(id){
   const i=DB.tasks.findIndex(t=>t.id===id); if(i<0) return;
-  const [x]=DB.tasks.splice(i,1); const vn=DB.voiceNotes.filter(v=>v.taskId===id); DB.voiceNotes=DB.voiceNotes.filter(v=>v.taskId!==id); save(); haptic(14);
-  toast('Tarea eliminada', ()=>{ DB.tasks.push(x); DB.voiceNotes.push(...vn); save(); });
+  const [x]=DB.tasks.splice(i,1); const vn=DB.voiceNotes.filter(v=>v.taskId===id); DB.voiceNotes=DB.voiceNotes.filter(v=>v.taskId!==id); const at=cutAttachments(new Set([id])); save(); haptic(14);
+  toast('Tarea eliminada', ()=>{ DB.tasks.push(x); DB.voiceNotes.push(...vn); putAttachments(at); save(); });
 }
 function addSpace(name){ const t=new Date().toISOString(); const sp={id:uid(), name, order:DB.spaces.length, created:t, modified:t}; DB.spaces.push(sp); save(); return sp; }
 /* Decision 28a: a space goes with everything in it: its projects (archived too), its tasks (completed long ago too) and their voice notes.
    spaceLoad lists them; deleteSpace takes them out in one save and returns what puts them back (null for the only space) */
 function spaceLoad(id){ const ps=DB.projects.filter(p=>p.spaceId===id), pids=new Set(ps.map(p=>p.id)); const ts=DB.tasks.filter(x=>x.spaceId===id||(x.projectId&&pids.has(x.projectId))), tids=new Set(ts.map(x=>x.id));
-  return {ps, ts, vs:DB.voiceNotes.filter(v=>tids.has(v.taskId))}; }
+  return {ps, ts, vs:DB.voiceNotes.filter(v=>tids.has(v.taskId)), as:DB.attachments.filter(a=>tids.has(a.taskId))}; }
 function deleteSpace(id){ const i=DB.spaces.findIndex(sp=>sp.id===id); if(DB.spaces.length<2||i<0) return null;
-  const sp=DB.spaces[i], L=spaceLoad(id), was=DB.settings.activeSpace===id, P=new Set(L.ps), T=new Set(L.ts), V=new Set(L.vs);
-  DB.spaces.splice(i,1); DB.projects=DB.projects.filter(p=>!P.has(p)); DB.tasks=DB.tasks.filter(x=>!T.has(x)); DB.voiceNotes=DB.voiceNotes.filter(v=>!V.has(v));
+  const sp=DB.spaces[i], L=spaceLoad(id), was=DB.settings.activeSpace===id, P=new Set(L.ps), T=new Set(L.ts), V=new Set(L.vs), AT=new Set(L.as);
+  DB.spaces.splice(i,1); DB.projects=DB.projects.filter(p=>!P.has(p)); DB.tasks=DB.tasks.filter(x=>!T.has(x)); DB.voiceNotes=DB.voiceNotes.filter(v=>!V.has(v)); DB.attachments=DB.attachments.filter(a=>!AT.has(a));
   L.ts.forEach(x=>HELD.delete(x.id)); if(was){ DB.settings.activeSpace=DB.spaces.slice().sort((a,b)=>a.order-b.order)[0].id; resetListState(); } save();
   return ()=>{ if(DB.spaces.some(x=>x.id===id)) return; DB.spaces.splice(Math.min(i, DB.spaces.length), 0, sp);
-    const has=(list, o)=>list.some(x=>x.id===o.id); L.ps.forEach(p=>{ if(!has(DB.projects,p)) DB.projects.push(p); }); L.ts.forEach(x=>{ if(!has(DB.tasks,x)) DB.tasks.push(x); }); L.vs.forEach(v=>{ if(!has(DB.voiceNotes,v)) DB.voiceNotes.push(v); });
+    const has=(list, o)=>list.some(x=>x.id===o.id); L.ps.forEach(p=>{ if(!has(DB.projects,p)) DB.projects.push(p); }); L.ts.forEach(x=>{ if(!has(DB.tasks,x)) DB.tasks.push(x); }); L.vs.forEach(v=>{ if(!has(DB.voiceNotes,v)) DB.voiceNotes.push(v); }); L.as.forEach(a=>{ if(!has(DB.attachments,a)) DB.attachments.push(a); });
     if(was){ DB.settings.activeSpace=id; resetListState(); } save(); }; }
 function addProject(name, color){ const t=new Date().toISOString(); const p={id:uid(), spaceId:space().id, name, color, order:DB.projects.length, archived:false, created:t, modified:t}; DB.projects.push(p); save(); return p; }
 
@@ -1588,7 +1685,7 @@ function renderNow(){
 }
 function renderPushed(s){ drawing(()=>renderPushedNow(s)); }
 function renderPushedNow(s){ const osc=s.el.querySelector('.scroll'), ost=osc?osc.scrollTop:0; swapHTML(s.el, s.kind==='detail'?viewDetail(s.id):viewProject(s.id), s.kind==='project');
-  if(s.kind==='detail'){ bindDetail(s.el, s.id); const sc=s.el.querySelector('.scroll'); if(sc) sc.scrollTop=ost; } } // restored once the text areas have their full height, or a long note would clamp it to the top
+  if(s.kind==='detail'){ bindDetail(s.el, s.id); const sc=s.el.querySelector('.scroll'); if(sc) sc.scrollTop=ost; attHydrate(s.el); } } // restored once the text areas have their full height, or a long note would clamp it to the top
 // A root put away keeps its scroll in UI.scroll; it is drawn anew when it comes back and gets it back there
 function hideRoot(s){ if(s.classList.contains('hidden-tab')) return; const sc=s.querySelector('.scroll'), pc=s.querySelector('.pchips');
   if(sc) UI.scroll[s.dataset.root]=sc.scrollTop; UI.scroll[s.dataset.root+'.chips']=pc?pc.scrollLeft:null; s.classList.add('hidden-tab'); }
@@ -1697,7 +1794,7 @@ function rowHTML(x, opts={}){
   else { if(x.date){ if(x.carried&&x.date<=t){ if(!opts.hideCarried) meta.push('<span class="carried">Aplazada</span>'); }
       else if(!(opts.noToday&&x.date===t) && x.date!==opts.day) meta.push('<span class="'+(x.date<t?'over':'')+'">'+fmtDate(x.date)+'</span>'); }
     if(x.reminder) meta.push('<span class="bell">'+I.bell+(x.date&&localDay(x.reminder)===x.date?fmtTime(x.reminder):fmtDateTime(x.reminder))+'</span>'); } // the reminder's own day when it is not the task's date (moved task, no date)
-  const ind=(x.notes&&x.notes.trim()?I.note:'')+(DB.voiceNotes.some(v=>v.taskId===x.id)?I.mic:'');
+  const ind=(x.notes&&x.notes.trim()?I.note:'')+(DB.voiceNotes.some(v=>v.taskId===x.id)?I.mic:'')+(hasAtt(x.id)?I.clip:''); // decision 29: a paperclip when it has photos or audio
   const pri = done?'':x.priority==='high'?'<span class="pri high">!!!</span>':x.priority==='mid'?'<span class="pri mid">!!</span>':'';
   const pc=p?p.color:null;
   const selecting = UI.select && !opts.simple; const selected = selecting && UI.select.ids.has(x.id);
@@ -1894,6 +1991,7 @@ function viewDetail(id){
    '<button class="cell" data-act="pickPriority"><span class="lbl">Prioridad</span><span class="val '+(x.priority==='none'?'':x.priority)+'">'+pl+'</span>'+chev+'</button></div>'+
    (pushNote(x)?'<div class="footnote push-note">'+pushNote(x)+'</div>':'')+
    '<div class="group-title">Notas de voz</div><div class="group">'+vns.map(vnHTML).join('')+'<button class="cell link" data-act="voice">'+I.mic.replace('<svg','<svg style="width:18px;height:18px"')+'<span class="lbl">Añadir nota de voz</span></button></div>'+
+   attWrapHTML(x)+
    '</div>';
 }
 /* R17: the desktop detail as a Mac inspector. The title and notes (the same fields and roles as the iPhone, for bindDetail),
@@ -1912,6 +2010,7 @@ function inspectorHTML(x, p, vns, links){
    '<span class="ilbl">Recordatorio</span>'+pop('pickReminder', x.reminder?fmtDateTime(x.reminder):'Ninguno', !x.reminder, I.bell)+
    '<span class="ilbl">Prioridad</span><div class="seg iseg" role="radiogroup" aria-label="Prioridad">'+seg+'</div></div>'+
    '<div class="group-title">Notas de voz</div><div class="group">'+vns.map(vnHTML).join('')+'<button class="cell link" data-act="voice">'+I.mic.replace('<svg','<svg style="width:16px;height:16px"')+'<span class="lbl">Añadir nota de voz</span></button></div>'+
+   attWrapHTML(x)+
    '<div class="ifoot">'+[['Creada',x.created],['Modificada',x.modified],['Completada',x.status==='done'&&x.completed]].filter(o=>o[1]).map(o=>{ const w=fmtDateTime(o[1]); return o[0]+' '+w[0].toLowerCase()+w.slice(1)+'<br>'; }).join('')+(pushNote(x)?'<span class="push-note">'+pushNote(x)+'</span>':'')+'</div>'+
    '</div>';
 }
@@ -1958,7 +2057,7 @@ function bindRows(box){
 function bindCommon(scr){
   scr.addEventListener('click', onClick);
   bindRows(scr);
-  if(!UI.wide) scr.querySelectorAll('.vn[data-vn]').forEach(bindVnGestures);
+  if(!UI.wide) scr.querySelectorAll('.vn[data-vn], .vn[data-au]').forEach(bindVnGestures); // voice notes and recordings (decision 29)
   scr.querySelectorAll('[data-open-project]').forEach(b=>bindLongPress(b, src=>{ if(b.dataset.openProject!=='none') projectMenu(b.dataset.openProject, src); }));
   const s=$('[data-role=search]',scr); if(s) bindSearch(s, ()=>searchAround(s));
   bindBackSwipe(scr);
@@ -2009,6 +2108,13 @@ function onClick(e){
   const pr=e.target.closest('[data-push-revoke]'); if(pr){ pushRevokeSheet(pr.dataset.pushRevoke); return; }
   const ua=e.target.closest('[data-unarchive]'); if(ua){ const p=proj(ua.dataset.unarchive); p.archived=false; p.modified=new Date().toISOString(); save(); render(); return; }
   const pf=e.target.closest('[data-pf]'); if(pf){ const v=pf.dataset.pf; UI.projFilter=(v===''||UI.projFilter===v)?null:v; haptic(4); render(); return; }
+  // Decision 29: a photo opens the viewer (on the desktop a click; Comando or the right button offer its menu); a recording plays, seeks or goes
+  const aa=e.target.closest('[data-aact]'); if(aa){ const el=aa.closest('.vn[data-au]'), id=el&&el.dataset.au; if(!id) return;
+    if(aa.dataset.aact==='del'){ closeVn(el); deleteAttachment(id); return; } if(el.dataset.open){ closeVn(el); return; }
+    if(aa.dataset.aact==='play'){ apToggle(id); return; }
+    if(aa.dataset.aact==='seek'){ if(AP.id!==id){ apToggle(id); return; } const r=aa.getBoundingClientRect(); apSeek(id, (e.clientX-r.left)/r.width); return; } }
+  const auEl=e.target.closest('.vn[data-au]'); if(auEl){ if(auEl.dataset.open){ closeVn(auEl); return; } if(UI.wide) audioMenu(auEl.dataset.au, e); return; }
+  const ph=e.target.closest('.att-ph[data-att]'); if(ph){ const a=att(ph.dataset.att); if(a){ if(UI.wide&&(e.metaKey||e.ctrlKey)) photoMenu(a.id, e); else openViewer(a.taskId, a.id); } return; }
   const va=e.target.closest('[data-vact]'); if(va){ const el=va.closest('.vn'); const vid=el&&el.dataset.vn; closeVn(el); if(va.dataset.vact==='del') deleteVoiceNote(vid); else editVoiceNote(vid); return; }
   const vnEl=e.target.closest('.vn[data-vn]'); if(vnEl&&!e.target.closest('a')){ if(vnEl.dataset.open){ closeVn(vnEl); return; } if(UI.wide) voiceNoteMenu(vnEl.dataset.vn, e); return; }
   if(UI.select){ const row=e.target.closest('.row'); if(row && !row.closest('.first')){ toggleSelected(row); return; } }
@@ -2061,6 +2167,8 @@ function onClick(e){
     case 'pickDate': dateSheet(detailId, act); break; // on the desktop a popover anchored to the control (R17)
     case 'pickReminder': reminderSheet(detailId, act); break;
     case 'voice': voiceSheet(detailId); break;
+    case 'attPhoto': if(detailId) pickPhotos(detailId); break; // decision 29: inside the tap, so iOS offers the camera or the library
+    case 'attAudio': if(detailId) recordSheet(detailId); break;
     case 'export': exportJSON(); break;
     case 'backupNow': dailyBackup(true); toast('Creando copia'); break;
     case 'shakeToggle': toggleShake(); break;
@@ -2102,7 +2210,7 @@ function pop(){
   // The screen below shows again: drawn now if a render was asked while it was covered; if only the data changed (typing in the detail), after the slide
   let under = underScreen(); if(!under){ under=rootScreen(UI.tab); under.classList.remove('hidden-tab'); restoreRootScroll(under); } // never a blank screen behind
   drawIfDirty(under); under.classList.remove('under','dragging-under','dragging'); under.style.transform='';
-  setTimeout(()=>{ s.el.remove(); const u=underScreen(); if(!UI.stack.length&&typingIn(u)){ renderTabbar(); return; } if(u&&(u.dataset.dirty||+u.dataset.ver!==dataVer)) render(); },RM.matches?220:520); // a search tapped meanwhile keeps its keyboard
+  setTimeout(()=>{ s.el.remove(); fuGCSoon(); const u=underScreen(); if(!UI.stack.length&&typingIn(u)){ renderTabbar(); return; } if(u&&(u.dataset.dirty||+u.dataset.ver!==dataVer)) render(); },RM.matches?220:520); // a search tapped meanwhile keeps its keyboard
 }
 function underScreen(){ return UI.stack.length? UI.stack[UI.stack.length-1].el : app.querySelector('.screen.root:not(.hidden-tab)'); }
 function bindBackSwipe(scr){
@@ -2168,10 +2276,11 @@ function bindRowGestures(row){
   row.addEventListener('touchend',end);
   row.addEventListener('touchcancel',()=>{ clearTimeout(lp); const was=mode; mode=null; if(was==='off') return; if(was==='swipe') closeRow(row); dragEnd(true); }); // a cancelled touch never completes the task or opens the buttons
 }
-// Voice note rows: right reveals Editar (a long swipe opens it), left reveals Eliminar and stops there, like task rows
+// Voice note rows: right reveals Editar (a long swipe opens it), left reveals Eliminar and stops there, like task rows.
+// A recording (decision 29) has no Editar: it only slides to the left
 let openVn=null;
 function closeVn(el){ if(!el) return; const c=el.querySelector('.vn-c'); c.classList.remove('drag'); c.style.transform=''; delete el.dataset.open; if(openVn===el) openVn=null; setTimeout(()=>{ if(!el.dataset.open) el.classList.remove('dir-l','dir-r'); },300); }
-function bindVnGestures(el){ if(el._vnb) return; el._vnb=1; let c=null,x0=0,y0=0,dx=0,mode=null,edge=false,thr=false; // once per element, as bindLongPress (R18)
+function bindVnGestures(el){ if(el._vnb) return; el._vnb=1; let c=null,x0=0,y0=0,dx=0,mode=null,edge=false,thr=false; const left=!!el.querySelector('.vn-bg.l'); // once per element, as bindLongPress (R18)
   el.addEventListener('touchstart',e=>{ c=el.querySelector('.vn-c'); if(!c){ mode='off'; return; } const t=e.touches[0]; x0=t.clientX; y0=t.clientY; dx=0; mode=null; thr=false; edge=x0<EDGE&&!!el.closest('.pushed-screen'); if(openVn&&openVn!==el) closeVn(openVn); if(openRow) closeRow(openRow); },{passive:true});
   el.addEventListener('touchmove',e=>{ const t=e.touches[0], mx=t.clientX-x0, my=t.clientY-y0;
     if(mode===null){ if(Math.abs(my)>8) mode='scroll'; else if(Math.abs(mx)>10){ if(edge){ mode='edge'; return; } mode='swipe'; c.classList.add('drag'); } }
@@ -2179,6 +2288,7 @@ function bindVnGestures(el){ if(el._vnb) return; el._vnb=1; let c=null,x0=0,y0=0
     const base=el.dataset.open==='l'?-88:el.dataset.open==='r'?88:0; let raw=base+mx;
     if(raw<-88) raw=-88+(raw+88)*0.15; // stops at Eliminar
     if(raw>150) raw=150+(raw-150)*0.25;
+    if(!left&&raw>0) raw=0;
     dx=Math.max(-104,Math.min(190,raw)); c.style.transform='translate3d('+dx+'px,0,0)'; el.classList.toggle('dir-r',dx>0); el.classList.toggle('dir-l',dx<0);
     const passed=dx>150; if(passed&&!thr){ thr=true; haptic(8); } if(!passed) thr=false; },{passive:false});
   const end=()=>{ if(mode!=='swipe'){ mode=null; return; } mode=null; c.classList.remove('drag');
@@ -2319,6 +2429,7 @@ const MI = {
   eye:mi('<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/>'),
   eyeOff:mi('<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/><path d="M4 4l16 16"/>'),
   summary:mi('<rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M7 9h10M7 13h6"/>'),
+  play:mi('<path d="M8 5.5v13l10.5-6.5z"/>'),
   pencil:mi('<path d="M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4"/>'),
   up:mi('<path d="M12 19V5M6 11l6-6 6 6"/>'),
   down:mi('<path d="M12 5v14M6 13l6 6 6-6"/>'),
@@ -2545,7 +2656,7 @@ function selectAllVisible(){ const ids=visibleRowIds(); if(UI.select.all){ UI.se
 function selSet(){ return UI.wide ? (deskMulti()?UI.dsel.ids:null) : UI.select ? UI.select.ids : null; }
 function selectedTasks(){ const s=selSet(); return s ? [...s].map(task).filter(Boolean) : []; } // empty once selection mode has ended
 function bulkComplete(){ const xs=selectedTasks(); if(!xs.length) return; const prev=xs.map(x=>({id:x.id, status:x.status, completed:x.completed})); const now=new Date().toISOString(); batch(()=>xs.forEach(x=>{ if(x.status==='pending') updTask(x.id,{status:'done', completed:now}); })); const n=prev.filter(p=>p.status==='pending').length; log('info','Completadas en bloque: '+n); endSelect(); toast(n+(n===1?' tarea completada':' tareas completadas'), ()=>batch(()=>prev.forEach(p=>updTask(p.id,{status:p.status, completed:p.completed})))); }
-function bulkDelete(){ const xs=selectedTasks(); if(!xs.length) return; confirmSheet('Eliminar '+xs.length+(xs.length===1?' tarea':' tareas'), 'Podrás deshacerlo durante unos segundos.', ()=>{ const ids=new Set(xs.map(x=>x.id)); const removedT=DB.tasks.filter(x=>ids.has(x.id)), removedV=DB.voiceNotes.filter(v=>ids.has(v.taskId)); DB.tasks=DB.tasks.filter(x=>!ids.has(x.id)); DB.voiceNotes=DB.voiceNotes.filter(v=>!ids.has(v.taskId)); save(); log('info','Eliminadas en bloque: '+removedT.length); endSelect(); haptic(14); toast(removedT.length+(removedT.length===1?' tarea eliminada':' tareas eliminadas'), ()=>{ DB.tasks.push(...removedT); DB.voiceNotes.push(...removedV); save(); }); }); }
+function bulkDelete(){ const xs=selectedTasks(); if(!xs.length) return; confirmSheet('Eliminar '+xs.length+(xs.length===1?' tarea':' tareas'), 'Podrás deshacerlo durante unos segundos.', ()=>{ const ids=new Set(xs.map(x=>x.id)); const removedT=DB.tasks.filter(x=>ids.has(x.id)), removedV=DB.voiceNotes.filter(v=>ids.has(v.taskId)); DB.tasks=DB.tasks.filter(x=>!ids.has(x.id)); DB.voiceNotes=DB.voiceNotes.filter(v=>!ids.has(v.taskId)); const removedA=cutAttachments(ids); save(); log('info','Eliminadas en bloque: '+removedT.length); endSelect(); haptic(14); toast(removedT.length+(removedT.length===1?' tarea eliminada':' tareas eliminadas'), ()=>{ DB.tasks.push(...removedT); DB.voiceNotes.push(...removedV); putAttachments(removedA); save(); }); }); }
 function bulkReschedule(date, label){ const xs=selectedTasks(); if(!xs.length) return; const prev=xs.map(daySnap); batch(()=>xs.forEach(x=>updTask(x.id, dayPatch(x, date)))); endSelect(); toast(xs.length+(xs.length===1?' tarea aplazada a ':' tareas aplazadas a ')+label, ()=>batch(()=>prev.forEach(undoDay))); }
 function bulkPostponeSheet(src){ const sel=selSet(); if(!sel||!sel.size) return; const t=todayStr(); const opts=uniqueBy([['Mañana',addDays(t,1)],['Fin de semana',weekendDay()],['Próxima semana',nextWeekday(1,true)],['En una semana',addDays(t,7)]], o=>o[1]);
   popMenu({anchor:src, align:UI.wide?'left':undefined, title:'Aplazar '+sel.size+(sel.size===1?' tarea':' tareas'), groups:[opts.map(([l,d])=>dateItem(l, d, ()=>bulkReschedule(d,l.toLowerCase()))), [dateItem('Sin fecha', null, ()=>bulkReschedule(null,'sin fecha'))]]}); }
@@ -2596,12 +2707,12 @@ function reviewStep(ids, i, st){
     s.onclick=e=>{ const c=e.target.closest('[data-rv]'); if(c){ const o=opts.find(q=>q[0]===c.dataset.rv); keep(); updTask(x.id, dayPatch(x, o[1], {carried:false})); tally(o[0]); next(); return; } // Hoy confirms the task and clears its Aplazada mark
       const b=e.target.closest('[data-x]'); if(!b) return; const k=b.dataset.x;
       if(k==='done'){ keep(); applyDone(x.id, true); tally('done'); next(); }
-      else if(k==='del'){ const j=DB.tasks.indexOf(x); if(j>=0){ DB.tasks.splice(j,1); const vn=DB.voiceNotes.filter(v=>v.taskId===x.id); DB.voiceNotes=DB.voiceNotes.filter(v=>v.taskId!==x.id); st.removed.push({x, vn}); save(); } tally('del'); haptic(10); next(); }
+      else if(k==='del'){ const j=DB.tasks.indexOf(x); if(j>=0){ DB.tasks.splice(j,1); const vn=DB.voiceNotes.filter(v=>v.taskId===x.id); DB.voiceNotes=DB.voiceNotes.filter(v=>v.taskId!==x.id); st.removed.push({x, vn, at:cutAttachments(new Set([x.id]))}); save(); } tally('del'); haptic(10); next(); }
       else if(k==='skip'){ tally('skip'); reviewStep(ids, i+1, st); }
       else { st.tally.skip=(st.tally.skip||0)+ids.length-i; sheetOnClose=null; reviewEnd(st, true); } }; });
 }
 function reviewEnd(st, asSheet){ const T=st.tally, decided=Object.keys(T).some(k=>k!=='skip'&&T[k]);
-  const undo=()=>batch(()=>{ st.prev.forEach((o,id)=>{ if(task(id)) updTask(id, o); }); st.removed.forEach(r=>{ if(!task(r.x.id)){ DB.tasks.push(r.x); DB.voiceNotes.push(...r.vn); } }); save(); });
+  const undo=()=>batch(()=>{ st.prev.forEach((o,id)=>{ if(task(id)) updTask(id, o); }); st.removed.forEach(r=>{ if(!task(r.x.id)){ DB.tasks.push(r.x); DB.voiceNotes.push(...r.vn); putAttachments(r.at); } }); save(); });
   const parts=REVIEW_OUT.filter(o=>T[o[0]]).map(o=>T[o[0]]+' '+(T[o[0]]===1?o[1]:o[2]));
   log('info', st.kind==='carried'?'Repaso de aplazadas':'Día cerrado una a una', T);
   if(!decided){ if(asSheet) closeSheet(); renderAnimated(); return; }
@@ -2759,7 +2870,7 @@ function addSheet(projectId){
 function swallowClick(){ const f=e=>{ e.stopPropagation(); e.preventDefault(); off(); }; const off=()=>{ document.removeEventListener('click', f, true); clearTimeout(t); }; document.addEventListener('click', f, true); const t=setTimeout(off, 1000); }
 // R6: several tasks at once (a pasted list, the items of a note). Each line is read as a quick-add title over the shared values.
 function addMany(lines, base, extra){ const ids=[]; batch(()=>{ lines.forEach(l=>{ const r=quickTask(l, base); if(!r.title) return; ids.push(addTask(Object.assign({title:r.title, date:r.date, projectId:r.projectId, priority:r.priority, reminder:r.reminder}, extra||{})).id); }); }); haptic(8); return ids; }
-function removeTasks(ids){ const set=new Set(ids); DB.tasks=DB.tasks.filter(x=>!set.has(x.id)); DB.voiceNotes=DB.voiceNotes.filter(v=>!set.has(v.taskId)); save(); }
+function removeTasks(ids){ const set=new Set(ids); DB.tasks=DB.tasks.filter(x=>!set.has(x.id)); DB.voiceNotes=DB.voiceNotes.filter(v=>!set.has(v.taskId)); cutAttachments(set); save(); }
 /* New or edited project */
 function projectSheet(id){
   const p=id?proj(id):null; let color=p?p.color:COLORS[4];
@@ -2933,16 +3044,18 @@ function restoreBackup(date){ const b=BACKUPS.find(x=>x.date===date); if(!b) ret
   const when = date===todayStr()?'de hoy':date===addDays(todayStr(),-1)?'de ayer':'del '+fmtDate(date);
   // Signed in, the copy applies to every device (agreed with Enric): restored records get a new modified so they win, and what the copy lacks is deleted everywhere by the next sync
   const synced=!!(typeof SY!=='undefined'&&SY&&SY.user);
-  confirmSheet('Restaurar copia '+when, synced?'Se sustituyen espacios, proyectos, tareas y notas de voz por los de esa copia ('+b.tasks+' tareas) en todos tus dispositivos. Lo creado después de esa copia se eliminará también en ellos.':'Se sustituyen espacios, proyectos, tareas y notas de voz por los de esa copia ('+b.tasks+' tareas). Podrás deshacerlo durante unos segundos.', async()=>{
-    try{ const snap=await BK.get(date); if(!snap) return; const prev={spaces:DB.spaces, projects:DB.projects, tasks:DB.tasks, voiceNotes:DB.voiceNotes}, prevActive=DB.settings.activeSpace;
+  confirmSheet('Restaurar copia '+when, synced?'Se sustituyen espacios, proyectos, tareas, notas de voz y adjuntos por los de esa copia ('+b.tasks+' tareas) en todos tus dispositivos. Lo creado después de esa copia se eliminará también en ellos.':'Se sustituyen espacios, proyectos, tareas, notas de voz y adjuntos por los de esa copia ('+b.tasks+' tareas). Podrás deshacerlo durante unos segundos.', async()=>{
+    try{ const snap=await BK.get(date); if(!snap) return; const prev={spaces:DB.spaces, projects:DB.projects, tasks:DB.tasks, voiceNotes:DB.voiceNotes, attachments:DB.attachments}, prevActive=DB.settings.activeSpace;
       DB.spaces=snap.data.spaces||prev.spaces; DB.projects=snap.data.projects||[]; DB.tasks=snap.data.tasks||[]; DB.voiceNotes=snap.data.voiceNotes||[];
-      if(synced){ const now=new Date().toISOString(); [DB.spaces,DB.projects,DB.tasks,DB.voiceNotes].forEach(a=>a.forEach(r=>{ r.modified=now; })); log('info','Copia restaurada con sesión iniciada: se aplicará en todos los dispositivos', {date}); }
+      // Decision 29.5: the copy's attachment records (their files are on the device or in Storage for 24 hours more); a copy from before them keeps those of its tasks
+      { const tids=new Set(DB.tasks.map(x=>x.id)); DB.attachments=Array.isArray(snap.data.attachments)?snap.data.attachments:prev.attachments.filter(a=>tids.has(a.taskId)); }
+      if(synced){ const now=new Date().toISOString(); [DB.spaces,DB.projects,DB.tasks,DB.voiceNotes,DB.attachments].forEach(a=>a.forEach(r=>{ r.modified=now; })); log('info','Copia restaurada con sesión iniciada: se aplicará en todos los dispositivos', {date}); }
       if(!DB.spaces.some(sp=>sp.id===DB.settings.activeSpace)){ DB.settings.activeSpace=DB.spaces[0].id; resetListState(); } save(); rollOver(); render(); haptic(10);
-      log('info','Copia restaurada', {date, tasks:DB.tasks.length}); toast('Copia '+when+' restaurada', ()=>{ Object.assign(DB, prev); if(synced){ const now=new Date().toISOString(); [DB.spaces,DB.projects,DB.tasks,DB.voiceNotes].forEach(a=>a.forEach(r=>{ r.modified=now; })); } DB.settings.activeSpace=prevActive; save(); });
+      log('info','Copia restaurada', {date, tasks:DB.tasks.length}); toast('Copia '+when+' restaurada', ()=>{ Object.assign(DB, prev); if(synced){ const now=new Date().toISOString(); [DB.spaces,DB.projects,DB.tasks,DB.voiceNotes,DB.attachments].forEach(a=>a.forEach(r=>{ r.modified=now; })); } DB.settings.activeSpace=prevActive; save(); });
     }catch(e){ log('error','Restaurar copia falló: '+(e&&e.message||e)); toast('No se pudo restaurar'); } }, 'Restaurar'); }
 
 /* Export and import */
-function exportData(){ return { app:'tareas', version:APP_VERSION, exported:new Date().toISOString(), spaces:DB.spaces, projects:DB.projects, tasks:DB.tasks, voiceNotes:DB.voiceNotes }; }
+function exportData(){ return { app:'tareas', version:APP_VERSION, exported:new Date().toISOString(), spaces:DB.spaces, projects:DB.projects, tasks:DB.tasks, voiceNotes:DB.voiceNotes, attachments:DB.attachments }; } // decision 29.5: the list of attachments, not their files
 function exportJSON(){ const t=JSON.stringify(exportData(),null,2); if(navigator.share){ navigator.share({title:'Tareas (copia)', text:t}).catch(()=>copyText(t,'Copia JSON en el portapapeles')); } else copyText(t,'Copia JSON en el portapapeles'); }
 // CSV for Excel in Spanish locales: semicolon separated, UTF-8 with BOM, one row per task.
 // A cell that starts with = + - or @ gets a leading apostrophe: Excel runs it as a formula even when quoted.
@@ -2972,7 +3085,7 @@ function importData(text){
   const d=JSON.parse(text); if(!d||typeof d!=='object') throw new Error('Formato no reconocido');
   let added=0, updated=0;
   const merge=(arr,src)=>{ (Array.isArray(src)?src:[]).forEach(it=>{ if(!it||!it.id) return; const i=arr.findIndex(a=>a.id===it.id); if(i<0){ arr.push(it); added++; } else if((it.modified||'')>(arr[i].modified||'')){ arr[i]=it; updated++; } }); };
-  merge(DB.spaces,d.spaces); merge(DB.projects,d.projects); merge(DB.tasks,d.tasks); merge(DB.voiceNotes,d.voiceNotes);
+  merge(DB.spaces,d.spaces); merge(DB.projects,d.projects); merge(DB.tasks,d.tasks); merge(DB.voiceNotes,d.voiceNotes); merge(DB.attachments,d.attachments);
   DB.tasks.forEach(x=>{ if(x.carried===undefined) x.carried=false; });
   save(); rollOver(); log('info','Importación', {added, updated, spaces:(d.spaces||[]).length, projects:(d.projects||[]).length, tasks:(d.tasks||[]).length});
   return {added, updated};
@@ -3018,11 +3131,411 @@ function clearDemo(){
     // Your own tasks filed in a test project stay, with no project; notes of removed tasks go with them
     const pids=new Set(DB.projects.map(p=>p.id)), tids=new Set(DB.tasks.map(x=>x.id)), now=new Date().toISOString(); let moved=0;
     DB.tasks.forEach(x=>{ if(x.projectId&&!pids.has(x.projectId)){ x.projectId=null; x.modified=now; moved++; } });
-    const vn=DB.voiceNotes.length; DB.voiceNotes=DB.voiceNotes.filter(v=>tids.has(v.taskId));
+    const vn=DB.voiceNotes.length; DB.voiceNotes=DB.voiceNotes.filter(v=>tids.has(v.taskId)); DB.attachments=DB.attachments.filter(a=>tids.has(a.taskId));
     save(); render(); haptic(10);
     log('info','Datos de prueba eliminados', {tasks:n, unfiled:moved, voiceNotes:vn-DB.voiceNotes.length}); toast('Datos de prueba eliminados');
   });
 }
+
+/* ======================= ATTACHMENTS (decision 29): photos and recorded audio =======================
+   A task holds photos and recordings in DB.attachments: {id, taskId, kind 'photo' or 'audio', path, mime, size, width, height,
+   durationMs, created, modified}. The files themselves never go in localStorage:
+   - On the device (FS, IndexedDB 'tareas-files'): whatever is captured is stored here first and shown from here at once. Stores: files
+     (the file), thumbs (a JPEG of each photo, 320 px on its short side) and meta (sizes, last use, waiting to upload). Up to FILE_CAP
+     (200 MB, decision 29.3): past it the files used longest ago leave the device, never one still waiting to upload; thumbnails stay.
+   - Upload (attFlush): signed in and online, each file waiting goes to the private bucket at <owner>/<task>/<id>.<ext>. Only then does
+     the record get its path and go up with the sync (SYNC_TABLES), so another device never gets a record whose file is not there yet.
+     Retried with a growing wait, logged. Signed out, or without config, the attachments stay on this device and the detail says so.
+   - Download on demand: a record with a path and no file here is fetched through a short-lived signed URL (SY.remote.fileUrl),
+     kept (FS) and, for a photo, given its thumbnail.
+   - Deleting: the record goes (the sync marks it deleted everywhere) and the file stays in the cache and in Storage, so Deshacer and a
+     restored copy bring it back; send-reminders removes the file from Storage 24 hours later (decision 29.4).
+   - Screens: the Adjuntos group of the detail (iPhone and inspector), the photo viewer (openViewer) and the recorder (recordSheet).
+     Object URLs are made when a file is shown and revoked once nothing on screen shows it (fuGC). */
+const FILES_DB='tareas-files', ATT_BUCKET='attachments';
+const ATT_EXT={'image/jpeg':'jpg','image/png':'png','image/webp':'webp','image/heic':'heic','image/gif':'gif','audio/mp4':'m4a','audio/x-m4a':'m4a','audio/aac':'aac','audio/webm':'webm','audio/ogg':'ogg','audio/mpeg':'mp3','audio/wav':'wav'};
+let FILE_CAP=200*1024*1024, REC_MAX_MS=10*60*1000; // decisions 29.3 and 29.2 (a test lowers them)
+const PHOTO_MAX=2048, PHOTO_Q=0.82, THUMB_SIDE=320, THUMB_Q=0.72, SIGN_TTL=300, AUDIO_BPS=48000; // decision 29.1; voice quality for 29.2
+const baseMime = m => String(m||'').split(';')[0].trim().toLowerCase();
+const att = id => DB.attachments.find(a=>a.id===id);
+const attOf = (taskId, kind) => DB.attachments.filter(a=>a.taskId===taskId&&(!kind||a.kind===kind)).sort((a,b)=>a.created<b.created?-1:a.created>b.created?1:0);
+const fmtDur = (ms, floor) => { const s=Math.max(0, (floor?Math.floor:Math.round)((ms||0)/1000)); return Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); };
+// The tasks with attachments, worked out once per data version (the paperclip of the rows)
+let attSetV=-1, attSetC=null;
+function hasAtt(taskId){ if(attSetV!==dataVer||!attSetC){ attSetC=new Set(DB.attachments.map(a=>a.taskId)); attSetV=dataVer; } return attSetC.has(taskId); }
+// Changes made here to what a render drew (a thumbnail arriving, the progress of a recording) are not changes that need a redraw (R18)
+function attOwn(fn){ markDirty(rowWatch.takeRecords()); try{ fn(); } finally{ rowWatch.takeRecords(); } }
+const AST=new Map(); // id: 'load' (downloading), 'err' (failed), 'off' (no account or connection), 'none' (the file is nowhere)
+const canShareFiles = () => { try{ return !!(navigator.canShare&&navigator.canShare({files:[new File([new Blob(['x'],{type:'image/jpeg'})], 'foto.jpg', {type:'image/jpeg'})]})); }catch(e){ return false; } };
+const isSafari = () => isIOS() || (/Safari\//.test(navigator.userAgent) && !/Chrome|Chromium|Edg\//.test(navigator.userAgent));
+
+/* ---------- Files on the device ---------- */
+const FS={ p:null, touched:new Map(), evT:0,
+  open(){ if(!this.p){ this.p=new Promise((res,rej)=>{ let r; try{ r=indexedDB.open(FILES_DB,1); }catch(e){ rej(e); return; }
+      r.onupgradeneeded=()=>{ const d=r.result; ['files','thumbs','meta'].forEach(n=>{ if(!d.objectStoreNames.contains(n)) d.createObjectStore(n,{keyPath:'id'}); }); };
+      r.onsuccess=()=>{ const d=r.result; d.onversionchange=()=>{ d.close(); FS.p=null; }; d.onclose=()=>{ FS.p=null; }; res(d); };
+      r.onerror=()=>rej(r.error); r.onblocked=()=>rej(new Error('Base de archivos bloqueada')); });
+      this.p.catch(()=>{ this.p=null; }); }
+    return this.p; },
+  // One transaction: fn gets the stores and returns a request (its result is the answer) or a value; resolves once it is written
+  async tx(names, mode, fn){ const d=await this.open(); return new Promise((res,rej)=>{ let t, out;
+    try{ t=d.transaction(names, mode); out=fn(...names.map(n=>t.objectStore(n))); }catch(e){ rej(e); return; }
+    t.oncomplete=()=>res(out&&typeof IDBRequest!=='undefined'&&out instanceof IDBRequest?out.result:out); t.onerror=()=>rej(t.error); t.onabort=()=>rej(t.error||new Error('Escritura cancelada')); }); },
+  get(store, id){ return this.tx([store],'readonly',s=>s.get(id)); },
+  async getFile(id){ const r=await this.get('files', id); if(!r) return null; this.touch(id); return new Blob([r.buf], {type:r.mime||''}); },
+  async getThumb(id){ const r=await this.get('thumbs', id); return r?new Blob([r.buf], {type:'image/jpeg'}):null; },
+  meta(id){ return this.get('meta', id); },
+  allMeta(){ return this.tx(['meta'],'readonly',s=>s.getAll()); },
+  // ArrayBuffers rather than Blobs: every WebKit version keeps them
+  async putFile(id, blob, o){ o=o||{}; const buf=await blob.arrayBuffer(), tb=o.thumb?await o.thumb.arrayBuffer():null, now=Date.now();
+    await this.tx(['files','thumbs','meta'],'readwrite',(f,t,m)=>{ f.put({id, buf, mime:baseMime(blob.type)}); if(tb) t.put({id, buf:tb});
+      const rq=m.get(id); rq.onsuccess=()=>{ const old=rq.result||{}; m.put({id, size:buf.byteLength, tsize:tb?tb.byteLength:(old.tsize||0), pending:!!o.pending, file:true, used:now}); }; });
+    this.evictSoon(); },
+  async putThumb(id, blob){ const tb=await blob.arrayBuffer();
+    await this.tx(['thumbs','meta'],'readwrite',(t,m)=>{ t.put({id, buf:tb}); const rq=m.get(id); rq.onsuccess=()=>{ const x=rq.result||{id, size:0, pending:false, file:false, used:Date.now()}; x.tsize=tb.byteLength; m.put(x); }; }); },
+  async setPending(id, v){ await this.tx(['meta'],'readwrite',m=>{ const rq=m.get(id); rq.onsuccess=()=>{ if(rq.result){ rq.result.pending=v; m.put(rq.result); } }; }); },
+  // The last use, written at most once a minute per file
+  touch(id){ const t=Date.now(); if(t-(this.touched.get(id)||0)<6e4) return; this.touched.set(id,t);
+    this.tx(['meta'],'readwrite',m=>{ const rq=m.get(id); rq.onsuccess=()=>{ if(rq.result){ rq.result.used=t; m.put(rq.result); } }; }).catch(()=>{}); },
+  async total(){ return (await this.allMeta()).reduce((n,m)=>n+(m.file?m.size:0)+(m.tsize||0), 0); },
+  evictSoon(){ clearTimeout(this.evT); this.evT=setTimeout(()=>this.evict().catch(e=>log('warn','Caché de adjuntos: '+(e&&e.message||e))), 300); },
+  // Decision 29.3: past the cap, the files used longest ago leave the device (their thumbnails stay); one still waiting to upload never does.
+  // A file whose attachment has been gone for a day (deleted, no Deshacer left) goes whole
+  async evict(){ const ms=await this.allMeta(), live=new Set(DB.attachments.map(a=>a.id)), day=Date.now()-864e5;
+    const gone=ms.filter(m=>!live.has(m.id)&&m.used<day), goneIds=new Set(gone.map(m=>m.id));
+    let total=ms.reduce((n,m)=>n+(goneIds.has(m.id)?0:(m.file?m.size:0)+(m.tsize||0)), 0); const before=total, drop=[];
+    if(total>FILE_CAP) ms.filter(m=>m.file&&!goneIds.has(m.id)&&!(m.pending&&live.has(m.id))).sort((a,b)=>a.used-b.used).some(m=>{ if(total<=FILE_CAP) return true; drop.push(m); total-=m.size; return false; });
+    if(!gone.length&&!drop.length) return;
+    await this.tx(['files','thumbs','meta'],'readwrite',(f,t,m)=>{ gone.forEach(x=>{ f.delete(x.id); t.delete(x.id); m.delete(x.id); }); drop.forEach(x=>{ f.delete(x.id); m.put(Object.assign({}, x, {file:false, size:0})); }); });
+    log('info','Caché de adjuntos', {quitados:drop.length, huerfanos:gone.length, antes:before, ahora:total, limite:FILE_CAP}); }
+};
+
+/* ---------- Object URLs ---------- */
+const FU=new Map(); // 'id|t' (thumbnail) or 'id|f' (file): its object URL while something shows it
+const fuGet = (id, k) => FU.get(id+'|'+k)||null;
+function fuMake(id, k, blob){ const key=id+'|'+k; let u=FU.get(key); if(!u){ u=URL.createObjectURL(blob); FU.set(key, u); } return u; }
+let fuT=0; function fuGCSoon(){ clearTimeout(fuT); fuT=setTimeout(fuGC, 900); }
+// Whatever no screen shows any more is let go; a recording playing whose row has gone stops
+function fuGC(){ const keep=new Set(); document.querySelectorAll('[data-att],[data-au],[data-vw-id]').forEach(e=>keep.add(e.dataset.att||e.dataset.au||e.dataset.vwId));
+  if(VW) VW.ids.forEach(i=>keep.add(i));
+  if(AP.id&&!keep.has(AP.id)) apStop();
+  for(const [key,u] of FU){ if(!keep.has(key.slice(0, key.lastIndexOf('|')))){ URL.revokeObjectURL(u); FU.delete(key); } } }
+
+/* ---------- Getting a file: here, or downloaded ---------- */
+const FDL=new Map(); // downloads under way, one per attachment
+async function attFile(a){ const b=await FS.getFile(a.id).catch(()=>null); return b||attDownload(a); }
+function attDownload(a){ if(FDL.has(a.id)) return FDL.get(a.id);
+  if(!a.path){ AST.set(a.id,'none'); return Promise.resolve(null); } // captured on another device that never uploaded it, or imported
+  if(!SY||!SY.user||!SY.remote.fileUrl||!navigator.onLine){ AST.set(a.id,'off'); return Promise.resolve(null); }
+  AST.set(a.id,'load'); const t0=Date.now();
+  const p=(async()=>{ const url=await SY.remote.fileUrl(a.path, SIGN_TTL); const r=await fetch(url, {cache:'no-store'}); if(!r.ok) throw new Error('HTTP '+r.status);
+      const raw=await r.blob(), blob=baseMime(raw.type)===baseMime(a.mime)?raw:new Blob([raw], {type:a.mime||raw.type});
+      await FS.putFile(a.id, blob, {pending:false}).catch(e=>log('warn','Adjunto descargado pero no guardado en el dispositivo: '+(e&&e.message||e)));
+      AST.delete(a.id); log('info', a.kind==='photo'?'Foto descargada':'Audio descargado', {size:blob.size, ms:Date.now()-t0}); return blob; })()
+    .catch(e=>{ const off=syncOffline(e); AST.set(a.id, off?'off':'err'); log(off?'warn':'error','Adjunto no descargado: '+(e&&(e.message||e.error)||e), {id:a.id}); return null; })
+    .finally(()=>FDL.delete(a.id));
+  FDL.set(a.id, p); return p; }
+// A photo's thumbnail: kept on the device, or made from the file (a remote photo, after its first download)
+async function attThumbUrl(a){ const u=fuGet(a.id,'t'); if(u) return u;
+  let tb=await FS.getThumb(a.id).catch(()=>null);
+  if(!tb){ const f=await attFile(a); if(!f) return null;
+    try{ const img=await decodeImage(f); try{ tb=await drawJpeg(img, thumbSize(img.w, img.h), THUMB_Q); } finally{ img.close(); } FS.putThumb(a.id, tb).catch(()=>{}); }
+    catch(e){ log('warn','Miniatura no generada: '+(e&&e.message||e)); tb=f; } }
+  return fuMake(a.id,'t',tb); }
+
+/* ---------- Photos: decode upright, reduce, compress ---------- */
+// The image as the camera held it (EXIF orientation applied). WebKit draws an <img> upright for sure; elsewhere createImageBitmap does it
+async function decodeImage(blob){
+  if(window.createImageBitmap && !isSafari()){ try{ const b=await createImageBitmap(blob, {imageOrientation:'from-image'}); return {src:b, w:b.width, h:b.height, close:()=>{ try{ b.close(); }catch(e){} }}; }catch(e){} }
+  const url=URL.createObjectURL(blob); const img=new Image(); img.decoding='async';
+  try{ await new Promise((res,rej)=>{ img.onload=res; img.onerror=()=>rej(new Error('No se pudo leer la imagen')); img.src=url; }); if(img.decode) await img.decode().catch(()=>{});
+    return {src:img, w:img.naturalWidth, h:img.naturalHeight, close:()=>URL.revokeObjectURL(url)}; }
+  catch(e){ URL.revokeObjectURL(url); throw e; } }
+const fitSize = (w, h, max) => { const s=Math.min(1, max/Math.max(w,h)); return {w:Math.max(1,Math.round(w*s)), h:Math.max(1,Math.round(h*s))}; };
+const thumbSize = (w, h) => { const s=Math.min(1, THUMB_SIDE/Math.min(w,h), 1280/Math.max(w,h)); return {w:Math.max(1,Math.round(w*s)), h:Math.max(1,Math.round(h*s))}; };
+function drawJpeg(img, sz, q){ const c=document.createElement('canvas'); c.width=sz.w; c.height=sz.h; const g=c.getContext('2d');
+  g.imageSmoothingEnabled=true; g.imageSmoothingQuality='high'; g.fillStyle='#fff'; g.fillRect(0,0,sz.w,sz.h); g.drawImage(img.src, 0, 0, sz.w, sz.h);
+  return new Promise((res,rej)=>c.toBlob(b=>{ c.width=c.height=0; b?res(b):rej(new Error('No se pudo comprimir la imagen')); }, 'image/jpeg', q)); }
+// Decision 29.1: at most 2048 px on its long side, JPEG of good quality (re-encoding also leaves the location and the rest of the EXIF out)
+async function processPhoto(file){ const img=await decodeImage(file);
+  try{ if(!img.w||!img.h) throw new Error('Imagen vacía'); const sz=fitSize(img.w, img.h, PHOTO_MAX);
+    const blob=await drawJpeg(img, sz, PHOTO_Q), thumb=await drawJpeg(img, thumbSize(sz.w, sz.h), THUMB_Q);
+    return {blob, thumb, w:sz.w, h:sz.h}; }
+  finally{ img.close(); } }
+
+/* ---------- Adding ---------- */
+// Inside the tap: iOS offers the camera or the library for an image input
+function pickPhotos(taskId){ let inp=$('#attFile'); if(!inp){ inp=document.createElement('input'); inp.type='file'; inp.id='attFile'; inp.accept='image/*'; inp.multiple=true; inp.tabIndex=-1; inp.setAttribute('aria-hidden','true'); inp.style.cssText='position:fixed;left:-100px;top:0;width:1px;height:1px;opacity:0'; document.body.appendChild(inp); }
+  inp.value=''; inp.onchange=()=>{ const fs=[...(inp.files||[])]; inp.value=''; if(fs.length) addPhotos(taskId, fs); }; inp.click(); }
+async function addPhotos(taskId, files){
+  const imgs=files.filter(f=>/^image\//.test(f.type||'')||/\.(jpe?g|png|heic|heif|webp|gif)$/i.test(f.name||''));
+  if(!imgs.length){ toast('Solo se pueden añadir fotos'); return 0; }
+  let n=0;
+  for(const f of imgs){ if(!task(taskId)) break; const t0=Date.now();
+    try{ const p=await processPhoto(f); const id=uid(), now=new Date().toISOString();
+      await FS.putFile(id, p.blob, {pending:true, thumb:p.thumb}); if(!task(taskId)) break;
+      fuMake(id,'t',p.thumb); // on screen at once, from the device
+      DB.attachments.push({id, taskId, kind:'photo', path:null, mime:'image/jpeg', size:p.blob.size, width:p.w, height:p.h, durationMs:null, created:now, modified:now});
+      updTask(taskId,{}); n++; attPaint(taskId);
+      log('info','Foto añadida', {w:p.w, h:p.h, size:p.blob.size, original:f.size, ms:Date.now()-t0}); }
+    catch(e){ log('error','Foto no añadida: '+(e&&e.message||e), {type:f.type, size:f.size}); toast(/quota|space|IndexedDB|abort|bloque/i.test(String(e&&(e.name+' '+e.message)))?'No hay espacio para guardar la foto en el dispositivo':'No se pudo añadir la foto'); } }
+  if(n){ haptic(8); attFlushSoon(); } return n; }
+// The Adjuntos group of the screens showing that task changes at once, even while its title or notes are being typed; the rest (the paperclip
+// of the list, the pane's own drawing) follows with the next render, now or once the typing ends
+function attPaint(taskId){ attRefresh(taskId); if(busyEditing()||touchDrag){ staleView=true; return; } render(); }
+function attRefresh(taskId){ const x=task(taskId); if(!x) return;
+  const boxes=[...document.querySelectorAll('.att-wrap[data-att-task="'+CSS.escape(taskId)+'"]')];
+  boxes.forEach(b=>{ const t=document.createElement('template'); t.innerHTML=attWrapHTML(x); const nb=t.content.firstElementChild; b.replaceWith(nb);
+    if(!UI.wide) nb.querySelectorAll('.vn[data-au]').forEach(bindVnGestures); attHydrate(nb); }); }
+const attWrapHTML = x => '<div class="att-wrap" data-att-task="'+esc(x.id)+'">'+attGroupHTML(x)+'</div>';
+function deleteAttachment(id){ const i=DB.attachments.findIndex(a=>a.id===id); if(i<0) return; const [a]=DB.attachments.splice(i,1);
+  if(AP.id===id) apStop(); if(task(a.taskId)) updTask(a.taskId,{}); else save(); haptic(14); attPaint(a.taskId);
+  log('info', a.kind==='photo'?'Foto eliminada':'Audio eliminado');
+  toast(a.kind==='photo'?'Foto eliminada':'Audio eliminado', ()=>{ if(!DB.attachments.some(x=>x.id===a.id)) DB.attachments.push(a); save(); attPaint(a.taskId); }); }
+// A task's attachments leave with it and come back with its Deshacer (deleteTask, the bulk and review deletions, a space)
+function cutAttachments(ids){ const out=DB.attachments.filter(a=>ids.has(a.taskId)); if(out.length){ DB.attachments=DB.attachments.filter(a=>!ids.has(a.taskId)); if(AP.id&&out.some(a=>a.id===AP.id)) apStop(); } return out; }
+function putAttachments(list){ (list||[]).forEach(a=>{ if(!DB.attachments.some(x=>x.id===a.id)) DB.attachments.push(a); }); }
+
+/* ---------- Upload queue ---------- */
+const UQ={running:false, timer:0, retry:0};
+function attFlushSoon(ms){ clearTimeout(UQ.timer); UQ.timer=setTimeout(attFlush, ms==null?400:ms); }
+async function attFlush(){ if(UQ.running||!SY||!SY.user||!SY.remote.fileUpload||!navigator.onLine||syncMissing('attachments')) return;
+  const user=SY.user.id, todo=DB.attachments.filter(a=>!a.path&&!syncDemoId(a.id)&&task(a.taskId)&&!syncDemoId(a.taskId)).map(a=>a.id); if(!todo.length) return;
+  UQ.running=true; let done=0;
+  try{ for(const id of todo){ if(!SY.user||SY.user.id!==user||!navigator.onLine) break; const a=att(id); if(!a||a.path||!task(a.taskId)) continue;
+      const blob=await FS.getFile(id).catch(()=>null); if(!blob){ if(AST.get(id)!=='none'){ AST.set(id,'none'); log('warn','Adjunto sin archivo en este dispositivo: no se puede subir', {id}); } continue; }
+      const mime=baseMime(a.mime)||baseMime(blob.type), path=user+'/'+a.taskId+'/'+id+'.'+(ATT_EXT[mime]||'bin'), t0=Date.now();
+      await SY.remote.fileUpload(path, blob, mime);
+      await FS.setPending(id, false).catch(()=>{});
+      const cur=att(id); if(cur&&!cur.path){ cur.path=path; cur.modified=new Date().toISOString(); save(); } done++;
+      log('info', a.kind==='photo'?'Foto subida':'Audio subido', {size:blob.size, ms:Date.now()-t0}); }
+    UQ.retry=0; }
+  catch(e){ const off=syncOffline(e), ms=Math.min(300e3, 3000*Math.pow(2, UQ.retry++)); log(off?'warn':'error','Subida de adjunto falló: '+(e&&(e.message||e.error)||e), {reintento:Math.round(ms/1000)+' s'}); attFlushSoon(ms); }
+  finally{ UQ.running=false; if(done){ const id=detailTaskId(); if(id&&hasAtt(id)) attPaint(id); } } }
+// Under the group: where the files are while they have not reached the account
+function attNote(taskId){ const all=attOf(taskId); if(!all.length) return ''; const dev=UI.wide?'este dispositivo':'este iPhone';
+  if(!SY) return 'Los adjuntos se guardan solo en '+dev+'.';
+  const n=all.filter(a=>!a.path).length; if(!n) return '';
+  if(!SY.user) return 'Se guardan en '+dev+' y se subirán a tu cuenta al iniciar sesión.';
+  if(!navigator.onLine) return 'Se subirán a tu cuenta al volver la conexión.';
+  return 'Subiendo '+n+(n===1?' adjunto':' adjuntos')+' a tu cuenta.'; }
+
+/* ---------- The Adjuntos group of the detail ---------- */
+function attGroupHTML(x){ const ps=attOf(x.id,'photo'), as=attOf(x.id,'audio'), note=attNote(x.id);
+  const tile=a=>{ const u=fuGet(a.id,'t'), st=AST.get(a.id), miss=!u&&(st==='err'||st==='none'||st==='off');
+    return '<button class="att-ph'+(u?'':miss?' miss':' wait')+'" data-att="'+esc(a.id)+'" aria-label="Foto'+(miss?' no disponible':'')+'"><img data-att-img="'+esc(a.id)+'" alt="" draggable="false"'+(u?' src="'+u+'"':'')+'></button>'; };
+  const row=a=>'<div class="vn att-au" data-au="'+esc(a.id)+'"><div class="vn-bg r"><button data-aact="del">Eliminar</button></div><div class="vn-c au-c">'+
+    '<button class="au-play" data-aact="play" aria-label="Reproducir">'+I.play+I.pause+'</button><div class="au-body"><div class="au-top"><span class="au-name">Audio, '+esc(fmtDateTime(a.created).toLowerCase())+'</span>'+
+    '<span class="au-t"><span class="au-cur">0:00</span> de '+fmtDur(a.durationMs)+'</span></div><div class="au-bar" data-aact="seek"><i></i></div></div></div></div>';
+  return '<div class="group-title">Adjuntos</div><div class="group att-group">'+(ps.length?'<div class="att-grid">'+ps.map(tile).join('')+'</div>':'')+as.map(row).join('')+
+    '<button class="cell link" data-act="attPhoto"'+(UI.wide?' title="También puedes arrastrar fotos aquí"':'')+'>'+I.photo+'<span class="lbl">Añadir foto</span></button>'+
+    '<button class="cell link" data-act="attAudio">'+I.wave+'<span class="lbl">Grabar audio</span></button></div>'+(note?'<div class="footnote att-note">'+note+'</div>':''); }
+// After a draw: the thumbnails not in memory yet come from the device (or are downloaded); the audio rows show the one playing
+function attHydrate(root){ if(!root) return;
+  root.querySelectorAll('img[data-att-img]:not([src])').forEach(img=>{ const a=att(img.dataset.attImg); if(!a) return;
+    attThumbUrl(a).then(u=>{ if(!img.isConnected) return; const b=img.closest('.att-ph');
+      attOwn(()=>{ if(u){ img.src=u; if(b) b.classList.remove('wait','miss'); } else if(b){ b.classList.remove('wait'); b.classList.add('miss'); b.setAttribute('aria-label','Foto no disponible'); } }); }); });
+  if(AP.id&&root.querySelector('[data-au="'+CSS.escape(AP.id)+'"]')) apPaint(); }
+
+/* ---------- Playing a recording (one at a time) ---------- */
+const AP={el:null, id:null, raf:0, durMs:0, loading:false};
+function apEl(){ if(!AP.el){ const a=AP.el=new Audio(); a.preload='auto';
+    a.addEventListener('ended', ()=>{ a.currentTime=0; apPaint(); }); a.addEventListener('pause', apPaint); a.addEventListener('playing', apPaint);
+    a.addEventListener('error', ()=>{ if(!AP.id||!a.getAttribute('src')) return; log('error','No se pudo reproducir el audio', {code:a.error&&a.error.code, mime:(att(AP.id)||{}).mime}); toast('No se pudo reproducir el audio'); apStop(); }); }
+  return AP.el; }
+async function apToggle(id){ const a=att(id); if(!a) return; const el=apEl();
+  if(AP.id===id&&el.getAttribute('src')){ if(el.paused) el.play().catch(apFail); else el.pause(); return; }
+  if(AP.id===id&&AP.loading) return;
+  apStop(); AP.id=id; AP.durMs=a.durationMs||0;
+  let u=fuGet(id,'f');
+  if(!u){ AP.loading=true; apPaint(); const b=await attFile(a); AP.loading=false; if(AP.id!==id) return;
+    if(!b){ AP.id=null; apPaint(); toast(navigator.onLine?'Audio no disponible':'Sin conexión'); return; } u=fuMake(id,'f',b); }
+  el.src=u; el.play().catch(apFail); apPaint(); }
+// iOS may refuse to play once the download has taken the tap's moment: the recording stays loaded and the next tap plays it
+function apFail(e){ if(e&&e.name==='NotAllowedError'){ apPaint(); return; } if(e&&e.name==='AbortError') return; log('warn','Reproducción: '+(e&&e.message||e)); }
+function apStop(){ const el=AP.el; AP.id=null; AP.loading=false; if(el){ el.pause(); el.removeAttribute('src'); try{ el.load(); }catch(e){} } apPaint(); }
+function apSeek(id, frac){ const el=AP.el; if(!el||AP.id!==id) return; const d=isFinite(el.duration)&&el.duration>0?el.duration:AP.durMs/1000; if(d){ el.currentTime=Math.max(0, Math.min(d-0.05, frac*d)); apTick(); } }
+function apPaint(){ cancelAnimationFrame(AP.raf); const el=AP.el, on=!!(el&&AP.id&&!el.paused);
+  attOwn(()=>document.querySelectorAll('.vn[data-au]').forEach(r=>{ const me=r.dataset.au===AP.id; r.classList.toggle('playing', me&&on); r.classList.toggle('loading', me&&AP.loading);
+    const b=r.querySelector('.au-play'); if(b) b.setAttribute('aria-label', me&&on?'Pausar':'Reproducir');
+    if(!me){ const i=r.querySelector('.au-bar i'), c=r.querySelector('.au-cur'); if(i&&i.style.transform) i.style.transform=''; if(c&&c.textContent!=='0:00') c.textContent='0:00'; } }));
+  apTick(); }
+function apTick(){ const el=AP.el; if(!el||!AP.id) return; const d=isFinite(el.duration)&&el.duration>0?el.duration*1000:AP.durMs, t=el.currentTime*1000, p=d?Math.min(1, t/d):0;
+  attOwn(()=>document.querySelectorAll('.vn[data-au="'+CSS.escape(AP.id)+'"]').forEach(r=>{ const i=r.querySelector('.au-bar i'); if(i) i.style.transform='scaleX('+p.toFixed(4)+')'; const c=r.querySelector('.au-cur'), s=fmtDur(t); if(c&&c.textContent!==s) c.textContent=s; }));
+  if(!el.paused) AP.raf=requestAnimationFrame(apTick); }
+// The desktop: a click on a recording (not on its play button or bar) offers what can be done with it, at the pointer
+function audioMenu(id, ev){ const el=document.querySelector('.vn[data-au="'+CSS.escape(id)+'"]'); const at=ev&&ev.clientX!=null&&UI.wide?{x:ev.clientX, y:ev.clientY}:{anchor:el};
+  popMenu(Object.assign(at, {groups:[[{label:AP.id===id&&AP.el&&!AP.el.paused?'Pausar':'Reproducir', icon:MI.play, fn:()=>apToggle(id)}],[{label:'Eliminar audio', icon:MI.trash, red:true, fn:()=>deleteAttachment(id)}]]})); }
+function photoMenu(id, ev){ const a=att(id); if(!a) return; const at=ev&&ev.clientX!=null?{x:ev.clientX, y:ev.clientY}:{anchor:document.querySelector('.att-ph[data-att="'+CSS.escape(id)+'"]')};
+  popMenu(Object.assign(at, {groups:[[{label:'Abrir', icon:MI.eye, fn:()=>openViewer(a.taskId, id)}],[{label:'Eliminar foto', icon:MI.trash, red:true, fn:()=>deleteAttachment(id)}]]})); }
+
+/* ---------- Recording ---------- */
+// Decision 29.2: m4a (AAC) where the browser records it, which every device plays; WebM with Opus otherwise
+function recMime(){ const MR=window.MediaRecorder; if(!MR||!MR.isTypeSupported) return '';
+  const list=isSafari()?['audio/mp4;codecs=mp4a.40.2','audio/mp4','audio/aac','audio/webm;codecs=opus','audio/webm']:['audio/webm;codecs=opus','audio/webm','audio/ogg;codecs=opus','audio/mp4;codecs=mp4a.40.2','audio/mp4'];
+  return list.find(t=>{ try{ return MR.isTypeSupported(t); }catch(e){ return false; } })||''; }
+const playerHTML = () => '<div class="au-c"><button class="au-play" data-x="play" aria-label="Reproducir">'+I.play+I.pause+'</button><div class="au-body"><div class="au-top"><span class="au-name">Grabación</span><span class="au-t"><span class="au-cur">0:00</span> de <span class="au-dur">0:00</span></span></div><div class="au-bar" data-x="seek"><i></i></div></div></div>';
+// The sheet: elapsed time, a big button that records and stops, then the recording to listen to before Guardar. Up to REC_MAX_MS, then it
+// stops by itself. Closing it in any way stops the recording and lets the microphone go; one not saved asks first (decision 28b)
+function recordSheet(taskId){ if(!task(taskId)) return;
+  const can=!!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia&&window.MediaRecorder);
+  const R={state:'idle', rec:null, stream:null, chunks:[], blob:null, mime:'', t0:0, ms:0, timer:0, url:null, gen:0, saveAfter:false, pa:null, raf:0, auto:false};
+  const maxMin=Math.round(REC_MAX_MS/6e4);
+  openSheet(sheadHTML('Grabar audio','Descartar','Guardar')+'<div class="recw"><div class="rec-time">0:00</div><button class="recbtn" data-x="rec" aria-label="Grabar"'+(can?'':' disabled')+'><span class="c"></span><span class="s"></span></button>'+
+    '<div class="hint rec-hint">'+(can?'Toca para grabar. Hasta '+maxMin+(maxMin===1?' minuto.':' minutos.'):'Este navegador no puede grabar audio.')+'</div><div class="rec-prev" hidden>'+playerHTML()+'</div></div>', s=>{
+    const ok=$('.hbtn.ok',s), btn=$('.recbtn',s), time=$('.rec-time',s), hint=$('.rec-hint',s), prev=$('.rec-prev',s);
+    ok.disabled=true;
+    const say=(t, warn)=>{ hint.textContent=t; hint.classList.toggle('warn', !!warn); };
+    const tick=()=>{ const ms=R.state==='rec'?Date.now()-R.t0:R.ms; time.textContent=fmtDur(Math.min(ms, REC_MAX_MS), true); if(R.state==='rec'&&ms>=REC_MAX_MS) stop(true); };
+    const release=()=>{ if(R.stream){ R.stream.getTracks().forEach(t=>{ try{ t.stop(); }catch(e){} }); R.stream=null; } };
+    const unplay=()=>{ cancelAnimationFrame(R.raf); if(R.pa){ R.pa.pause(); R.pa.removeAttribute('src'); try{ R.pa.load(); }catch(e){} R.pa=null; } prev.classList.remove('playing'); if(R.url){ URL.revokeObjectURL(R.url); R.url=null; } };
+    const ptick=()=>{ const a=R.pa; if(!a) return; const d=isFinite(a.duration)&&a.duration>0?a.duration*1000:R.ms, t=a.currentTime*1000; $('.au-bar i',prev).style.transform='scaleX('+(d?Math.min(1,t/d):0).toFixed(4)+')'; $('.au-cur',prev).textContent=fmtDur(t); if(!a.paused) R.raf=requestAnimationFrame(ptick); };
+    const finish=()=>{ release(); clearInterval(R.timer); const type=baseMime(R.mime||(R.chunks[0]&&R.chunks[0].type))||'audio/mp4';
+      R.blob=R.chunks.length?new Blob(R.chunks, {type}):null; R.chunks=[]; R.rec=null; btn.classList.remove('on'); btn.setAttribute('aria-label','Grabar de nuevo'); btn.disabled=false;
+      if(!R.blob||!R.blob.size){ R.state='idle'; R.blob=null; say('No se grabó nada. Toca para intentarlo de nuevo.', true); log('warn','Grabación vacía'); return; }
+      R.state='done'; tick(); log('info','Audio grabado', {ms:R.ms, size:R.blob.size, mime:type});
+      if(R.saveAfter){ saveRec(); return; }
+      ok.disabled=false; say(R.auto?'Grabación detenida al llegar a '+maxMin+(maxMin===1?' minuto.':' minutos.')+' Escúchala y guárdala.':'Escucha la grabación y guárdala, o toca para grabar de nuevo.');
+      R.url=URL.createObjectURL(R.blob); $('.au-dur',prev).textContent=fmtDur(R.ms); $('.au-cur',prev).textContent='0:00'; $('.au-bar i',prev).style.transform=''; prev.hidden=false; };
+    const stop=auto=>{ if(R.state!=='rec') return; R.ms=Math.min(REC_MAX_MS, Date.now()-R.t0); clearInterval(R.timer); R.state='stopping'; R.auto=!!auto; btn.disabled=true; haptic(10);
+      if(auto) log('info','Grabación detenida por el límite');
+      try{ R.rec.stop(); }catch(e){ finish(); } };
+    const start=()=>{ const my=++R.gen; unplay(); prev.hidden=true; R.blob=null; R.auto=false; ok.disabled=true; btn.disabled=true; say('Pidiendo acceso al micrófono');
+      navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true, noiseSuppression:true, autoGainControl:true}}).then(stream=>{
+        if(my!==R.gen||!btn.isConnected){ stream.getTracks().forEach(t=>t.stop()); return; } // the sheet went meanwhile
+        R.stream=stream; R.mime=recMime(); const o={audioBitsPerSecond:AUDIO_BPS}; if(R.mime) o.mimeType=R.mime;
+        let rec; try{ rec=new MediaRecorder(stream, o); }catch(e){ rec=new MediaRecorder(stream); }
+        R.rec=rec; R.chunks=[]; if(!R.mime) R.mime=rec.mimeType||'';
+        rec.ondataavailable=e=>{ if(my===R.gen&&e.data&&e.data.size) R.chunks.push(e.data); };
+        rec.onstop=()=>{ if(my===R.gen) finish(); };
+        rec.onerror=e=>{ if(my!==R.gen) return; log('error','Grabación: '+(e&&e.error&&(e.error.name+' '+e.error.message)||'error')); if(R.state==='rec') stop(false); };
+        rec.start(1000); R.t0=Date.now(); R.ms=0; R.state='rec'; R.timer=setInterval(tick, 250); tick();
+        btn.disabled=false; btn.classList.add('on'); btn.setAttribute('aria-label','Parar'); say('Grabando. Toca para parar.'); ok.disabled=false; haptic(10);
+        log('info','Grabación iniciada', {mime:rec.mimeType||R.mime||'?'}); })
+      .catch(e=>{ if(my!==R.gen) return; btn.disabled=false; const denied=e&&(e.name==='NotAllowedError'||e.name==='SecurityError');
+        say(denied?(UI.wide?'Sin permiso para el micrófono. Permítelo en los ajustes del navegador.':'Sin permiso para el micrófono. Actívalo en la app Ajustes del iPhone.'):'No se pudo usar el micrófono.', true);
+        log(denied?'warn':'error','Micrófono: '+(e&&(e.name+' '+e.message)||e)); }); };
+    const cleanup=()=>{ R.gen++; clearInterval(R.timer); if(R.rec&&R.rec.state!=='inactive'){ R.rec.onstop=null; try{ R.rec.stop(); }catch(e){} } R.rec=null; release(); unplay(); R.state='idle'; };
+    const saveRec=()=>{ const blob=R.blob, ms=Math.round(R.ms); if(!blob) return; R.blob=null; R.state='saved';
+      const id=uid(), now=new Date().toISOString(), mime=baseMime(blob.type)||'audio/mp4';
+      FS.putFile(id, blob, {pending:true}).then(()=>{ if(!task(taskId)) return; fuMake(id,'f',blob);
+          DB.attachments.push({id, taskId, kind:'audio', path:null, mime, size:blob.size, width:null, height:null, durationMs:ms, created:now, modified:now});
+          updTask(taskId,{}); haptic(8); log('info','Audio añadido', {ms, size:blob.size, mime}); attFlushSoon(); attPaint(taskId); })
+        .catch(e=>{ log('error','Audio no guardado: '+(e&&e.message||e)); toast('No se pudo guardar el audio en el dispositivo'); });
+      closeSheet(); };
+    stopRec=cleanup; // closeSheet stops a recording and lets the microphone go, however the sheet closes
+    sheetGuard=()=>R.state==='rec'||R.state==='stopping'||R.state==='done'?{title:'La grabación no se ha guardado.', label:'Descartar grabación', discard:cleanup}:null;
+    s.onclick=e=>{ const b=e.target.closest('[data-x]'); if(!b||ghostSheet(e)) return; const x=b.dataset.x;
+      if(x==='rec'){ if(R.state==='rec') stop(false); else if(R.state==='idle'||R.state==='done') start(); return; }
+      if(x==='play'){ if(!R.url) return; if(!R.pa){ R.pa=new Audio(R.url); R.pa.addEventListener('ended', ()=>{ prev.classList.remove('playing'); R.pa.currentTime=0; ptick(); }); R.pa.addEventListener('pause', ()=>prev.classList.remove('playing')); }
+        if(R.pa.paused){ R.pa.play().then(()=>{ prev.classList.add('playing'); ptick(); }).catch(err=>log('warn','Escucha de la grabación: '+(err&&err.message||err))); } else R.pa.pause(); return; }
+      if(x==='seek'){ if(!R.pa) return; const r=b.getBoundingClientRect(), d=isFinite(R.pa.duration)&&R.pa.duration>0?R.pa.duration:R.ms/1000; R.pa.currentTime=Math.max(0, Math.min(d, (e.clientX-r.left)/r.width*d)); ptick(); return; }
+      if(x==='cancel'){ requestCloseSheet(); return; }
+      if(x==='ok'){ if(R.state==='rec'){ R.saveAfter=true; stop(false); return; } if(R.state==='done') saveRec(); } }; }); }
+
+/* ---------- The photo viewer ---------- */
+// Full screen, black. A finger slides between the photos of the task (the next one follows it), two fingers zoom (only transform),
+// a double tap zooms in and out, a drag down closes it. Compartir sends the file through the share sheet where the browser can,
+// otherwise it downloads it; Eliminar has its Deshacer. The desktop adds arrows, the keys and the trackpad pinch
+let VW=null; const VW_GAP=20;
+function openViewer(taskId, id){ const list=attOf(taskId,'photo'), i=list.findIndex(a=>a.id===id); if(i<0) return;
+  closeMenu(true); if(VW) closeViewer(true); if(openVn) closeVn(openVn);
+  const share=canShareFiles(), el=document.createElement('div'); el.className='viewer'; el.setAttribute('role','dialog'); el.setAttribute('aria-modal','true'); el.setAttribute('aria-label','Fotos');
+  el.innerHTML='<div class="vw-bg"></div><div class="vw-stage"><div class="vw-track"></div></div><div class="vw-bar"><button class="vw-b" data-vw="close" aria-label="Cerrar" title="Cerrar (Esc)">'+XICON+'</button><span class="vw-n"></span><span class="vw-r">'+
+    '<button class="vw-b" data-vw="share" aria-label="'+(share?'Compartir':'Descargar')+'" title="'+(share?'Compartir':'Descargar')+'">'+(share?I.share:I.download)+'</button><button class="vw-b" data-vw="del" aria-label="Eliminar" title="Eliminar">'+I.trash+'</button></span></div>'+
+    (UI.wide?'<button class="vw-nav l" data-vw="prev" aria-label="Anterior">'+I.chevL+'</button><button class="vw-nav r" data-vw="next" aria-label="Siguiente">'+I.chevR+'</button>':'');
+  document.body.appendChild(el);
+  VW={el, taskId, ids:list.map(a=>a.id), i, s:1, tx:0, ty:0, blobs:new Map(), ptr:new Map(), g:null, lastTap:0, from:document.activeElement, share};
+  vwLayout(); el.getBoundingClientRect(); el.classList.add('on'); log('info','Visor de fotos abierto', {n:list.length});
+  el.addEventListener('click', vwClick); el.addEventListener('pointerdown', vwDown); el.addEventListener('pointermove', vwMove); el.addEventListener('pointerup', vwUp); el.addEventListener('pointercancel', vwUp);
+  el.addEventListener('wheel', vwWheel, {passive:false}); // a double tap or double click zooms through vwUp, on the iPhone and the desktop alike
+  el.addEventListener('contextmenu', e=>e.preventDefault()); window.addEventListener('resize', vwLayout);
+  const c=$('[data-vw=close]', el); if(c&&UI.wide) c.focus({preventScroll:true}); }
+function closeViewer(now){ const v=VW; if(!v) return; VW=null; window.removeEventListener('resize', vwLayout); v.el.classList.remove('on'); v.el.style.pointerEvents='none';
+  setTimeout(()=>{ v.el.remove(); fuGCSoon(); }, now||RM.matches?0:320); if(v.from&&v.from.isConnected&&UI.wide) try{ v.from.focus({preventScroll:true}); }catch(e){} }
+const vwW = () => innerWidth, vwH = () => innerHeight;
+// The photo in its slide: as large as the screen allows, centred
+function vwFit(a){ const W=vwW(), H=vwH(), w=a.width||W, h=a.height||H, s=Math.min(W/w, H/h); return {w:w*s, h:h*s}; }
+function vwLayout(){ const v=VW; if(!v) return; const tr=$('.vw-track', v.el), W=vwW();
+  const want=new Set([v.i-1, v.i, v.i+1].filter(k=>k>=0&&k<v.ids.length).map(k=>v.ids[k]));
+  [...tr.children].forEach(sl=>{ if(!want.has(sl.dataset.vwId)) sl.remove(); });
+  v.ids.forEach((id,k)=>{ if(!want.has(id)) return; let sl=tr.querySelector('[data-vw-id="'+CSS.escape(id)+'"]'); const a=att(id); if(!a) return;
+    if(!sl){ sl=document.createElement('div'); sl.className='vw-slide'; sl.dataset.vwId=id; sl.innerHTML='<img class="vw-img" alt="" draggable="false">'; tr.appendChild(sl); vwLoad(id, sl); }
+    const f=vwFit(a), im=$('.vw-img', sl); sl.style.transform='translate3d('+(k*(W+VW_GAP))+'px,0,0)';
+    Object.assign(im.style, {width:f.w+'px', height:f.h+'px', left:(W-f.w)/2+'px', top:(vwH()-f.h)/2+'px'}); });
+  vwTrack(0, false); vwApply(false);
+  $('.vw-n', v.el).textContent=(v.i+1)+' de '+v.ids.length;
+  const pv=$('[data-vw=prev]', v.el), nx=$('[data-vw=next]', v.el); if(pv) pv.disabled=v.i===0; if(nx) nx.disabled=v.i>=v.ids.length-1; }
+function vwLoad(id, sl){ const a=att(id), im=$('.vw-img', sl); if(!a) return; const t=fuGet(id,'t'), f=fuGet(id,'f'); if(f){ im.src=f; return; } if(t) im.src=t; sl.classList.add('wait');
+  attFile(a).then(b=>{ if(!sl.isConnected) return; sl.classList.remove('wait'); if(!b){ if(!t) toast(navigator.onLine?'Foto no disponible':'Sin conexión'); return; } if(VW) VW.blobs.set(id, b); im.src=fuMake(id,'f',b); }); }
+const vwCur = () => VW&&VW.el.querySelector('.vw-slide[data-vw-id="'+CSS.escape(VW.ids[VW.i])+'"] .vw-img');
+function vwTrack(dx, anim){ const tr=$('.vw-track', VW.el); tr.classList.toggle('anim', !!anim); tr.style.transform='translate3d('+(-VW.i*(vwW()+VW_GAP)+dx)+'px,0,0)'; }
+function vwApply(anim){ const im=vwCur(); if(!im) return; im.classList.toggle('anim', !!anim); im.style.transform=VW.s===1&&!VW.tx&&!VW.ty?'':'translate3d('+VW.tx+'px,'+VW.ty+'px,0) scale('+VW.s+')'; }
+// Within the edges: a zoomed photo never leaves a gap it does not need
+function vwClamp(){ const v=VW, a=att(v.ids[v.i]); if(!a) return; const f=vwFit(a), mx=Math.max(0,(f.w*v.s-vwW())/2), my=Math.max(0,(f.h*v.s-vwH())/2);
+  v.tx=Math.max(-mx, Math.min(mx, v.tx)); v.ty=Math.max(-my, Math.min(my, v.ty)); }
+function vwGo(k){ const v=VW; if(!v) return; k=Math.max(0, Math.min(v.ids.length-1, k)); const moved=k!==v.i; v.i=k; v.s=1; v.tx=v.ty=0;
+  vwLayout(); vwTrack(0, !RM.matches); if(moved) haptic(4); }
+function vwZoomAt(x, y){ const v=VW; if(!v) return; if(v.s>1){ v.s=1; v.tx=v.ty=0; } else { const s=2.5, cx=x-vwW()/2, cy=y-vwH()/2; v.tx=cx-s*(cx-v.tx)/v.s; v.ty=cy-s*(cy-v.ty)/v.s; v.s=s; vwClamp(); } vwApply(!RM.matches); }
+function vwWheel(e){ const v=VW; if(!v) return; e.preventDefault(); if(!e.ctrlKey&&v.s===1){ if(Math.abs(e.deltaX)>30&&Math.abs(e.deltaX)>Math.abs(e.deltaY)&&!v.wheelT){ v.wheelT=setTimeout(()=>{ if(VW) VW.wheelT=0; }, 400); vwGo(v.i+(e.deltaX>0?1:-1)); } return; }
+  if(!e.ctrlKey){ v.tx-=e.deltaX; v.ty-=e.deltaY; vwClamp(); vwApply(false); return; } // two fingers on a trackpad: pan a zoomed photo
+  const s=Math.max(1, Math.min(5, v.s*Math.exp(-e.deltaY/100))), cx=e.clientX-vwW()/2, cy=e.clientY-vwH()/2; v.tx=cx-s*(cx-v.tx)/v.s; v.ty=cy-s*(cy-v.ty)/v.s; v.s=s; if(s===1) v.tx=v.ty=0; vwClamp(); vwApply(false); }
+function vwDown(e){ const v=VW; if(!v||e.target.closest('.vw-bar,.vw-nav')||(e.pointerType==='mouse'&&e.button!==0)) return; v.ptr.set(e.pointerId, {x:e.clientX, y:e.clientY});
+  try{ v.el.setPointerCapture(e.pointerId); }catch(err){}
+  const pts=[...v.ptr.values()];
+  if(pts.length===2){ const [p,q]=pts, d=Math.hypot(p.x-q.x, p.y-q.y)||1, mx=(p.x+q.x)/2-vwW()/2, my=(p.y+q.y)/2-vwH()/2;
+    if(v.g&&v.g.mode==='swipe') vwTrack(0, true); v.g={mode:'pinch', d0:d, s0:v.s, qx:(mx-v.tx)/v.s, qy:(my-v.ty)/v.s}; return; }
+  if(pts.length>2) return;
+  v.g={mode:'pending', x0:e.clientX, y0:e.clientY, t0:e.timeStamp, tx0:v.tx, ty0:v.ty, lx:e.clientX, ly:e.clientY, lt:e.timeStamp, vx:0, vy:0, moved:false}; }
+function vwMove(e){ const v=VW; if(!v||!v.ptr.has(e.pointerId)) return; v.ptr.set(e.pointerId, {x:e.clientX, y:e.clientY}); const g=v.g; if(!g) return;
+  if(g.mode==='pinch'){ const pts=[...v.ptr.values()]; if(pts.length<2) return; const [p,q]=pts, d=Math.hypot(p.x-q.x, p.y-q.y)||1, mx=(p.x+q.x)/2-vwW()/2, my=(p.y+q.y)/2-vwH()/2;
+    let s=g.s0*d/g.d0; if(s<1) s=1-(1-s)*0.4; s=Math.min(6, s); v.s=s; v.tx=mx-s*g.qx; v.ty=my-s*g.qy; vwApply(false); return; }
+  const dx=e.clientX-g.x0, dy=e.clientY-g.y0, dt=e.timeStamp-g.lt;
+  if(dt>0){ g.vx=0.6*(e.clientX-g.lx)/dt+0.4*g.vx; g.vy=0.6*(e.clientY-g.ly)/dt+0.4*g.vy; g.lx=e.clientX; g.ly=e.clientY; g.lt=e.timeStamp; }
+  if(g.mode==='pending'){ if(Math.hypot(dx,dy)<8) return; g.moved=true; g.mode=v.s>1?'pan':Math.abs(dx)>=Math.abs(dy)?'swipe':(dy>0?'down':'pan'); }
+  if(g.mode==='pan'){ if(v.s<=1) return; v.tx=g.tx0+dx; v.ty=g.ty0+dy; vwApply(false); return; }
+  if(g.mode==='swipe'){ const edge=(v.i===0&&dx>0)||(v.i===v.ids.length-1&&dx<0); vwTrack(edge?dx*0.35:dx, false); return; }
+  if(g.mode==='down'){ const y=Math.max(0, dy), p=Math.min(1, y/(vwH()*0.6)), tr=$('.vw-stage', v.el); tr.style.transition='none'; tr.style.transform='translate3d('+dx*0.5+'px,'+y+'px,0) scale('+(1-p*0.25).toFixed(4)+')'; $('.vw-bg', v.el).style.opacity=String(1-p); } }
+function vwUp(e){ const v=VW; if(!v) return; v.ptr.delete(e.pointerId); const g=v.g; if(!g) return;
+  if(g.mode==='pinch'){ if(v.ptr.size) { const [p]=[...v.ptr.values()]; v.g={mode:'pan', x0:p.x, y0:p.y, tx0:v.tx, ty0:v.ty, lx:p.x, ly:p.y, lt:e.timeStamp, vx:0, vy:0, moved:true}; return; }
+    if(v.s<1.05){ v.s=1; v.tx=v.ty=0; } vwClamp(); vwApply(!RM.matches); v.g=null; return; }
+  if(v.ptr.size) return; v.g=null; const dx=e.clientX-g.x0, dy=e.clientY-g.y0, fresh=e.timeStamp-g.lt<80;
+  if(g.mode==='pending'){ if(e.type==='pointercancel') return; // a tap: a second one soon after zooms, a single one shows or hides the bars
+    if(e.timeStamp-v.lastTap<300){ v.lastTap=0; clearTimeout(v.tapT); vwZoomAt(e.clientX, e.clientY); return; }
+    v.lastTap=e.timeStamp; if(e.pointerType!=='mouse'){ clearTimeout(v.tapT); v.tapT=setTimeout(()=>{ if(VW===v) v.el.classList.toggle('bare'); }, 300); } return; }
+  if(g.mode==='pan'){ vwClamp(); vwApply(!RM.matches); return; }
+  if(g.mode==='swipe'){ const vx=fresh?g.vx:0, W=vwW(); let k=v.i; if(dx<-W/3||vx<-FLICK) k++; else if(dx>W/3||vx>FLICK) k--; k=Math.max(0, Math.min(v.ids.length-1, k));
+    if(k!==v.i) vwGo(k); else vwTrack(0, !RM.matches); return; }
+  if(g.mode==='down'){ const vy=fresh?g.vy:0, st=$('.vw-stage', v.el); if(dy>140||(vy>FLICK&&dy>40)){ closeViewer(); return; }
+    st.style.transition=''; st.style.transform=''; $('.vw-bg', v.el).style.opacity=''; } }
+function vwClick(e){ const b=e.target.closest('[data-vw]'); if(!b||!VW) return; const k=b.dataset.vw, id=VW.ids[VW.i];
+  if(k==='close') closeViewer(); else if(k==='prev') vwGo(VW.i-1); else if(k==='next') vwGo(VW.i+1); else if(k==='share') vwShare(id); else if(k==='del') vwDelete(); }
+// Inside the tap: the file is already in memory (the share sheet of iOS opens only from the tap itself)
+function vwShare(id){ const a=att(id), b=VW&&VW.blobs.get(id); if(!a) return; if(!b){ toast('La foto aún se está cargando'); return; }
+  const name='foto-'+localDay(a.created)+'.'+(ATT_EXT[baseMime(a.mime)]||'jpg'), file=new File([b], name, {type:baseMime(a.mime)||'image/jpeg'});
+  if(VW.share&&navigator.share){ navigator.share({files:[file]}).then(()=>log('info','Foto compartida')).catch(e=>{ if(!e||e.name!=='AbortError') log('warn','Compartir foto: '+(e&&e.message||e)); }); return; }
+  const l=document.createElement('a'); l.href=fuMake(id,'f',b); l.download=name; document.body.appendChild(l); l.click(); l.remove(); toast('Foto descargada'); log('info','Foto descargada a un archivo'); }
+function vwDelete(){ const v=VW; if(!v) return; const id=v.ids[v.i]; v.ids.splice(v.i,1); v.blobs.delete(id); deleteAttachment(id);
+  if(!v.ids.length){ closeViewer(); return; } if(v.i>=v.ids.length) v.i=v.ids.length-1; v.s=1; v.tx=v.ty=0; vwLayout(); }
+// While it is open the keys are its own: arrows, Esc, Supr; nothing reaches the lists behind
+window.addEventListener('keydown', e=>{ if(!VW) return; const k=e.key;
+  if(k==='Tab') return; e.stopPropagation();
+  if(k==='Escape'){ e.preventDefault(); if(VW.s>1){ VW.s=1; VW.tx=VW.ty=0; vwApply(!RM.matches); } else closeViewer(); }
+  else if(k==='ArrowRight'){ e.preventDefault(); vwGo(VW.i+1); } else if(k==='ArrowLeft'){ e.preventDefault(); vwGo(VW.i-1); }
+  else if(k==='Delete'||k==='Backspace'){ e.preventDefault(); vwDelete(); }
+  else if(k==='+'||k==='='||k==='-'){ e.preventDefault(); if((k==='-')===(VW.s>1)) vwZoomAt(vwW()/2, vwH()/2); } }, true);
+
+/* ---------- Desktop: photos dragged from the computer onto the inspector ---------- */
+const dragFiles = e => !!(e.dataTransfer&&[...(e.dataTransfer.types||[])].includes('Files'));
+function attBindDrop(d){
+  const lit=pn=>attOwn(()=>d.querySelectorAll('.pane.filedrop').forEach(p=>{ if(p!==pn) p.classList.remove('filedrop'); }));
+  d.addEventListener('dragover', e=>{ if(!dragFiles(e)) return; const pn=e.target.closest('.pane[data-task]'); e.preventDefault(); e.dataTransfer.dropEffect=pn?'copy':'none'; lit(pn); if(pn&&!pn.classList.contains('filedrop')) attOwn(()=>pn.classList.add('filedrop')); });
+  d.addEventListener('dragleave', e=>{ if(!dragFiles(e)) return; const pn=e.target.closest('.pane.filedrop'); if(pn&&!pn.contains(e.relatedTarget)) attOwn(()=>pn.classList.remove('filedrop')); });
+  d.addEventListener('drop', e=>{ if(!dragFiles(e)) return; e.preventDefault(); const pn=e.target.closest('.pane[data-task]'); lit(null); if(!pn||!task(pn.dataset.task)) return;
+    const fs=[...(e.dataTransfer.files||[])]; log('info','Fotos soltadas en el panel', {n:fs.length}); if(fs.length) addPhotos(pn.dataset.task, fs); }); }
+// A file let go anywhere else never replaces the app with the picture
+window.addEventListener('dragover', e=>{ if(dragFiles(e)&&!e.defaultPrevented){ e.preventDefault(); e.dataTransfer.dropEffect='none'; } });
+window.addEventListener('drop', e=>{ if(dragFiles(e)) e.preventDefault(); });
 
 /* ======================= SYNC (block 8): Supabase =======================
    The data on the device stays the truth for the screen (rule 7): this block copies it to Supabase and back in the background,
@@ -3040,7 +3553,7 @@ function clearDemo(){
      matched by name, the newest copy of each record wins and the rest goes up (decision 5). */
 const SYNC_KEY='tareas-sync', SUPABASE_JS='vendor/supabase-js-2.117.3.umd.js';
 const SYNC_PAGE=1000, SYNC_CHUNK=200, SYNC_OVERLAP=30e3, SYNC_DEBOUNCE=1500, EPOCH='1970-01-01T00:00:00.000Z';
-const SYNC_TABLES=[{list:'spaces', table:'spaces'},{list:'projects', table:'projects'},{list:'tasks', table:'tasks'},{list:'voiceNotes', table:'voice_notes'}];
+const SYNC_TABLES=[{list:'spaces', table:'spaces'},{list:'projects', table:'projects'},{list:'tasks', table:'tasks'},{list:'voiceNotes', table:'voice_notes'},{list:'attachments', table:'attachments'}]; // attachments after tasks (decision 29)
 const INITIAL_SPACES=['trabajo','personal'];
 // Local field, column and kind; id, created and modified are common to all.
 // tsOpt (block 9, reminder_sent): sent only when set, so the tasks' signatures from before block 9 stay the same and nothing is sent again;
@@ -3049,10 +3562,12 @@ const SYNC_FIELDS={
   spaces:[['name','name','text'],['order','sort_order','int']],
   projects:[['spaceId','space_id','id'],['name','name','text'],['color','color','id'],['order','sort_order','int'],['archived','archived','bool']],
   tasks:[['spaceId','space_id','id'],['projectId','project_id','id'],['title','title','text'],['date','date','day'],['reminder','reminder','ts'],['priority','priority','pri'],['status','status','status'],['notes','notes','text'],['carried','carried','bool'],['completed','completed','ts'],['reminderSent','reminder_sent','tsOpt']],
-  voice_notes:[['taskId','task_id','id'],['text','text','text']] };
+  voice_notes:[['taskId','task_id','id'],['text','text','text']],
+  // Decision 29 (0003_attachments.sql): the record of a photo or a recording; its file goes to Storage first (attFlush)
+  attachments:[['taskId','task_id','id'],['kind','kind','kind'],['path','path','id'],['mime','mime','id'],['size','size','int'],['width','width','int'],['height','height','int'],['durationMs','duration_ms','int']] };
 const syncTs = v => { if(!v) return null; const d=new Date(v); return isNaN(d) ? null : d.toISOString(); };
 const SYNC_TO={ id:v=>v==null||v===''?null:String(v), text:v=>v==null?'':String(v), int:v=>v==null||v===''||isNaN(+v)?null:Math.round(+v), bool:v=>!!v,
-  day:v=>/^\d{4}-\d{2}-\d{2}$/.test(String(v||''))?v:null, ts:syncTs, tsOpt:syncTs, pri:v=>['high','mid','none'].includes(v)?v:'none', status:v=>['pending','done'].includes(v)?v:'pending' };
+  day:v=>/^\d{4}-\d{2}-\d{2}$/.test(String(v||''))?v:null, ts:syncTs, tsOpt:syncTs, pri:v=>['high','mid','none'].includes(v)?v:'none', status:v=>['pending','done'].includes(v)?v:'pending', kind:v=>['photo','audio'].includes(v)?v:null };
 // A local record as a row: always the same keys in the same order, so the signature only changes with the content
 function syncToRow(table, rec){ const row={id:String(rec.id), created:syncTs(rec.created)};
   SYNC_FIELDS[table].forEach(([f,c,k])=>{ const v=SYNC_TO[k](rec[f]); if(k!=='tsOpt'||v!==null) row[c]=v; });
@@ -3069,8 +3584,11 @@ function syncHash(str){ let h1=0xdeadbeef, h2=0x41c6ce57; for(let i=0;i<str.leng
   return (4294967296*(2097151&h2)+(h1>>>0)).toString(36); }
 const syncSig = row => syncHash(JSON.stringify(row));
 const syncDemoId = id => String(id).startsWith('demo-');
-// Records that never go up: demo data, notes of demo tasks, the initial spaces until they get their real id
-const syncSkip = (table, rec) => syncDemoId(rec.id) || (table==='spaces'&&INITIAL_SPACES.includes(rec.id)) || (table==='voice_notes'&&syncDemoId(rec.taskId));
+// Records that never go up: demo data, notes and attachments of demo tasks, the initial spaces until they get their real id, and an attachment
+// whose file has not reached Storage yet (no path: attFlush gives it one once uploaded)
+const syncSkip = (table, rec) => syncDemoId(rec.id) || (table==='spaces'&&INITIAL_SPACES.includes(rec.id)) || ((table==='voice_notes'||table==='attachments')&&syncDemoId(rec.taskId)) || (table==='attachments'&&!rec.path);
+// A table the database does not have yet (attachments before 0003_attachments.sql ran): left out of this session's sync
+const syncMissing = table => !!(SY&&SY.remote&&SY.remote.missing&&SY.remote.missing.has(table));
 function syncState(){ let s=null; try{ s=JSON.parse(localStorage.getItem(SYNC_KEY)||'null'); }catch(e){}
   if(!s||typeof s!=='object') s={}; ['known','cursor','del'].forEach(k=>{ if(!s[k]||typeof s[k]!=='object') s[k]={}; });
   SYNC_TABLES.forEach(({table})=>{ s.known[table]=s.known[table]||{}; s.del[table]=s.del[table]||{}; }); return s; }
@@ -3091,7 +3609,11 @@ function supabaseRemote(cfg){
   const rows=({data,error})=>{ if(error) throw error; return data||[]; };
   const user=u=>u?{id:u.id, email:u.email||''}:null;
   let noSent=false; const stripSent=r=>{ if(!('reminder_sent' in r)) return r; const c=Object.assign({}, r); delete c.reminder_sent; return c; };
-  return {
+  // Decision 29 published before 0003_attachments.sql ran: the table is not there, the rest syncs as before and the attachments stay on the device
+  const missing=new Set(), absent=(table, error)=>{ if(table!=='attachments'||!error) return false; const m=String(error.message||'')+' '+String(error.code||'');
+    if(!/42P01|PGRST20[0-9]|does not exist|could not find the table|schema cache/i.test(m)) return false;
+    if(!missing.has(table)){ missing.add(table); log('warn','La base de datos no tiene todavía la tabla '+table+': falta 0003_attachments.sql. Los adjuntos se quedan en este dispositivo'); } return true; };
+  return { missing,
     async init(){
       if(!client){ if(!window.supabase) await loadScript(SUPABASE_JS);
         client=window.supabase.createClient(cfg.url, cfg.anonKey, {auth:{flowType:'pkce', detectSessionInUrl:true, persistSession:true, autoRefreshToken:true, storageKey:'tareas-auth'}}); }
@@ -3104,7 +3626,7 @@ function supabaseRemote(cfg){
     onAuth(cb){ db().auth.onAuthStateChange((ev, session)=>{ if(ev==='SIGNED_IN'||ev==='SIGNED_OUT'||ev==='USER_UPDATED') setTimeout(()=>cb(user(session&&session.user), ev), 0); }); },
     async signIn(){ const {error}=await db().auth.signInWithOAuth({provider:'google', options:{redirectTo:location.origin+location.pathname}}); if(error) throw error; },
     async signOut(){ const {error}=await db().auth.signOut({scope:'local'}); if(error) throw error; },
-    async pull(table, after, limit){ let q=db().from(table).select('*').order('server_ts',{ascending:true}).order('id',{ascending:true}).limit(limit); if(after) q=q.gt('server_ts', after); return rows(await q); },
+    async pull(table, after, limit){ let q=db().from(table).select('*').order('server_ts',{ascending:true}).order('id',{ascending:true}).limit(limit); if(after) q=q.gt('server_ts', after); const res=await q; if(absent(table, res.error)) return []; return rows(res); },
     async byIds(table, ids){ return rows(await db().from(table).select('*').in('id', ids)); },
     // Rows the server keeps because its copy is newer are left out of the answer (trigger in 0001_init.sql)
     async upsert(table, list){ const send=l=>db().from(table).upsert(l, {onConflict:'id', defaultToNull:false}).select('id');
@@ -3114,7 +3636,7 @@ function supabaseRemote(cfg){
       return rows(res); },
     async markDeleted(table, items){ return rows(await db().from(table).upsert(items.map(x=>({id:x.id, deleted:x.ts, modified:x.ts})), {onConflict:'id', defaultToNull:false}).select('id')); },
     subscribe(uid, onRow, onStatus){ const c=db(); const ch=c.channel('tareas-'+uid);
-      T.forEach(t=>ch.on('postgres_changes', {event:'*', schema:'public', table:t, filter:'owner_id=eq.'+uid}, p=>{ if(p&&p.new&&p.new.id) onRow(t, p.new); }));
+      T.filter(t=>!missing.has(t)).forEach(t=>ch.on('postgres_changes', {event:'*', schema:'public', table:t, filter:'owner_id=eq.'+uid}, p=>{ if(p&&p.new&&p.new.id) onRow(t, p.new); }));
       ch.subscribe((st, err)=>onStatus(st, err)); return ()=>{ try{ c.removeChannel(ch); }catch(e){} }; },
     // Block 9: the Edge Function's public key, this device's subscription (0002_push.sql) and the account's devices
     async pushKey(){ const r=await fetch(fnUrl+'?publicKey', {headers:{apikey:cfg.anonKey}}); const j=await r.json().catch(()=>({}));
@@ -3124,7 +3646,12 @@ function supabaseRemote(cfg){
     async pushRevoke(id){ const ts=new Date().toISOString(); return rows(await db().from('push_subscriptions').update({deleted:ts, modified:ts}).eq('id', id).select('id')); },
     async pushTest(id){ const {data}=await db().auth.getSession(); const tok=data&&data.session&&data.session.access_token; if(!tok) throw new Error('Sin sesión');
       const r=await fetch(fnUrl, {method:'POST', headers:{apikey:cfg.anonKey, Authorization:'Bearer '+tok, 'Content-Type':'application/json'}, body:JSON.stringify({test:true, id})});
-      const j=await r.json().catch(()=>({})); if(!r.ok) throw new Error('Función de notificaciones: '+(j.error||'HTTP '+r.status)); return j; }
+      const j=await r.json().catch(()=>({})); if(!r.ok) throw new Error('Función de notificaciones: '+(j.error||'HTTP '+r.status)); return j; },
+    // Decision 29: the private bucket, a folder per user (0003_attachments.sql); downloads through short-lived signed URLs
+    // supabase-js sends a Blob as a form whose file part carries the Blob's own type: the type is set on the Blob itself
+    async fileUpload(path, blob, mime){ const type=mime||blob.type||'application/octet-stream', b=blob.type===type?blob:new Blob([blob], {type});
+      const {error}=await db().storage.from(ATT_BUCKET).upload(path, b, {contentType:type, upsert:true, cacheControl:'31536000'}); if(error) throw error; },
+    async fileUrl(path, ttl){ const {data, error}=await db().storage.from(ATT_BUCKET).createSignedUrl(path, ttl||SIGN_TTL); if(error) throw error; if(!data||!data.signedUrl) throw new Error('Sin enlace firmado'); return data.signedUrl; }
   };
 }
 
@@ -3165,7 +3692,7 @@ function syncMerge(W, st, table, rows, stats){
     known[id]=rsig; // what the server holds now: a local copy that stays different goes up afterwards
     if(!takeRemote) return;
     if(!remote){ W[list][i]=null; removed=true; stats.removed++;
-      if(table==='tasks') W.voiceNotes.forEach((v,j)=>{ if(v&&v.taskId===id){ W.voiceNotes[j]=null; } }); return; }
+      if(table==='tasks'){ W.voiceNotes.forEach((v,j)=>{ if(v&&v.taskId===id){ W.voiceNotes[j]=null; } }); W.attachments.forEach((a,j)=>{ if(a&&a.taskId===id){ W.attachments[j]=null; } }); } return; }
     const keep={}; Object.keys(local).forEach(k=>{ if(!(k in lrow) && !SYNC_FIELDS[table].some(f=>f[0]===k)) keep[k]=local[k]; }); // fields this model does not sync stay
     W[list][i]=Object.assign(keep, remote); stats.updated++; });
   if(removed) SYNC_TABLES.forEach(({list:l})=>{ W[l]=W[l].filter(Boolean); });
@@ -3175,7 +3702,7 @@ function syncMerge(W, st, table, rows, stats){
    pulled: {table: rows}; o.cursor moves the tables' cursors (a pull; realtime events do not); o.pool runs the space matching */
 function syncApply(pulled, o){ o=o||{};
   const st=syncState(), stats={added:0, updated:0, removed:0, conflicts:[], remaps:[]};
-  const W={spaces:DB.spaces.map(x=>Object.assign({},x)), projects:DB.projects.map(x=>Object.assign({},x)), tasks:DB.tasks.map(x=>Object.assign({},x)), voiceNotes:DB.voiceNotes.map(x=>Object.assign({},x)), settings:Object.assign({}, DB.settings)};
+  const W={spaces:DB.spaces.map(x=>Object.assign({},x)), projects:DB.projects.map(x=>Object.assign({},x)), tasks:DB.tasks.map(x=>Object.assign({},x)), voiceNotes:DB.voiceNotes.map(x=>Object.assign({},x)), attachments:DB.attachments.map(x=>Object.assign({},x)), settings:Object.assign({}, DB.settings)};
   if(o.pool || W.spaces.some(s=>INITIAL_SPACES.includes(s.id))) stats.remaps=syncRemapSpaces(W, o.pool||null);
   SYNC_TABLES.forEach(({table})=>{ const rows=pulled[table]||[]; if(rows.length) syncMerge(W, st, table, rows, stats);
     if(o.cursor) rows.forEach(r=>{ if(syncTime(r.server_ts)>syncTime(st.cursor[table])) st.cursor[table]=r.server_ts; }); });
@@ -3193,7 +3720,7 @@ function syncApply(pulled, o){ o=o||{};
 /* ---------- Push ---------- */
 // What differs from the server now. dry: only count it (Ajustes), without marking anything
 function syncCollect(dry){ const st=syncState(), now=new Date().toISOString(), up={}, del={}; let n=0, bumped=false;
-  SYNC_TABLES.forEach(({list, table})=>{ const known=st.known[table], dels=st.del[table], here=new Set(); up[table]=[]; del[table]=[];
+  SYNC_TABLES.forEach(({list, table})=>{ const known=st.known[table], dels=st.del[table], here=new Set(); up[table]=[]; del[table]=[]; if(syncMissing(table)) return;
     DB[list].forEach(rec=>{ if(!rec||rec.id==null) return; here.add(rec.id); if(syncSkip(table, rec)) return;
       if(known[rec.id]==='x' && !dry){ rec.modified=now; bumped=true; } // back after its deletion went up: this copy is the newest
       const row=syncToRow(table, rec), s=syncSig(row); if(s!==known[rec.id]){ up[table].push({row, s}); n++; }
@@ -3215,7 +3742,7 @@ async function syncPush(c){ const out={pushed:0, deleted:0, kept:0}; const late=
   if(out.kept) syncApply(got, {});
   return out; }
 async function syncPull(cursor){ const out={};
-  for(const {table} of SYNC_TABLES){ let after=cursor&&cursor[table]?new Date(syncTime(cursor[table])-SYNC_OVERLAP).toISOString():null; const rows=[];
+  for(const {table} of SYNC_TABLES){ if(syncMissing(table)){ out[table]=[]; continue; } let after=cursor&&cursor[table]?new Date(syncTime(cursor[table])-SYNC_OVERLAP).toISOString():null; const rows=[];
     for(;;){ const page=await SY.remote.pull(table, after, SYNC_PAGE); if(page.length<SYNC_PAGE){ rows.push(...page); break; }
       // A full page: the rows of its last instant may continue on the next one, so they are asked for again from the one before
       const last=page[page.length-1].server_ts, keep=page.filter(r=>r.server_ts!==last);
@@ -3253,11 +3780,14 @@ function syncRun(reason){
     log('info','Sincronización ('+reason+')', {recibidas:a.added+a.updated, eliminadas:a.removed, conflictos:a.conflicts.length, enviadas:p.pushed, borradas:p.deleted, mantenidas:p.kept, ms:Date.now()-t0});
     return true; };
   const locked=()=>(navigator.locks&&navigator.locks.request) ? navigator.locks.request('tareas-sync', body) : body();
-  SY.runP=locked().then(ok=>{ SY.running=false; if(ok){ SY.status='ok'; SY.error=''; pushFlush(); } syncPaint(); if(SY.again) syncChanged(); return !!ok; }, e=>{
+  SY.runP=locked().then(ok=>{ SY.running=false; if(ok){ SY.status='ok'; SY.error=''; pushFlush(); attFlushSoon(0); syncResubscribe(); } syncPaint(); if(SY.again) syncChanged(); return !!ok; }, e=>{
     SY.running=false; const off=syncOffline(e); SY.status=off?'offline':'error'; SY.error=String(e&&(e.message||e.code)||e);
     log(off?'warn':'error', 'Sincronización falló ('+reason+'): '+SY.error); syncRetry(); syncPaint(); return false; });
   return SY.runP; }
-function syncSubscribe(){ if(SY.unsub||!SY.user||!SY.remote.subscribe) return;
+// The realtime channel leaves out a table the database lacks (attachments before 0003): once a run finds it missing, the channel is made again
+const syncMissingKey = () => SY&&SY.remote&&SY.remote.missing?[...SY.remote.missing].join():'';
+function syncResubscribe(){ if(SY.unsub&&SY.subKey!==syncMissingKey()){ SY.unsub(); SY.unsub=null; syncSubscribe(); } }
+function syncSubscribe(){ if(SY.unsub||!SY.user||!SY.remote.subscribe) return; SY.subKey=syncMissingKey();
   let was=false; SY.unsub=SY.remote.subscribe(SY.user.id, (table,row)=>{ SY.rt.push([table,row]); clearTimeout(SY.rtT); SY.rtT=setTimeout(syncRealtime, 250); }, (st, err)=>{
     if(st==='SUBSCRIBED'){ if(was) syncRun('tiempo real'); was=true; } // back after a cut: catch up with what came meanwhile
     else if(st==='CHANNEL_ERROR'||st==='TIMED_OUT') log('warn','Tiempo real: '+st+(err?' '+(err.message||err):'')); }); }
@@ -3293,7 +3823,7 @@ function syncBoot(){
   const remote=fake||(url&&key?supabaseRemote({url, anonKey:key}):null); if(!remote) return; // no config: local only, as before
   const st=syncState();
   SY={remote, user:st.user||null, status:'idle', error:'', ready:false, running:false, again:false, runP:null, timer:0, retry:0, pending:0, unsub:null, rt:[], rtT:0, quiet:false, lastSync:st.lastSync||null, initP:null, authBound:false};
-  window.addEventListener('online', ()=>{ SY.retry=0; if(!SY.ready) syncInit(); else syncRun('conexión'); });
+  window.addEventListener('online', ()=>{ SY.retry=0; UQ.retry=0; if(!SY.ready) syncInit(); else syncRun('conexión'); }); // the run uploads the attachments waiting (attFlush) once it reaches the server
   window.addEventListener('offline', ()=>syncStatus('offline'));
   document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible' && SY.user) syncRun('vuelta'); });
   setInterval(()=>{ if(onSettings() && SY.user && !busyEditing()) render(); }, 6e4); // "hace 3 min" stays true
@@ -3553,7 +4083,7 @@ function badge(){ try{ if(!navigator.setAppBadge) return; const t=todayStr(); co
 let renderedDay='', renderedClock='', backupChain=Promise.resolve();
 function queueDailyBackup(){ backupChain=backupChain.then(()=>dailyBackup(false)).catch(()=>{}); return backupChain; }
 function checkDay(){ if(DB.settings.summaryDay===todayStr()) return false; const n=rollOver(); if(n) log('info','Tareas pasadas a hoy: '+n); queueDailyBackup(); return true; }
-const _render=render; render=function(){ staleView=false; checkDay(); _render(); badge(); renderedDay=todayStr(); renderedClock=clockKey(); };
+const _render=render; render=function(){ staleView=false; checkDay(); _render(); badge(); renderedDay=todayStr(); renderedClock=clockKey(); fuGCSoon(); }; // decision 29: object URLs no screen shows are let go
 // A redraw while something is being typed or picked would close the keyboard or the sheet
 const busyEditing=()=>sheet.classList.contains('on')||asheet.classList.contains('on')||menuOpen()||!!UI.select||/^(INPUT|TEXTAREA)$/.test((document.activeElement||{}).tagName||'');
 // Checked every minute rather than with one timer at midnight, which a computer asleep at that hour would delay
@@ -3954,6 +4484,7 @@ function putPane(d, html){ let pn=d.querySelector(':scope > .pane'); const was=!
   const t=document.createElement('template'); t.innerHTML=html; const nw=t.content.firstElementChild; nw._h=html; nw._x=UI.deskDetail?task(UI.deskDetail):null;
   if(pn) pn.replaceWith(nw); else d.appendChild(nw); pn=nw; watchBox(pn);
   if(UI.deskDetail){ bindDetail(pn, UI.deskDetail); if(pid===UI.deskDetail){ const p2=pn.querySelector('.scroll'); if(p2) p2.scrollTop=pst; } } // restored after bindDetail has grown the text areas
+  attHydrate(pn); // decision 29: thumbnails from the device (attOwn: not a change to the drawing)
   markDirty(rowWatch.takeRecords()); pn._dirty=false; // what bindDetail set is part of the drawing
   if(!was&&!pn.classList.contains('wpop')&&pn.animate){ try{ pn.animate(RM.matches?[{opacity:0},{opacity:1}]:[{transform:'translate3d(24px,0,0)',opacity:0},{transform:'none',opacity:1}], {duration:RM.matches?200:260, easing:'cubic-bezier(.2,.8,.2,1)'}); }catch(e){} }
   return true; }
@@ -4053,11 +4584,14 @@ function dropTask(id, z){ const x=task(id); if(!x) return; const old={date:x.dat
   releaseHold(id); updTask(id, patch); haptic(6); renderAnimated(); log('info','Tarea movida en el calendario', {date:patch.date, time:!!patch.reminder});
   toast(msg, ()=>updTask(id, old)); }
 function bindDeskEvents(d){
+  attBindDrop(d); // decision 29: photos dragged from the computer onto the inspector
   // Right click opens the row menu, and on a sidebar project the project menu (the iPhone long press)
   // R17: each one opens at the pointer, as a Mac context menu; text fields keep the browser's own
   d.addEventListener('contextmenu', e=>{ if(e.target.closest('input,textarea')) return; const pt={x:e.clientX, y:e.clientY};
     const pj=e.target.closest('.side [data-view^="project:"]'); if(pj){ e.preventDefault(); if(pj.dataset.view!=='project:none') projectMenu(pj.dataset.view.slice(8), pt); return; }
     const dh=e.target.closest('[data-day-head]'); if(dh){ e.preventDefault(); dayHeadMenu(dh, pt); return; } // R14: a day header of Todas
+    const ph=e.target.closest('.att-ph[data-att]'); if(ph){ e.preventDefault(); photoMenu(ph.dataset.att, e); return; } // decision 29: a photo or a recording of the inspector
+    const au=e.target.closest('.vn[data-au]'); if(au){ e.preventDefault(); audioMenu(au.dataset.au, e); return; }
     const row=e.target.closest('.row[data-id], .wcard[data-id]'); if(!row) return; e.preventDefault(); rowMenu(row.dataset.id, pt); });
   // R17: the week popover closes on a press anywhere outside it, as a Mac popover; the click itself still acts (another card opens its own).
   // It is taken away at once, without a redraw, so the click lands on what was under the pointer

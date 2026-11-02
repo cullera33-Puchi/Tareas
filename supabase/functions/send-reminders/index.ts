@@ -11,6 +11,10 @@
 //                              Sends the reminders that are due: pending tasks, not deleted, reminder <= now and not sent yet.
 //                              Each one is marked as sent first (one statement, so two runs never send it twice), then goes to every
 //                              device of its owner. Devices whose push service answers 404 or 410 no longer exist and are deleted.
+//                              Then the purge of attachments (decision 29.4, 0003_attachments.sql): files of attachments deleted more than
+//                              24 hours ago, or whose task was, are removed from the private bucket "attachments" and their rows marked
+//                              purged (and deleted, when only the task was). A few per run; a file already gone counts as removed, so a
+//                              run cut halfway is simply repeated by the next one. Before 0003 runs it does nothing.
 //   POST {test:true, id?} with the user's JWT in Authorization
 //                              A test notification to the caller's own devices (only the one with that id when given).
 //
@@ -22,6 +26,9 @@ const FUNCTION_NAME = 'send-reminders';
 const LATE_LIMIT_MS = 60 * 60 * 1000;
 // How long a push service keeps a message for a device that is off (seconds)
 const PUSH_TTL = 4 * 3600;
+// Decision 29.4: the Storage bucket of the attachments, and how many files one run removes at most
+const ATT_BUCKET = 'attachments';
+const PURGE_LIMIT = 50;
 
 const CORS: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
@@ -204,6 +211,43 @@ async function sendDue(c: Conf) {
   return { due: claimed.length, late, devices: subs.length, ...out };
 }
 
+/* ---------- Purge: files of attachments deleted more than 24 hours ago (decision 29.4) ---------- */
+// The Storage API with the service role: one request removes up to PURGE_LIMIT objects. Objects that no longer exist are simply not in the answer
+async function removeObjects(c: Conf, paths: string[]) {
+  const h: Record<string, string> = { apikey: c.key, 'Content-Type': 'application/json' };
+  if (c.key.startsWith('eyJ')) h.Authorization = 'Bearer ' + c.key;
+  const r = await fetch(c.url + '/storage/v1/object/' + ATT_BUCKET, { method: 'DELETE', headers: h, body: JSON.stringify({ prefixes: paths }) });
+  const text = await r.text();
+  if (!r.ok) throw new Error('storage delete: ' + r.status + ' ' + text.slice(0, 300));
+  try { const j = JSON.parse(text || '[]'); return Array.isArray(j) ? j.length : 0; } catch { return 0; }
+}
+let purgeMissing = false; // 0003_attachments.sql not run yet: said once per instance
+async function purgeAttachments(c: Conf): Promise<Record<string, number>> {
+  let rows: { id: string; path: string | null; deleted: string | null }[];
+  try {
+    rows = (await rest(c, 'POST', 'rpc/tareas_attachments_to_purge', { p_limit: PURGE_LIMIT })).data || [];
+  } catch (e) {
+    const m = String((e as Error)?.message || e);
+    if (/ 404 |PGRST202|Could not find the function|does not exist/i.test(m)) {
+      if (!purgeMissing) { purgeMissing = true; console.log(JSON.stringify({ event: 'purge-skipped', reason: '0003_attachments.sql not run' })); }
+      return { purged: 0 };
+    }
+    throw e;
+  }
+  purgeMissing = false;
+  if (!rows.length) return { purged: 0 };
+  const paths = [...new Set(rows.map(r => r.path).filter(Boolean))] as string[];
+  const removed = paths.length ? await removeObjects(c, paths) : 0;
+  // Only after Storage answered: a failure leaves the rows as they were, for the next run
+  const nowIso = new Date().toISOString();
+  const ids = (list: typeof rows) => encodeURIComponent(inList(list.map(r => r.id)));
+  const own = rows.filter(r => r.deleted), byTask = rows.filter(r => !r.deleted);
+  if (own.length) await rest(c, 'PATCH', 'attachments?id=' + ids(own), { purged: nowIso }, 'return=minimal');
+  // Deleted with their task only: marked deleted too, so every device lets them go (modified stays: the newest-wins rule accepts it)
+  if (byTask.length) await rest(c, 'PATCH', 'attachments?id=' + ids(byTask), { purged: nowIso, deleted: nowIso }, 'return=minimal');
+  return { purged: rows.length, files: paths.length, removed };
+}
+
 /* ---------- Test: the caller's own devices ---------- */
 async function sendTest(c: Conf, req: Request, body: { id?: string }) {
   const jwt = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim();
@@ -240,7 +284,11 @@ export async function handler(req: Request): Promise<Response> {
     }
     const out = await sendDue(c);
     if (out.due) console.log(JSON.stringify({ event: 'reminders', ...out, ms: Date.now() - t0 }));
-    return json(out);
+    // The reminders go first; a purge that fails is logged and tried again on the next run, and never holds them back
+    let purge: Record<string, number> = { purged: 0 };
+    try { purge = await purgeAttachments(c); } catch (e) { console.error(JSON.stringify({ event: 'purge-failed', error: String((e as Error)?.message || e) })); purge = { purged: 0, purgeFailed: 1 }; }
+    if (purge.purged) console.log(JSON.stringify({ event: 'purge', ...purge, ms: Date.now() - t0 }));
+    return json({ ...out, ...purge });
   } catch (e) {
     console.error(JSON.stringify({ event: 'error', error: String((e as Error)?.message || e) }));
     return json({ error: String((e as Error)?.message || e) }, 500);

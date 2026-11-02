@@ -285,7 +285,7 @@ function spaceSheet(id){
 function calendarHTML(ym, sel, opts){ const mini=!!(opts&&opts.mini), rg=opts&&opts.range;
   const [y,m]=ym.split('-').map(Number); const t=todayStr(); const startDow=(new Date(y,m-1,1).getDay()+6)%7;
   const days=new Date(y,m,0).getDate(), prevDays=new Date(y,m-1,0).getDate();
-  const load=new Map(); spaceTasks().forEach(x=>{ if(x.status==='pending'&&x.date) load.set(x.date, (load.get(x.date)||0)+1); });
+  const load=new Map(); spaceTasks().forEach(x=>{ if(isOpen(x)&&x.date) load.set(x.date, (load.get(x.date)||0)+1); });
   const dots=ds=>{ const n=load.get(ds)||0; return n?'<i class="ld">'+'<b></b>'.repeat(n<3?1:n<6?2:3)+'</i>':''; };
   let cells=''; const total=Math.ceil((startDow+days)/7)*7;
   for(let i=0;i<total;i++){ const n=i-startDow+1; let yy=y,mm=m,dd=n,other=false; if(n<1){ other=true; mm=m-1; dd=prevDays+n; if(mm<1){ mm=12; yy--; } } else if(n>days){ other=true; mm=m+1; dd=n-days; if(mm>12){ mm=1; yy++; } }

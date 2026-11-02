@@ -41,8 +41,8 @@ function weekendHTML(start, end){ if(!workWeekOn()) return ''; const wk=[]; for(
     return '<div class="wkd'+dayCls(d)+'" data-day="'+d+'"><div class="wkdl">'+DIAS_FULL[dd.getDay()]+' '+dd.getDate()+'</div><div class="wl" data-keep="wk'+d+'">'+l.map(x=>calCardHTML(x,'')).join('')+'</div></div>'; }).join('')+'</aside>'; }
 // As in the lists, a search ignores the project filter
 function calFilter(){ if(UI.query) return queryMatcher(UI.query); if(UI.projFilter!==null) return x=> UI.projFilter==='none' ? !x.projectId : x.projectId===UI.projFilter; return ()=>true; }
-// The tasks dated from start to end: pending ones, and done ones completed in that span
-function calTasks(start, end){ const pf=calFilter(); return spaceTasks().filter(x=>x.date&&x.date>=start&&x.date<=end&&(x.status==='pending'||(x.completed&&localDay(x.completed)>=start))&&pf(x)); }
+// The tasks dated from start to end: pending ones (and waiting ones on their review day, decision 41), and done ones completed in that span
+function calTasks(start, end){ const pf=calFilter(); return spaceTasks().filter(x=>x.date&&x.date>=start&&x.date<=end&&(isOpen(x)||(x.completed&&localDay(x.completed)>=start))&&pf(x)); }
 // The minute of the day of a reminder set on the task's own date; any other reminder gives the task no time in the calendar
 function remMin(x){ if(!x.reminder||!x.date||localDay(x.reminder)!==x.date) return null; const d=new Date(x.reminder); return d.getHours()*60+d.getMinutes(); }
 function inGrid(x){ const m=remMin(x); return m!==null&&m>=H0&&m<H1; }
@@ -50,13 +50,14 @@ function inGrid(x){ const m=remMin(x); return m!==null&&m>=H0&&m<H1; }
 function calSort(xs){ const tm=xs.map(x=>[x,remMin(x)]); return tm.filter(a=>a[1]!==null).sort((a,b)=>a[1]-b[1]).map(a=>a[0]).concat(orderTasks(tm.filter(a=>a[1]===null).map(a=>a[0]))); }
 // A one-line card (kind ''), a month chip ('mc') or an hour block ('hb'); the full title shows on hover. Carried tasks have an orange edge
 function calCardHTML(x, kind, style){ const p=x.projectId?proj(x.projectId):null, m=remMin(x), done=x.status==='done', tm=m!==null?fmtTime(x.reminder):'';
-  const tip=x.title+(p?'\n'+p.name:'')+(tm?'\n'+tm:'')+(x.carried&&!done?'\nAplazada':'')+(repParse(x.repeat)?'\n'+repSummary(x.repeat):'');
+  const wt=x.status==='waiting'?'\nPor confirmar'+(x.waitingFor?', esperando a '+x.waitingFor:''):''; // decision 41
+  const tip=x.title+(p?'\n'+p.name:'')+(tm?'\n'+tm:'')+(x.carried&&!done?'\nAplazada':'')+wt+(repParse(x.repeat)?'\n'+repSummary(x.repeat):'');
   return '<div class="wcard'+(kind?' '+kind:'')+(done?' done':'')+(x.carried&&!done?' carried':'')+'" draggable="true" data-id="'+x.id+'" title="'+esc(tip)+'" style="'+(p?'--pc:'+p.color+';':'')+(style||'')+'">'+
-    (kind==='mc'?'<span class="mdot"></span>':'<button class="check'+(done?' done':'')+'" data-act="wcheck" aria-label="Completar">'+I.check+'</button>')+
+    (kind==='mc'?'<span class="mdot"></span>':'<button class="check'+(done?' done':x.status==='waiting'?' waiting':'')+'" data-act="wcheck" aria-label="Completar">'+I.check+'</button>')+
     (kind==='hb'?'<span class="tm">'+tm+'</span>':'')+'<div class="t">'+(x.priority==='high'?'<span class="pri high">!!!</span>':x.priority==='mid'?'<span class="pri mid">!!</span>':'')+esc(x.title)+'</div>'+
     (x.focus&&!done?'<span class="cic ist">'+I.starF+'</span>':'')+(repParse(x.repeat)?'<span class="cic irp">'+I.repeat+'</span>':'')+(tm&&kind!=='hb'?'<span class="tm">'+tm+'</span>':'')+'</div>'; } // decisions 38 and 39: repeats, in Ahora
 // R12: a day's header: name and date, pending count, high-priority count and a load bar, orange above 8 tasks and red above 12
-function dayHeadHTML(d, xs){ const t=todayStr(), dd=new Date(d+'T00:00:00'), pend=xs.filter(x=>x.status==='pending'), n=pend.length, hi=pend.filter(x=>x.priority==='high').length, dn=xs.length-n;
+function dayHeadHTML(d, xs){ const t=todayStr(), dd=new Date(d+'T00:00:00'), pend=xs.filter(isOpen), n=pend.length, hi=pend.filter(x=>x.priority==='high').length, dn=xs.length-n;
   const what=n?n+(n===1?' tarea':' tareas'):dn?dn+(dn===1?' hecha':' hechas'):'Sin tareas'; // a past day only has done tasks
   return '<div class="dh" title="'+what+(hi?', '+hi+(hi===1?' prioritaria':' prioritarias'):'')+'"><div class="dt"><b>'+DIAS_FULL[dd.getDay()].slice(0,3)+'<small>'+dd.getDate()+(dd.getDate()===1?' '+MESES[dd.getMonth()]:'')+'</small></b>'+(d<t?'':'<button data-add-date="'+d+'" aria-label="Añadir" title="Añadir">'+I.plus+'</button>')+'</div>'+
     '<div class="dm"><span class="wc">'+what+'</span>'+(hi?'<span class="wp">'+hi+' !!!</span>':'')+'</div><div class="ld'+(n>12?' red':n>8?' orange':'')+'"><i style="transform:scaleX('+Math.min(1,n/12).toFixed(3)+')"></i></div></div>'; }

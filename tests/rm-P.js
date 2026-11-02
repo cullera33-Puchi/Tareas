@@ -198,6 +198,10 @@ async function fnTests(st){
   let cross = false; try { decrypt(toA1[0].body, dB); cross = true; } catch(e){} check('fn_payload_bound_to_device', !cross);
   const r2 = await fnCall('POST', '', {}); check('fn_cron_once', r2.json && r2.json.due===0 && PUSHES.length===4, r2.json);
   const r3 = await fnCall('POST', '', undefined); check('fn_cron_empty_body', r3.status===200 && r3.json && r3.json.due===0, r3.json);
+  // Decision 41: a task Por confirmar notifies too, and on its review day it counts in the badge (one without a date, or a later one, does not)
+  store.t.tasks.push(T('w1', { status:'waiting', reminder:iso(-20e3), title:'Esperando la firma' }), T('w2', { status:'waiting', date:null }), T('w3', { status:'waiting', date:'2099-01-01' }));
+  const nW = PUSHES.length, r4 = await fnCall('POST', '', {}); const pw = PUSHES.slice(nW).filter(p => p.url==='/push/a1').map(p => decrypt(p.body, dA1));
+  check('fn_waiting_notifies', r4.json && r4.json.due===1 && r4.json.sent===1 && pw.length===1 && pw[0].tag==='w1' && pw[0].title==='Esperando la firma' && pw[0].badge===7 && !!store.t.tasks.find(t=>t.id==='w1').reminder_sent, {json:r4.json, pw}); // the badge of t1 was 6, plus w1
   GONE.clear(); store.t.push_subscriptions.push({ id:'sA3', owner_id:'user-A', endpoint:EP('a3'), p256dh:dA2.p256dh, auth:dA2.authB64, deleted:null });
   const n0 = PUSHES.length; const tNo = await fnCall('POST', '', {test:true}), tBad = await fnCall('POST', '', {test:true}, {Authorization:'Bearer nope'});
   check('fn_test_needs_session', tNo.status===401 && tBad.status===401 && PUSHES.length===n0, [tNo.status, tBad.status]);

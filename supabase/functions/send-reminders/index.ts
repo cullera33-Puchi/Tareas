@@ -8,7 +8,7 @@
 //   GET  ?publicKey            {publicKey}: the VAPID public key the app subscribes with. The first call ever creates the key pair
 //                              and keeps it in push_keys (only the service role reads that table), so nobody handles a private key.
 //   POST (pg_cron, every minute, body {})
-//                              Sends the reminders that are due: pending tasks, not deleted, reminder <= now and not sent yet.
+//                              Sends the reminders that are due: pending or waiting tasks (decision 41), not deleted, reminder <= now and not sent yet.
 //                              Each one is marked as sent first (one statement, so two runs never send it twice), then goes to every
 //                              device of its owner. Devices whose push service answers 404 or 410 no longer exist and are deleted.
 //                              Then the purge of attachments (decision 29.4, 0003_attachments.sql): files of attachments deleted more than
@@ -177,7 +177,7 @@ async function deliver(c: Conf, v: Vapid, jobs: { sub: Sub; msg: Message }[]) {
 async function sendDue(c: Conf) {
   const now = new Date(), nowIso = now.toISOString();
   // Claim: mark as sent in one statement. A run at the same time finds them already marked
-  const claimed = (await rest(c, 'PATCH', 'tasks?' + qs({ reminder: 'lte.' + nowIso, reminder_sent: 'is.null', deleted: 'is.null', status: 'eq.pending', select: 'id,owner_id,title,project_id,date,reminder' }),
+  const claimed = (await rest(c, 'PATCH', 'tasks?' + qs({ reminder: 'lte.' + nowIso, reminder_sent: 'is.null', deleted: 'is.null', status: 'in.(pending,waiting)', select: 'id,owner_id,title,project_id,date,reminder' }), // decision 41: Por confirmar notifies too
     { reminder_sent: nowIso }, 'return=representation')).data as { id: string; owner_id: string; title: string | null; project_id: string | null; date: string | null; reminder: string }[];
   if (!claimed.length) return { due: 0, late: 0, sent: 0, failed: 0, gone: 0 };
   const fresh = claimed.filter(t => now.getTime() - Date.parse(t.reminder) <= LATE_LIMIT_MS);
@@ -189,11 +189,12 @@ async function sendDue(c: Conf) {
   const pids = [...new Set(fresh.map(t => t.project_id).filter(Boolean))] as string[];
   const names = new Map<string, string>();
   if (pids.length) ((await rest(c, 'GET', 'projects?' + qs({ id: inList(pids), deleted: 'is.null', select: 'id,name' }))).data as { id: string; name: string }[]).forEach(p => names.set(p.id, p.name));
-  // The icon's badge: the owner's pending tasks up to the task's day (the app's own count, with that day as today)
+  // The icon's badge: the owner's pending tasks up to the task's day, and the waiting ones whose review day it is or has passed (decision 41):
+  // the app's own count, with that day as today. A waiting task without a date has no date, so the date filter leaves it out
   const badges = new Map<string, number>();
   for (const t of fresh) {
     const k = t.owner_id + '|' + t.date; if (!t.date || badges.has(k)) continue;
-    const r = await rest(c, 'GET', 'tasks?' + qs({ owner_id: 'eq.' + t.owner_id, status: 'eq.pending', deleted: 'is.null', date: 'lte.' + t.date, select: 'id', limit: '1' }), undefined, 'count=exact');
+    const r = await rest(c, 'GET', 'tasks?' + qs({ owner_id: 'eq.' + t.owner_id, status: 'in.(pending,waiting)', deleted: 'is.null', date: 'lte.' + t.date, select: 'id', limit: '1' }), undefined, 'count=exact');
     const n = Number((r.headers.get('content-range') || '').split('/')[1]); if (Number.isFinite(n)) badges.set(k, n);
   }
   const jobs: { sub: Sub; msg: Message }[] = [];

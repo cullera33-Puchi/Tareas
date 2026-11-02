@@ -404,6 +404,16 @@ async function desktop(browser){
   x = await ev(page, ()=>({rep:!!document.querySelector('#desk .wcard[data-id=r3] .cic.irp'), star:!!document.querySelector('#desk .wcard[data-id=a1] .cic.ist'), no:!document.querySelector('#desk .wcard[data-id=a6] .cic')}));
   await shot(page, 'd8-week-cards');
   check('desk_week_cards', x.rep && x.star && x.no, x);
+  // Decision 41 in the calendar: a task Por confirmar on its review day, half filled, Esperando a in the tooltip; a drag moves its review day
+  // (Deshacer), the card's circle completes it; the mini month counts it
+  x = await ev(page, ()=>{ const c=document.querySelector('#desk .wcard[data-id=a6]'); return c&&{day:c.closest('[data-day]').dataset.day, half:!!c.querySelector('.check.waiting'), tip:c.title, mini:!!document.querySelector('#desk .minical [data-mini="2026-11-05"] .ld')}; });
+  check('desk_cal_waiting', x && x.day==='2026-11-05' && x.half && /Por confirmar, esperando a Ramiro/.test(x.tip) && x.mini, x);
+  await page.dragAndDrop('#desk .wcard[data-id=a6]', '#desk .wday[data-day="2026-11-09"]'); await sleep(500);
+  x = await ev(page, ()=>({d:task('a6').date, st:task('a6').status})); await page.keyboard.press('Control+z'); await sleep(400);
+  check('desk_cal_waiting_drag', x.d==='2026-11-09' && x.st==='waiting' && await ev(page, ()=>task('a6').date==='2026-11-05'), x);
+  await page.click('#desk .wcard[data-id=a6] [data-act=wcheck]'); await sleep(600);
+  x = await ev(page, ()=>task('a6').status); await page.keyboard.press('Control+z'); await sleep(400);
+  check('desk_cal_waiting_done', x==='done' && await ev(page, ()=>task('a6').status==='waiting'), x);
   await ev(page, ()=>{ DB.settings.theme='dark'; save(); applyTheme(); setDeskView('hoy'); }); await sleep(300); await page.click('#desk .main .row[data-id=a2]:not(.first .row) .row-title'); await sleep(400);
   await page.click('#desk .pane [data-act=pickRepeat]'); await sleep(300); await menuItem(page, 'Personalizada…').click(); await sleep(400); await page.click('#pmenu .pm-pop [data-rp="u:M"]'); await sleep(200);
   await shot(page, 'd9-dark-custom-month'); await page.keyboard.press('Escape');
@@ -500,6 +510,22 @@ async function syncTests(browser){
   // Deshacer on A after the sync: the next one is deleted everywhere
   await ev(A.page, ()=>undoDone({id:'s2', status:'pending', completed:null})); // the Deshacer of the completion, after it went up check('sync_A_undo', await synced(A.page));
   check('sync_undo_everywhere', await until(B.page, s=>DB.tasks.filter(x=>repSeries(x.repeat)===s).length===1 && task('s2').status==='pending', ser) && [...fake.t.tasks.values()].filter(x=>(x.repeat||'').endsWith('#'+ser)&&!x.deleted).length===1);
+  // Both devices complete the same task of a series offline: each makes the next one; once both are back, one stays, on both and on the server
+  await ev(A.page, ()=>{ setRepeat('s1', 'D1'); }); check('sync_dup_ready', await synced(A.page) && await until(B.page, ()=>!!repParse(task('s1').repeat)));
+  await synced(B.page); const ser2 = await ev(A.page, ()=>repSeries(task('s1').repeat));
+  fake.down.add(A.page); fake.down.add(B.page); await A.ctx.setOffline(true); await B.ctx.setOffline(true); await sleep(200);
+  await ev(A.page, ()=>completeTask('s1')); await ev(B.page, ()=>completeTask('s1'));
+  const nextA = await ev(A.page, s=>DB.tasks.filter(x=>repSeries(x.repeat)===s&&x.status==='pending').map(x=>x.id+'|'+x.date), ser2), nextB = await ev(B.page, s=>DB.tasks.filter(x=>repSeries(x.repeat)===s&&x.status==='pending').map(x=>x.id+'|'+x.date), ser2);
+  fake.down.delete(A.page); await A.ctx.setOffline(false); check('sync_dup_A_up', await synced(A.page));
+  fake.down.delete(B.page); await B.ctx.setOffline(false); check('sync_dup_B_up', await synced(B.page)); await synced(A.page);
+  const keep = [nextA[0], nextB[0]].map(s=>s.split('|')[0]).sort()[0];
+  const pendOn = page => page.evaluate(s=>DB.tasks.filter(x=>repSeries(x.repeat)===s&&x.status==='pending').map(x=>x.id), ser2);
+  check('sync_dup_one_left', nextA.length===1 && nextB.length===1 && nextA[0]!==nextB[0] && nextA[0].split('|')[1]===nextB[0].split('|')[1]
+    && await until(A.page, ([s,k])=>{ const xs=DB.tasks.filter(x=>repSeries(x.repeat)===s&&x.status==='pending'); return xs.length===1&&xs[0].id===k; }, [ser2, keep])
+    && await until(B.page, ([s,k])=>{ const xs=DB.tasks.filter(x=>repSeries(x.repeat)===s&&x.status==='pending'); return xs.length===1&&xs[0].id===k; }, [ser2, keep])
+    && [...fake.t.tasks.values()].filter(x=>(x.repeat||'').endsWith('#'+ser2)&&x.status==='pending'&&!x.deleted).map(x=>x.id).join()===keep,
+    {nextA, nextB, keep, A:await pendOn(A.page), B:await pendOn(B.page), server:[...fake.t.tasks.values()].filter(x=>(x.repeat||'').endsWith('#'+ser2)).map(x=>x.id+':'+x.status+':'+!!x.deleted)});
+  check('sync_dup_logged', await ev(B.page, ()=>LOG.some(e=>/^Tarea repetida de una serie retirada/.test(e.m))) || await ev(A.page, ()=>LOG.some(e=>/^Tarea repetida de una serie retirada/.test(e.m))));
   await A.ctx.close(); await B.ctx.close();
 
   // A database without the columns: logged once per column, the values stay on the device, nothing goes up again and again

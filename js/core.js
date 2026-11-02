@@ -415,6 +415,16 @@ function skipOccurrence(id, quiet){ const x=task(id); if(!x) return null; const 
   const old=Object.assign(daySnap(x), {focus:x.focus||null}); releaseHold(id); updTask(id, dayPatch(x, d, {carried:false, focus:null})); log('info','Eliminada solo esta de una serie', {to:d});
   const undo=()=>updTask(id, {date:old.date, carried:old.carried, reminder:old.reminder, focus:old.focus});
   if(!quiet){ haptic(14); toast('Eliminada solo esta, la siguiente '+dayWords(d), undo); } return undo; }
+/* Two devices that complete the same task of a series while offline each create its next one. When their data meets (a sync, or the
+   start), two pending tasks of the same series on the same date are one: the one with the lowest id stays (the same choice on every
+   device) and the others are removed as any deletion is, so the server marks them deleted. Different series or dates are never touched.
+   W: an object with tasks, voiceNotes and attachments (DB, or the working copy of a sync). Returns how many went */
+function dedupeSeries(W){ const by=new Map(), out=[];
+  W.tasks.forEach(x=>{ if(!x||x.status!=='pending'||!x.date) return; const s=repSeries(x.repeat); if(!s) return; const k=s+'|'+x.date, o=by.get(k);
+    if(!o){ by.set(k, x); return; } if(String(x.id)<String(o.id)){ out.push(o); by.set(k, x); } else out.push(x); });
+  if(!out.length) return 0; const ids=new Set(out.map(x=>x.id));
+  W.tasks=W.tasks.filter(x=>!x||!ids.has(x.id)); W.voiceNotes=W.voiceNotes.filter(v=>!v||!ids.has(v.taskId)); W.attachments=(W.attachments||[]).filter(a=>!a||!ids.has(a.taskId));
+  log('info','Tarea repetida de una serie retirada: dos dispositivos crearon la misma siguiente', {ids:[...ids]}); return out.length; }
 // After a completion: the toast says when the next one of the series comes
 const doneText = (n, nx) => n===1&&nx ? 'Tarea completada, la siguiente '+dayWords(nx.date) : n===1?'Tarea completada':n+' tareas completadas';
 
@@ -479,7 +489,7 @@ const undoDay = o => updTask(o.id, {date:o.date, carried:o.carried, reminder:o.r
 // Decision 39: Ahora empties with the day; a task put there before today goes back to its usual place (focus cleared, modified untouched)
 // Decision 38: a carried task of a series stays one task: no copies for the days it missed
 function rollOver(){ const t=todayStr(); let n=0, f=0; if(DB.settings.summaryDay!==t){ DB.settings.summaryDay=t; UI.summaryFirst=true; save(); } DB.tasks.forEach(x=>{ if(x.status==='pending'&&x.date&&x.date<t){ Object.assign(x, dayPatch(x, t, {carried:true})); n++; } if(x.focus&&localDay(x.focus)<t){ x.focus=null; f++; } });
-  if(f) log('info','Ahora vaciada con el cambio de día', {n:f}); if(n||f) save(); return n; }
+  if(f) log('info','Ahora vaciada con el cambio de día', {n:f}); const dd=dedupeSeries(DB); if(n||f||dd) save(); return n; } // decision 38: duplicates of a series, at the start too
 /* The data side of completing or reopening, with no feedback. Completing takes the task out of Ahora (decision 39) and, in a series,
    creates the next one (decision 38), which it returns; reopening takes that next one back */
 function applyDone(id, done){ const x=task(id); if(!x||(x.status==='done')===done) return null;

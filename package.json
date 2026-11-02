@@ -1,0 +1,14 @@
+{
+  "name": "tareas",
+  "private": true,
+  "description": "Gestor de tareas personal (PWA). Sin build: este archivo solo sirve para las pruebas.",
+  "scripts": {
+    "test": "bash tests/run.sh"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.10",
+    "http_ece": "1.2.0",
+    "playwright": "1.63.0",
+    "web-push": "3.6.7"
+  }
+}

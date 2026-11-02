@@ -7,3 +7,7 @@ supabase/.temp/
 
 # Test screenshots never belong in the repository (icons live in icons/)
 /*.png
+
+# Test dependencies and outputs (screenshots, downloads, logs)
+node_modules/
+tests/out/

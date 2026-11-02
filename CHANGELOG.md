@@ -1,5 +1,11 @@
 # Registro de cambios
 
+## v0.23.1. Borrar pasos (2 de noviembre de 2026)
+
+- Al borrar un paso deslizando, el paso desaparecía de los datos pero la fila se quedaba en pantalla si el foco seguía en ella (su botón Eliminar o su texto), y los siguientes borrados parecían no hacer nada. Ahora la fila sale siempre de la pantalla.
+- Deslizar un paso mientras se edita su texto abre Eliminar en lugar de mover el cursor, y la pulsación larga no lo levanta mientras se escribe.
+- Prueba nueva en `rm-ST`: tres borrados seguidos, uno de ellos con el texto del paso en edición.
+
 ## v0.23.0. Pasos dentro de una tarea (2 de noviembre de 2026)
 
 - Grupo «Pasos» en el detalle, en el iPhone y en el ordenador: lista de casillas con «3 de 4». Intro añade el siguiente sin cerrar el teclado; pegar varias líneas crea varios pasos. Se reordenan arrastrando y se borran deslizando a la izquierda o con Supr, con Deshacer.

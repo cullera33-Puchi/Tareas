@@ -52,7 +52,10 @@ function toggleStep(sid){ const s=stepRec(sid); if(!s) return; flushEdits(); s.d
   stepsRefresh(s.taskId, sid); const st=stepStats(s.taskId), x=task(s.taskId);
   if(s.done&&st&&st.done===st.n&&x&&x.status!=='done'&&!HELD.has(x.id)){ log('info','Todos los pasos hechos', {n:st.n});
     toast('Todos los pasos hechos', ()=>{ const y=task(x.id); if(y&&y.status!=='done'&&!HELD.has(y.id)) toggleHold(y.id); }, 'Completar tarea'); } }
-function deleteStep(sid, quiet){ const i=DB.subtasks.findIndex(s=>s&&s.id===sid); if(i<0) return; const [s]=DB.subtasks.splice(i,1); save(); haptic(quiet?4:14); stepsRefresh(s.taskId);
+function deleteStep(sid, quiet){ const i=DB.subtasks.findIndex(s=>s&&s.id===sid); if(i<0) return;
+  // A step deleted on purpose leaves the screen even if the focus is in it (its Eliminar button, or its title on the iPhone): the focus goes first
+  document.querySelectorAll('.step[data-st="'+CSS.escape(sid)+'"]').forEach(el=>{ const ae=document.activeElement; if(ae&&el.contains(ae)&&ae.blur) ae.blur(); if(openVn===el) openVn=null; });
+  const [s]=DB.subtasks.splice(i,1); save(); haptic(quiet?4:14); stepsRefresh(s.taskId);
   if(quiet) return; log('info','Paso eliminado');
   toast('Paso eliminado', ()=>{ if(!DB.subtasks.some(x=>x.id===s.id)) DB.subtasks.push(s); save(); stepsRefresh(s.taskId); }); }
 // Moves a step to index i of its task's steps, with Deshacer (the orders of all of them come back)
@@ -105,7 +108,8 @@ function stepsPaint(box){ const tid=box.dataset.steps, list=stepsOf(tid), ae=doc
       else { const n=htmlEl(stepRowHTML(s)); n._sig=sig; if(el.dataset.open) closeVn(el); el.replaceWith(n); el=n; stepBindRow(n); } } }
     else { el=htmlEl(stepRowHTML(s)); el._sig=sig; stepBindRow(el); }
     want.push(el); if(drafts.has(s.id)) want.push(drafts.get(s.id)); });
-  have.forEach(el=>{ if(el.contains(ae)) want.push(el); else { if(openVn===el) openVn=null; el.remove(); } }); // a step deleted elsewhere while typed in stays until it is left
+  const typing=!!ae&&ae.matches&&ae.matches('textarea, input, [contenteditable]');
+  have.forEach(el=>{ if(typing&&el.contains(ae)) want.push(el); else { if(openVn===el) openVn=null; el.remove(); } }); // a step deleted elsewhere while its title is being typed stays until it is left (a focused button does not count)
   drafts.forEach((el,k)=>{ if(!want.includes(el)) want.push(el); });
   want.push(add); let cur=box.firstElementChild;
   want.forEach(el=>{ if(el===cur){ cur=cur.nextElementSibling; return; } box.insertBefore(el, cur); });
@@ -198,16 +202,17 @@ function stepDrag(el){ const box=el.parentElement, rows=[...box.querySelectorAll
       if(n!==k){ k=n; haptic(4); } rows.forEach((r,j)=>{ if(j===i0) return; const s=(j>i0&&j<=k)?-h:(j<i0&&j>=k)?h:0; r.style.transform=s?'translate3d(0,'+s+'px,0)':''; }); },
     end(apply){ box.classList.remove('sorting'); el.classList.remove('lifted'); rows.forEach(r=>{ r.style.transform=''; }); if(apply&&k!==i0) reorderStep(el.dataset.st, k); } }; } // the transitions go first: the rows are already where the new order puts them
 // iPhone: swipe left for Eliminar (it stops there, as the voice notes); a long press lifts the step and the same finger moves it
-function bindStepGestures(el){ if(el._stb||!el.querySelector('.vn-bg')) return; el._stb=1; let c=null, x0=0, y0=0, dx=0, mode=null, edge=false, lp=null, drag=null, sc=null, st0=0, lastY=0, raf=0;
+function bindStepGestures(el){ if(el._stb||!el.querySelector('.vn-bg')) return; el._stb=1; let c=null, x0=0, y0=0, dx=0, mode=null, edge=false, lp=null, drag=null, sc=null, st0=0, lastY=0, raf=0, inTa=false;
   const tick=()=>{ if(mode!=='lift') return; const b=sc.getBoundingClientRect(); let v=0; if(lastY<b.top+60) v=-Math.ceil((b.top+60-lastY)/6); else if(lastY>b.bottom-60) v=Math.ceil((lastY-b.bottom+60)/6);
     if(v){ sc.scrollTop+=v; drag.move(lastY-y0+sc.scrollTop-st0); } raf=requestAnimationFrame(tick); };
   el.addEventListener('touchstart', e=>{ c=el.querySelector('.vn-c'); mode=null; dx=0; clearTimeout(lp); if(!c||e.touches.length>1||!el.dataset.st){ mode='off'; return; }
-    const ta=el.querySelector('.stepin'); if(e.target.closest('.vn-bg')||(ta&&document.activeElement===ta&&e.target===ta)){ mode='off'; return; } // its Eliminar button, or a title being edited (the caret moves there)
+    const ta=el.querySelector('.stepin'); if(e.target.closest('.vn-bg')){ mode='off'; return; } // its Eliminar button
+    inTa=!!ta&&document.activeElement===ta&&e.target===ta; // a title being edited: a tap moves the caret there, a clear sideways swipe still opens Eliminar
     const t=e.touches[0]; x0=t.clientX; y0=lastY=t.clientY; edge=x0<EDGE; if(openVn&&openVn!==el) closeVn(openVn); if(openRow) closeRow(openRow);
-    lp=setTimeout(()=>{ if(mode!==null||el.dataset.open) return; drag=stepDrag(el); if(!drag) return; mode='lift'; dragStart(); sc=el.closest('.scroll'); st0=sc?sc.scrollTop:0; if(sc) raf=requestAnimationFrame(tick); }, 500); }, {passive:true});
+    lp=setTimeout(()=>{ if(mode!==null||el.dataset.open||inTa) return; drag=stepDrag(el); if(!drag) return; mode='lift'; dragStart(); sc=el.closest('.scroll'); st0=sc?sc.scrollTop:0; if(sc) raf=requestAnimationFrame(tick); }, 500); }, {passive:true});
   el.addEventListener('touchmove', e=>{ const t=e.touches[0], mx=t.clientX-x0, my=t.clientY-y0;
     if(mode==='lift'){ if(e.cancelable) e.preventDefault(); lastY=t.clientY; drag.move(my+(sc?sc.scrollTop-st0:0)); return; }
-    if(mode===null){ if(Math.abs(my)>8){ mode='scroll'; clearTimeout(lp); } else if(Math.abs(mx)>10){ clearTimeout(lp); if(edge){ mode='edge'; return; } mode='swipe'; c.classList.add('drag'); } }
+    if(mode===null){ if(Math.abs(my)>8){ mode='scroll'; clearTimeout(lp); } else if(Math.abs(mx)>(inTa?16:10)&&Math.abs(mx)>Math.abs(my)*1.5){ clearTimeout(lp); if(edge){ mode='edge'; return; } if(inTa){ const ta=el.querySelector('.stepin'); if(ta) ta.blur(); } mode='swipe'; c.classList.add('drag'); } }
     if(mode!=='swipe') return; if(e.cancelable) e.preventDefault();
     let raw=(el.dataset.open==='l'?-88:0)+mx; if(raw<-88) raw=-88+(raw+88)*0.15; if(raw>0) raw=raw*0.15;
     dx=Math.max(-104, Math.min(12, raw)); c.style.transform='translate3d('+dx+'px,0,0)'; el.classList.toggle('dir-l', dx<0); }, {passive:false});

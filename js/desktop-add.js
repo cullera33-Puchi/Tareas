@@ -245,7 +245,7 @@ document.addEventListener('keydown', e=>{ if(!UI.wide) return; const tag=(e.targ
   if(modal||typing) return; // N, / and the keys below never reach the page behind a menu or a sheet, nor a field being typed in
   const k=e.key, mod=e.metaKey||e.ctrlKey;
   if(mod){ if(e.altKey||e.shiftKey) return; // the browser keeps its own (Comando L, T, W, R...); only these two are the app's
-    if(k==='z'||k==='Z'){ if(undoFn&&$('#toast').classList.contains('on')){ e.preventDefault(); $('#toastBtn').click(); } return; } // R15: the last action's Deshacer
+    if(k==='z'||k==='Z'){ if(undoFn&&!toastLbl&&$('#toast').classList.contains('on')){ e.preventDefault(); $('#toastBtn').click(); } return; } // R15: the last action's Deshacer
     if((k==='a'||k==='A')&&deskListView()){ e.preventDefault(); selectAllDesk(); } return; }
   if(e.altKey) return;
   // Space and Intro on a focused button or control are that control's own

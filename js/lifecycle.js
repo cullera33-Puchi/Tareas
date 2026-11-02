@@ -39,7 +39,7 @@ function logSheet(){
 
 /* Shake to undo (optional): undoes the action whose toast is still showing */
 let shakeArmed=false, lastShake=0, lastAcc=null;
-function onMotion(e){ const a=e.accelerationIncludingGravity; if(!a) return; if(lastAcc){ const d=Math.abs(a.x-lastAcc.x)+Math.abs(a.y-lastAcc.y)+Math.abs(a.z-lastAcc.z); if(d>30 && Date.now()-lastShake>1200){ lastShake=Date.now(); if(undoFn && undoFn!==applyUpdate){ haptic(15); $('#toastBtn').click(); } } } lastAcc={x:a.x,y:a.y,z:a.z}; } // a shake undoes an action, never installs an update
+function onMotion(e){ const a=e.accelerationIncludingGravity; if(!a) return; if(lastAcc){ const d=Math.abs(a.x-lastAcc.x)+Math.abs(a.y-lastAcc.y)+Math.abs(a.z-lastAcc.z); if(d>30 && Date.now()-lastShake>1200){ lastShake=Date.now(); if(undoFn && !toastLbl){ haptic(15); $('#toastBtn').click(); } } } lastAcc={x:a.x,y:a.y,z:a.z}; } // a shake undoes an action, never installs an update
 function armShake(){ if(shakeArmed) return; shakeArmed=true; window.addEventListener('devicemotion', onMotion); }
 function disarmShake(){ shakeArmed=false; window.removeEventListener('devicemotion', onMotion); }
 async function toggleShake(){
@@ -128,7 +128,7 @@ function reloadFromStorage(src){ // src 'sync': the data came from the server (b
   applyTheme(); dataVer++; // screens drawn before this show stale data
   // Typing still waiting for its save is put back and saved as planned. Not saved here: a second write from the other window
   // may already be on its way, and this one would cover it
-  if(ep){ if(task(ep.id)) Object.assign(task(ep.id), ep.patch); else { clearTimeout(editSaveT); editSaveT=null; editPatch=null; } }
+  if(ep){ const rec=ep.step?stepRec(ep.id):task(ep.id); if(rec) Object.assign(rec, ep.patch); else { clearTimeout(editSaveT); editSaveT=null; editPatch=null; } } // a step's title too (decision 46)
   if(DB.spaces.some(sp=>sp.id===keep.activeSpace)) DB.settings.activeSpace=keep.activeSpace;
   else if(DB.spaces.length&&!DB.spaces.some(sp=>sp.id===DB.settings.activeSpace)){ DB.settings.activeSpace=DB.spaces.slice().sort((a,b)=>a.order-b.order)[0].id; resetListState(); } // decision 28a: the space on screen was deleted elsewhere
   DB.settings.filter=keep.filter;

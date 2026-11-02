@@ -298,7 +298,8 @@ function tagVars(c){ let v=tagCache.get(c); if(v) return v;
    hideCarried (the Aplazadas group: no "Aplazada"), byDay (Completadas grouped by day: the time alone, not struck through),
    day (R14: a day group of Todas; a row dated that day says no date),
    simple ("Lo primero", Ahora: no swipe), compact (Ahora, decision 39: the project capsule alone under the title, no indicators).
-   A carried task says "Aplazada" in orange where it would say "Hoy". The indicators: a star in Ahora (39), notes, voice, attachments, repeats (38) */
+   A carried task says "Aplazada" in orange where it would say "Hoy". The indicators: a star in Ahora (39), notes, voice, attachments, repeats (38),
+   and the steps' progress "3/4" (46, its own column on the desktop) */
 function rowHTML(x, opts={}){
   const p = x.projectId?proj(x.projectId):null; const t=todayStr();
   const done=x.status==='done';
@@ -313,13 +314,14 @@ function rowHTML(x, opts={}){
     if(x.reminder) meta.push('<span class="bell">'+I.bell+(x.date&&localDay(x.reminder)===x.date?fmtTime(x.reminder):fmtDateTime(x.reminder))+'</span>'); } // the reminder's own day when it is not the task's date (moved task, no date)
   const ind=opts.compact?'':(x.focus&&!done&&!opts.simple?'<span class="ist" title="En Ahora">'+I.starF+'</span>':'')+(x.notes&&x.notes.trim()?I.note:'')+(DB.voiceNotes.some(v=>v.taskId===x.id)?I.mic:'')+(hasAtt(x.id)?I.clip:'')+(x.repeat&&repParse(x.repeat)?'<span class="irp" title="'+esc(repSummary(x.repeat))+'">'+I.repeat+'</span>':''); // decision 29: a paperclip when it has photos or audio
   const pri = done?'':x.priority==='high'?'<span class="pri high">!!!</span>':x.priority==='mid'?'<span class="pri mid">!!</span>':'';
+  const prog=opts.compact?'':stepProgHTML(x); // decision 46: "3/4" and its ring, next to the indicators; on the desktop a column of its own
   const pc=p?p.color:null;
   const selecting = UI.select && !opts.simple; const selected = selecting && UI.select.ids.has(x.id);
-  if(UI.wide) return deskRowHTML(x, opts, {p, t, done, held, shownDone, ind, pri, pc, selecting, selected});
+  if(UI.wide) return deskRowHTML(x, opts, {p, t, done, held, shownDone, ind, pri, pc, selecting, selected, prog});
   return '<div class="row'+(done?' done':'')+(held?' held':'')+(opts.byDay?' byday':'')+(selected?' selected':'')+'" data-id="'+x.id+'"'+(pc?' style="'+tagVars(pc)+'"':'')+'>'+
     (opts.simple||selecting?'':'<div class="row-bg left"><span>'+I.check+'</span></div><div class="row-bg right"><button class="b-tomorrow" data-act="postpone">Aplazar</button><button class="b-delete" data-act="delete">Eliminar</button></div>')+
     '<div class="row-content">'+(selecting?'<span class="selbox">'+I.check+'</span>':'<button class="check'+(shownDone?' done':x.status==='waiting'?' waiting':'')+'" data-act="check" aria-label="Completar">'+I.check+'</button>')+
-    '<div class="row-text"><div class="row-title">'+esc(x.title||'Sin título')+'</div>'+(meta.length?'<div class="row-meta">'+meta.join('')+'</div>':'')+'</div>'+(ind?'<span class="inds">'+ind+'</span>':'')+pri+(UI.wide&&!selecting&&!opts.simple?'<button class="rowmore" data-act="rowMenu" aria-label="Más">'+I.more+'</button>':'')+'</div></div>';
+    '<div class="row-text"><div class="row-title">'+esc(x.title||'Sin título')+'</div>'+(meta.length?'<div class="row-meta">'+meta.join('')+'</div>':'')+'</div>'+(ind||prog?'<span class="inds">'+ind+prog+'</span>':'')+pri+(UI.wide&&!selecting&&!opts.simple?'<button class="rowmore" data-act="rowMenu" aria-label="Más">'+I.more+'</button>':'')+'</div></div>';
 }
 /* R11: a desktop row is one line of 32 px: circle, title and project capsule, then right-aligned columns for the notes and voice
    indicators, the date (or "Aplazada", or when it was done), the reminder and the priority. The R3 rules decide what each column says */
@@ -336,7 +338,7 @@ function deskRowHTML(x, opts, v){ const t=v.t; let date='', dcls='', rem='';
   return '<div class="row'+(v.done?' done':'')+(v.held?' held':'')+(opts.byDay?' byday':'')+(sel?' selected':'')+(cur?' cur':'')+'" data-id="'+x.id+'"'+(v.pc?' style="'+tagVars(v.pc)+'"':'')+' role="option" aria-selected="'+(sel||cur)+'" tabindex="'+(own&&ds.cur===x.id?0:-1)+'"'+(edit?'':' draggable="true"')+'>'+
     '<div class="row-content">'+(v.selecting?'<span class="selbox">'+I.check+'</span>':'<button class="check'+(v.shownDone?' done':x.status==='waiting'?' waiting':'')+'" data-act="check" aria-label="Completar" tabindex="-1">'+I.check+'</button>')+pcol+
     '<div class="row-text">'+(edit?'<input class="rowedit" data-role="rowedit" type="text" value="'+esc(ds.edit.text)+'" aria-label="Título" autocomplete="off" spellcheck="false">':'<div class="row-title" title="'+esc(x.title||'')+'">'+esc(x.title||'Sin título')+'</div>')+(x.status==='waiting'&&x.waitingFor&&!v.done?'<span class="wtag" title="Esperando a '+esc(x.waitingFor)+'">'+esc(x.waitingFor)+'</span>':'')+'</div>'+ // decision 41
-    '<span class="inds">'+v.ind+'</span><span class="row-meta"><span class="rc rc-date'+dcls+'"'+(date?' title="'+esc(date)+'"':'')+'>'+date+'</span><span class="rc rc-rem"'+(rem?' title="Recordatorio: '+esc(rem)+'"':'')+'>'+(rem?I.bell+rem:'')+'</span></span>'+
+    '<span class="inds">'+v.ind+'</span><span class="rsteps">'+v.prog+'</span><span class="row-meta"><span class="rc rc-date'+dcls+'"'+(date?' title="'+esc(date)+'"':'')+'>'+date+'</span><span class="rc rc-rem"'+(rem?' title="Recordatorio: '+esc(rem)+'"':'')+'>'+(rem?I.bell+rem:'')+'</span></span>'+
     '<span class="pri'+(v.pri?(x.priority==='high'?' high':' mid'):'')+'">'+(v.pri?(x.priority==='high'?'!!!':'!!'):'')+'</span>'+
     (v.selecting?'':opts.simple?'<span class="rowmore" aria-hidden="true"></span>':'<button class="rowmore" data-act="rowMenu" aria-label="Más" title="Más" tabindex="-1">'+I.more+'</button>')+'</div></div>'; } // "Lo primero" keeps the columns aligned with the list
 /* Decision 39: the Ahora block. iPhone: at the top of Hoy, above the summary, compact rows (circle, title, project, priority) that open the
@@ -532,6 +534,7 @@ function viewDetail(id){
    '<button class="cell" data-act="pickRepeat"><span class="lbl">Repetir</span><span class="val">'+(repParse(x.repeat)?esc(repSummary(x.repeat)):'Nunca')+'</span>'+chev+'</button>'+ // decision 38
    '<button class="cell" data-act="pickPriority"><span class="lbl">Prioridad</span><span class="val '+(x.priority==='none'?'':x.priority)+'">'+pl+'</span>'+chev+'</button></div>'+
    (pushNote(x)?'<div class="footnote push-note">'+pushNote(x)+'</div>':'')+
+   stepsGroupHTML(x)+ // decision 46
    '<div class="group-title">Notas de voz</div><div class="group">'+vns.map(vnHTML).join('')+'<button class="cell link" data-act="voice">'+I.mic.replace('<svg','<svg style="width:18px;height:18px"')+'<span class="lbl">Añadir nota de voz</span></button></div>'+
    attWrapHTML(x)+
    '</div>';
@@ -553,6 +556,7 @@ function inspectorHTML(x, p, vns, links){
    (x.status==='waiting'?'<span class="ilbl">Por confirmar</span>'+pop('pickWaiting', x.waitingFor?'Esperando a '+esc(x.waitingFor):'Sí', false, MI.wait):'')+ // decision 41
    '<span class="ilbl">Repetir</span>'+pop('pickRepeat', repParse(x.repeat)?esc(repSummary(x.repeat)):'Nunca', !repParse(x.repeat), I.repeat)+ // decision 38
    '<span class="ilbl">Prioridad</span><div class="seg iseg" role="radiogroup" aria-label="Prioridad">'+seg+'</div></div>'+
+   stepsGroupHTML(x)+ // decision 46
    '<div class="group-title">Notas de voz</div><div class="group">'+vns.map(vnHTML).join('')+'<button class="cell link" data-act="voice">'+I.mic.replace('<svg','<svg style="width:16px;height:16px"')+'<span class="lbl">Añadir nota de voz</span></button></div>'+
    attWrapHTML(x)+
    '<div class="ifoot">'+[['Creada',x.created],['Modificada',x.modified],['Completada',x.status==='done'&&x.completed]].filter(o=>o[1]).map(o=>{ const w=fmtDateTime(o[1]); return o[0]+' '+w[0].toLowerCase()+w.slice(1)+'<br>'; }).join('')+(pushNote(x)?'<span class="push-note">'+pushNote(x)+'</span>':'')+'</div>'+
@@ -591,4 +595,5 @@ function bindDetail(el, id){
   const refreshConvert=()=>{ const old=$('.convert',el), html=convertHTML(x); if(!no.isConnected) return; if(old&&old.outerHTML===html) return; if(old) old.remove(); if(html) no.closest('.group').insertAdjacentHTML('beforeend', html); };
   no.addEventListener('input',()=>{ saveEdit(x,{notes:no.value}); grow(); clearTimeout(lt); lt=setTimeout(()=>{ refreshLinks(); refreshConvert(); }, 400); });
   no.addEventListener('blur', flushEdits);
+  bindSteps(el); // decision 46
 }

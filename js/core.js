@@ -20,7 +20,7 @@ window.addEventListener('unhandledrejection', e => log('error', 'Promesa rechaza
 const _consoleError = console.error.bind(console);
 console.error = (...a) => { log('error', a.map(x=>x&&x.message||String(x)).join(' ')); _consoleError(...a); };
 function logText(){
-  const d = (typeof DB!=='undefined'&&DB) ? ' | espacios '+DB.spaces.length+', proyectos '+DB.projects.length+', tareas '+DB.tasks.length+', notas de voz '+DB.voiceNotes.length+', adjuntos '+(DB.attachments||[]).length : '';
+  const d = (typeof DB!=='undefined'&&DB) ? ' | espacios '+DB.spaces.length+', proyectos '+DB.projects.length+', tareas '+DB.tasks.length+', notas de voz '+DB.voiceNotes.length+', adjuntos '+(DB.attachments||[]).length+', pasos '+(DB.subtasks||[]).length : '';
   let st='?'; try{ st = (navigator.standalone===true||matchMedia('(display-mode: standalone)').matches)?'instalada':'navegador'; }catch(e){}
   const head = 'Tareas v'+APP_VERSION+' | '+st+' | '+navigator.userAgent+' | '+new Date().toString()+d;
   const lines = LOG.map(e=>{ const t=e.t.replace('T',' ').slice(5,19); return t+' ['+e.l+'] '+e.m+(e.x?' | '+e.x:''); });
@@ -197,14 +197,14 @@ const KEY = 'tareas-v1';
 let DB = null;
 function blank(){
   const t=new Date().toISOString();
-  return { spaces:[{id:'trabajo',name:'Trabajo',order:0,created:t},{id:'personal',name:'Personal',order:1,created:t}], projects:[], tasks:[], voiceNotes:[], attachments:[], settings:{activeSpace:'trabajo', summaryState:'auto', filter:'hoy', doneOpen:false, theme:'auto', tipsSeen:false, shakeUndo:false, allGroup:'date', hoyGroup:'date'} };
+  return { spaces:[{id:'trabajo',name:'Trabajo',order:0,created:t},{id:'personal',name:'Personal',order:1,created:t}], projects:[], tasks:[], voiceNotes:[], attachments:[], subtasks:[], settings:{activeSpace:'trabajo', summaryState:'auto', filter:'hoy', doneOpen:false, theme:'auto', tipsSeen:false, shakeUndo:false, allGroup:'date', hoyGroup:'date'} };
 }
 let lastRaw = null; // the stored text this window last read or wrote; another window may have changed it since
 function load(){
   let raw=null; try{ raw=localStorage.getItem(KEY); }catch(e){ log('error','No se pudieron leer los datos: '+(e&&e.message||e)); }
   lastRaw=raw; if(!raw) return blank();
   let d=null; try{ d=JSON.parse(raw); }catch(e){}
-  const b=blank(), lists=['spaces','projects','tasks','voiceNotes','attachments'];
+  const b=blank(), lists=['spaces','projects','tasks','voiceNotes','attachments','subtasks']; // subtasks: decision 46
   if(!d || typeof d!=='object' || Array.isArray(d) || !lists.some(k=>Array.isArray(d[k]))){
     // Unreadable data: keep the raw text aside before the first save replaces it
     try{ localStorage.setItem(KEY+'-corrupt', raw); }catch(e){}
@@ -275,8 +275,8 @@ function orderTasks(list){
   });
 }
 // The query is normalised once and the voice notes searched once per list, not once per task
-function queryMatcher(query){ const q=norm(query); const vn=new Set(DB.voiceNotes.filter(v=>norm(v.text).includes(q)).map(v=>v.taskId));
-  return x => norm(x.title).includes(q) || norm(x.notes).includes(q) || (x.waitingFor && norm(x.waitingFor).includes(q)) || (x.projectId && norm((proj(x.projectId)||{}).name).includes(q)) || vn.has(x.id); }
+function queryMatcher(query){ const q=norm(query); const vn=new Set(DB.voiceNotes.filter(v=>norm(v.text).includes(q)).map(v=>v.taskId)), sv=new Set(DB.subtasks.filter(s=>s&&norm(s.title).includes(q)).map(s=>s.taskId)); // decision 46: the steps' titles too
+  return x => norm(x.title).includes(q) || norm(x.notes).includes(q) || (x.waitingFor && norm(x.waitingFor).includes(q)) || (x.projectId && norm((proj(x.projectId)||{}).name).includes(q)) || vn.has(x.id) || sv.has(x.id); }
 function matchesQuery(x, query){ return queryMatcher(query)(x); }
 // R18: while one screen is drawn (drawing) each pending list is worked out once: the summary, the counts and the list ask for the same ones,
 // and nothing changes the data in between. Callers only read the lists
@@ -318,8 +318,8 @@ const bulkN = n => n+(n===1?' tarea':' tareas');
 const AX={open:false, notes:'', voice:'', voiceOn:false, rec:null, date:undefined, projectId:undefined, priority:undefined, time:null, opened:false}; // decision 31: the desktop add bar's composer (axOpen)
 
 /* ---------- Toast with undo ---------- */
-let toastTimer=null, undoFn=null;
-function toast(text, undo, label){
+let toastTimer=null, undoFn=null, toastLbl=null; // toastLbl: the button is not Deshacer (Actualizar, Completar tarea): Comando Z and shaking leave it alone
+function toast(text, undo, label){ toastLbl=undo&&label||null;
   if(saveErrorNow && !label) text='No se pudo guardar en el dispositivo'; // an action whose save failed must not claim success
   const el=$('#toast'); $('#toastText').textContent=text; undoFn=undo||null; const b=$('#toastBtn'); b.textContent=label||'Deshacer'; b.style.display=undo?'':'none';
   el.classList.add('on'); clearTimeout(toastTimer); toastTimer=setTimeout(()=>{el.classList.remove('on'); undoFn=null;}, label?12000:4000);
@@ -404,11 +404,12 @@ function spawnNext(x){ const r=repParse(x.repeat); if(!r) return null;
   const t=todayStr(), date=repNext(r, x.date&&x.date>t?x.date:t); if(!date) return null;
   let reminder=null; if(x.reminder){ const a=new Date(x.reminder), d=new Date(date+'T00:00:00'); d.setHours(a.getHours(), a.getMinutes(), 0, 0); reminder=d.toISOString(); }
   const n=addTask({title:x.title, spaceId:x.spaceId, projectId:x.projectId, priority:x.priority, notes:x.notes||'', date, reminder, repeat:x.repeat});
+  copySteps(x.id, n.id); // decision 46: its steps, unchecked
   log('info','Siguiente tarea de la serie', {date}); return n; }
 // Reopening a completed task of a series (Deshacer, or marking it pending again) takes back the next one it created, while nobody has touched it
 function dropNext(x){ const s=repSeries(x.repeat); if(!s||!x.completed) return []; const c=Date.parse(x.completed)-2000;
-  const out=DB.tasks.filter(o=>o!==x&&o.status==='pending'&&repSeries(o.repeat)===s&&Date.parse(o.created)>=c&&o.modified===o.created&&!DB.voiceNotes.some(v=>v.taskId===o.id)&&!hasAtt(o.id));
-  if(out.length){ const ids=new Set(out.map(o=>o.id)); DB.tasks=DB.tasks.filter(o=>!ids.has(o.id)); ids.forEach(i=>HELD.delete(i)); save(); log('info','Siguiente de la serie retirada'); }
+  const out=DB.tasks.filter(o=>o!==x&&o.status==='pending'&&repSeries(o.repeat)===s&&Date.parse(o.created)>=c&&o.modified===o.created&&!DB.voiceNotes.some(v=>v.taskId===o.id)&&!hasAtt(o.id)&&!stepsTouched(o.id));
+  if(out.length){ const ids=new Set(out.map(o=>o.id)); DB.tasks=DB.tasks.filter(o=>!ids.has(o.id)); cutSteps(ids); ids.forEach(i=>HELD.delete(i)); save(); log('info','Siguiente de la serie retirada'); }
   return out; }
 // "Eliminar solo esta": the task moves to the next date of its series, with Deshacer (it also leaves Ahora). quiet: the caller gives the feedback
 function skipOccurrence(id, quiet){ const x=task(id); if(!x) return null; const r=repParse(x.repeat); if(!r) return null; const t=todayStr(), d=repNext(r, x.date&&x.date>t?x.date:t); if(!d) return null;
@@ -418,12 +419,12 @@ function skipOccurrence(id, quiet){ const x=task(id); if(!x) return null; const 
 /* Two devices that complete the same task of a series while offline each create its next one. When their data meets (a sync, or the
    start), two pending tasks of the same series on the same date are one: the one with the lowest id stays (the same choice on every
    device) and the others are removed as any deletion is, so the server marks them deleted. Different series or dates are never touched.
-   W: an object with tasks, voiceNotes and attachments (DB, or the working copy of a sync). Returns how many went */
+   W: an object with tasks, voiceNotes, attachments and subtasks (DB, or the working copy of a sync). Returns how many went */
 function dedupeSeries(W){ const by=new Map(), out=[];
   W.tasks.forEach(x=>{ if(!x||x.status!=='pending'||!x.date) return; const s=repSeries(x.repeat); if(!s) return; const k=s+'|'+x.date, o=by.get(k);
     if(!o){ by.set(k, x); return; } if(String(x.id)<String(o.id)){ out.push(o); by.set(k, x); } else out.push(x); });
   if(!out.length) return 0; const ids=new Set(out.map(x=>x.id));
-  W.tasks=W.tasks.filter(x=>!x||!ids.has(x.id)); W.voiceNotes=W.voiceNotes.filter(v=>!v||!ids.has(v.taskId)); W.attachments=(W.attachments||[]).filter(a=>!a||!ids.has(a.taskId));
+  W.tasks=W.tasks.filter(x=>!x||!ids.has(x.id)); W.voiceNotes=W.voiceNotes.filter(v=>!v||!ids.has(v.taskId)); W.attachments=(W.attachments||[]).filter(a=>!a||!ids.has(a.taskId)); if(W.subtasks) W.subtasks=W.subtasks.filter(s=>!s||!ids.has(s.taskId));
   log('info','Tarea repetida de una serie retirada: dos dispositivos crearon la misma siguiente', {ids:[...ids]}); return out.length; }
 // After a completion: the toast says when the next one of the series comes
 const doneText = (n, nx) => n===1&&nx ? 'Tarea completada, la siguiente '+dayWords(nx.date) : n===1?'Tarea completada':n+' tareas completadas';
@@ -531,19 +532,19 @@ function rescheduleTask(id, date, label){ const x=task(id); if(!x) return; const
 function tomorrowTask(id){ const x=task(id); if(!x) return; const old=daySnap(x); updTask(id, dayPatch(x, addDays(todayStr(),1))); haptic(10); toast('Aplazada a mañana', ()=>undoDay(old)); }
 function deleteTask(id){
   const i=DB.tasks.findIndex(t=>t.id===id); if(i<0) return;
-  const [x]=DB.tasks.splice(i,1); const vn=DB.voiceNotes.filter(v=>v.taskId===id); DB.voiceNotes=DB.voiceNotes.filter(v=>v.taskId!==id); const at=cutAttachments(new Set([id])); save(); haptic(14);
-  toast('Tarea eliminada', ()=>{ DB.tasks.push(x); DB.voiceNotes.push(...vn); putAttachments(at); save(); });
+  const [x]=DB.tasks.splice(i,1); const vn=DB.voiceNotes.filter(v=>v.taskId===id); DB.voiceNotes=DB.voiceNotes.filter(v=>v.taskId!==id); const at=cutAttachments(new Set([id])), ss=cutSteps(new Set([id])); save(); haptic(14);
+  toast('Tarea eliminada', ()=>{ DB.tasks.push(x); DB.voiceNotes.push(...vn); putAttachments(at); putSteps(ss); save(); });
 }
 function addSpace(name){ const t=new Date().toISOString(); const sp={id:uid(), name, order:DB.spaces.length, created:t, modified:t}; DB.spaces.push(sp); save(); return sp; }
 /* Decision 28a: a space goes with everything in it: its projects (archived too), its tasks (completed long ago too) and their voice notes.
    spaceLoad lists them; deleteSpace takes them out in one save and returns what puts them back (null for the only space) */
 function spaceLoad(id){ const ps=DB.projects.filter(p=>p.spaceId===id), pids=new Set(ps.map(p=>p.id)); const ts=DB.tasks.filter(x=>x.spaceId===id||(x.projectId&&pids.has(x.projectId))), tids=new Set(ts.map(x=>x.id));
-  return {ps, ts, vs:DB.voiceNotes.filter(v=>tids.has(v.taskId)), as:DB.attachments.filter(a=>tids.has(a.taskId))}; }
+  return {ps, ts, vs:DB.voiceNotes.filter(v=>tids.has(v.taskId)), as:DB.attachments.filter(a=>tids.has(a.taskId)), ss:DB.subtasks.filter(s=>tids.has(s.taskId))}; }
 function deleteSpace(id){ const i=DB.spaces.findIndex(sp=>sp.id===id); if(DB.spaces.length<2||i<0) return null;
-  const sp=DB.spaces[i], L=spaceLoad(id), was=DB.settings.activeSpace===id, P=new Set(L.ps), T=new Set(L.ts), V=new Set(L.vs), AT=new Set(L.as);
-  DB.spaces.splice(i,1); DB.projects=DB.projects.filter(p=>!P.has(p)); DB.tasks=DB.tasks.filter(x=>!T.has(x)); DB.voiceNotes=DB.voiceNotes.filter(v=>!V.has(v)); DB.attachments=DB.attachments.filter(a=>!AT.has(a));
+  const sp=DB.spaces[i], L=spaceLoad(id), was=DB.settings.activeSpace===id, P=new Set(L.ps), T=new Set(L.ts), V=new Set(L.vs), AT=new Set(L.as), SS=new Set(L.ss);
+  DB.spaces.splice(i,1); DB.projects=DB.projects.filter(p=>!P.has(p)); DB.tasks=DB.tasks.filter(x=>!T.has(x)); DB.voiceNotes=DB.voiceNotes.filter(v=>!V.has(v)); DB.attachments=DB.attachments.filter(a=>!AT.has(a)); DB.subtasks=DB.subtasks.filter(s=>!SS.has(s));
   L.ts.forEach(x=>HELD.delete(x.id)); if(was){ DB.settings.activeSpace=DB.spaces.slice().sort((a,b)=>a.order-b.order)[0].id; resetListState(); } save();
   return ()=>{ if(DB.spaces.some(x=>x.id===id)) return; DB.spaces.splice(Math.min(i, DB.spaces.length), 0, sp);
-    const has=(list, o)=>list.some(x=>x.id===o.id); L.ps.forEach(p=>{ if(!has(DB.projects,p)) DB.projects.push(p); }); L.ts.forEach(x=>{ if(!has(DB.tasks,x)) DB.tasks.push(x); }); L.vs.forEach(v=>{ if(!has(DB.voiceNotes,v)) DB.voiceNotes.push(v); }); L.as.forEach(a=>{ if(!has(DB.attachments,a)) DB.attachments.push(a); });
+    const has=(list, o)=>list.some(x=>x.id===o.id); L.ps.forEach(p=>{ if(!has(DB.projects,p)) DB.projects.push(p); }); L.ts.forEach(x=>{ if(!has(DB.tasks,x)) DB.tasks.push(x); }); L.vs.forEach(v=>{ if(!has(DB.voiceNotes,v)) DB.voiceNotes.push(v); }); L.as.forEach(a=>{ if(!has(DB.attachments,a)) DB.attachments.push(a); }); putSteps(L.ss);
     if(was){ DB.settings.activeSpace=id; resetListState(); } save(); }; }
 function addProject(name, color){ const t=new Date().toISOString(); const p={id:uid(), spaceId:space().id, name, color, order:DB.projects.length, archived:false, created:t, modified:t}; DB.projects.push(p); save(); return p; }

@@ -241,7 +241,7 @@ function deskTaskMenu(id){ const x=task(id); if(!x) return null; const done=x.st
     [{label:'Fecha', menu:()=>dateMenu(id)}, {label:'Prioridad', menu:()=>({title:'Prioridad', groups:[prioItems(x, id)]})}, {label:'Proyecto', key:'P', menu:()=>projectPickMenu(id)}].concat(DB.spaces.length>1?[{label:'Mover a otro espacio', menu:()=>spaceMoveMenu(id)}]:[]),
     [{label:'Duplicar', fn:()=>duplicateTask(id)}],
     [{label:'Eliminar', key:'Supr', red:true, fn:()=>confirmDelete(id)}] ]}; }
-function duplicateTask(id){ const x=task(id); if(!x) return; const n=addTask({title:x.title, projectId:x.projectId, priority:x.priority, notes:x.notes, spaceId:x.spaceId}); haptic(8); renderAnimated(); toast('Tarea duplicada'); openDetail(n.id); }
+function duplicateTask(id){ const x=task(id); if(!x) return; const n=addTask({title:x.title, projectId:x.projectId, priority:x.priority, notes:x.notes, spaceId:x.spaceId}); copySteps(id, n.id); /* decision 46: the steps, unchecked */ haptic(8); renderAnimated(); toast('Tarea duplicada'); openDetail(n.id); }
 function leaveRows(id){ document.querySelectorAll('.row[data-id="'+id+'"]').forEach(r=>r.classList.add('leaving')); }
 function confirmDelete(id, after){ const x=task(id); if(!x) return; releaseHold(id);
   const go=fn=>()=>{ leaveRows(id); setTimeout(()=>{ fn(); after?after():renderAnimated(); },200); };

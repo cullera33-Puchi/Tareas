@@ -17,11 +17,11 @@ function bulkComplete(){ const xs=selectedTasks(); if(!xs.length) return; const 
 /* Decision 38: deleting tasks that repeat asks first (askRepeatDelete): "solo estas" move each one to the next date of its series and delete
    the others; "las series" delete them all. One Deshacer for everything */
 function bulkDelete(){ const xs=selectedTasks(); if(!xs.length) return; const rep=xs.filter(x=>isOpen(x)&&repParse(x.repeat));
-  const run=only=>{ const skip=only?rep:[], ids=new Set(xs.filter(x=>!skip.includes(x)).map(x=>x.id)); let undoS=[], removedT=[], removedV=[], removedA=[];
-    batch(()=>{ undoS=skip.map(x=>skipOccurrence(x.id, true)).filter(Boolean); removedT=DB.tasks.filter(x=>ids.has(x.id)); removedV=DB.voiceNotes.filter(v=>ids.has(v.taskId)); DB.tasks=DB.tasks.filter(x=>!ids.has(x.id)); DB.voiceNotes=DB.voiceNotes.filter(v=>!ids.has(v.taskId)); removedA=cutAttachments(ids); save(); });
+  const run=only=>{ const skip=only?rep:[], ids=new Set(xs.filter(x=>!skip.includes(x)).map(x=>x.id)); let undoS=[], removedT=[], removedV=[], removedA=[], removedS=[];
+    batch(()=>{ undoS=skip.map(x=>skipOccurrence(x.id, true)).filter(Boolean); removedT=DB.tasks.filter(x=>ids.has(x.id)); removedV=DB.voiceNotes.filter(v=>ids.has(v.taskId)); DB.tasks=DB.tasks.filter(x=>!ids.has(x.id)); DB.voiceNotes=DB.voiceNotes.filter(v=>!ids.has(v.taskId)); removedA=cutAttachments(ids); removedS=cutSteps(ids); save(); });
     log('info','Eliminadas en bloque: '+removedT.length+(undoS.length?', '+undoS.length+' pasadas a su siguiente fecha':'')); endSelect(); haptic(14);
     const parts=[]; if(removedT.length) parts.push(removedT.length+(removedT.length===1?' tarea eliminada':' tareas eliminadas')); if(undoS.length) parts.push(undoS.length+(undoS.length===1?' pasada a su siguiente fecha':' pasadas a su siguiente fecha'));
-    toast(parts.join(', '), ()=>batch(()=>{ undoS.forEach(u=>u()); DB.tasks.push(...removedT); DB.voiceNotes.push(...removedV); putAttachments(removedA); save(); })); };
+    toast(parts.join(', '), ()=>batch(()=>{ undoS.forEach(u=>u()); DB.tasks.push(...removedT); DB.voiceNotes.push(...removedV); putAttachments(removedA); putSteps(removedS); save(); })); };
   if(rep.length){ askRepeatDelete({n:xs.length, rep:rep.length}, ()=>run(true), ()=>run(false)); return; }
   confirmSheet('Eliminar '+xs.length+(xs.length===1?' tarea':' tareas'), 'Podrás deshacerlo durante unos segundos.', ()=>run(false)); }
 function bulkReschedule(date, label){ const xs=selectedTasks(); if(!xs.length) return; const prev=xs.map(daySnap); batch(()=>xs.forEach(x=>updTask(x.id, dayPatch(x, date)))); endSelect(); toast(xs.length+(xs.length===1?' tarea aplazada a ':' tareas aplazadas a ')+label, ()=>batch(()=>prev.forEach(undoDay))); }
@@ -74,14 +74,14 @@ function reviewStep(ids, i, st){
     s.onclick=e=>{ const c=e.target.closest('[data-rv]'); if(c){ const o=opts.find(q=>q[0]===c.dataset.rv); keep(); updTask(x.id, dayPatch(x, o[1], {carried:false})); tally(o[0]); next(); return; } // Hoy confirms the task and clears its Aplazada mark
       const b=e.target.closest('[data-x]'); if(!b) return; const k=b.dataset.x;
       if(k==='done'){ keep(); applyDone(x.id, true); tally('done'); next(); }
-      else if(k==='del'){ const go=()=>{ const j=DB.tasks.indexOf(x); if(j>=0){ DB.tasks.splice(j,1); const vn=DB.voiceNotes.filter(v=>v.taskId===x.id); DB.voiceNotes=DB.voiceNotes.filter(v=>v.taskId!==x.id); st.removed.push({x, vn, at:cutAttachments(new Set([x.id]))}); save(); } tally('del'); haptic(10); next(); };
+      else if(k==='del'){ const go=()=>{ const j=DB.tasks.indexOf(x); if(j>=0){ DB.tasks.splice(j,1); const vn=DB.voiceNotes.filter(v=>v.taskId===x.id); DB.voiceNotes=DB.voiceNotes.filter(v=>v.taskId!==x.id); st.removed.push({x, vn, at:cutAttachments(new Set([x.id])), ss:cutSteps(new Set([x.id]))}); save(); } tally('del'); haptic(10); next(); };
         if(repParse(x.repeat)) askRepeatDelete({n:1, title:x.title}, ()=>{ keep(); skipOccurrence(x.id, true); tally('del'); haptic(10); next(); }, go); else go(); } // decision 38: only this one, or the series
       else if(k==='skip'){ tally('skip'); reviewStep(ids, i+1, st); }
       else { st.tally.skip=(st.tally.skip||0)+ids.length-i; sheetOnClose=null; reviewEnd(st, true); } }; });
 }
 // Deshacer of a review: a task completed in it takes back the next one of its series (decision 38)
 function reviewEnd(st, asSheet){ const T=st.tally, decided=Object.keys(T).some(k=>k!=='skip'&&T[k]);
-  const undo=()=>batch(()=>{ st.prev.forEach((o,id)=>{ const x=task(id); if(!x) return; if(x.status==='done'&&o.status!=='done') dropNext(x); updTask(id, o); }); st.removed.forEach(r=>{ if(!task(r.x.id)){ DB.tasks.push(r.x); DB.voiceNotes.push(...r.vn); putAttachments(r.at); } }); save(); });
+  const undo=()=>batch(()=>{ st.prev.forEach((o,id)=>{ const x=task(id); if(!x) return; if(x.status==='done'&&o.status!=='done') dropNext(x); updTask(id, o); }); st.removed.forEach(r=>{ if(!task(r.x.id)){ DB.tasks.push(r.x); DB.voiceNotes.push(...r.vn); putAttachments(r.at); putSteps(r.ss); } }); save(); });
   const parts=REVIEW_OUT.filter(o=>T[o[0]]).map(o=>T[o[0]]+' '+(T[o[0]]===1?o[1]:o[2]));
   log('info', st.kind==='carried'?'Repaso de aplazadas':'Día cerrado una a una', T);
   if(!decided){ if(asSheet) closeSheet(); renderAnimated(); return; }
@@ -241,7 +241,7 @@ function addSheet(projectId){
 function swallowClick(){ const f=e=>{ e.stopPropagation(); e.preventDefault(); off(); }; const off=()=>{ document.removeEventListener('click', f, true); clearTimeout(t); }; document.addEventListener('click', f, true); const t=setTimeout(off, 1000); }
 // R6: several tasks at once (a pasted list, the items of a note). Each line is read as a quick-add title over the shared values.
 function addMany(lines, base, extra){ const ids=[]; batch(()=>{ lines.forEach(l=>{ const r=quickTask(l, base); if(!r.title) return; ids.push(addTask(Object.assign({title:r.title, date:r.date, projectId:r.projectId, priority:r.priority, reminder:r.reminder}, extra||{})).id); }); }); haptic(8); return ids; }
-function removeTasks(ids){ const set=new Set(ids); DB.tasks=DB.tasks.filter(x=>!set.has(x.id)); DB.voiceNotes=DB.voiceNotes.filter(v=>!set.has(v.taskId)); cutAttachments(set); save(); }
+function removeTasks(ids){ const set=new Set(ids); DB.tasks=DB.tasks.filter(x=>!set.has(x.id)); DB.voiceNotes=DB.voiceNotes.filter(v=>!set.has(v.taskId)); cutAttachments(set); cutSteps(set); save(); }
 /* New or edited project */
 function projectSheet(id){
   const p=id?proj(id):null; let color=p?p.color:COLORS[4];
@@ -390,6 +390,7 @@ function shareText(id){ const x=task(id); if(!x) return ''; const p=x.projectId?
   if(x.notes&&x.notes.trim()) t+='\nNotas:\n'+x.notes.trim()+'\n';
   const stamp=iso=>{ const dt=new Date(iso); return String(dt.getDate()).padStart(2,'0')+'/'+String(dt.getMonth()+1).padStart(2,'0')+' '+fmtTime(iso); }; // absolute, as "31/10 09:15": the text is often read on another day
   if(vns.length) t+='\nNotas de voz:\n'+vns.map(v=>'- '+stamp(v.created)+': '+v.text).join('\n')+'\n';
+  const ss=stepsOf(id); if(ss.length) t+='\nPasos ('+stepsCount(id)+' hechos):\n'+ss.map(o=>'- ['+(o.done?'x':' ')+'] '+o.title).join('\n')+'\n'; // decision 46: the boxes Convertir líneas reads back
   return t; }
 async function shareTask(id){ const t=shareText(id); if(!t) return; try{ if(navigator.share){ await navigator.share({title:task(id).title, text:t}); return; } }catch(e){ if(e&&e.name==='AbortError') return; } copyText(t,'Texto copiado. Pégalo en Claude, WhatsApp o Mail.'); }
 async function copyText(t,msg){ try{ await navigator.clipboard.writeText(t); toast(msg||'Copiado'); }catch(e){ const ta=document.createElement('textarea'); ta.value=t; ta.setAttribute('readonly',''); ta.style.cssText='position:fixed;top:0;left:0;opacity:0;font-size:16px;'; document.body.appendChild(ta); ta.select(); ta.setSelectionRange(0,t.length); // iOS selects only through setSelectionRange
@@ -438,25 +439,26 @@ function restoreBackup(date){ const b=BACKUPS.find(x=>x.date===date); if(!b) ret
   const when = date===todayStr()?'de hoy':date===addDays(todayStr(),-1)?'de ayer':'del '+fmtDate(date);
   // Signed in, the copy applies to every device (agreed with Enric): restored records get a new modified so they win, and what the copy lacks is deleted everywhere by the next sync
   const synced=!!(typeof SY!=='undefined'&&SY&&SY.user);
-  confirmSheet('Restaurar copia '+when, synced?'Se sustituyen espacios, proyectos, tareas, notas de voz y adjuntos por los de esa copia ('+b.tasks+' tareas) en todos tus dispositivos. Lo creado después de esa copia se eliminará también en ellos.':'Se sustituyen espacios, proyectos, tareas, notas de voz y adjuntos por los de esa copia ('+b.tasks+' tareas). Podrás deshacerlo durante unos segundos.', async()=>{
-    try{ const snap=await BK.get(date); if(!snap) return; const prev={spaces:DB.spaces, projects:DB.projects, tasks:DB.tasks, voiceNotes:DB.voiceNotes, attachments:DB.attachments}, prevActive=DB.settings.activeSpace;
+  confirmSheet('Restaurar copia '+when, synced?'Se sustituyen espacios, proyectos, tareas, pasos, notas de voz y adjuntos por los de esa copia ('+b.tasks+' tareas) en todos tus dispositivos. Lo creado después de esa copia se eliminará también en ellos.':'Se sustituyen espacios, proyectos, tareas, pasos, notas de voz y adjuntos por los de esa copia ('+b.tasks+' tareas). Podrás deshacerlo durante unos segundos.', async()=>{
+    try{ const snap=await BK.get(date); if(!snap) return; const prev={spaces:DB.spaces, projects:DB.projects, tasks:DB.tasks, voiceNotes:DB.voiceNotes, attachments:DB.attachments, subtasks:DB.subtasks}, prevActive=DB.settings.activeSpace;
       DB.spaces=snap.data.spaces||prev.spaces; DB.projects=snap.data.projects||[]; DB.tasks=snap.data.tasks||[]; DB.voiceNotes=snap.data.voiceNotes||[];
       // Decision 29.5: the copy's attachment records (their files are on the device or in Storage for 24 hours more); a copy from before them keeps those of its tasks
-      { const tids=new Set(DB.tasks.map(x=>x.id)); DB.attachments=Array.isArray(snap.data.attachments)?snap.data.attachments:prev.attachments.filter(a=>tids.has(a.taskId)); }
-      if(synced){ const now=new Date().toISOString(); [DB.spaces,DB.projects,DB.tasks,DB.voiceNotes,DB.attachments].forEach(a=>a.forEach(r=>{ r.modified=now; })); log('info','Copia restaurada con sesión iniciada: se aplicará en todos los dispositivos', {date}); }
+      { const tids=new Set(DB.tasks.map(x=>x.id)); DB.attachments=Array.isArray(snap.data.attachments)?snap.data.attachments:prev.attachments.filter(a=>tids.has(a.taskId));
+        DB.subtasks=Array.isArray(snap.data.subtasks)?snap.data.subtasks:prev.subtasks.filter(o=>tids.has(o.taskId)); } // decision 46: the copy's steps; a copy from before them keeps those of its tasks
+      if(synced){ const now=new Date().toISOString(); [DB.spaces,DB.projects,DB.tasks,DB.voiceNotes,DB.attachments,DB.subtasks].forEach(a=>a.forEach(r=>{ r.modified=now; })); log('info','Copia restaurada con sesión iniciada: se aplicará en todos los dispositivos', {date}); }
       if(!DB.spaces.some(sp=>sp.id===DB.settings.activeSpace)){ DB.settings.activeSpace=DB.spaces[0].id; resetListState(); } save(); rollOver(); render(); haptic(10);
-      log('info','Copia restaurada', {date, tasks:DB.tasks.length}); toast('Copia '+when+' restaurada', ()=>{ Object.assign(DB, prev); if(synced){ const now=new Date().toISOString(); [DB.spaces,DB.projects,DB.tasks,DB.voiceNotes,DB.attachments].forEach(a=>a.forEach(r=>{ r.modified=now; })); } DB.settings.activeSpace=prevActive; save(); });
+      log('info','Copia restaurada', {date, tasks:DB.tasks.length}); toast('Copia '+when+' restaurada', ()=>{ Object.assign(DB, prev); if(synced){ const now=new Date().toISOString(); [DB.spaces,DB.projects,DB.tasks,DB.voiceNotes,DB.attachments,DB.subtasks].forEach(a=>a.forEach(r=>{ r.modified=now; })); } DB.settings.activeSpace=prevActive; save(); });
     }catch(e){ log('error','Restaurar copia falló: '+(e&&e.message||e)); toast('No se pudo restaurar'); } }, 'Restaurar'); }
 
 /* Export and import */
-function exportData(){ return { app:'tareas', version:APP_VERSION, exported:new Date().toISOString(), spaces:DB.spaces, projects:DB.projects, tasks:DB.tasks, voiceNotes:DB.voiceNotes, attachments:DB.attachments }; } // decision 29.5: the list of attachments, not their files
+function exportData(){ return { app:'tareas', version:APP_VERSION, exported:new Date().toISOString(), spaces:DB.spaces, projects:DB.projects, tasks:DB.tasks, voiceNotes:DB.voiceNotes, attachments:DB.attachments, subtasks:DB.subtasks }; } // decision 29.5: the list of attachments, not their files; decision 46: the steps
 function exportJSON(){ const t=JSON.stringify(exportData(),null,2); if(navigator.share){ navigator.share({title:'Tareas (copia)', text:t}).catch(()=>copyText(t,'Copia JSON en el portapapeles')); } else copyText(t,'Copia JSON en el portapapeles'); }
 // CSV for Excel in Spanish locales: semicolon separated, UTF-8 with BOM, one row per task.
 // A cell that starts with = + - or @ gets a leading apostrophe: Excel runs it as a formula even when quoted.
 function csvText(){ const q=v=>{ let s=String(v==null?'':v).replace(/"/g,'""').replace(/\r?\n/g,' '); if(/^[=+\-@\t\r]/.test(s)) s="'"+s; return '"'+s+'"'; }; const sp=Object.fromEntries(DB.spaces.map(s=>[s.id,s.name])); const pr={high:'Alta',mid:'Media',none:''};
-  const head=['Espacio','Proyecto','Título','Fecha','Prioridad','Estado','Completada','Recordatorio','Se repite','Esperando a','Aplazada','Notas','Notas de voz','Creada']; // decision 38: Se repite, the rule in words
-  const rows=DB.tasks.slice().sort((a,b)=>(a.spaceId+(a.date||'9999')+a.created)<(b.spaceId+(b.date||'9999')+b.created)?-1:1).map(x=>{ const p=x.projectId?proj(x.projectId):null; const vn=DB.voiceNotes.filter(v=>v.taskId===x.id).map(v=>v.text).join(' | ');
-    return [sp[x.spaceId]||'', p?p.name:'', x.title, x.date||'', pr[x.priority]||'', x.status==='done'?'Hecha':x.status==='waiting'?'Por confirmar':'Pendiente', x.completed?localDay(x.completed)+' '+fmtTime(x.completed):'', x.reminder?localDay(x.reminder)+' '+fmtTime(x.reminder):'', repSummary(x.repeat), x.waitingFor||'', x.carried?'Sí':'', x.notes||'', vn, localDay(x.created)].map(q).join(';'); });
+  const head=['Espacio','Proyecto','Título','Fecha','Prioridad','Estado','Completada','Recordatorio','Se repite','Esperando a','Aplazada','Notas','Notas de voz','Pasos','Creada']; // decision 38: Se repite, the rule in words; decision 46: Pasos, each with its box
+  const rows=DB.tasks.slice().sort((a,b)=>(a.spaceId+(a.date||'9999')+a.created)<(b.spaceId+(b.date||'9999')+b.created)?-1:1).map(x=>{ const p=x.projectId?proj(x.projectId):null; const vn=DB.voiceNotes.filter(v=>v.taskId===x.id).map(v=>v.text).join(' | '), ps=stepsOf(x.id).map(o=>'['+(o.done?'x':' ')+'] '+o.title).join(' | ');
+    return [sp[x.spaceId]||'', p?p.name:'', x.title, x.date||'', pr[x.priority]||'', x.status==='done'?'Hecha':x.status==='waiting'?'Por confirmar':'Pendiente', x.completed?localDay(x.completed)+' '+fmtTime(x.completed):'', x.reminder?localDay(x.reminder)+' '+fmtTime(x.reminder):'', repSummary(x.repeat), x.waitingFor||'', x.carried?'Sí':'', x.notes||'', vn, ps, localDay(x.created)].map(q).join(';'); });
   return '﻿'+head.map(q).join(';')+'\r\n'+rows.join('\r\n')+'\r\n'; }
 async function exportCSV(){
   const name='tareas-'+todayStr()+'.csv'; const blob=new Blob([csvText()],{type:'text/csv;charset=utf-8'});
@@ -479,7 +481,7 @@ function importData(text){
   const d=JSON.parse(text); if(!d||typeof d!=='object') throw new Error('Formato no reconocido');
   let added=0, updated=0;
   const merge=(arr,src)=>{ (Array.isArray(src)?src:[]).forEach(it=>{ if(!it||!it.id) return; const i=arr.findIndex(a=>a.id===it.id); if(i<0){ arr.push(it); added++; } else if((it.modified||'')>(arr[i].modified||'')){ arr[i]=it; updated++; } }); };
-  merge(DB.spaces,d.spaces); merge(DB.projects,d.projects); merge(DB.tasks,d.tasks); merge(DB.voiceNotes,d.voiceNotes); merge(DB.attachments,d.attachments);
+  merge(DB.spaces,d.spaces); merge(DB.projects,d.projects); merge(DB.tasks,d.tasks); merge(DB.voiceNotes,d.voiceNotes); merge(DB.attachments,d.attachments); merge(DB.subtasks,d.subtasks);
   DB.tasks.forEach(x=>{ if(x.carried===undefined) x.carried=false; });
   save(); rollOver(); log('info','Importación', {added, updated, spaces:(d.spaces||[]).length, projects:(d.projects||[]).length, tasks:(d.tasks||[]).length});
   return {added, updated};
@@ -501,7 +503,8 @@ function generateDemo(){
   const verbs=['Preparar','Revisar','Enviar','Cerrar','Actualizar','Llamar a','Validar','Redactar','Planificar','Documentar','Confirmar','Analizar'];
   const objs=['comité de seguimiento','SOW con legal','acta del steering','plan de cutover','RAID log','Marta por el presupuesto','mapping de Verifactu','propuesta de fase 2','sesión de formación','backlog de defectos','escenarios de prueba UAT','calendario de go-live','informe de horas','presentación a dirección','integración con BTP','matriz de riesgos','contrato marco','facturas pendientes','ampliación del equipo','notas del taller'];
   const noteTexts=['Pendiente de la respuesta del cliente.','Revisar con el equipo antes del jueves.','Incluye los cambios acordados en la última reunión.','Ver correo de ayer con el detalle.',''];
-  const tasks=[], vnotes=[];
+  const tasks=[], vnotes=[], steps=[];
+  const stepTexts=['Pedir los datos','Revisar el borrador','Enviar al cliente','Validar con el equipo','Preparar la plantilla','Confirmar la fecha'];
   for(let i=0;i<150;i++){
     const r=rnd(); let date=null; if(r<0.2) date=addDays(t,-1-Math.floor(rnd()*10)); else if(r<0.5) date=t; else if(r<0.8) date=addDays(t,1+Math.floor(rnd()*30));
     const pr=rnd(); const priority=pr<0.15?'high':pr<0.4?'mid':'none';
@@ -512,20 +515,21 @@ function generateDemo(){
     const id='demo-t-'+batch+'-'+i;
     tasks.push({id, title:pick(verbs)+' '+pick(objs), spaceId:sp, projectId, date, reminder, priority, status:done?'done':'pending', notes:pick(noteTexts), carried:false, created, modified:created, completed});
     if(rnd()<0.06) vnotes.push({id:'demo-v-'+batch+'-'+i, taskId:id, text:'Nota dictada de prueba: '+pick(noteTexts.filter(Boolean)), created});
+    if(rnd()<0.12){ const n=2+Math.floor(rnd()*3); for(let k=0;k<n;k++) steps.push({id:'demo-s-'+batch+'-'+i+'-'+k, taskId:id, title:pick(stepTexts), done:done||rnd()<0.4, order:(k+1)*STEP_GAP, created, modified:created}); } // decision 46
   }
-  DB.projects.push(...projects); DB.tasks.push(...tasks); DB.voiceNotes.push(...vnotes); save(); const n=rollOver(); render(); haptic(8);
-  log('info','Datos de prueba generados', {projects:projects.length, tasks:tasks.length, voiceNotes:vnotes.length, rolledOver:n});
+  DB.projects.push(...projects); DB.tasks.push(...tasks); DB.voiceNotes.push(...vnotes); DB.subtasks.push(...steps); save(); const n=rollOver(); render(); haptic(8);
+  log('info','Datos de prueba generados', {projects:projects.length, tasks:tasks.length, voiceNotes:vnotes.length, steps:steps.length, rolledOver:n});
   toast(tasks.length+' tareas de prueba en '+projects.length+' proyectos');
 }
 function clearDemo(){
   const n=demoCount(); if(!n){ toast('No hay datos de prueba'); return; }
   confirmSheet('Eliminar '+n+' tareas de prueba', 'Se eliminan solo los elementos marcados como prueba. Tus datos no se tocan.', ()=>{
     const isDemo=x=>String(x.id).startsWith('demo-');
-    DB.tasks=DB.tasks.filter(x=>!isDemo(x)); DB.projects=DB.projects.filter(x=>!isDemo(x)); DB.voiceNotes=DB.voiceNotes.filter(x=>!isDemo(x));
+    DB.tasks=DB.tasks.filter(x=>!isDemo(x)); DB.projects=DB.projects.filter(x=>!isDemo(x)); DB.voiceNotes=DB.voiceNotes.filter(x=>!isDemo(x)); DB.subtasks=DB.subtasks.filter(x=>!isDemo(x));
     // Your own tasks filed in a test project stay, with no project; notes of removed tasks go with them
     const pids=new Set(DB.projects.map(p=>p.id)), tids=new Set(DB.tasks.map(x=>x.id)), now=new Date().toISOString(); let moved=0;
     DB.tasks.forEach(x=>{ if(x.projectId&&!pids.has(x.projectId)){ x.projectId=null; x.modified=now; moved++; } });
-    const vn=DB.voiceNotes.length; DB.voiceNotes=DB.voiceNotes.filter(v=>tids.has(v.taskId)); DB.attachments=DB.attachments.filter(a=>tids.has(a.taskId));
+    const vn=DB.voiceNotes.length; DB.voiceNotes=DB.voiceNotes.filter(v=>tids.has(v.taskId)); DB.attachments=DB.attachments.filter(a=>tids.has(a.taskId)); DB.subtasks=DB.subtasks.filter(o=>tids.has(o.taskId));
     save(); render(); haptic(10);
     log('info','Datos de prueba eliminados', {tasks:n, unfiled:moved, voiceNotes:vn-DB.voiceNotes.length}); toast('Datos de prueba eliminados');
   });

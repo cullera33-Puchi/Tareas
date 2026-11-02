@@ -533,7 +533,7 @@ body.desktop .toast{left:auto;right:28px;bottom:28px;width:360px;}
 /* Toast */
 .toast{position:fixed;left:calc(16px + env(safe-area-inset-left,0px));right:calc(92px + env(safe-area-inset-right,0px));bottom:calc(60px + env(safe-area-inset-bottom,0px));background:var(--mat);-webkit-backdrop-filter:saturate(180%) blur(24px);backdrop-filter:saturate(180%) blur(24px);color:var(--ink);border-radius:12px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 6px 24px rgba(0,0,0,.18);transform:translate3d(0,20px,0);opacity:0;transition:transform .4s cubic-bezier(.32,.72,0,1),opacity .3s;z-index:30;pointer-events:none;font-size:0.882rem;}
 .toast.on{transform:translate3d(0,0,0);opacity:1;pointer-events:auto;}
-.toast button{color:var(--blue);font-weight:600;}
+.toast button{color:var(--blue);font-weight:600;white-space:nowrap;flex:none;} /* a two-word button (Completar tarea, decision 46) stays on one line; the text wraps instead */
 
 /* Detail */
 .detail .scroll{padding-top:4px;}
@@ -1238,3 +1238,66 @@ body.resizing,body.resizing *{cursor:col-resize !important;-webkit-user-select:n
 .pm-pop .wsheet .wlbl{font-size:11px;}
 .pm-pop .wsheet .wfor{height:28px;border-radius:6px;font-size:13px;background:var(--fill);padding:0 8px;}
 .pm-pop .wsheet .wline{font-size:12px;color:var(--ink2);text-align:center;}
+
+/* Decision 46: steps. The group Pasos of the detail and the inspector, the progress "3/4" with its ring in the rows and the calendar cards */
+.steps-title{display:flex;align-items:baseline;}
+.steps-count{margin-left:auto;font-variant-numeric:tabular-nums;}
+.step-c{display:flex;align-items:flex-start;gap:12px;padding:0 16px;white-space:normal;font-size:1rem;}
+.step .scheck{margin-top:11px;}
+.step-c .stepin,.step-add .stepin{flex:1;min-width:0;min-height:0;display:block;background:none;border:0;outline:0;resize:none;overflow:hidden;padding:11px 0;font-size:max(16px,1rem);line-height:1.3;color:var(--ink);}
+.step.done .stepin{color:var(--ink2);}
+.step.draft .scheck{opacity:.5;}
+.step-add{position:relative;display:flex;align-items:flex-start;gap:12px;padding:0 16px;cursor:text;}
+/* Separators start at the text, as between the task rows */
+.steps > .vn{border-top:0;}
+.steps > .step + .step::before,.steps > .step + .step-add::before{content:'';position:absolute;top:0;left:50px;right:0;border-top:.5px solid var(--sep);z-index:1;pointer-events:none;}
+.steps.sorting > .step::before{display:none;}
+.step-add .sadd{flex:none;width:22px;height:22px;margin-top:11px;display:flex;align-items:center;justify-content:center;color:var(--blue);}
+.step-add .sadd svg{width:18px;height:18px;}
+.step-add .stepin::placeholder{color:var(--blue);opacity:1;}
+.step-add .stepin:focus::placeholder{color:var(--ink3);}
+/* iPhone: the title takes no touch until it is being edited, so a tap edits it through the row (synchronous focus) and a long press lifts the step */
+.app:not(.desktop) .step .stepin:not(:focus){pointer-events:none;}
+.app:not(.desktop) .step .vn-c{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;}
+.step.lifted{position:relative;z-index:4;box-shadow:0 8px 24px rgba(0,0,0,.18);transition:none;}
+.step.lifted .vn-c{background:var(--card);}
+.steps.sorting > .step:not(.lifted){transition:transform .2s cubic-bezier(.32,.72,0,1);}
+.steps.sorting{overflow:visible;}
+@media (prefers-reduced-motion: reduce){ .steps.sorting > .step:not(.lifted){transition:none;} }
+.sprog{display:inline-flex;align-items:center;gap:3px;font-size:0.706rem;font-variant-numeric:tabular-nums;color:var(--ink2);white-space:nowrap;}
+.sprog svg{width:12px;height:12px;flex:none;}
+.sprog .sr-bg{fill:none;stroke:var(--ink3);stroke-width:2;opacity:.45;}
+.sprog .sr-fg{fill:none;stroke:var(--pc,var(--blue));stroke-width:2;}
+.sprog.full .sr-fg{stroke:var(--green);}
+.inds .sprog svg{width:12px;height:12px;}
+.row.held .rsteps{opacity:.4;transition:opacity .2s;}
+/* Desktop: a column of its own, only when some row of the list has steps (point 22); the handle and the menu show on hover */
+.rsteps{display:none;}
+.app.desktop .rsteps{display:flex;flex:none;width:48px;justify-content:flex-end;align-items:center;}
+.app.desktop .main:not(:has(.row .rsteps:not(:empty))) .rsteps{display:none;}
+.app.desktop .rsteps .sprog{font-size:11px;}
+.app.desktop .rsteps .sprog svg,.app.desktop .inds .sprog svg{width:11px;height:11px;}
+.wcard .cic .sprog{font-size:10px;gap:2px;}
+.wcard .cic .sprog svg{width:10px;height:10px;}
+.wcard.mc .cic .sprog svg{display:none;}
+.app.desktop .pane .steps .vn-c{cursor:default;padding:0 8px 0 12px;font-size:13px;background:none;}
+.app.desktop .pane .steps .vn-c:hover{background:none;}
+.app.desktop .pane .step-c,.app.desktop .pane .step-add{gap:9px;padding:0 8px 0 12px;}
+.app.desktop .pane .steps > .step + .step::before,.app.desktop .pane .steps > .step + .step-add::before{left:37px;border-top-color:var(--dline);}
+.app.desktop .pane .step .scheck,.app.desktop .pane .step-add .sadd{width:16px;height:16px;margin-top:8px;}
+.app.desktop .pane .step .scheck{border-width:1.2px;}
+.app.desktop .pane .step .scheck svg{width:9px;height:9px;}
+.app.desktop .pane .step .scheck::after{width:28px;height:28px;margin:-14px 0 0 -14px;}
+.app.desktop .pane .step-add .sadd svg{width:14px;height:14px;}
+.app.desktop .pane .stepin{font-size:13px;line-height:1.35;padding:7px 0;}
+.app.desktop .pane .step:focus{outline:none;}
+.app.desktop .pane .step:focus > .vn-c{background:var(--qhl);}
+.app.desktop .pane .step:focus-visible > .vn-c{box-shadow:inset 0 0 0 2px var(--blue);}
+.smore,.sgrip{flex:none;width:22px;height:22px;margin-top:4px;border-radius:5px;display:flex;align-items:center;justify-content:center;color:var(--ink2);opacity:0;transition:opacity .15s;}
+.smore svg{width:14px;height:14px;}
+.sgrip{cursor:grab;}
+.sgrip svg{width:9px;height:12px;}
+.smore:hover{background:var(--dhov);}
+.step:hover .smore,.step:hover .sgrip,.step:focus-within .smore,.step.lifted .sgrip{opacity:1;}
+body.sdragging,body.sdragging *{cursor:grabbing !important;-webkit-user-select:none;user-select:none;}
+.app.desktop .pane .step.lifted > .vn-c{background:var(--dmain);}

@@ -309,8 +309,8 @@ function rowHTML(x, opts={}){
   const dl=x.deadline&&!opts.compact?'<span class="dl'+(dlLevel(x)?' dl-'+dlLevel(x):'')+'">'+dlText(x.deadline)+'</span>':''; // decision 48a: "Entrega jueves"
   if(opts.compact){}
   else if(done){ if(x.completed) meta.push('<span>'+(opts.byDay?fmtTime(x.completed):'Hecha '+fmtDateTime(x.completed))+'</span>'); if(dl) meta.push(dl); }
-  else { if(x.date){ if(waitDue(x)) meta.push('<span class="review">Revisar</span>'); // decision 41: its review day has come
-      else if(x.carried&&x.date<=t){ if(!opts.hideCarried) meta.push('<span class="carried">Aplazada</span>'); }
+  else { if(waitIn(x)){ if(!opts.noReview) meta.push('<span class="review">Revisar hoy</span>'); } // decisions 41 and 51: its review day (or its deadline) has come; the group Revisar hoy says it already
+    else if(x.date){ if(x.carried&&x.date<=t){ if(!opts.hideCarried) meta.push('<span class="carried">Aplazada</span>'); }
       else if(!(opts.noToday&&x.date===t) && x.date!==opts.day && x.date!==x.deadline) meta.push('<span class="'+(x.date<t?'over':'')+'">'+fmtDate(x.date)+'</span>'); } // a date that is the deadline says it once
     if(dl) meta.push(dl);
     if(x.status==='waiting'&&x.waitingFor) meta.push('<span class="waitfor">Esperando a '+esc(x.waitingFor)+'</span>');
@@ -330,7 +330,8 @@ function rowHTML(x, opts={}){
    indicators, the date (or "Aplazada", or when it was done), the reminder and the priority. The R3 rules decide what each column says */
 function deskRowHTML(x, opts, v){ const t=v.t; let date='', dcls='', rem=''; const dl=x.deadline?dlText(x.deadline):'', dlc=dlLevel(x); // decision 48a: a column of its own
   if(v.done){ if(x.completed) date=opts.byDay?fmtTime(x.completed):fmtDateTime(x.completed); }
-  else { if(x.date){ if(waitDue(x)){ date='Revisar'; dcls=' review'; } else if(x.carried&&x.date<=t){ if(!opts.hideCarried){ date='Aplazada'; dcls=' carried'; } }
+  else { if(waitIn(x)){ if(!opts.noReview){ date='Revisar hoy'; dcls=' review'; } } // decision 51, as on the iPhone
+    else if(x.date){ if(x.carried&&x.date<=t){ if(!opts.hideCarried){ date='Aplazada'; dcls=' carried'; } }
       else if(!(opts.noToday&&x.date===t) && x.date!==opts.day && x.date!==x.deadline){ date=fmtDate(x.date); if(x.date<t) dcls=' over'; } } // a deadline on the same day says it once, as on the iPhone
     if(x.reminder) rem=x.date&&localDay(x.reminder)===x.date?fmtTime(x.reminder):fmtDateTime(x.reminder); }
   // The project goes in a fixed column on the left, so titles start aligned and keep the room on the right; a list of one project has no column
@@ -423,8 +424,14 @@ function listHTML(filter, projectId){
   const R = (x,o)=>rowHTML(x, Object.assign({noProj}, o));
   const addBtn = '<button class="btn-link" data-act="add"'+(projectId!==undefined?' data-project="'+(projectId||'')+'"':'')+'>Añadir tarea</button>';
   const byProject = root && DB.settings[filter==='hoy'?'hoyGroup':'allGroup']==='project'; // R13: each view keeps its own grouping
+  /* Decision 51: in Hoy the waiting tasks whose review day (or deadline) has come go first, in their own group Revisar hoy; in Todas and
+     in a project every waiting task is in the block Por confirmar at the foot, so none is listed twice. A search keeps them all in its results */
+  let rv=[];
+  if(!UI.query){ if(filter==='hoy'){ rv=list.filter(x=>x.status==='waiting'); if(rv.length) list=list.filter(x=>x.status!=='waiting'); }
+    else list=list.filter(x=>x.status!=='waiting'); }
   let h='';
-  if(!list.length){ if(!(UI.query && UI.searchDone && dm.length) && !nm.length){ // the completed matches (or notes) are listed below: no "Sin resultados" above them
+  if(rv.length) h += gtitle('Revisar hoy', rv.length, '', ' data-review-head=""')+'<div class="group" data-review="">'+rv.map(x=>R(x,{noToday:true,noReview:true})).join('')+'</div>'; // decision 36: not a drop target
+  if(!list.length){ if(rv.length){} else if(!(UI.query && UI.searchDone && dm.length) && !nm.length){ // the completed matches (or notes) are listed below: no "Sin resultados" above them
     let title, sub, acts;
     if(UI.query){ title='Sin resultados'; sub='Prueba con otra palabra'; acts='<button class="btn-link" data-act="clearSearch">Borrar búsqueda</button>'; }
     else if(root && filter==='hoy' && UI.sumFilter){ title=UI.sumFilter==='carried'?'Sin aplazadas':'Sin prioritarias'; sub='Hoy no hay ninguna'; acts='<button class="btn-link" data-sum="all">Quitar filtro</button>'; }
@@ -442,11 +449,11 @@ function listHTML(filter, projectId){
   else if(filter==='hoy' && root && UI.sumFilter!=='carried' && list.some(carriedOn)){ const c=list.filter(carriedOn), d=list.filter(x=>!carriedOn(x)); /* decision 48a: a task here by its deadline is not Aplazada */
     h += gtitle('Aplazadas', null, UI.select?'':'<button class="gx" data-act="review">Repasar ('+c.length+')</button>')+'<div class="group">'+c.map(x=>R(x,{noToday:true,hideCarried:true})).join('')+'</div>'+
       (d.length?'<div class="group-title"'+gdrop('day',todayStr())+'>Hoy</div><div class="group"'+gdrop('day',todayStr())+'>'+d.map(x=>R(x,{noToday:true})).join('')+'</div>':''); } // decision 36: an Aplazada dropped on Hoy is confirmed for today
-  else h += '<div class="group">'+list.map(x=>R(x,{noToday:filter==='hoy', hideCarried:root&&filter==='hoy'&&UI.sumFilter==='carried'})).join('')+'</div>';
+  else h += (rv.length?'<div class="group-title"'+gdrop('day',todayStr())+'>Hoy</div>':'')+'<div class="group"'+(rv.length?gdrop('day',todayStr()):'')+'>'+list.map(x=>R(x,{noToday:filter==='hoy', hideCarried:root&&filter==='hoy'&&UI.sumFilter==='carried'})).join('')+'</div>'; // below Revisar hoy, the rest under Hoy
   // R8: from 19:00 the day can be closed from the end of Hoy too, whatever the summary shows
   if(root && filter==='hoy' && !UI.select && new Date().getHours()>=19){ const n=pendingFor('hoy').length; if(n) h += '<div class="group"><button class="cell link closecell" data-act="closeDay">'+I.cal+'<span class="lbl">Cerrar el día</span><span class="val">'+n+(n===1?' pendiente':' pendientes')+'</span></button></div>'; }
   if(root && filter==='hoy' && !UI.sumFilter){ const tmd=addDays(todayStr(),1), tm=pendingFor('todas').filter(x=>!inHoy(x)&&(x.date===tmd||x.deadline===tmd)).length; /* decision 48a: a deadline tomorrow brings it tomorrow */ if(tm) h += '<button class="preview" data-filter="todas"><span>Mañana: '+tm+(tm===1?' tarea':' tareas')+'</span>'+I.chev+'</button>'; }
-  h += waitingBlockHTML(root, projectId, R);
+  h += waitingBlockHTML(root, projectId, R, filter==='hoy');
   if(done.length){ const dt=done.filter(x=>x.completed&&localDay(x.completed)===todayStr()).length;
     if(!DB.settings.doneOpen){ h += '<div class="group"><button class="cell link" data-act="toggleDone" style="justify-content:center"><span>Mostrar completadas ('+done.length+(dt?', '+dt+' hoy':'')+')</span></button></div>'; }
     else { const t=todayStr(), yd=addDays(t,-1); const by={}, order=[]; done.forEach(x=>{ const d=x.completed?localDay(x.completed):'0000'; if(!by[d]){ by[d]=[]; order.push(d); } by[d].push(x); });
@@ -454,20 +461,25 @@ function listHTML(filter, projectId){
       order.forEach(d=>{ const label=d===t?'Hoy':d===yd?'Ayer':d==='0000'?'Sin fecha':fmtDate(d); h += gsec(gtitle(label, by[d].length), by[d].map(x=>R(x,{byDay:true})).join('')); }); } }
   return h;
 }
-/* Decision 41: the folded block Por confirmar (N) at the end of a list: the waiting tasks of that list whose review day has not come.
-   The fold is kept for the session; the desktop also has the view Por confirmar */
-function waitingBlockHTML(root, projectId, R){ let ws=waitingList(projectId);
+/* Decisions 41 and 51: the folded block at the end of a list. In Hoy, Por confirmar más adelante (N): the waiting tasks whose review day has
+   not come (those that have are in Revisar hoy, on top). In Todas and in a project, Por confirmar (N): every waiting task, with Revisar hoy
+   or its review day on the row. Its header always shows; the link on the right unfolds it. The fold is kept for the session; the desktop
+   also has the view Por confirmar */
+function waitingBlockHTML(root, projectId, R, hoy){ let ws=hoy?waitingList(projectId):waitingAll(projectId);
   if(root&&UI.projFilter!==null) ws=ws.filter(x=> UI.projFilter==='none' ? !x.projectId : x.projectId===UI.projFilter);
   if(!ws.length) return ''; const open=!!UI.waitOpen;
-  return '<div class="group wblock"><button class="cell link" data-act="toggleWaiting" aria-expanded="'+open+'" style="justify-content:center"><span>'+(open?'Ocultar por confirmar':'Por confirmar ('+ws.length+')')+'</span></button></div>'+
-    (open?gsec(gtitle('Por confirmar', ws.length), ws.map(x=>R(x)).join(''), ' data-waiting=""'):''); }
-function waitingViewHTML(){ let xs=spaceTasks().filter(x=>x.status==='waiting'); if(UI.query) xs=xs.filter(queryMatcher(UI.query));
-  xs=orderTasks(xs.filter(waitIn)).concat(waitingList().filter(x=>xs.includes(x)));
+  const head=gtitle(hoy?'Por confirmar más adelante':'Por confirmar', ws.length, '<button class="gx" data-act="toggleWaiting" aria-expanded="'+open+'">'+(open?'Ocultar ':'Mostrar ')+(hoy?'las que esperan':'por confirmar')+'</button>');
+  return '<div class="wblock">'+(open?gsec(head, ws.map(x=>R(x)).join(''), ' data-waiting=""'):head)+'</div>'; }
+// Every waiting task of the space (or of a project): those to review today first, in the order of the lists, then the rest by review day
+function waitingAll(projectId){ let xs=spaceTasks().filter(x=>x.status==='waiting'&&waitIn(x));
+  if(projectId!==undefined) xs=xs.filter(x=> projectId===null ? !x.projectId : x.projectId===projectId);
+  return orderTasks(xs).concat(waitingList(projectId)); }
+function waitingViewHTML(){ let xs=waitingAll(); if(UI.query) xs=xs.filter(queryMatcher(UI.query));
   if(!xs.length) return '<div class="empty">'+MI.wait.replace('<svg','<svg style="width:44px;height:44px"')+'<b>'+(UI.query?'Sin resultados':'Nada por confirmar')+'</b>'+(UI.query?'Prueba con otra palabra':'Marca una tarea Por confirmar desde su menú cuando dependa de otra persona.')+'</div>';
-  return '<div class="group">'+xs.map(x=>rowHTML(x)).join('')+'</div><div class="footnote">Cada una vuelve a Hoy en su día de revisión, marcada Revisar.</div>'; }
+  return '<div class="group">'+xs.map(x=>rowHTML(x)).join('')+'</div><div class="footnote">Cada una vuelve a Hoy en su día de revisión, en el grupo Revisar hoy.</div>'; }
 function selectNav(){ const n=UI.select.ids.size; return '<header class="nav"><div class="nav-row"><button class="action" data-act="selAll">'+(UI.select.all?'Ninguna':'Todas')+'</button><div class="nav-title" id="selTitle">'+(n?n+(n===1?' seleccionada':' seleccionadas'):'Seleccionar')+'</div><button class="action strong" data-act="selDone">OK</button></div></header>'; }
 function viewTareas(){
-  const f=DB.settings.filter; const nHoy=UI.query?0:pendingFor('hoy').length, nTodas=UI.query?0:pendingFor('todas').length; // a search hides the segment that shows them
+  const f=DB.settings.filter; const nHoy=UI.query?0:pendingFor('hoy').length, nTodas=UI.query?0:pendingFor('todas').filter(x=>x.status!=='waiting').length; // a search hides the segment that shows them; decision 51: Todas lists its waiting tasks in the block at the foot, outside the count
   if(UI.select && UI.select.scope==='root') return selectNav()+'<div class="scroll">'+listHTML(UI.query?'todas':f)+'</div>';
   return '<header class="nav"><div class="nav-row"><button class="title" data-act="spaceMenu" aria-label="Cambiar espacio">'+esc(space().name)+I.chevD+'</button>'+'<button class="action vopts" data-act="viewMenu" aria-label="Opciones de vista">'+I.more+'</button>'+'</div></header>'+
    '<div class="scroll">'+(f==='hoy'&&!UI.query?ahoraHTML()+summaryHTML():'')+

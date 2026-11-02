@@ -233,19 +233,19 @@ async function iphone(browser){
   // 3c bis. Por confirmar (decision 41)
   await ev(page, ()=>rowMenu('a6')); await sleep(600); await menuItem(page, 'Por confirmar').tap(); await sleep(700);
   x = await ev(page, ()=>({on:document.querySelector('#sheet').classList.contains('on'), chips:[...document.querySelectorAll('#sheet .wchips .chip')].map(c=>c.textContent+(c.classList.contains('on')?'*':'')), line:document.querySelector('#sheet .wline').textContent}));
-  check('wait_sheet', x.on && x.chips.join()==='Mañana*,En 3 días,Próxima semana,Sin fecha' && x.line==='Vuelve a Hoy mañana, marcada Revisar.', x);
+  check('wait_sheet', x.on && x.chips.join()==='Mañana*,En 3 días,Próxima semana,Sin fecha' && x.line==='Vuelve a Hoy mañana, en Revisar hoy.', x);
   await page.fill('#sheet [data-role=waitfor]', 'Ramiro'); await page.tap('#sheet [data-wd="3d"]'); await sleep(200); await shot(page, 'm12-waiting-sheet');
   await page.tap('#sheet [data-x=ok]'); await sleep(700);
-  x = await ev(page, L=>({st:task('a6').status, who:task('a6').waitingFor, d:task('a6').date, t:document.querySelector('#toastText').textContent, inList:!!document.querySelector(L+' .row[data-id=a6]'), hoy:pendingFor('hoy').some(x=>x.id==='a6'), btn:(document.querySelector(L+' .wblock .cell')||{}).textContent}), L);
-  check('wait_mark', x.st==='waiting' && x.who==='Ramiro' && x.d==='2026-11-07' && x.t==='Por confirmar, esperando a Ramiro, revisar el sábado 7' && !x.inList && !x.hoy && x.btn==='Por confirmar (1)', x);
-  await page.tap(L+' .wblock .cell'); await sleep(400);
+  x = await ev(page, L=>({st:task('a6').status, who:task('a6').waitingFor, d:task('a6').date, t:document.querySelector('#toastText').textContent, inList:!!document.querySelector(L+' .row[data-id=a6]'), hoy:pendingFor('hoy').some(x=>x.id==='a6'), btn:(document.querySelector(L+' .wblock [data-act=toggleWaiting]')||{}).textContent, head:(document.querySelector(L+' .wblock .gl')||{}).textContent}), L);
+  check('wait_mark', x.st==='waiting' && x.who==='Ramiro' && x.d==='2026-11-07' && x.t==='Por confirmar, esperando a Ramiro, revisar el sábado 7' && !x.inList && !x.hoy && x.btn==='Mostrar las que esperan' && x.head==='Por confirmar más adelante1', x); // decision 51
+  await page.tap(L+' .wblock [data-act=toggleWaiting]'); await sleep(400);
   x = await ev(page, L=>{ const r=document.querySelector(L+' .gsec[data-waiting] .row[data-id=a6]'); return r&&{meta:r.querySelector('.row-meta').textContent, half:r.querySelector('.check').classList.contains('waiting')}; }, L);
   await ev(page, L=>{ const e=document.querySelector(L+' .gsec[data-waiting]'); e&&e.scrollIntoView({block:'center'}); }, L); await ev(page, ()=>document.querySelector('#toast').classList.remove('on')); await sleep(200); await shot(page, 'm13-waiting-block');
   check('wait_block', x && x.meta==='SábadoEsperando a Ramiro' && x.half, x);
-  // Its review day: back in Hoy, marked Revisar, counted; rollOver never carries it
-  x = await ev(page, L=>{ updTask('a6', {date:'2026-11-02'}); task('a6').status='waiting'; DB.settings.summaryDay='2026-11-03'; save(); rollOver(); render(); const r=document.querySelector(L+' .row[data-id=a6]:not(.first .row)');
+  // Its review day: back in Hoy, in the group Revisar hoy (decision 51), counted; rollOver never carries it
+  x = await ev(page, L=>{ updTask('a6', {date:'2026-11-02'}); task('a6').status='waiting'; DB.settings.summaryDay='2026-11-03'; save(); rollOver(); render(); const r=document.querySelector(L+' .group[data-review] .row[data-id=a6]:not(.first .row)');
     return {d:task('a6').date, c:task('a6').carried, st:task('a6').status, hoy:pendingFor('hoy').some(x=>x.id==='a6'), meta:r&&r.querySelector('.row-meta').textContent, block:!!document.querySelector(L+' .wblock')}; }, L);
-  check('wait_review_day', x.d==='2026-11-02' && !x.c && x.st==='waiting' && x.hoy && x.meta==='RevisarEsperando a Ramiro' && !x.block, x);
+  check('wait_review_day', x.d==='2026-11-02' && !x.c && x.st==='waiting' && x.hoy && x.meta==='Esperando a Ramiro' && !x.block, x);
   await ev(page, ()=>updTask('a6', {date:'2026-11-07'}));
   // Not in Ahora; marking a task in Ahora takes it out, Deshacer puts it back
   x = await ev(page, ()=>{ const no=toggleFocus('a6'); toggleFocus('a1'); setWaiting('a1', '', undefined); const mid={st:task('a1').status, f:task('a1').focus||null}; undoFn(); return {no, mid, st:task('a1').status, f:!!task('a1').focus}; });
@@ -409,8 +409,8 @@ async function desktop(browser){
   // Por confirmar from the context menu: a popover, Intro saves; the block, the sidebar view, C and Deshacer
   await page.click('#desk .main .row[data-id=a6]:not(.first .row) .row-title', {button:'right'}); await sleep(400); await menuItem(page, 'Por confirmar…').click(); await sleep(400);
   await page.keyboard.type('Ramiro'); await shot(page, 'd10-waiting-popover'); await page.keyboard.press('Enter'); await sleep(500);
-  x = await ev(page, ()=>({st:task('a6').status, who:task('a6').waitingFor, d:task('a6').date, blk:(document.querySelector('#desk .main .wblock .cell')||{}).textContent, n:document.querySelector('#desk .side [data-view=waiting] .n').textContent}));
-  check('desk_wait_mark', x.st==='waiting' && x.who==='Ramiro' && x.d==='2026-11-05' && x.blk==='Por confirmar (1)' && x.n==='1', x);
+  x = await ev(page, ()=>({st:task('a6').status, who:task('a6').waitingFor, d:task('a6').date, blk:(document.querySelector('#desk .main .wblock .gl')||{}).textContent, n:document.querySelector('#desk .side [data-view=waiting] .n').textContent}));
+  check('desk_wait_mark', x.st==='waiting' && x.who==='Ramiro' && x.d==='2026-11-05' && x.blk==='Por confirmar más adelante1' && x.n==='1', x);
   await page.click('#desk .side [data-view=waiting]'); await sleep(400);
   x = await ev(page, ()=>{ const r=document.querySelector('#desk .main .row[data-id=a6]'); return {title:document.querySelector('#desk .mhead h1').textContent, tag:r&&r.querySelector('.wtag').textContent, date:r&&r.querySelector('.rc-date').textContent, half:r&&r.querySelector('.check.waiting')!==null}; });
   await ev(page, ()=>document.querySelector('#toast').classList.remove('on')); await sleep(100); await shot(page, 'd11-waiting-view');

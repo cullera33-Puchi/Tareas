@@ -136,7 +136,7 @@ async function iphone(browser){
     document.querySelectorAll('.screen.root .scroll .group-title, .screen.root .scroll .group').forEach(e=>{ if(e.classList.contains('group-title')) cur=e.textContent.replace(/Repasar.*/,'').trim(); else if(cur) groups[cur]=(groups[cur]||[]).concat([...e.querySelectorAll('.row')].map(r=>r.dataset.id)); });
     return {nums, groups}; });
   check('summary_counts', x.nums[0]==='8' && x.nums[1]==='1', x.nums);
-  check('hoy_groups', (x.groups.Aplazadas||[]).join()==='d5' && (x.groups.Hoy||[]).length===7 && !(x.groups.Hoy||[]).includes('d5'), x.groups);
+  check('hoy_groups', (x.groups.Aplazadas||[]).join()==='d5' && (x.groups.Hoy||[]).length===6 && !(x.groups.Hoy||[]).includes('d5') && (x.groups['Revisar hoy1']||[]).join()==='d6', x.groups); // decision 51: the waiting one due today heads Hoy in Revisar hoy
   // Row texts and colours
   const m1=await meta(page,'d1'), m2=await meta(page,'d2'), m3=await meta(page,'d3'), m4=await meta(page,'d4'), m5=await meta(page,'d5'), m6=await meta(page,'d6');
   check('row_due_today', m1 && m1.dl==='Entrega hoy' && /dl-due/.test(m1.cls) && /Viernes/.test(m1.text) && !/Aplazada/.test(m1.text), m1);

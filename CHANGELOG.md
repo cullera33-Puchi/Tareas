@@ -1,5 +1,14 @@
 # Registro de cambios
 
+## v0.24.0. Notas de proyecto (2 de noviembre de 2026)
+
+- Cada proyecto tiene ahora dos pestañas, «Tareas» y «Notas», en el iPhone y en el ordenador. Varias notas por proyecto, con título y fecha: primero las fijadas y después la más reciente.
+- Texto libre que se guarda solo al escribir. Las líneas con guion se ven como lista y las de «[ ]» como casillas que se marcan con un toque. Los enlaces y teléfonos se pueden tocar. Intro continúa la lista.
+- «Crear tareas» convierte líneas de la nota en tareas del proyecto, reconociendo la fecha escrita al final, con un solo Deshacer. En el ordenador también se crean a partir de las líneas seleccionadas.
+- En el iPhone: deslizar a la izquierda para eliminar y pulsación larga para Fijar, Compartir, Crear tareas o Eliminar. En el ordenador: lista a la izquierda y nota abierta al lado, tecla N para una nota nueva, flechas para moverse, Intro para editar y clic derecho para el menú.
+- La búsqueda encuentra las notas. Exportar, importar y las copias locales las incluyen. Eliminar un espacio borra también las notas de sus proyectos, con Deshacer. Archivar un proyecto conserva sus notas.
+- Supabase: migración `0006_project_notes.sql`, incluida en `supabase/all.sql`, y una fila nueva en `check.sql`. Sin ella, las notas se quedan en cada dispositivo y el resto sincroniza.
+
 ## v0.23.1. Borrar pasos (2 de noviembre de 2026)
 
 - Al borrar un paso deslizando, el paso desaparecía de los datos pero la fila se quedaba en pantalla si el foco seguía en ella (su botón Eliminar o su texto), y los siguientes borrados parecían no hacer nada. Ahora la fila sale siempre de la pantalla.

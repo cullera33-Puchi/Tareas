@@ -1,6 +1,6 @@
 /* Service worker: app shell cache and update notice.
    Bump CACHE on every release so installed devices pick up the new version. */
-const CACHE = 'tareas-v0.16.1';
+const CACHE = 'tareas-v0.16.2';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png', './vendor/supabase-js-2.117.3.umd.js'];
 // Written at deploy time from the repository secrets (block 8). Cached when present; a copy without it (404) still installs and runs local only.
 const OPTIONAL = ['./config.js'];
@@ -24,6 +24,15 @@ self.addEventListener('message', e => {
 self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
+  // config.js (Supabase URL and public key, written at deploy) goes network first, so corrected keys reach installed
+  // phones on the next deploy without a new version; offline, the cached copy is used.
+  if (new URL(req.url).pathname.endsWith('/config.js')) {
+    e.respondWith(fetch(req, { cache: 'no-store' }).then(res => {
+      if (res.ok) { const copy = res.clone(); caches.open(CACHE).then(c => c.put('./config.js', copy)); }
+      return res;
+    }).catch(() => caches.match('./config.js').then(r => r || new Response('window.TAREAS_CONFIG = null;\n', { headers: { 'Content-Type': 'application/javascript' } }))));
+    return;
+  }
   // Navigations always resolve to the cached shell so the app opens offline.
   // If the shell is missing (for example another app on the origin removed the cache), the network copy refills it.
   if (req.mode === 'navigate') {

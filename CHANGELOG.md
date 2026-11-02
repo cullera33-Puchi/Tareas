@@ -1,5 +1,10 @@
 # Registro de cambios
 
+## v0.16.2. Configuración de Supabase que se corrige sin nueva versión (2 de noviembre de 2026)
+
+- El archivo de configuración con la dirección y la clave pública de Supabase se pide siempre a la red y solo se usa la copia guardada sin conexión. Si se corrigen los secretos en GitHub, basta con volver a publicar; los iPhone instalados lo recogen sin esperar a otra versión.
+- La publicación detecta los secretos guardados al revés (la clave en la dirección y la dirección en la clave) y los corrige, nunca publica una clave secreta y anota en su registro la forma de cada secreto, sin mostrarlos.
+
 ## v0.16.1. Dirección de Supabase escrita de cualquier forma (2 de noviembre de 2026)
 
 - El inicio de sesión fallaba con «Cliente de Supabase no cargado»: la dirección guardada en los secretos de GitHub no tenía la forma completa (`https://xxxx.supabase.co`). La app y la publicación aceptan ahora la dirección sin `https://`, con una ruta detrás (como `/auth/v1/callback`), entre comillas o solo el identificador del proyecto.

@@ -109,6 +109,20 @@ body.desktop .sheet .handle{display:none;}
 body.desktop .asheet{left:50%;right:auto;bottom:auto;top:50%;width:320px;transform:translate(-50%,-50%) scale(.96);opacity:0;visibility:hidden;pointer-events:none;transition:transform .28s cubic-bezier(.32,.72,0,1),opacity .22s,visibility 0s linear .28s;}
 body.desktop .asheet.on{transform:translate(-50%,-50%) scale(1);opacity:1;visibility:visible;pointer-events:auto;transition-delay:0s;}
 body.desktop .asheet button.it{height:46px;font-size:1rem;}
+/* Decision 28c: the macOS alert (macAlert), in the action sheet's element: 260 px, app icon, bold title, small text, two buttons */
+body.desktop .asheet.alert{width:260px;overflow:visible;max-height:none;transition:transform .2s cubic-bezier(.32,.72,0,1),opacity .2s,visibility 0s linear .2s;}
+body.desktop .asheet.alert.on{transition-delay:0s;}
+.asheet .al{background:var(--mat);-webkit-backdrop-filter:saturate(180%) blur(30px);backdrop-filter:saturate(180%) blur(30px);border-radius:12px;padding:20px 16px 16px;text-align:center;box-shadow:0 0 0 .5px rgba(0,0,0,.18),0 18px 50px rgba(0,0,0,.28);}
+.asheet .al-icon{display:block;width:56px;height:56px;margin:0 auto 10px;border-radius:12px;}
+.asheet .al-t{font-size:13px;font-weight:700;line-height:17px;color:var(--ink);margin:0 4px;}
+.asheet .al-x{font-size:11px;line-height:15px;color:var(--ink);margin:6px 4px 0;}
+.asheet .al-b{display:flex;gap:8px;margin-top:16px;}
+.asheet .al-btn{flex:1;height:28px;border-radius:6px;font-size:13px;color:var(--ink);background:var(--fill,rgba(120,120,128,.16));box-shadow:0 .5px 1px rgba(0,0,0,.12);}
+.asheet .al-btn.def{background:var(--blue);color:#fff;font-weight:500;}
+.asheet .al-btn.def.red{background:var(--fill,rgba(120,120,128,.16));color:var(--red);font-weight:600;}
+.asheet .al-btn:focus-visible{outline:3px solid color-mix(in srgb, var(--blue) 50%, transparent);outline-offset:1px;}
+.asheet .al-btn:active{filter:brightness(.92);}
+body.desktop .scrim.on.light{opacity:.45;}
 body.desktop .app.sheet-open{transform:none;border-radius:0;}
 body.desktop .toast{left:auto;right:28px;bottom:28px;width:360px;}
 
@@ -789,7 +803,9 @@ body.desktop .sheet.keysheet{width:min(680px, calc(100% - 48px));}
 .hall{flex:none;border-bottom:.5px solid var(--dline);}
 .hgut{font-size:10px;color:var(--ink2);padding:5px 6px 0 0;text-align:right;line-height:1.15;}
 .hallday{min-width:0;min-height:34px;border-left:.5px solid var(--dline);border:1.5px solid transparent;border-left-color:var(--dline);}
-.hallday .wl{max-height:96px;overflow-y:auto;padding:3px 4px 0;}
+.hallday .wl{padding:3px 4px 0;}
+.hmore{display:block;height:20px;margin:0 0 3px;padding:0 6px;border-radius:4px;font-size:11px;font-weight:600;color:var(--ink2);text-align:left;}
+.hmore:hover{background:var(--dhov);color:var(--ink);}
 .hallday .hcount{display:block;padding:7px 8px;font-size:12px;color:var(--ink2);}
 .hscroll{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;}
 .hgrid{position:relative;border-bottom:.5px solid var(--dline);}
@@ -2018,6 +2034,7 @@ function onClick(e){
     case 'bulkSpace': bulkSpaceMenu(act); break;
     case 'searchDone': UI.searchDone=true; render(); break;
     case 'toggleSummary': toggleSummary(); break;
+    case 'allDayMore': UI.allDayOpen=act.dataset.dayMore||null; render(); break; // decision 28d, the Día view
     case 'toggleDone': DB.settings.doneOpen=!DB.settings.doneOpen; save(); render(); break;
     case 'add': if(act.dataset.project!==undefined) addSheet(act.dataset.project||null); else addFromList(); break; // a project screen keeps its project
     case 'convertLines': { const id=detailTaskId(); if(id){ flushEdits(); convertNoteLines(id); } break; }
@@ -2216,7 +2233,7 @@ const pickFresh = e => UI.wide ? e.detail>1&&menuFresh() : sheetFresh();
 const ghostSheet = e => UI.wide ? !!e&&e.detail>1&&sheetFresh() : sheetFresh(); // the sheets' own guard follows the same rule on the desktop (centred dialogs)
 function noteEarlyClose(kind){ const ms=Math.round(performance.now()-sheetOpenedAt); if(sheetOpenedAt&&ms<800) log('warn','Hoja cerrada a los '+ms+' ms ('+kind+')', String((new Error()).stack||'').split('\n').slice(2,5).map(l=>l.trim().slice(0,90)).join(' | ')); }
 function openSheet(html, onOpen){ sheetOpenedAt=performance.now(); sheetOnClose=null; sheetGuard=null; sheet.classList.remove('addsheet','keysheet'); sheet.innerHTML='<div class="handle"></div>'+html; sheet.classList.add('on'); scrim.classList.add('on'); dimApp(true); bindSheetDrag(); onOpen&&onOpen(sheet); }
-function closeSheet(){ if(sheet.classList.contains('on')||asheet.classList.contains('on')) noteEarlyClose('cerrar'); sheetGuard=null; closeMenu(true); sheet.classList.remove('on','drag','top'); sheet.style.transform=''; asheet.classList.remove('on'); asheet.onclick=null; scrim.classList.remove('on'); dimApp(false); try{ stopRec&&stopRec(); }catch(e){} setTimeout(()=>{ if(!sheet.classList.contains('on')) sheet.innerHTML=''; if(!asheet.classList.contains('on')) asheet.innerHTML=''; },520); const oc=sheetOnClose; sheetOnClose=null; if(oc) oc(); if(staleView) setTimeout(flushStale, 0); } // a closed menu keeps no buttons or handler that a stray click could fire; data reloaded meanwhile is drawn now, unless the caller already redrew
+function closeSheet(){ if(sheet.classList.contains('on')||asheet.classList.contains('on')) noteEarlyClose('cerrar'); sheetGuard=null; closeMenu(true); sheet.classList.remove('on','drag','top'); sheet.style.transform=''; const al=asheet.classList.contains('on')&&asheet.classList.contains('alert'); asheet.classList.remove('on'); asheet.onclick=null; scrim.classList.remove('on','light'); dimApp(false); if(al) alertBack(); try{ stopRec&&stopRec(); }catch(e){} setTimeout(()=>{ if(!sheet.classList.contains('on')) sheet.innerHTML=''; if(!asheet.classList.contains('on')){ asheet.innerHTML=''; asheet.classList.remove('alert'); } },520); const oc=sheetOnClose; sheetOnClose=null; if(oc) oc(); if(staleView) setTimeout(flushStale, 0); } // a closed menu keeps no buttons or handler that a stray click could fire; data reloaded meanwhile is drawn now, unless the caller already redrew
 function requestCloseSheet(){ const g=sheet.classList.contains('on')&&sheetGuard&&sheetGuard(); if(!g){ closeSheet(); return; }
   const back=()=>{ const f=g.field; if(f&&f.isConnected){ f.focus(); if(f.setSelectionRange){ const l=f.value.length; f.setSelectionRange(l,l); } } }; // inside the tap that chose it: iOS opens the keyboard again
   const go=()=>{ log('info','Hoja descartada con texto', g.label); if(g.discard) g.discard(); closeSheet(); };
@@ -2225,7 +2242,8 @@ function requestCloseSheet(){ const g=sheet.classList.contains('on')&&sheetGuard
 /* An action menu opened over an open sheet (the Proyecto and Prioridad chips of Nueva tarea) is nested:
    Cancelar, a tap outside or Escape close only the menu and give the sheet back with what was typed */
 let asheetNested=false, asheetCancel=null;
-function closeAction(){ asheet.classList.remove('on'); asheet.onclick=null; setTimeout(()=>{ if(!asheet.classList.contains('on')) asheet.innerHTML=''; },480); }
+function closeAction(){ const al=asheet.classList.contains('alert'); asheet.classList.remove('on'); asheet.onclick=null; scrim.classList.remove('light'); setTimeout(()=>{ if(!asheet.classList.contains('on')){ asheet.innerHTML=''; asheet.classList.remove('alert'); } },480); if(al) alertBack(); }
+function alertBack(){ const f=alertFocus; alertFocus=null; if(f&&f.isConnected&&f!==document.body&&!asheet.contains(f)) try{ f.focus({preventScroll:true}); }catch(e){} } // the focus goes back where it was before the alert
 function cancelAction(){ if(asheetNested&&sheet.classList.contains('on')){ const f=asheetCancel; asheetCancel=null; closeAction(); f&&f(); } else closeSheet(); }
 scrim.addEventListener('click', e=>{ if(ghostSheet(e)){ log('warn','Toque en el fondo ignorado justo al abrir una hoja'); return; } if(asheet.classList.contains('on')) cancelAction(); else requestCloseSheet(); });
 function bindSheetDrag(){ const h=sheet; let y0=0,dy=0,drag=false,inner=null,lastY=0,lastT=0,vy=0,hh=1;
@@ -2245,8 +2263,29 @@ function bindSheetDrag(){ const h=sheet; let y0=0,dy=0,drag=false,inner=null,las
   // R4: it closes past 110 px or on a quick flick down (a finger that stopped before lifting has no speed left)
   h.ontouchend=e=>{ inner=null; if(!drag) return; drag=false; h.classList.remove('drag'); unfollow(); const v=e.timeStamp-lastT>80?0:vy; if(dy>110||(v>FLICK&&dy>30)){ if(sheetGuard&&sheetGuard()){ h.style.transform=''; requestCloseSheet(); } else closeSheet(); } else h.style.transform=''; }; // with text to lose, the sheet goes back up and asks
   h.ontouchcancel=()=>{ inner=null; if(!drag) return; drag=false; reset(); }; }
-function actionSheet(title, items, onCancel){ sheetOpenedAt=performance.now(); asheetNested=sheet.classList.contains('on'); asheetCancel=onCancel||null; asheet.innerHTML='<div class="grp">'+(title?'<div class="t">'+esc(title)+'</div>':'')+items.map((it,i)=>'<button class="it'+(it.red?' red':'')+'" data-i="'+i+'">'+esc(it.label)+'</button>').join('')+'</div><div class="grp"><button class="it cancel" data-i="-1">Cancelar</button></div>'; asheet.classList.add('on'); scrim.classList.add('on'); dimApp(true); asheet.onclick=e=>{ const b=e.target.closest('[data-i]'); if(!b) return; if(ghostSheet(e)){ log('warn','Toque en el menú ignorado justo al abrir'); return; } const i=+b.dataset.i; if(i<0){ cancelAction(); return; } if(asheetNested&&sheet.classList.contains('on')) closeAction(); else closeSheet(); items[i].fn(); }; }
-function confirmSheet(title, text, fn){ actionSheet(text, [{label:title, red:true, fn}]); }
+function actionSheet(title, items, onCancel, cancelLabel){ sheetOpenedAt=performance.now(); asheetNested=sheet.classList.contains('on'); asheetCancel=onCancel||null; asheet.classList.remove('alert'); scrim.classList.remove('light'); asheet.innerHTML='<div class="grp">'+(title?'<div class="t">'+esc(title)+'</div>':'')+items.map((it,i)=>'<button class="it'+(it.red?' red':'')+'" data-i="'+i+'">'+esc(it.label)+'</button>').join('')+'</div><div class="grp"><button class="it cancel" data-i="-1">'+esc(cancelLabel||'Cancelar')+'</button></div>'; asheet.classList.add('on'); scrim.classList.add('on'); dimApp(true); asheet.onclick=asheetClick(items); }
+const asheetClick = items => e=>{ const b=e.target.closest('[data-i]'); if(!b) return; if(ghostSheet(e)){ log('warn','Toque en el menú ignorado justo al abrir'); return; } const i=+b.dataset.i; if(i<0){ cancelAction(); return; } asheetDone(); items[i].fn(); };
+function asheetDone(){ if(asheetNested&&sheet.classList.contains('on')) closeAction(); else closeSheet(); }
+/* Decision 28c: on the desktop a confirmation is a macOS alert: a small centred panel with the app icon, a bold title, the text and two
+   buttons, Cancelar and the action on the right (red when it destroys). Intro runs the action and Esc cancels; Tab stays between the two
+   buttons; the backdrop dims a little. It reuses the action sheet's element, so the modal rules (Escape, the backdrop) apply as they are.
+   o: {title, text, ok, cancel, red (default true), fn, onCancel} */
+let alertFocus=null;
+function macAlert(o){ sheetOpenedAt=performance.now(); asheetNested=sheet.classList.contains('on'); asheetCancel=o.onCancel||null; alertFocus=document.activeElement;
+  asheet.classList.add('alert'); asheet.innerHTML='<div class="al" role="alertdialog" aria-modal="true" aria-labelledby="alT"'+(o.text?' aria-describedby="alX"':'')+'><img class="al-icon" src="icons/icon-192.png" alt=""><div class="al-t" id="alT">'+esc(o.title)+'</div>'+(o.text?'<div class="al-x" id="alX">'+esc(o.text)+'</div>':'')+
+    '<div class="al-b"><button class="al-btn" data-i="-1">'+esc(o.cancel||'Cancelar')+'</button><button class="al-btn def'+(o.red===false?'':' red')+'" data-i="0">'+esc(o.ok)+'</button></div></div>';
+  asheet.classList.add('on'); scrim.classList.add('on','light'); dimApp(true); asheet.onclick=asheetClick([{fn:o.fn}]);
+  const d=$('.al-btn.def', asheet); if(d) d.focus({preventScroll:true}); }
+const alertOn = () => asheet.classList.contains('on') && asheet.classList.contains('alert');
+window.addEventListener('keydown', e=>{ if(!alertOn()) return; const bs=[...asheet.querySelectorAll('.al-btn')];
+  if(e.key==='Enter'&&!e.isComposing){ e.preventDefault(); e.stopPropagation(); const d=$('.al-btn.def', asheet); if(d) d.click(); return; }
+  if(e.key==='Escape'){ e.preventDefault(); e.stopPropagation(); cancelAction(); return; }
+  if(e.key==='Tab'){ e.preventDefault(); e.stopPropagation(); const i=bs.indexOf(document.activeElement); const n=bs[(i<0?0:i+(e.shiftKey?bs.length-1:1))%bs.length]; if(n) n.focus(); return; }
+  if(e.key===' '&&bs.includes(document.activeElement)) return; // Space presses the focused button
+  e.stopPropagation(); }, true); // no other key reaches the page behind the alert
+asheet.addEventListener('focusout', ()=>{ setTimeout(()=>{ if(alertOn()&&!asheet.contains(document.activeElement)){ const d=$('.al-btn.def', asheet); if(d) d.focus({preventScroll:true}); } }, 0); }); // the focus stays inside
+// Destructive confirmations: the bottom action sheet on the iPhone, a macOS alert on the desktop (ok: the button's word there)
+function confirmSheet(title, text, fn, ok){ if(UI.wide){ macAlert({title, text, ok:ok||(/^Eliminar/.test(title)?'Eliminar':title), fn}); return; } actionSheet(text, [{label:title, red:true, fn}]); }
 /* ---------- R10: anchored menus (iPhone) ----------
    A long press lifts the row (a copy of it, over the blurred and dimmed screen; the row itself is hidden meanwhile) and opens a
    compact menu next to it. A button (the space title, three dots, a detail cell, the select bar) opens the same menu anchored to it.
@@ -2667,6 +2706,9 @@ function addSheet(projectId){
       lastId=addTask({title:r.title, date:r.date, projectId:r.projectId, priority:r.priority, reminder:r.reminder}).id; st.added++; haptic(8); return r.title; };
     // The list behind the sheet is drawn once, when the sheet closes (any way it closes), not after every Enter
     sheetOnClose=()=>{ if(st.added) render(); };
+    // Decision 28b: a typed title or a pasted list not yet added asks before the sheet goes
+    sheetGuard=()=>{ const n=st.lines?many().length:(inp.value.trim()?1:0); if(!n) return null;
+      return {title:n>1?'Las tareas no se han añadido.':'La tarea no se ha añadido.', label:n>1?'Descartar tareas':'Descartar tarea', field:inp}; };
     const finish=()=>{ closeSheet(); if(st.added) toast(st.added===1?'Tarea añadida':st.added+' tareas añadidas'); };
     const createList=()=>{ const ls=many(); if(!ls.length){ st.lines=null; draw(); inp.focus(); return; } const ids=addMany(ls, base()); st.added=0; closeSheet(); renderAnimated();
       log('info','Tareas creadas desde una lista', {n:ids.length}); toast(ids.length===1?'1 tarea creada':ids.length+' tareas creadas', ()=>removeTasks(ids)); };
@@ -2828,10 +2870,14 @@ function voiceSheet(id, editId){ if(!task(id)) return; // a note always belongs 
         cur.text=t; cur.modified=new Date().toISOString(); updTask(id,{}); haptic(8); log('info','Nota de voz editada');
         setTimeout(()=>toast('Nota de voz editada', ()=>{ const v=DB.voiceNotes.find(x=>x.id===editing.id); if(!v) return; v.text=prev.text; if(prev.modified) v.modified=prev.modified; else delete v.modified; save(); render(); }),0); return true; }
       DB.voiceNotes.push({id:uid(), taskId:id, text:t, created:new Date().toISOString()}); updTask(id,{}); haptic(8); return true; };
+    // Decision 28b: text not saved (a new note, or an edit that changed it) asks before it goes
+    sheetGuard=()=>{ const t=ta.value.trim(); if(!t) return null; if(editing){ const cur=DB.voiceNotes.find(v=>v.id===editing.id); if(!cur||t===cur.text) return null; }
+      return {title:editing?'Los cambios de la nota no se han guardado.':'La nota no se ha guardado.', label:'Descartar nota', field:ta, discard:stop}; };
     s.onclick=e=>{ const b=e.target.closest('[data-x]'); if(!b) return;
       if(b.dataset.x==='mic'){ recording?stop():start(); return; }
       if(b.dataset.x==='redo'){ ta.value=''; ta.focus(); if(SR&&!recording) start(); return; } // focus inside the tap so iOS opens the keyboard
       stop();
+      if(b.dataset.x==='cancel'){ requestCloseSheet(); return; }
       if(b.dataset.x==='ok'){ if(!saveNote()) return; }
       closeSheet(); render(); };
   });
@@ -2880,7 +2926,7 @@ function restoreBackup(date){ const b=BACKUPS.find(x=>x.date===date); if(!b) ret
       if(synced){ const now=new Date().toISOString(); [DB.spaces,DB.projects,DB.tasks,DB.voiceNotes].forEach(a=>a.forEach(r=>{ r.modified=now; })); log('info','Copia restaurada con sesión iniciada: se aplicará en todos los dispositivos', {date}); }
       if(!DB.spaces.some(sp=>sp.id===DB.settings.activeSpace)){ DB.settings.activeSpace=DB.spaces[0].id; resetListState(); } save(); rollOver(); render(); haptic(10);
       log('info','Copia restaurada', {date, tasks:DB.tasks.length}); toast('Copia '+when+' restaurada', ()=>{ Object.assign(DB, prev); if(synced){ const now=new Date().toISOString(); [DB.spaces,DB.projects,DB.tasks,DB.voiceNotes].forEach(a=>a.forEach(r=>{ r.modified=now; })); } DB.settings.activeSpace=prevActive; save(); });
-    }catch(e){ log('error','Restaurar copia falló: '+(e&&e.message||e)); toast('No se pudo restaurar'); } }); }
+    }catch(e){ log('error','Restaurar copia falló: '+(e&&e.message||e)); toast('No se pudo restaurar'); } }, 'Restaurar'); }
 
 /* Export and import */
 function exportData(){ return { app:'tareas', version:APP_VERSION, exported:new Date().toISOString(), spaces:DB.spaces, projects:DB.projects, tasks:DB.tasks, voiceNotes:DB.voiceNotes }; }
@@ -3832,7 +3878,10 @@ function hoursHTML(days, agenda){ const t=todayStr(), xs=calTasks(days[0], days[
   const per=d=>xs.filter(x=>x.date===d);
   const head=agenda?'':'<div class="hrow hhead" style="grid-template-columns:'+cols+'"><div class="hgut"></div>'+days.map(d=>'<div class="hdh'+dayCls(d)+'">'+dayHeadHTML(d, per(d))+'</div>').join('')+'</div>';
   const all='<div class="hrow hall" style="grid-template-columns:'+cols+'"><div class="hgut">Todo el día</div>'+days.map(d=>{ const a=calSort(per(d).filter(x=>!inGrid(x)));
-    return '<div class="hallday'+dayCls(d)+'" data-day="'+d+'" data-allday="1">'+(agenda?'<span class="hcount">'+(a.length?a.length+(a.length===1?' tarea sin hora':' tareas sin hora'):'Ninguna tarea sin hora')+'</span>':'<div class="wl" data-keep="all'+d+'">'+a.map(x=>calCardHTML(x,'')).join('')+'</div>')+'</div>'; }).join('')+'</div>';
+    // Decision 28d: up to three tasks and "N más", which opens that day; in Día itself it shows the rest in place. The strip never scrolls inside
+    const one=days.length===1, open=one&&UI.allDayOpen===d, shown=open?a:a.slice(0,3), more=a.length-shown.length;
+    const link=more>0?'<button class="hmore" '+(one?'data-act="allDayMore" data-day-more="'+d+'"':'data-open-day="'+d+'" title="Abrir el día"')+'>'+more+' más</button>':open&&a.length>3?'<button class="hmore" data-act="allDayMore" data-day-more="">Mostrar menos</button>':'';
+    return '<div class="hallday'+dayCls(d)+'" data-day="'+d+'" data-allday="1">'+(agenda?'<span class="hcount">'+(a.length?a.length+(a.length===1?' tarea sin hora':' tareas sin hora'):'Ninguna tarea sin hora')+'</span>':'<div class="wl" data-keep="all'+d+'">'+shown.map(x=>calCardHTML(x,'')).join('')+link+'</div>')+'</div>'; }).join('')+'</div>';
   let labels=''; for(let m=H0;m<H1;m+=60) labels+='<span style="top:'+((m-H0)/SLOT*SH)+'px">'+hhmm(m)+'</span>';
   const col=d=>{ let s=''; for(let m=H0;m<H1;m+=SLOT){ const dt=new Date(d+'T00:00:00'); dt.setHours(0,m,0,0); s+='<div class="hs'+(m%60?' half':'')+(dt.getTime()<=now?' past':'')+'" data-slot="'+d+'T'+String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0')+'"></div>'; }
     const b=layoutBlocks(calSort(per(d).filter(inGrid))).map(c=>calCardHTML(c.x,'hb','top:'+((c.m-H0)/SLOT*SH)+'px;height:'+(SH-2)+'px;left:calc('+c.col+' * 100% / '+c.k+' + 2px);width:calc(100% / '+c.k+' - 4px);')).join('');

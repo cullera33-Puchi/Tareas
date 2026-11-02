@@ -1,5 +1,10 @@
 # Registro de cambios
 
+## v0.24.1. Borrar el registro (2 de noviembre de 2026)
+
+- En Ajustes, sección Registro, «Borrar registro» vacía el registro de este dispositivo para empezar de cero, tras confirmar y con Deshacer. Lo que se registre mientras tanto se conserva al deshacer. El botón Borrar de «Ver registro» también tiene Deshacer.
+- Prueba nueva `rm-LOG`.
+
 ## v0.24.0. Notas de proyecto (2 de noviembre de 2026)
 
 - Cada proyecto tiene ahora dos pestañas, «Tareas» y «Notas», en el iPhone y en el ordenador. Varias notas por proyecto, con título y fecha: primero las fijadas y después la más reciente.

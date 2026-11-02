@@ -28,12 +28,16 @@ function bindPullRefresh(){
   app.addEventListener('touchend', end, {passive:true}); app.addEventListener('touchcancel', ()=>{ if(mode==='pull') hide(); mode=null; }, {passive:true}); }
 
 /* Log sheet */
+// Clearing the log (this device only), with Deshacer: what was logged meanwhile stays after the entries that come back
+function logPut(l){ LOG=l; try{ if(l.length) localStorage.setItem(LOGKEY, JSON.stringify(l)); else localStorage.removeItem(LOGKEY); }catch(err){} }
+function logClear(){ const was=LOG; logPut([]); render(); toast('Registro borrado', ()=>{ logPut(was.concat(LOG).slice(-400)); render(); }); }
+function logClearAsk(){ const n=LOG.length; if(!n) return; confirmSheet('Borrar registro', (n===1?'La entrada':'Las '+n+' entradas')+' del registro de este dispositivo se borrarán. Podrás deshacerlo durante unos segundos.', logClear); }
 function logSheet(){
   openSheet('<h2>Registro</h2><div class="hint">'+LOG.length+' entradas. Cópialo y pégalo en el chat.</div><textarea readonly style="min-height:260px;font-size:12px;line-height:1.35;font-family:ui-monospace,Menlo,monospace">'+esc(logText())+'</textarea><div class="sheet-actions"><button class="btn" data-x="clear">Borrar</button><button class="btn primary" data-x="copy">Copiar</button></div>'+(navigator.share?'<div class="sheet-actions" style="margin-top:10px"><button class="btn" data-x="share">Compartir</button></div>':''), s=>{
     s.onclick=e=>{ const b=e.target.closest('[data-x]'); if(!b) return;
       if(b.dataset.x==='copy'){ copyText(logText(),'Registro copiado'); return; }
       if(b.dataset.x==='share'){ navigator.share({title:'Registro de Tareas', text:logText()}).catch(()=>{}); return; }
-      if(b.dataset.x==='clear'){ LOG=[]; try{ localStorage.removeItem(LOGKEY); }catch(err){} closeSheet(); render(); toast('Registro borrado'); } };
+      if(b.dataset.x==='clear'){ closeSheet(); logClear(); } };
   });
 }
 

@@ -36,6 +36,8 @@ const MI = {
   down:mi('<path d="M12 5v14M6 13l6 6 6-6"/>'),
   archive:mi('<rect x="3" y="4" width="18" height="5" rx="1.5"/><path d="M5 9v9a2 2 0 002 2h10a2 2 0 002-2V9M10 13h4"/>'),
   check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5l5 5L19.5 6.5"/></svg>',
+  wait:mi('<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>'),
+  unwait:mi('<path d="M9 14L4 9l5-5M4 9h10.5a5.5 5.5 0 010 11H11"/>'),
   star:mi('<path d="M12 3.2l2.7 5.5 6 .9-4.35 4.25 1.03 6L12 17l-5.38 2.85 1.03-6L3.3 9.6l6-.9z"/>'),
   starOff:mi('<path d="M12 3.2l2.7 5.5 6 .9-4.35 4.25 1.03 6L12 17l-5.38 2.85 1.03-6L3.3 9.6l6-.9z"/><path d="M4 4l16 16"/>'),
   repeat:mi('<path d="M17 3l3 3-3 3M4 11.5V10a4 4 0 014-4h12M7 21l-3-3 3-3M20 12.5V14a4 4 0 01-4 4H4"/>'),
@@ -235,7 +237,7 @@ function dateMenu(id){ const x=task(id); if(!x) return null; const t=todayStr();
    on the current value, Mover a otro espacio, Duplicar and Eliminar, each with the key that acts on the selected row (R15) */
 function deskTaskMenu(id){ const x=task(id); if(!x) return null; const done=x.status==='done';
   return {groups:[
-    [{label:done?'Marcar pendiente':'Completar', key:'C', fn:()=>{ releaseHold(id); leaveRows(id); setTimeout(()=>{ completeTask(id); renderAnimated(); },200); }}].concat(done?[]:[{label:x.focus?'Quitar de Ahora':'Ahora', key:'A', fn:()=>toggleFocus(id)}]), // decision 39
+    [{label:done?'Marcar pendiente':'Completar', key:'C', fn:()=>{ releaseHold(id); leaveRows(id); setTimeout(()=>{ completeTask(id); renderAnimated(); },200); }}].concat(x.status==='pending'?[{label:x.focus?'Quitar de Ahora':'Ahora', key:'A', fn:()=>toggleFocus(id)}]:[]).concat(waitItems(x)), // decisions 39 and 41
     [{label:'Fecha', menu:()=>dateMenu(id)}, {label:'Prioridad', menu:()=>({title:'Prioridad', groups:[prioItems(x, id)]})}, {label:'Proyecto', key:'P', menu:()=>projectPickMenu(id)}].concat(DB.spaces.length>1?[{label:'Mover a otro espacio', menu:()=>spaceMoveMenu(id)}]:[]),
     [{label:'Duplicar', fn:()=>duplicateTask(id)}],
     [{label:'Eliminar', key:'Supr', red:true, fn:()=>confirmDelete(id)}] ]}; }
@@ -243,7 +245,7 @@ function duplicateTask(id){ const x=task(id); if(!x) return; const n=addTask({ti
 function leaveRows(id){ document.querySelectorAll('.row[data-id="'+id+'"]').forEach(r=>r.classList.add('leaving')); }
 function confirmDelete(id, after){ const x=task(id); if(!x) return; releaseHold(id);
   const go=fn=>()=>{ leaveRows(id); setTimeout(()=>{ fn(); after?after():renderAnimated(); },200); };
-  if(x.status==='pending'&&repParse(x.repeat)){ askRepeatDelete({n:1, title:x.title}, go(()=>skipOccurrence(id)), go(()=>deleteTask(id))); return; } // decision 38
+  if(isOpen(x)&&repParse(x.repeat)){ askRepeatDelete({n:1, title:x.title}, go(()=>skipOccurrence(id)), go(()=>deleteTask(id))); return; } // decision 38
   confirmSheet('Eliminar tarea', '"'+x.title+'" se eliminará. Podrás deshacerlo durante unos segundos.', go(()=>deleteTask(id))); }
 /* Decision 38: a task that repeats (or a selection with some) asks how far the deletion goes: only this one, which moves to the next date of
    its series, or the series. The bottom action sheet on the iPhone, a macOS alert with three buttons on the desktop (Intro: only this one). o: {n, rep, title} */
@@ -255,7 +257,7 @@ function askRepeatDelete(o, onlyFn, seriesFn){ const one=o.n===1, k=o.rep||1;
   actionSheet(text, [{label:only, red:true, fn:onlyFn}, {label:all, red:true, fn:seriesFn}]); }
 function detailMenu(id, src){ const x=task(id); if(!x) return;
   popMenu({anchor:src, align:'right', groups:[
-    [{label:x.status==='done'?'Marcar pendiente':'Marcar completada', icon:x.status==='done'?MI.undo:MI.done, key:'C', fn:()=>{ completeTask(id,true); render(); }}],
+    [{label:x.status==='done'?'Marcar pendiente':'Marcar completada', icon:x.status==='done'?MI.undo:MI.done, key:'C', fn:()=>{ completeTask(id,true); render(); }}].concat(waitItems(x, MI, src)), // decision 41
     (DB.spaces.length>1?[{label:'Mover a otro espacio', icon:MI.space, menu:()=>spaceMoveMenu(id)}]:[]).concat([{label:'Duplicar', icon:MI.dup, fn:()=>duplicateTask(id)}]),
     [{label:'Eliminar tarea', icon:MI.trash, red:true, key:'Supr', fn:()=>confirmDelete(id, closeDetailOf(id))}] ]}); }
 // After a delete from the detail, close that task's detail only if it is still the one showing: Atrás may have been tapped meanwhile
@@ -297,3 +299,29 @@ function repeatCustom(id, src){ const x=task(id); if(!x) return; const st=rpStat
       else if(k==='u') st.u=v; else if(k==='m') st.mm=v; else if(k==='o') st.nth=+v; else if(k==='w') st.wd=+v;
       else if(k==='d'){ const d=+v; if(st.days.has(d)) st.days.delete(d); else st.days.add(d); }
       haptic(4); const box=$('.rp', s); if(box) box.innerHTML=rpHTML(st); }; }); }
+
+/* ---------- Decision 41: Por confirmar ----------
+   The menu items (row menu, desktop context menu, detail menu): Por confirmar… for a pending task, Volver a pendiente and Cambiar for a waiting one.
+   waitingSheet: Esperando a (optional) and the review day, a sheet on the iPhone (actions in its head, decision 18) and a popover on the desktop */
+function waitItems(x, icons, src){ const id=x.id;
+  if(x.status==='pending') return [{label:UI.wide?'Por confirmar…':'Por confirmar', icon:icons&&icons.wait, fn:()=>waitingSheet(id, src)}];
+  if(x.status==='waiting') return [{label:'Volver a pendiente', icon:icons&&icons.unwait, fn:()=>{ unWait(id); renderAnimated(); }}, {label:UI.wide?'Cambiar Por confirmar…':'Cambiar Por confirmar', icon:icons&&icons.wait, fn:()=>waitingSheet(id, src)}];
+  return []; }
+// The review days: Mañana, En 3 días, Próxima semana and Sin fecha; the one the task already has is chosen, else none (its date stays)
+function waitDays(){ const t=todayStr(); return uniqueBy([['man',addDays(t,1),'Mañana'],['3d',addDays(t,3),'En 3 días'],['nsem',nextWeekday(1,true),'Próxima semana']], o=>o[1]).concat([['none',null,'Sin fecha']]); }
+function waitingSheet(id, src){ const x=task(id); if(!x||x.status==='done') return; const days=waitDays(); let sel=(days.find(o=>o[1]===(x.date||null))||[])[0]||(x.status==='waiting'?null:x.date&&x.date>todayStr()?null:'man');
+  const chips=()=>days.map(o=>'<button class="chip'+(sel===o[0]?' on':'')+'" data-wd="'+o[0]+'">'+o[2]+'</button>').join('');
+  const line=()=>{ const d=sel?days.find(o=>o[0]===sel)[1]:x.date; return d?'Vuelve a Hoy '+dayWords(d)+', marcada Revisar.':'Sin día de revisión: queda en Por confirmar.'; };
+  const field='<input type="text" class="wfor" data-role="waitfor" placeholder="Nombre o motivo (opcional)" value="'+esc(x.waitingFor||'')+'" autocomplete="off" enterkeyhint="done"'+(UI.wide?' autofocus':'')+'>';
+  const body='<div class="wsheet"><label class="wlbl">Esperando a</label>'+field+'<div class="wlbl">Revisar</div><div class="chips wchips">'+chips()+'</div><div class="hint wline">'+line()+'</div>';
+  const save=(close, s)=>{ const v=$('[data-role=waitfor]', s).value; close(); setWaiting(id, v, sel?days.find(o=>o[0]===sel)[1]:undefined); renderAnimated(); };
+  const bind=(s, close)=>{ const inp=$('[data-role=waitfor]', s);
+    inp.addEventListener('keydown', e=>{ if(e.key==='Enter'&&!e.isComposing){ e.preventDefault(); save(close, s); } });
+    s.onclick=e=>{ const c=e.target.closest('[data-wd]'); if(c){ sel=c.dataset.wd; $('.wchips', s).innerHTML=chips(); $('.wline', s).textContent=line(); haptic(4); return; }
+      const b=e.target.closest('[data-x]'); if(!b) return; if(b.dataset.x==='ok') save(close, s); else close(); }; };
+  const title=x.status==='waiting'?'Cambiar Por confirmar':'Por confirmar';
+  if(UI.wide){ pickerPanel(title, '<div class="pm-title wtitle">'+title+'</div>'+body+'<div class="sheet-actions"><button class="btn" data-x="cancel">Cancelar</button><button class="btn primary" data-x="ok">Guardar</button></div></div>', id, src&&src.isConnected?src:null, 'menu', bind); return; }
+  openSheet(sheadHTML(title, 'Cancelar', 'Guardar')+body+'</div>', s=>bind(s, closeSheet)); }
+// The Por confirmar row of the detail and the inspector: Volver a pendiente, or Cambiar (who and the review day)
+function waitingMenu(id, src){ const x=task(id); if(!x||x.status!=='waiting') return; const at=src?{anchor:src, align:UI.wide?'left':'right'}:taskAnchor(id, 'pickWaiting')||{};
+  popMenu(Object.assign(at, {groups:[waitItems(x, MI, src)]})); }

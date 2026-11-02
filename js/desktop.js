@@ -12,7 +12,7 @@ function setDeskView(v){ if(v==='project:none') v='project:none'; UI.deskView=v;
    order and idx remember the list as last drawn, so a row that leaves it (done, moved, deleted) hands the selection to its neighbour.
    The iPhone keeps its own selection mode (UI.select) */
 function deskMulti(){ return UI.wide && (UI.dsel.mode || UI.dsel.ids.size>1); }
-function deskListView(){ const v=UI.deskView; return v==='hoy'||v==='todas'||v==='ahora'||v.startsWith('project:'); } // decision 39: Ahora is a list too
+function deskListView(){ const v=UI.deskView; return v==='hoy'||v==='todas'||v==='ahora'||v==='waiting'||v.startsWith('project:'); } // decisions 39 and 41: Ahora and Por confirmar are lists too
 // The rows of the visible list in order, with the placeholders of a long one; "Lo primero" repeats rows and is left out
 function deskOrder(){ return [...document.querySelectorAll('#desk .main .mbody .row[data-id], #desk .main .mbody .rph[data-id]')].filter(r=>!r.closest('.first')).map(r=>r.dataset.id); }
 function deskRow(id){ return id?document.querySelector('#desk .main .mbody .row[data-id="'+CSS.escape(id)+'"]:not(.first .row)'):null; }
@@ -180,7 +180,7 @@ function deskSide(){
   const it=(view,ic,label,n,on,attr)=>'<button class="it'+(on?' on':'')+'" data-view="'+view+'"'+(attr||'')+'>'+ic+'<span>'+label+'</span>'+(n!==undefined?'<span class="n">'+n+'</span>':'')+'</button>';
   return '<aside class="side"><button class="sp" data-act="spaceMenu">'+esc(space().name)+I.chevD+'</button>'+
     it('ahora',I.star,'Ahora',ahoraTasks().length,v==='ahora',' data-drop-ahora=""')+ // decision 39: above Hoy, and rows dropped on it go into Ahora
-    it('hoy',I.list,'Hoy',pendingFor('hoy').length,v==='hoy',' data-day="'+todayStr()+'"')+it('todas',I.inbox.replace('viewBox="0 0 48 48"','viewBox="0 0 48 48" stroke-width="3"'),'Todas',pendingFor('todas').length,v==='todas')+it('week',I.cal,'Semana',undefined,isCalView(v))+miniMonthHTML()+
+    it('hoy',I.list,'Hoy',pendingFor('hoy').length,v==='hoy',' data-day="'+todayStr()+'"')+it('todas',I.inbox.replace('viewBox="0 0 48 48"','viewBox="0 0 48 48" stroke-width="3"'),'Todas',pendingFor('todas').length,v==='todas')+it('waiting',MI.wait,'Por confirmar',spaceTasks().filter(x=>x.status==='waiting').length,v==='waiting')+it('week',I.cal,'Semana',undefined,isCalView(v))+miniMonthHTML()+ // decision 41
     '<div class="sec">Proyectos</div>'+ps.map(p=>'<button class="it'+(v==='project:'+p.id?' on':'')+'" data-view="project:'+p.id+'" data-drop-project="'+p.id+'" aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown"><span class="dot" style="background:'+p.color+'"></span><span>'+esc(p.name)+'</span><span class="n">'+cnt(p.id)+'</span></button>').join('')+
     '<button class="it'+(v==='project:none'?' on':'')+'" data-view="project:none" data-drop-project=""><span class="dot" style="background:var(--ink3)"></span><span>Sin proyecto</span><span class="n">'+cnt(null)+'</span></button>'+
     '<button class="it add" data-act="newProject">'+I.plus+'<span>Nuevo proyecto</span></button>'+
@@ -206,6 +206,7 @@ function deskMain(){
     body = addBarHTML(null)+(UI.query?'':ahoraHTML())+(f==='hoy'&&!UI.query?summaryHTML():'')+
       listHTML(UI.query?'todas':f); }
   else if(v==='ahora'){ title='Ahora'; body=ahoraViewHTML(); } // decision 39
+  else if(v==='waiting'){ title='Por confirmar'; body=waitingViewHTML(); } // decision 41
   else if(isCalView(v)){ title={day:'Día',week:'Semana',month:'Mes'}[v]; pf=true; body=weekHTML(); } // the project filter applies here too, so it stays visible and clearable
   else if(v.startsWith('project:')){ const id=v.slice(8); const p=id==='none'?null:proj(id); if(id!=='none'&&(!p||p.archived||p.spaceId!==space().id)){ UI.deskView=DB.settings.filter||'hoy'; return deskMain(); } /* gone, archived or in another space */ title=p?p.name:'Sin proyecto'; body=addBarHTML(p?p.id:null)+listHTML('todas', p?p.id:null); }
   else if(v==='settings'){ title='Ajustes'; search=false; const h=viewAjustes(); body=h.slice(h.indexOf('<div class="scroll">')); }

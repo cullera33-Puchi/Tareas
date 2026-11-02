@@ -29,20 +29,21 @@ const INITIAL_SPACES=['trabajo','personal'];
 const SYNC_FIELDS={
   spaces:[['name','name','text'],['order','sort_order','int']],
   projects:[['spaceId','space_id','id'],['name','name','text'],['color','color','id'],['order','sort_order','int'],['archived','archived','bool']],
-  tasks:[['spaceId','space_id','id'],['projectId','project_id','id'],['title','title','text'],['date','date','day'],['reminder','reminder','ts'],['priority','priority','pri'],['status','status','status'],['notes','notes','text'],['carried','carried','bool'],['completed','completed','ts'],['reminderSent','reminder_sent','tsOpt'],['repeat','repeat','textN'],['focus','focus','tsN']],
+  tasks:[['spaceId','space_id','id'],['projectId','project_id','id'],['title','title','text'],['date','date','day'],['reminder','reminder','ts'],['priority','priority','pri'],['status','status','status'],['notes','notes','text'],['carried','carried','bool'],['completed','completed','ts'],['reminderSent','reminder_sent','tsOpt'],['repeat','repeat','textN'],['focus','focus','tsN'],['waitingFor','waiting_for','textN']],
   voice_notes:[['taskId','task_id','id'],['text','text','text']],
   // Decision 29 (0003_attachments.sql): the record of a photo or a recording; its file goes to Storage first (attFlush)
   attachments:[['taskId','task_id','id'],['kind','kind','kind'],['path','path','id'],['mime','mime','id'],['size','size','int'],['width','width','int'],['height','height','int'],['durationMs','duration_ms','int']] };
 const syncTs = v => { if(!v) return null; const d=new Date(v); return isNaN(d) ? null : d.toISOString(); };
 const SYNC_TO={ id:v=>v==null||v===''?null:String(v), text:v=>v==null?'':String(v), int:v=>v==null||v===''||isNaN(+v)?null:Math.round(+v), bool:v=>!!v,
-  day:v=>/^\d{4}-\d{2}-\d{2}$/.test(String(v||''))?v:null, ts:syncTs, tsOpt:syncTs, tsN:syncTs, textN:v=>v==null||v===''?null:String(v), pri:v=>['high','mid','none'].includes(v)?v:'none', status:v=>['pending','done'].includes(v)?v:'pending', kind:v=>['photo','audio'].includes(v)?v:null };
+  day:v=>/^\d{4}-\d{2}-\d{2}$/.test(String(v||''))?v:null, ts:syncTs, tsOpt:syncTs, tsN:syncTs, textN:v=>v==null||v===''?null:String(v), pri:v=>['high','mid','none'].includes(v)?v:'none', status:v=>['pending','done','waiting'].includes(v)?v:'pending', kind:v=>['photo','audio'].includes(v)?v:null };
 const syncNullable = k => k==='textN'||k==='tsN';
 // Columns the database turned out not to have (table.column), for this session: 0004_repeat_focus.sql not run yet
 const SYNC_NOCOL=new Set();
 const syncNoCol = (table, c) => SYNC_NOCOL.has(table+'.'+c);
 // A local record as a row: always the same keys in the same order, so the signature only changes with the content
 function syncToRow(table, rec){ const row={id:String(rec.id), created:syncTs(rec.created)};
-  SYNC_FIELDS[table].forEach(([f,c,k])=>{ const v=SYNC_TO[k](rec[f]); if(syncNullable(k)){ if(v!==null&&!syncNoCol(table,c)) row[c]=v; } else if(k!=='tsOpt'||v!==null) row[c]=v; });
+  SYNC_FIELDS[table].forEach(([f,c,k])=>{ let v=SYNC_TO[k](rec[f]); if(k==='status'&&v==='waiting'&&syncNoCol(table,'status:waiting')) v='pending'; // decision 41 on a database that refuses it: pending there, waiting here
+    if(syncNullable(k)){ if(v!==null&&!syncNoCol(table,c)) row[c]=v; } else if(k!=='tsOpt'||v!==null) row[c]=v; });
   row.modified=syncTs(rec.modified)||row.created||EPOCH;
   row.deleted=null; // sent every time: a record back after its deletion clears the server's mark
   return row; }
@@ -171,6 +172,7 @@ function syncMerge(W, st, table, rows, stats){
       if(table==='tasks'){ W.voiceNotes.forEach((v,j)=>{ if(v&&v.taskId===id){ W.voiceNotes[j]=null; } }); W.attachments.forEach((a,j)=>{ if(a&&a.taskId===id){ W.attachments[j]=null; } }); } return; }
     const keep={}; Object.keys(local).forEach(k=>{ if(!(k in lrow) && !SYNC_FIELDS[table].some(f=>f[0]===k)) keep[k]=local[k]; }); // fields this model does not sync stay
     SYNC_FIELDS[table].forEach(([f,c,k])=>{ if(syncNullable(k)&&!(c in row)&&local[f]!=null) keep[f]=local[f]; }); // and a column the server lacks keeps the device's value
+    if(table==='tasks'&&syncNoCol(table,'status:waiting')&&local.status==='waiting'&&remote.status==='pending'){ keep.status='waiting'; if(local.waitingFor) keep.waitingFor=local.waitingFor; } // so does a status it cannot hold
     W[list][i]=Object.assign(keep, remote); stats.updated++; });
   if(removed) SYNC_TABLES.forEach(({list:l})=>{ W[l]=W[l].filter(Boolean); });
 }
@@ -211,9 +213,14 @@ function syncCollect(dry){ const st=syncState(), now=new Date().toISOString(), u
 const SYNC_NULLCOLS = table => SYNC_FIELDS[table].filter(([,,k])=>syncNullable(k)).map(([,c])=>c);
 function syncColRefused(table, e){ const m=String(e&&(e.message||e.details||e)||'')+' '+String(e&&e.code||'');
   if(!/PGRST204|42703|column|schema cache/i.test(m)) return null; return SYNC_NULLCOLS(table).find(c=>!syncNoCol(table,c)&&new RegExp('(^|\\W)'+c+'(\\W|$)').test(m))||null; }
-async function syncUpsert(table, rows){ for(;;){ const send=rows.map(r=>{ let o=r; SYNC_NULLCOLS(table).forEach(c=>{ if(syncNoCol(table,c)&&c in o){ if(o===r) o=Object.assign({}, r); delete o[c]; } }); return o; });
+// The status check of 0001 (pending or done) refuses 'waiting' (decision 41) until 0004 widens it: from then on such tasks go up as pending
+const syncWaitRefused = (table, e) => { const m=String(e&&(e.message||e.details||e)||'')+' '+String(e&&e.code||''); return table==='tasks'&&!syncNoCol(table,'status:waiting')&&/23514|check constraint/i.test(m)&&/status/i.test(m); };
+const NOCOL_WHAT={repeat:'La repetición', focus:'Ahora', waiting_for:'Esperando a'};
+async function syncUpsert(table, rows){ for(;;){ const send=rows.map(r=>{ let o=r; SYNC_NULLCOLS(table).forEach(c=>{ if(syncNoCol(table,c)&&c in o){ if(o===r) o=Object.assign({}, r); delete o[c]; } });
+      if(o.status==='waiting'&&syncNoCol(table,'status:waiting')){ if(o===r) o=Object.assign({}, r); o.status='pending'; } return o; });
     try{ return await SY.remote.upsert(table, send); }
-    catch(e){ const c=syncColRefused(table, e); if(!c) throw e; SYNC_NOCOL.add(table+'.'+c); log('warn','La base de datos no tiene todavía la columna '+table+'.'+c+': falta 0004_repeat_focus.sql. '+(c==='repeat'?'La repetición':'Ahora')+' se queda en este dispositivo'); } } }
+    catch(e){ if(syncWaitRefused(table, e)){ SYNC_NOCOL.add(table+'.status:waiting'); log('warn','La base de datos no admite todavía el estado Por confirmar: falta 0004_repeat_focus.sql. Esas tareas se envían como pendientes y siguen por confirmar en este dispositivo'); continue; }
+      const c=syncColRefused(table, e); if(!c) throw e; SYNC_NOCOL.add(table+'.'+c); log('warn','La base de datos no tiene todavía la columna '+table+'.'+c+': falta 0004_repeat_focus.sql. '+NOCOL_WHAT[c]+' se queda en este dispositivo'); } } }
 async function syncPush(c){ const out={pushed:0, deleted:0, kept:0}; const late={};
   for(const {table} of SYNC_TABLES){
     for(let i=0;i<c.up[table].length;i+=SYNC_CHUNK){ const part=c.up[table].slice(i,i+SYNC_CHUNK);

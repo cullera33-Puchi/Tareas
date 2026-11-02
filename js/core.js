@@ -276,7 +276,7 @@ function orderTasks(list){
 }
 // The query is normalised once and the voice notes searched once per list, not once per task
 function queryMatcher(query){ const q=norm(query); const vn=new Set(DB.voiceNotes.filter(v=>norm(v.text).includes(q)).map(v=>v.taskId));
-  return x => norm(x.title).includes(q) || norm(x.notes).includes(q) || (x.projectId && norm((proj(x.projectId)||{}).name).includes(q)) || vn.has(x.id); }
+  return x => norm(x.title).includes(q) || norm(x.notes).includes(q) || (x.waitingFor && norm(x.waitingFor).includes(q)) || (x.projectId && norm((proj(x.projectId)||{}).name).includes(q)) || vn.has(x.id); }
 function matchesQuery(x, query){ return queryMatcher(query)(x); }
 // R18: while one screen is drawn (drawing) each pending list is worked out once: the summary, the counts and the list ask for the same ones,
 // and nothing changes the data in between. Callers only read the lists
@@ -286,12 +286,21 @@ function pendingFor(filter, projectId, query){ if(!PF) return pendingCalc(filter
   const k=filter+'|'+projectId+'|'+(query||''); let v=PF.get(k); if(!v){ v=pendingCalc(filter, projectId, query); PF.set(k,v); } return v; }
 function pendingCalc(filter, projectId, query){
   const t=todayStr();
-  let list = spaceTasks().filter(x=>x.status==='pending');
+  let list = spaceTasks().filter(x=>x.status==='pending' || (x.status==='waiting' && (query || waitDue(x)))); // decision 41: a task waiting for confirmation joins the lists on its review day (and in a search)
   if(projectId!==undefined) list = list.filter(x=> projectId===null ? !x.projectId : x.projectId===projectId);
   if(filter==='hoy') list = list.filter(x=>x.date && x.date<=t);
   if(query) list = list.filter(queryMatcher(query));
   return orderTasks(list);
 }
+/* Decision 41: Por confirmar. status 'waiting' sits between pending and done; waitingFor is who or what it waits for (optional free text).
+   Such a task leaves Hoy and Todas for the folded block Por confirmar at the end of the list, and comes back to Hoy on its review day (its
+   date, or after it: rollOver never carries it), marked Revisar. The rest of the time it counts nowhere */
+const waitDue = x => x.status==='waiting' && !!x.date && x.date<=todayStr();
+const isOpen = x => x.status!=='done'; // pending or waiting: not done
+// The block Por confirmar: the waiting tasks of the space (of a project, or under the project filter) whose review day has not come
+function waitingList(projectId){ let list=spaceTasks().filter(x=>x.status==='waiting'&&!waitDue(x));
+  if(projectId!==undefined) list=list.filter(x=> projectId===null ? !x.projectId : x.projectId===projectId);
+  return list.sort((a,b)=>(a.date||'9999')<(b.date||'9999')?-1:(a.date||'9999')>(b.date||'9999')?1:a.created<b.created?-1:1); }
 function doneList(projectId){
   const lim = Date.now()-30*864e5;
   let list = spaceTasks().filter(x=>x.status==='done' && x.completed && new Date(x.completed).getTime()>lim);
@@ -391,7 +400,7 @@ function setRepeat(id, freq){ const x=task(id); if(!x) return; const cur=repPars
    with its title, project, priority, notes and the reminder's time on the new date; voice notes and attachments stay with the completed one.
    Only the device that completes it does this (a completion that arrives by sync creates nothing), and never a second pending one */
 function spawnNext(x){ const r=repParse(x.repeat); if(!r) return null;
-  if(r.series&&DB.tasks.some(o=>o!==x&&o.status==='pending'&&repSeries(o.repeat)===r.series)) return null;
+  if(r.series&&DB.tasks.some(o=>o!==x&&isOpen(o)&&repSeries(o.repeat)===r.series)) return null; // pending or waiting (decision 41)
   const t=todayStr(), date=repNext(r, x.date&&x.date>t?x.date:t); if(!date) return null;
   let reminder=null; if(x.reminder){ const a=new Date(x.reminder), d=new Date(date+'T00:00:00'); d.setHours(a.getHours(), a.getMinutes(), 0, 0); reminder=d.toISOString(); }
   const n=addTask({title:x.title, spaceId:x.spaceId, projectId:x.projectId, priority:x.priority, notes:x.notes||'', date, reminder, repeat:x.repeat});
@@ -426,6 +435,20 @@ function addToAhora(ids){ const xs=ids.map(task).filter(x=>x&&x.status==='pendin
   toast(xs.length===1?'Añadida a Ahora':xs.length+' tareas añadidas a Ahora', ()=>batch(()=>xs.forEach(x=>{ if(task(x.id)) updTask(x.id,{focus:null}); }))); return true; }
 function removeFromAhora(ids){ const xs=ids.map(task).filter(x=>x&&x.focus); if(!xs.length) return false; const prev=xs.map(x=>({id:x.id, focus:x.focus}));
   batch(()=>xs.forEach(x=>updTask(x.id,{focus:null}))); haptic(6); renderAnimated(); toast(xs.length===1?'Quitada de Ahora':xs.length+' tareas quitadas de Ahora', ()=>batch(()=>prev.forEach(o=>{ if(task(o.id)) updTask(o.id,{focus:o.focus}); }))); return true; }
+
+/* Decision 41: mark a task Por confirmar (who: Esperando a, optional; date: the review day, undefined to keep the task's date) or edit it.
+   It leaves Ahora; its reminder goes with the day (decision 25). With Deshacer */
+const waitSnap = x => ({status:x.status, waitingFor:x.waitingFor||null, date:x.date, carried:x.carried, reminder:x.reminder||null, focus:x.focus||null});
+function waitUndo(id, o){ const x=task(id); if(!x) return; const p={status:o.status, waitingFor:o.waitingFor, date:o.date, carried:o.carried, reminder:o.reminder}; if(o.focus||x.focus) p.focus=o.focus; updTask(id, p); }
+function setWaiting(id, who, date){ const x=task(id); if(!x||x.status==='done') return; const old=waitSnap(x), was=x.status==='waiting';
+  const p=Object.assign(date!==undefined&&date!==x.date ? dayPatch(x, date) : {}, {status:'waiting', waitingFor:String(who||'').trim()||null, carried:false}); if(x.focus) p.focus=null;
+  releaseHold(id); updTask(id, p); haptic(8); log('info', was?'Por confirmar cambiada':'Por confirmar', {date:x.date});
+  const when=x.date&&x.date>todayStr()?', revisar '+dayWords(x.date):x.date?', revisar hoy':'';
+  toast('Por confirmar'+(x.waitingFor?', esperando a '+x.waitingFor:'')+when, ()=>waitUndo(id, old)); }
+// Volver a pendiente: the task comes back to the lists as it was before it waited (a past date becomes today, carried, as rollOver)
+function unWait(id){ const x=task(id); if(!x||x.status!=='waiting') return; const old=waitSnap(x), t=todayStr();
+  releaseHold(id); updTask(id, Object.assign(x.date&&x.date<t ? dayPatch(x, t, {carried:true}) : {}, {status:'pending', waitingFor:null})); haptic(6); log('info','Vuelve a pendiente');
+  toast('Vuelve a pendiente', ()=>waitUndo(id, old)); }
 
 /* ---------- Actions ---------- */
 function addTask(data){
@@ -462,14 +485,14 @@ function rollOver(){ const t=todayStr(); let n=0, f=0; if(DB.settings.summaryDay
 function applyDone(id, done){ const x=task(id); if(!x||(x.status==='done')===done) return null;
   if(done){ updTask(id, Object.assign({status:'done', completed:new Date().toISOString()}, x.focus?{focus:null}:{})); return x.repeat?spawnNext(x):null; }
   dropNext(x); const t=todayStr(); updTask(id, x.date&&x.date<t ? dayPatch(x, t, {status:'pending', completed:null, carried:true}) : {status:'pending', completed:null}); return null; } // a reopened task never comes back overdue (decision 8.5), as rollOver
-// Deshacer of a completion: the task pending again as it was (in Ahora if it was there), without the next one of its series
-function undoDone(o){ const x=task(o.id); if(!x) return; if(x.status==='done'&&o.status==='pending') dropNext(x); const p={status:o.status, completed:o.completed};
-  ['date','carried'].forEach(k=>{ if(k in o) p[k]=o[k]; }); if(o.focus!==undefined) p.focus=o.focus; updTask(o.id, p); }
+// Deshacer of a completion: the task pending (or waiting, decision 41) again as it was (in Ahora if it was there), without the next one of its series
+function undoDone(o){ const x=task(o.id); if(!x) return; if(x.status==='done'&&o.status!=='done') dropNext(x); const p={status:o.status, completed:o.completed};
+  ['date','carried'].forEach(k=>{ if(k in o) p[k]=o[k]; }); if(o.focus||x.focus) p.focus=o.focus||null; updTask(o.id, p); } // focus only when it was or is set: no new key on other tasks
 const doneSnap = x => ({id:x.id, status:x.status, completed:x.completed, date:x.date, carried:x.carried, focus:x.focus||null});
 function completeTask(id, silent){
   const x=task(id); if(!x) return;
-  const was = x.status, prev={id, status:'pending', completed:null, focus:x.focus||null}; const nx=applyDone(id, was==='pending');
-  if(was==='pending'){ haptic(12); if(!silent) toast(doneText(1, nx), ()=>undoDone(prev)); }
+  const was = x.status, prev={id, status:was, completed:null, focus:x.focus||null}; const nx=applyDone(id, was!=='done'); // a waiting task completes too (decision 41)
+  if(was!=='done'){ haptic(12); if(!silent) toast(doneText(1, nx), ()=>undoDone(prev)); }
   else haptic(8);
 }
 /* R1: the circle and the swipe to the right mark a row and leave it where it is, dimmed, for HOLD_MS.

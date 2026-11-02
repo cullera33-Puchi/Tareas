@@ -1219,3 +1219,22 @@ body.resizing,body.resizing *{cursor:col-resize !important;-webkit-user-select:n
 .asheet .al-b.al-v{flex-direction:column;gap:6px;}
 .asheet .al-b.al-v .al-btn{flex:none;width:100%;}
 .asheet .al-btn.red:not(.def){color:var(--red);}
+/* Decision 41: Por confirmar. The circle half filled with the project's colour (or blue); Revisar in orange like Aplazada; Esperando a in grey */
+.check.waiting{background:linear-gradient(to top, var(--pc,var(--blue)) 50%, transparent 50%);border-color:var(--pc,var(--blue));}
+.row-meta .review{color:var(--orange);font-weight:500;}
+.row-meta .waitfor{color:var(--ink2);}
+.app.desktop .rc-date.review{color:var(--orange);font-weight:500;}
+.app.desktop .row-text:has(.wtag){display:flex;align-items:center;gap:8px;}
+.app.desktop .row-text:has(.wtag) .row-title{flex:0 1 auto;min-width:0;}
+.wtag{flex:0 1 auto;min-width:0;max-width:40%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:var(--ink2);background:var(--fill);border-radius:5px;padding:1px 6px;}
+.wtag::before{content:"Esperando a ";}
+.wsheet{display:flex;flex-direction:column;gap:8px;}
+.wsheet .wlbl{font-size:0.765rem;color:var(--ink2);margin-top:4px;}
+.wsheet .wfor{width:100%;height:44px;border:0;border-radius:10px;background:var(--bg);color:var(--ink);padding:0 12px;font-size:max(16px,1rem);outline:0;}
+.wsheet .chips{margin:0;}
+.wsheet .wline{margin:2px 0 0;}
+.pm-pop .wtitle{padding:0 0 8px;font-weight:600;font-size:13px;color:var(--ink);}
+.pm-pop .wsheet{gap:6px;}
+.pm-pop .wsheet .wlbl{font-size:11px;}
+.pm-pop .wsheet .wfor{height:28px;border-radius:6px;font-size:13px;background:var(--fill);padding:0 8px;}
+.pm-pop .wsheet .wline{font-size:12px;color:var(--ink2);text-align:center;}

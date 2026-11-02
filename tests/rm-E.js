@@ -96,7 +96,8 @@ const rowSel = id => '#desk .main .group .row[data-id="'+id+'"]';
   await page.mouse.click(px, py, {button:'right'}); await page.waitForTimeout(250);
   m = await menu(page); r.ctx=m;
   check('R17_ctxAtPointer', m.open && m.mac && !m.lift && Math.abs(m.levels[0].box.left-px)<=1 && (Math.abs(m.levels[0].box.top-py)<=1 || Math.abs(m.levels[0].box.bottom-py)<=1), {m, px, py});
-  check('R17_ctxItems', JSON.stringify(m.levels[0].items)===JSON.stringify(['Completar [C]','Fecha >','Prioridad >','Proyecto [P] >','Mover a otro espacio >','Duplicar','Eliminar [Supr]']), m.levels[0].items);
+  // Updated by decisions 39 (Ahora) and 41 (Por confirmar): two items after Completar
+  check('R17_ctxItems', JSON.stringify(m.levels[0].items)===JSON.stringify(['Completar [C]','Ahora [A]','Por confirmar…','Fecha >','Prioridad >','Proyecto [P] >','Mover a otro espacio >','Duplicar','Eliminar [Supr]']), m.levels[0].items);
   check('R17_macStyle', m.levels[0].font==='13px' && /rgba\(0, 0, 0, 0\)|transparent/.test(m.back), {font:m.levels[0].font, back:m.back});
   // Hover: highlight, then the submenu opens to the side with a check on the current value and the keys
   c = await item(page, 0, 'Prioridad'); await page.mouse.move(c.x, c.y); await page.waitForTimeout(400);
@@ -118,7 +119,7 @@ const rowSel = id => '#desk .main .group .row[data-id="'+id+'"]';
   const t2 = await page.evaluate(()=>pendingFor('hoy').find(x=>!x.carried&&x.priority==='none').id);
   const rb2 = await box(page, rowSel(t2)+' .row-title');
   await page.mouse.click(rb2.left+30, rb2.top+10, {button:'right'}); await page.waitForTimeout(250);
-  await page.keyboard.press('ArrowDown'); await page.keyboard.press('ArrowDown'); await page.waitForTimeout(80);
+  for(let i=0;i<4;i++) await page.keyboard.press('ArrowDown'); await page.waitForTimeout(80); // Completar, Ahora (decision 39), Por confirmar (decision 41), Fecha
   m = await menu(page); check('R17_keyDown', m.levels[0].hl==='Fecha', m.levels[0].hl);
   await page.keyboard.press('ArrowRight'); await page.waitForTimeout(120); m = await menu(page);
   check('R17_keyRight', m.levels.length===2 && m.levels[1].hl==='Hoy', m.levels.map(l=>l.hl));

@@ -51,7 +51,8 @@ const rowHidden = (page, title) => page.$eval(rowSel(title), e=>getComputedStyle
   let m = await menuState(page);
   check('lp_opens', m.open && m.lift, m);
   check('lp_rowHidden', await rowHidden(page, 'Dos'));
-  check('lp_items', JSON.stringify(m.items)===JSON.stringify(['Aplazar','Mover a proyecto','Mover a otro espacio','Completar','Duplicar','Seleccionar','Eliminar']), m.items);
+  // Updated by decisions 39 (Ahora) and 41 (Por confirmar): two items after Completar
+  check('lp_items', JSON.stringify(m.items)===JSON.stringify(['Aplazar','Mover a proyecto','Mover a otro espacio','Completar','Ahora','Por confirmar','Duplicar','Seleccionar','Eliminar']), m.items);
   check('lp_prio', JSON.stringify(m.prio)===JSON.stringify(['Alta','Media','Ninguna*']), m.prio);
   check('lp_groups_icons', m.groups===3 && m.icons, m);
   check('lp_onScreen', m.box.top>=8 && m.box.bottom<=m.vh-8 && m.box.left>=8 && m.box.right<=m.vw-8, m.box);

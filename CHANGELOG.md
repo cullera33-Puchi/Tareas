@@ -1,5 +1,19 @@
 # Registro de cambios
 
+## v0.20.0. Escritorio más completo, 16 colores y copias que se pueden borrar (2 de noviembre de 2026)
+
+Escritorio
+- Alta ampliada: al escribir en «Nueva tarea» se despliega un panel con Notas, Fecha, Proyecto, Prioridad, Recordatorio y Nota de voz. Intro añade con todo; Esc con texto pregunta antes de descartar. Tras añadir, el panel queda listo para la siguiente.
+- Selector de hora propio en Recordatorio: se escribe 9, 930, 9:30 o 21.15, lista de medias horas de 7:00 a 22:00, atajos 9:00, 12:00, 15:00 y 18:00, flechas para sumar o restar 15 minutos.
+- Calendario: opción «Solo de lunes a viernes» por espacio, activada en Trabajo. Las tareas de fin de semana siguen visibles en una columna estrecha «Fin de semana».
+- Arrastrar tareas entre los grupos de la lista: a otro día (o a Sin fecha), o a otro proyecto en la agrupación por proyecto, con Deshacer. El recordatorio se va con la fecha.
+- Adjuntos: «Añadir foto» y «Grabar audio» quedan alineados.
+
+iPhone y escritorio
+- 16 colores de proyecto en dos filas; los proyectos actuales conservan el suyo y todas las etiquetas se leen bien en los dos temas.
+- Las copias locales de Ajustes se pueden borrar una a una (deslizando en el iPhone, con clic derecho o la papelera en el escritorio) o todas a la vez, siempre con confirmación.
+- Fotos y notas de audio probadas por Enric en iPhone y ordenador.
+
 ## v0.19.0. Fotos y notas de audio en las tareas (2 de noviembre de 2026)
 
 - El detalle de cada tarea tiene un grupo Adjuntos, en el iPhone y en el panel del escritorio.

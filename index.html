@@ -1171,6 +1171,10 @@ body.resizing,body.resizing *{cursor:col-resize !important;-webkit-user-select:n
 .mwk.today .mnum{color:var(--red);font-weight:600;} .mwk.other{opacity:.6;}
 .mwk.over{background:var(--fill);outline-color:var(--blue);}
 .mwk .mmore{align-self:flex-start;font-size:11px;color:var(--ink2);}
+/* Decision 36: a day or project group of a desktop list under a dragged row: a light tint over the whole group and its header in blue */
+.app.desktop .gsec.over,.app.desktop .main [data-gday].over{background:color-mix(in srgb,var(--blue) 8%,transparent);border-radius:8px;}
+.app.desktop .gsec.over > .group-title,.app.desktop .main .group-title[data-gday].over{color:var(--blue);background:color-mix(in srgb,var(--blue) 10%,var(--dmain));}
+.app.desktop .gsec.over > .group-title .gl,.app.desktop .main .group-title[data-gday].over .gl{color:var(--blue);}
 </style>
 </head>
 <body>
@@ -1187,7 +1191,7 @@ body.resizing,body.resizing *{cursor:col-resize !important;-webkit-user-select:n
 <script src="config.js"></script>
 <script>
 'use strict';
-const APP_VERSION = '0.19.0';
+const APP_VERSION = '0.20.0';
 let pendingSW = null; // service worker installed and waiting to take over
 let updateRequested = false; // the user asked for the waiting worker to take over
 
@@ -1945,7 +1949,9 @@ function summaryHTML(){
 /* Group headers. R14: in Todas, a project, Hoy by project and Completadas each header sits in a .gsec with its group,
    so it stays at the top of the list (sticky, translucent) while its own rows scroll under it and the next one pushes it away */
 function gtitle(label, n, right, attrs){ return '<div class="group-title gh"'+(attrs||'')+'><span class="gl">'+label+(n!=null?'<span class="gn">'+n+'</span>':'')+'</span>'+(right||'')+'</div>'; }
-const gsec = (head, rows) => '<div class="gsec">'+head+'<div class="group">'+rows+'</div></div>';
+const gsec = (head, rows, attrs) => '<div class="gsec"'+(attrs||'')+'>'+head+'<div class="group">'+rows+'</div></div>';
+// Decision 36: on the desktop a group of days or of projects takes rows dropped on it (its date, or its project); months and Completadas do not
+const gdrop = (k, v) => UI.wide ? ' data-g'+k+'="'+esc(v)+'"' : '';
 // R14: a day of Todas, "Martes 3 nov"; a month, "Diciembre" (and the year when it is not this one)
 function dayTitle(d){ const t=todayStr(); if(d===t) return 'Hoy'; if(d===addDays(t,1)) return 'Mañana'; const x=new Date(d+'T00:00:00'); return DIAS_FULL[x.getDay()]+' '+x.getDate()+' '+MESES[x.getMonth()]; }
 function monthTitle(ym){ const [y,m]=ym.split('-').map(Number), n=MESES_FULL[m-1]; return n[0].toUpperCase()+n.slice(1)+(y!==new Date().getFullYear()?' '+y:''); }
@@ -1958,16 +1964,16 @@ function dayGroupsHTML(list, R, root, projectId){ const t=todayStr(), lim=addDay
     if(k==='~') head=root&&!UI.select ? gtitle('Sin fecha', null, '<button class="gx" data-act="plan">Planificar ('+xs.length+')</button>') : gtitle('Sin fecha', xs.length);
     else if(k.length===10) head=gtitle(dayTitle(k), xs.length, UI.select?'':'<button class="gadd" data-add-date="'+k+'"'+(projectId!==undefined?' data-project="'+(projectId||'')+'"':'')+' aria-label="Añadir con esta fecha">'+I.plus+'</button>', ' data-day-head="'+k+'"');
     else head=gtitle(monthTitle(k.slice(0,7)), xs.length);
-    h+=gsec(head, xs.map(x=>R(x, k.length===10?{day:k, noToday:true}:{})).join('')); });
+    h+=gsec(head, xs.map(x=>R(x, k.length===10?{day:k, noToday:true}:{})).join(''), k==='~'?gdrop('day',''):k.length===10?gdrop('day',k):''); });
   return h; }
 /* Grouped by project (Todas and, R13, Hoy): one group per project in the order of the Proyectos tab, with its colour and count.
    Tapping a header filters the list by that project (a second tap clears it). In Hoy the rows say "Aplazada" where it applies */
 function projectGroupsHTML(list, R, filter){ const ps=activeProjects(), by={}; let h=''; const o={noProj:true, noToday:filter==='hoy'};
   list.forEach(x=>{ const k=!x.projectId||!proj(x.projectId)?'none':ps.some(p=>p.id===x.projectId)?x.projectId:'archived'; (by[k]=by[k]||[]).push(x); });
   const head=(pf, dot, label, n)=>'<div class="group-title gh gtap" role="button" tabindex="0" data-pf="'+pf+'"><span class="gl"><span class="gdot" style="background:'+dot+'"></span>'+label+'<span class="gn">'+n+'</span></span>'+I.chev.replace('<svg','<svg class="gchev"')+'</div>'; // a div: a button would not stretch to the full width once stuck
-  ps.forEach(p=>{ if(by[p.id]) h+=gsec(head(p.id, p.color, esc(p.name), by[p.id].length), by[p.id].map(x=>R(x,o)).join('')); });
+  ps.forEach(p=>{ if(by[p.id]) h+=gsec(head(p.id, p.color, esc(p.name), by[p.id].length), by[p.id].map(x=>R(x,o)).join(''), gdrop('proj',p.id)); });
   if(by.archived) h+=gsec(gtitle('Proyectos archivados', by.archived.length), by.archived.map(x=>R(x,{noToday:o.noToday})).join(''));
-  if(by.none) h+=gsec(head('none', 'var(--ink3)', 'Sin proyecto', by.none.length), by.none.map(x=>R(x,o)).join(''));
+  if(by.none) h+=gsec(head('none', 'var(--ink3)', 'Sin proyecto', by.none.length), by.none.map(x=>R(x,o)).join(''), gdrop('proj','none'));
   return h; }
 function listHTML(filter, projectId){
   let list = pendingFor(filter, projectId, UI.query);
@@ -1998,7 +2004,7 @@ function listHTML(filter, projectId){
   // Hoy: the carried tasks first, under Aplazadas with "Repasar (N)" (R9); the aplazadas filter already says it, so it keeps a plain list
   else if(filter==='hoy' && root && UI.sumFilter!=='carried' && list.some(x=>x.carried)){ const c=list.filter(x=>x.carried), d=list.filter(x=>!x.carried);
     h += gtitle('Aplazadas', null, UI.select?'':'<button class="gx" data-act="review">Repasar ('+c.length+')</button>')+'<div class="group">'+c.map(x=>R(x,{noToday:true,hideCarried:true})).join('')+'</div>'+
-      (d.length?'<div class="group-title">Hoy</div><div class="group">'+d.map(x=>R(x,{noToday:true})).join('')+'</div>':''); }
+      (d.length?'<div class="group-title"'+gdrop('day',todayStr())+'>Hoy</div><div class="group"'+gdrop('day',todayStr())+'>'+d.map(x=>R(x,{noToday:true})).join('')+'</div>':''); } // decision 36: an Aplazada dropped on Hoy is confirmed for today
   else h += '<div class="group">'+list.map(x=>R(x,{noToday:filter==='hoy', hideCarried:root&&filter==='hoy'&&UI.sumFilter==='carried'})).join('')+'</div>';
   // R8: from 19:00 the day can be closed from the end of Hoy too, whatever the summary shows
   if(root && filter==='hoy' && !UI.select && new Date().getHours()>=19){ const n=pendingFor('hoy').length; if(n) h += '<div class="group"><button class="cell link closecell" data-act="closeDay">'+I.cal+'<span class="lbl">Cerrar el día</span><span class="val">'+n+(n===1?' pendiente':' pendientes')+'</span></button></div>'; }
@@ -4415,6 +4421,13 @@ function bulkSpace(sp){ const xs=selectedTasks(); if(!xs.length) return; const p
   xs.forEach(x=>releaseHold(x.id)); batch(()=>xs.forEach(x=>updTask(x.id,{spaceId:sp.id, projectId:null}))); haptic(8); log('info','Movidas a otro espacio en bloque: '+xs.length); endSelect();
   toast(bulkN(xs.length)+(xs.length===1?' movida a ':' movidas a ')+sp.name, ()=>batch(()=>prev.forEach(p=>updTask(p.id,{spaceId:p.spaceId, projectId:p.projectId})))); }
 // R16: rows dropped on a sidebar project or Sin proyecto
+/* Decision 36: rows dropped on a day group of a desktop list take that date (null: Sin fecha); the reminder goes with the day (decision 25),
+   one Deshacer for all. An Aplazada dropped on Hoy stays today, confirmed */
+function dropToDay(ids, day){ const t=todayStr(), xs=ids.map(task).filter(x=>x&&((x.date||null)!==day||(x.carried&&day===t))); if(!xs.length){ render(); return; }
+  const prev=xs.map(daySnap); batch(()=>xs.forEach(x=>{ releaseHold(x.id); updTask(x.id, dayPatch(x, day)); })); haptic(6); renderAnimated();
+  log('info','Tareas arrastradas a otro día de la lista', {n:xs.length, date:day});
+  const where=day?fmtDate(day).toLowerCase():'';
+  toast(xs.length===1?(day?'Movida a '+where:'Sin fecha'):bulkN(xs.length)+(day?' movidas a '+where:' sin fecha'), ()=>batch(()=>prev.forEach(undoDay))); }
 function dropToProject(ids, pid){ const xs=ids.map(task).filter(x=>x&&(x.projectId||null)!==pid); if(!xs.length){ render(); return; }
   xs.forEach(x=>releaseHold(x.id)); if(ids.length===1){ moveToProject(xs[0].id, pid); haptic(6); return; } // its own toast and Deshacer
   const prev=xs.map(x=>({id:x.id, projectId:x.projectId})), p=pid?proj(pid):null; batch(()=>xs.forEach(x=>updTask(x.id,{projectId:pid}))); haptic(6); renderAnimated(); log('info','Tareas arrastradas a un proyecto', {n:xs.length});
@@ -4905,21 +4918,29 @@ function bindDeskEvents(d){
   // Only a card drag moves a task: any other drag (a link, a file) clears dragId, so a cancelled card drag never carries over
   let dragId=null, dropped=false, refusal=null;
   let dragIds=null; // R16: the rows of a multiple selection dragged together
-  const zoneOf=t=>t.closest('[data-slot],[data-day],[data-drop-project]');
+  const zoneOf=t=>t.closest('[data-slot],[data-day],[data-drop-project],[data-gday],[data-gproj]');
+  // Decision 36: a day or project group of the lists. Its key; the elements lit with it (a gsec, or the Hoy block's title and rows); the group a drag started in
+  const gkey=z=>z?(z.dataset.gday!==undefined?'d:'+z.dataset.gday:z.dataset.gproj!==undefined?'p:'+z.dataset.gproj:null):null;
+  const lit=z=>{ const k=gkey(z); if(!k||z.classList.contains('gsec')) return [z]; return [...d.querySelectorAll(k[0]==='d'?'[data-gday="'+CSS.escape(z.dataset.gday)+'"]':'[data-gproj="'+CSS.escape(z.dataset.gproj)+'"]')]; };
+  let dragFrom=null;
   // Why a zone takes no drop: a past day (no task is ever overdue) or a past half hour (a reminder must be ahead, as in Recordatorio)
   const refuse=z=>{ if(z.dataset.slot){ const [dy,hm]=z.dataset.slot.split('T'), dt=new Date(dy+'T'+hm+':00'); return dt.getTime()<=Date.now()?(dy<todayStr()?'No se puede mover a un día pasado':'Esa hora ya ha pasado'):null; }
     if(z.dataset.dropProject!==undefined) return null;
+    if(z.dataset.gday!==undefined) return z.dataset.gday&&z.dataset.gday<todayStr()?'No se puede mover a un día pasado':null;
     return z.dataset.day&&z.dataset.day<todayStr()?'No se puede mover a un día pasado':null; };
-  d.addEventListener('dragstart', e=>{ const c=e.target.closest&&e.target.closest('[draggable="true"][data-id]'); dragId=c?c.dataset.id:null; dragIds=null; dropped=false; refusal=null; if(!c) return; c.classList.add('dragging'); try{ e.dataTransfer.setData('text/plain', dragId); e.dataTransfer.effectAllowed='move'; }catch(err){}
+  d.addEventListener('dragstart', e=>{ const c=e.target.closest&&e.target.closest('[draggable="true"][data-id]'); dragId=c?c.dataset.id:null; dragIds=null; dropped=false; refusal=null; if(!c) return; dragFrom=gkey(c.closest('[data-gday],[data-gproj]')); c.classList.add('dragging'); try{ e.dataTransfer.setData('text/plain', dragId); e.dataTransfer.effectAllowed='move'; }catch(err){}
     // R16: a row of the multiple selection takes the whole selection along, under a badge with how many
     if(c.classList.contains('row')&&deskMulti()&&UI.dsel.ids.has(dragId)&&UI.dsel.ids.size>1){ dragIds=[...UI.dsel.ids]; dragIds.forEach(id=>{ const r=deskRow(id); if(r) r.classList.add('dragging'); });
       const g=document.createElement('div'); g.className='dragcount'; g.textContent=bulkN(dragIds.length); document.body.appendChild(g); try{ e.dataTransfer.setDragImage(g, 14, 14); }catch(err){} setTimeout(()=>g.remove(), 0); } });
   d.addEventListener('dragend', e=>{ const id=dragId; dragId=null; dragIds=null; d.querySelectorAll('.dragging').forEach(x=>x.classList.remove('dragging')); d.querySelectorAll('.over').forEach(x=>x.classList.remove('over'));
     if(id&&!dropped&&refusal){ toast(refusal); haptic(10); } refusal=null; }); // let go over a past day: said, not silently ignored
-  d.addEventListener('dragover', e=>{ if(!dragId) return; const z=zoneOf(e.target); refusal=z?refuse(z):null; if(!z||refusal){ d.querySelectorAll('.over').forEach(x=>x.classList.remove('over')); return; }
-    e.preventDefault(); e.dataTransfer.dropEffect='move'; d.querySelectorAll('.over').forEach(x=>{ if(x!==z) x.classList.remove('over'); }); z.classList.add('over'); });
-  d.addEventListener('dragleave', e=>{ const z=zoneOf(e.target); if(z && !z.contains(e.relatedTarget)) z.classList.remove('over'); });
-  d.addEventListener('drop', e=>{ const z=zoneOf(e.target); if(!z||!dragId||e.dataTransfer.getData('text/plain')!==dragId||refuse(z)) return; e.preventDefault(); dropped=true; const id=dragId, ids=dragIds||[id]; dragId=null; dragIds=null;
+  d.addEventListener('dragover', e=>{ if(!dragId) return; const z=zoneOf(e.target); refusal=z?refuse(z):null; const same=!!z&&!!dragFrom&&gkey(z)===dragFrom; // its own group: nothing to do there
+    if(!z||refusal||same){ d.querySelectorAll('.over').forEach(x=>x.classList.remove('over')); return; }
+    e.preventDefault(); e.dataTransfer.dropEffect='move'; const L=lit(z); d.querySelectorAll('.over').forEach(x=>{ if(!L.includes(x)) x.classList.remove('over'); }); L.forEach(x=>x.classList.add('over')); });
+  d.addEventListener('dragleave', e=>{ const z=zoneOf(e.target); if(z && !lit(z).some(x=>x.contains(e.relatedTarget))) lit(z).forEach(x=>x.classList.remove('over')); });
+  d.addEventListener('drop', e=>{ const z=zoneOf(e.target); if(!z||!dragId||e.dataTransfer.getData('text/plain')!==dragId||refuse(z)||(dragFrom&&gkey(z)===dragFrom)) return; e.preventDefault(); dropped=true; const id=dragId, ids=dragIds||[id]; dragId=null; dragIds=null;
+    if(z.dataset.gday!==undefined){ dropToDay(ids, z.dataset.gday||null); return; } // decision 36: a day group of a list, or Sin fecha
+    if(z.dataset.gproj!==undefined){ dropToProject(ids, z.dataset.gproj==='none'?null:z.dataset.gproj); return; } // a project group
     if(z.dataset.dropProject!==undefined) dropToProject(ids, z.dataset.dropProject||null); else dropMany(ids, z); }); // R16: a project of the sidebar, or a date
   // R15: the title edited in place (a double click, see deskRowClick) keeps what is typed across a redraw and keeps it when left
   d.addEventListener('input', e=>{ if(e.target.dataset.role==='rowedit'&&UI.dsel.edit) UI.dsel.edit.text=e.target.value; });

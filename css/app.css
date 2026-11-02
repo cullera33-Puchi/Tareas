@@ -1316,7 +1316,7 @@ body.sdragging,body.sdragging *{cursor:grabbing !important;-webkit-user-select:n
 .nr-pj{flex:none;display:inline-flex;align-items:center;gap:4px;color:var(--ink2);}
 .nr-pj .dot{width:8px;height:8px;border-radius:50%;}
 .nr-pv{overflow:hidden;text-overflow:ellipsis;min-width:0;}
-.nedit-g{padding:14px 16px 18px;}
+.nedit-g{padding:14px 16px 18px;margin-top:8px;}
 .nedit .ntitle{width:100%;font-size:1.294rem;font-weight:700;background:none;border:0;outline:0;padding:0;resize:none;overflow:hidden;line-height:1.25;display:block;min-height:1.25em;letter-spacing:-.2px;}
 .nedit .ntitle::placeholder,.nedit .nbody::placeholder{color:var(--ink3);}
 .nmeta{font-size:.765rem;color:var(--ink2);margin:4px 0 12px;}

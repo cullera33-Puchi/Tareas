@@ -209,7 +209,8 @@ function noteTasksSheet(id){ const n=noteRec(id), p=n&&proj(n.projectId); if(!n|
       const pick=ls.filter((l,k)=>on[k]).map(l=>l.text); if(!pick.length) return; closeSheet(); noteMakeTasks(p.id, pick); }; }); }
 // Desktop: the whole lines the selection touches, in the text area or in the drawn view
 function noteSelLines(){ const ed=document.querySelector('#desk .ned .nedit[data-note]'); if(!ed) return []; const n=noteRec(ed.dataset.note); if(!n) return []; const ta=ed.querySelector('.nbody');
-  if(document.activeElement===ta){ if(ta.selectionStart===ta.selectionEnd) return []; const v=ta.value, a=v.lastIndexOf('\n', ta.selectionStart-1)+1; let b=ta.selectionEnd; if(b>a&&v[b-1]==='\n') b--;
+  if(document.activeElement===ta){ if(ta.selectionStart===ta.selectionEnd) return []; const v=ta.value, a=v.lastIndexOf('\n', ta.selectionStart-1)+1, e=ta.selectionEnd;
+    let b=e>a&&v[e-1]==='\n'?e-1:v.indexOf('\n', e); if(b<0) b=v.length; // whole lines; one only reached at its start is left out
     return v.slice(a, b).split('\n').filter(l=>l.trim()); }
   const s=getSelection(), view=ed.querySelector('.nview'); if(!s||s.isCollapsed||!s.rangeCount||!view) return []; const r=s.getRangeAt(0); if(!view.contains(r.startContainer)||!view.contains(r.endContainer)) return [];
   const ln=nd=>{ const e=(nd.nodeType===1?nd:nd.parentElement); const l=e&&e.closest('[data-ln]'); return l?+l.dataset.ln:null; };

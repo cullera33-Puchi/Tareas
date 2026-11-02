@@ -103,7 +103,7 @@ function deskShortcut(k){ const t=todayStr(), dates={h:t, m:addDays(t,1), v:next
   return !!x; }
 function shortcutsSheet(){ const k=(a,b)=>'<div class="kr"><span class="kk">'+a.map(x=>'<kbd>'+x+'</kbd>').join(' ')+'</span><span>'+b+'</span></div>', g=(t,rows)=>'<div class="kg"><div class="ks">'+t+'</div>'+rows.join('')+'</div>';
   openSheet('<h2>Atajos de teclado</h2><div class="keys">'+
-    g('Lista', [k(['Arriba','Abajo'],'Tarea anterior o siguiente'), k(['J','K'],'Lo mismo'), k(['Mayúsculas','Abajo'],'Ampliar la selección'), k(['Espacio'],'Abrir o cerrar el detalle'), k(['Intro'],'Cambiar el título, también con doble clic'), k(['N'],'Nueva tarea'), k(['/'],'Buscar'), k(['Esc'],'Cerrar o quitar la selección')])+
+    g('Lista', [k(['Arriba','Abajo'],'Tarea anterior o siguiente'), k(['J','K'],'Lo mismo'), k(['Mayúsculas','Abajo'],'Ampliar la selección'), k(['Espacio'],'Abrir o cerrar el detalle'), k(['Intro'],'Cambiar el título, también con doble clic'), k(['N'],'Nueva tarea, o nota en Notas'), k(['/'],'Buscar'), k(['Esc'],'Cerrar o quitar la selección')])+
     g('Varias tareas', [k([MODK,'clic'],'Añadir o quitar una'), k(['Mayúsculas','clic'],'Seleccionar un tramo'), k([MODK,'A'],'Seleccionar todas'), k(['Arrastrar'],'A un proyecto, a Hoy o a un día')])+
     g('Tarea seleccionada', [k(['C'],'Completar'), k(['A'],'Poner en Ahora o quitarla'), k(['1','2','0'],'Prioridad alta, media o ninguna'), k(['H','M'],'Hoy o mañana'), k(['V','S'],'Viernes o la próxima semana'), k(['F'],'Elegir fecha'), k(['P'],'Elegir proyecto'), k(['Supr'],'Eliminar')])+
     g('General', [k([MODK,'Z'],'Deshacer'), k(['?'],'Estos atajos')])+

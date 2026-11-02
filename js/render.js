@@ -238,7 +238,7 @@ $('#selbar').addEventListener('click', e=>{ const b=e.target.closest('[data-act]
     const gone=!!root&&root.classList.contains('hidden-tab'); if(gone) root=rootScreen(UI.tab); // the slide just settled put away the screen under the finger: what shows there now is the current tab
     if(!root||root.dataset.root!==UI.tab||root.classList.contains('hidden-tab')) return;
     if(!gone){ const row=e.target.closest('.row'); if(row&&row.querySelector('.row-bg')) return;
-      if(e.target.closest('.pchips')) return; if(e.target.closest('.vn[data-bk]')) return; } // the project chips scroll sideways on their own; a local copy of Ajustes slides to Eliminar (decision 34)
+      if(e.target.closest('.pchips')) return; if(e.target.closest('.vn[data-bk], .vn[data-pn]')) return; } // the project chips scroll sideways on their own; a local copy of Ajustes slides to Eliminar (decision 34), and so does a note a search found (decision 47)
     x0=lastX=t.clientX; y0=t.clientY; lastT=e.timeStamp; mode='pending'; cur=root; nb=null; w=innerWidth; vx=0; dragStart(); },{passive:true});
   app.addEventListener('touchmove',e=>{ if(!mode||mode==='off') return; const t=e.touches[0]; const dx=t.clientX-x0, dy=t.clientY-y0;
     if(mode==='pending'){ if(Math.abs(dy)>8&&Math.abs(dy)>Math.abs(dx)){ mode='off'; return; } if(Math.abs(dx)<10) return; dir=dx<0?1:-1; const nt=neighbor(dir); if(!nt){ mode='off'; return; }

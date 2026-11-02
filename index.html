@@ -1087,6 +1087,69 @@ body.resizing,body.resizing *{cursor:col-resize !important;-webkit-user-select:n
  .vw-stage{transform:none;transition:none;}
  .recbtn span{transition:opacity .2s;} .recbtn .s,.recbtn.on .c{transform:none;} .recbtn.on::after{animation:none;opacity:.4;}
 }
+/* Decision 31: the desktop add bar's composer. Open, the bar and the panel under it are one card that floats over the list (nothing below moves) */
+.addx{position:relative;z-index:6;}
+.app.desktop .addx.open .addbar{border-radius:8px 8px 0 0;margin-bottom:0;box-shadow:none;clip-path:inset(-4px -4px 0 -4px);}
+.app.desktop .addx.open:focus-within .addbar{border-color:var(--blue);box-shadow:0 0 0 3px var(--qhl);}
+.app.desktop .axp{position:absolute;left:0;right:0;top:100%;background:var(--dmain);border:.5px solid var(--dline);border-top-color:var(--dline);border-radius:0 0 10px 10px;box-shadow:0 12px 28px rgba(0,0,0,.14);padding:4px 10px 8px 32px;}
+.app.desktop .addx.open:focus-within .axp{border-color:var(--blue);border-top-color:var(--dline);box-shadow:0 0 0 3px var(--qhl),0 12px 28px rgba(0,0,0,.14);}
+.app.desktop .axp textarea{display:block;width:100%;background:none;border:0;outline:0;resize:none;font:inherit;font-size:13px;line-height:1.4;color:var(--ink);padding:4px 0;min-height:24px;max-height:160px;overflow:auto;}
+.app.desktop .axp textarea::placeholder{color:var(--ink2);}
+.app.desktop .axv{display:flex;align-items:flex-start;gap:6px;border-top:.5px solid var(--dline);margin-top:2px;}
+.app.desktop .axv > svg{flex:none;width:13px;height:13px;color:var(--ink2);margin:7px 0 0 -20px;}
+.app.desktop .axv textarea{flex:1;min-width:0;}
+.app.desktop .axx{flex:none;width:22px;height:22px;margin-top:3px;border-radius:5px;color:var(--ink2);display:flex;align-items:center;justify-content:center;}
+.app.desktop .axx svg{width:9px;height:9px;} .app.desktop .axx:hover{background:var(--dhov);}
+.app.desktop .axb{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:6px;}
+.app.desktop .axbs{display:flex;gap:6px;flex-wrap:wrap;min-width:0;}
+.app.desktop .axbt{display:inline-flex;align-items:center;gap:5px;height:24px;max-width:180px;padding:0 8px;border-radius:6px;border:.5px solid var(--dline);background:var(--dmain);color:var(--ink2);font-size:12px;white-space:nowrap;}
+.app.desktop .axbt span{overflow:hidden;text-overflow:ellipsis;}
+.app.desktop .axbt svg{flex:none;width:12px;height:12px;}
+.app.desktop .axbt .pm-dot{flex:none;width:8px;height:8px;border-radius:50%;}
+.app.desktop .axbt:hover,.app.desktop .axbt.open{background:var(--dhov);}
+.app.desktop .axbt.on{color:var(--blue);background:var(--qhl);border-color:transparent;}
+.app.desktop .axbt.on.high{color:var(--red);background:color-mix(in srgb,var(--red) 14%,transparent);}
+.app.desktop .axbt.on.mid{color:var(--orange);background:color-mix(in srgb,var(--orange) 14%,transparent);}
+.app.desktop .axbt.rec{color:#fff;background:var(--red);animation:axRec 1.2s ease-in-out infinite;}
+@keyframes axRec{50%{opacity:.6;}}
+.app.desktop .axadd{height:24px;padding:0 12px;border-radius:6px;background:var(--blue);color:#fff;font-size:12px;font-weight:600;}
+.app.desktop .axadd:disabled{opacity:.4;}
+.app.desktop .axp .addhint{margin:6px 0 0;}
+.axrem-day{font-size:12px;color:var(--ink2);margin:0 0 6px;}
+/* Decision 32: the desktop time picker, in the language of the calendar beside it */
+.tpk{margin-top:8px;}
+.tpk-row{display:flex;align-items:center;gap:8px;height:32px;padding:0 4px 0 10px;border-radius:7px;background:var(--fill);font-size:13px;}
+.tpk-lbl{flex:1;}
+.tpk-field{display:flex;align-items:center;height:24px;border-radius:5px;background:var(--dmain,var(--card));box-shadow:0 0 0 .5px var(--dline,var(--sep));}
+.tpk.bad .tpk-field{box-shadow:0 0 0 1.5px var(--red);}
+.tpk-in{width:52px;height:24px;border:0;outline:0;background:none;color:var(--ink);font:inherit;font-size:13px;font-variant-numeric:tabular-nums;text-align:right;padding:0 4px 0 6px;}
+.tpk-field:focus-within{box-shadow:0 0 0 2px var(--blue);}
+.tpk-open{width:22px;height:24px;display:flex;align-items:center;justify-content:center;color:var(--ink2);}
+.tpk-open svg{width:9px;height:9px;transition:transform .2s;}
+.tpk.open .tpk-open svg{transform:rotate(180deg);}
+.tpk-list{position:relative;margin:4px 0 0 auto;width:132px;max-height:186px;overflow-y:auto;border-radius:7px;background:var(--dmain,var(--card));box-shadow:0 0 0 .5px var(--dline,var(--sep)),0 6px 16px rgba(0,0,0,.12);padding:4px;display:flex;flex-direction:column;gap:1px;}
+.tpk-list[hidden]{display:none;}
+.tpk-o{flex:none;height:24px;border-radius:5px;font-size:13px;font-variant-numeric:tabular-nums;color:var(--ink);text-align:left;padding:0 10px;}
+.tpk-o:hover{background:var(--dhov,var(--fill2));}
+.tpk-o.now{color:var(--red);font-weight:600;}
+.tpk-o.on{background:var(--blue);color:#fff;font-weight:600;}
+.tpk-chips{display:flex;gap:6px;margin-top:8px;}
+.tpk-chips .chip{height:24px;padding:0 9px;border-radius:12px;font-size:12px;}
+.tpk-chips .chip.on{background:var(--blue);color:#fff;}
+/* Decision 33: 16 colours in two rows of eight, across the sheet's width on the iPhone and the desktop */
+.colors{display:grid;grid-template-columns:repeat(8,1fr);gap:10px 0;justify-items:center;}
+.colors button{width:34px;height:34px;}
+/* Decision 34: a local copy of Ajustes slides to Eliminar (iPhone); on the desktop a bin shows on hover */
+.bk-c{padding:0;display:flex;align-items:center;}
+.bk-c .cell{flex:1;min-width:0;}
+.bk-group .vn.bk + .cell,.bk-group .vn.bk:first-child{border-top:0;}
+.bk-group .vn.bk + .vn.bk{border-top:.5px solid var(--sep);margin-left:16px;}
+.bk-group .vn.bk + .vn.bk .vn-c{margin-left:-16px;padding-left:16px;}
+.bk-group .vn.bk + .cell{border-top:.5px solid var(--sep);margin-left:16px;padding-left:0;width:calc(100% - 16px);}
+.bk-del{flex:none;width:28px;height:28px;margin-right:6px;border-radius:6px;color:var(--red);display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .15s;}
+.bk-del svg{width:15px;height:15px;}
+.wide .bk:hover .bk-del,.wide .bk-del:focus-visible{opacity:1;} .wide .bk-del:hover{background:var(--dhov);}
+.wide .bk .vn-c:hover{background:none;}
 </style>
 </head>
 <body>
@@ -1252,7 +1315,10 @@ function linkify(text){ const t=String(text||''); let o='', last=0;
 const esc = s => String(s??'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 // iOS Safari has no vibrate(); toggling a native switch inside a user gesture gives a haptic tick on iOS 17.4 and later
 const haptic = (ms=10) => { try{ if(navigator.vibrate){ navigator.vibrate(ms); return; } const sw=document.getElementById('hap'); if(sw){ sw.click(); } }catch(e){} };
-const COLORS = ['#FF3B30','#FF9500','#FFCC00','#34C759','#007AFF','#5856D6','#AF52DE','#A2845E'];
+// Decision 33: 16 project colours in two rows. Row 1: red, orange, yellow, green, blue, purple, pink, brown; row 2: mint, cyan, indigo, gray,
+// maroon, olive, navy, coral. Apple's system values where they exist; a project keeps the colour it has (stored as its hex)
+const COLORS = ['#FF3B30','#FF9500','#FFCC00','#34C759','#007AFF','#AF52DE','#FF2D55','#A2845E',
+  '#00C7BE','#32ADE6','#5856D6','#8E8E93','#9B2242','#7D8A2E','#1F3A8A','#FF7A5C'];
 
 const I = {
   plus:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
@@ -1401,6 +1467,7 @@ const UI = { tab:'tareas', query:'', stack:[], scroll:{}, sumFilter:null, summar
 let deskRedraw=false; // while renderDesktop replaces the markup: a field it takes away is not a field the user left (R15)
 const MODK=/Mac|iPhone|iPad/.test(navigator.platform||navigator.userAgent||'')?'Comando':'Control'; // the key a Mac calls Comando
 const bulkN = n => n+(n===1?' tarea':' tareas');
+const AX={open:false, notes:'', voice:'', voiceOn:false, rec:null, date:undefined, projectId:undefined, priority:undefined, time:null, opened:false}; // decision 31: the desktop add bar's composer (axOpen)
 
 /* ---------- Toast with undo ---------- */
 let toastTimer=null, undoFn=null;
@@ -1726,7 +1793,7 @@ $('#selbar').addEventListener('click', e=>{ const b=e.target.closest('[data-act]
     const gone=!!root&&root.classList.contains('hidden-tab'); if(gone) root=rootScreen(UI.tab); // the slide just settled put away the screen under the finger: what shows there now is the current tab
     if(!root||root.dataset.root!==UI.tab||root.classList.contains('hidden-tab')) return;
     if(!gone){ const row=e.target.closest('.row'); if(row&&row.querySelector('.row-bg')) return;
-      if(e.target.closest('.pchips')) return; } // the project chips scroll sideways on their own
+      if(e.target.closest('.pchips')) return; if(e.target.closest('.vn[data-bk]')) return; } // the project chips scroll sideways on their own; a local copy of Ajustes slides to Eliminar (decision 34)
     x0=lastX=t.clientX; y0=t.clientY; lastT=e.timeStamp; mode='pending'; cur=root; nb=null; w=innerWidth; vx=0; dragStart(); },{passive:true});
   app.addEventListener('touchmove',e=>{ if(!mode||mode==='off') return; const t=e.touches[0]; const dx=t.clientX-x0, dy=t.clientY-y0;
     if(mode==='pending'){ if(Math.abs(dy)>8&&Math.abs(dy)>Math.abs(dx)){ mode='off'; return; } if(Math.abs(dx)<10) return; dir=dx<0?1:-1; const nt=neighbor(dir); if(!nt){ mode='off'; return; }
@@ -1769,7 +1836,9 @@ function bindScroll(scr){ const sc=scr.querySelector('.scroll'), nav=scr.querySe
 /* ---------- Tasks view ---------- */
 /* R3: a project capsule keeps the stored colour but its text is made readable, above 4.4:1 on its own background:
    in the light theme the colour is mixed with black, in the dark theme the system's dark variant is used (lightened if still short) */
-const TAG_DARK={'#FF3B30':'#FF453A','#FF9500':'#FF9F0A','#FFCC00':'#FFD60A','#34C759':'#30D158','#007AFF':'#0A84FF','#5856D6':'#5E5CE6','#AF52DE':'#BF5AF2','#A2845E':'#AC8E68'};
+const COLOR_NAMES=['Rojo','Naranja','Amarillo','Verde','Azul','Morado','Rosa','Marrón','Menta','Cian','Índigo','Gris','Granate','Oliva','Azul marino','Coral'];
+const TAG_DARK={'#FF3B30':'#FF453A','#FF9500':'#FF9F0A','#FFCC00':'#FFD60A','#34C759':'#30D158','#007AFF':'#0A84FF','#5856D6':'#5E5CE6','#AF52DE':'#BF5AF2','#A2845E':'#AC8E68',
+  '#FF2D55':'#FF375F','#00C7BE':'#63E6E2','#32ADE6':'#64D2FF','#8E8E93':'#98989D','#9B2242':'#E0627D','#7D8A2E':'#B5C454','#1F3A8A':'#7398F0','#FF7A5C':'#FF927A'}; // decision 33: the dark variants of the 16
 const tagCache=new Map();
 function tagVars(c){ let v=tagCache.get(c); if(v) return v;
   const rgb=h=>/^#[0-9a-f]{6}$/i.test(h)?[0,2,4].map(i=>parseInt(h.slice(1+i,3+i),16)):null;
@@ -1962,8 +2031,9 @@ function viewAjustes(){
    '<div class="footnote">Al eliminar un espacio se eliminan también sus proyectos, tareas y notas de voz.</div>'+
    '<div class="group-title">Datos</div><div class="group"><button class="cell" data-act="exportFile"><span class="lbl">Exportar a archivo</span><span class="val">JSON</span></button><button class="cell" data-act="exportCSV"><span class="lbl">Exportar a Excel</span><span class="val">CSV</span></button><button class="cell" data-act="importFile"><span class="lbl">Importar desde archivo</span><span class="val">JSON</span></button><button class="cell" data-act="import"><span class="lbl">Importar pegando texto</span></button></div>'+
    '<div class="footnote">Al importar, lo existente se actualiza si la copia es más reciente.</div>'+
-   '<div class="group-title">Copias de seguridad</div><div class="group">'+(BACKUPS.length?BACKUPS.map(b=>'<button class="cell" data-restore="'+b.date+'"><span class="lbl">'+fmtDate(b.date)+(b.date===todayStr()?'':'')+'</span><span class="val">'+b.tasks+' tareas</span>'+I.chev.replace('<svg','<svg class="chev"')+'</button>').join(''):'<div class="cell"><span class="lbl" style="color:var(--ink2)">Todavía ninguna</span></div>')+'<button class="cell link" data-act="backupNow">'+I.plus.replace('<svg','<svg style="width:18px;height:18px"')+'<span class="lbl">Crear copia ahora</span></button></div>'+
-   '<div class="footnote">Una copia automática al día en '+dev+'; se conservan las últimas siete. Toca una para restaurarla.</div>'+
+   '<div class="group-title">Copias de seguridad</div><div class="group bk-group">'+(BACKUPS.length?BACKUPS.map(backupRowHTML).join(''):'<div class="cell"><span class="lbl" style="color:var(--ink2)">Todavía ninguna</span></div>')+'<button class="cell link" data-act="backupNow">'+I.plus.replace('<svg','<svg style="width:18px;height:18px"')+'<span class="lbl">Crear copia ahora</span></button>'+
+   (BACKUPS.length?'<button class="cell" data-act="backupsClear"><span class="lbl" style="color:var(--red)">Borrar todas las copias</span></button>':'')+'</div>'+
+   '<div class="footnote">Una copia automática al día en '+dev+'; se conservan las últimas siete. '+(UI.wide?'Haz clic en una para restaurarla; con el botón derecho, o la papelera, se borra.':'Toca una para restaurarla; desliza a la izquierda para borrarla.')+'</div>'+
    (UI.wide?'':'<div class="group-title">Gestos</div><div class="group"><button class="cell" data-act="shakeToggle"><span class="lbl">Agitar para deshacer</span><span class="switch'+(DB.settings.shakeUndo?' on':'')+'"></span></button></div>'+
    '<div class="footnote">Agita el iPhone mientras se muestra el aviso para deshacer la última acción. Pide permiso de movimiento una vez.</div>')+ // shaking is an iPhone gesture
    '<div class="group-title">Pruebas</div><div class="group"><button class="cell" data-act="demo"><span class="lbl">Generar datos de prueba</span><span class="val">150 tareas</span></button><button class="cell" data-act="demoClear"><span class="lbl" style="color:var(--red)">Eliminar datos de prueba</span><span class="val">'+demoCount()+'</span></button></div>'+
@@ -2057,7 +2127,8 @@ function bindRows(box){
 function bindCommon(scr){
   scr.addEventListener('click', onClick);
   bindRows(scr);
-  if(!UI.wide) scr.querySelectorAll('.vn[data-vn], .vn[data-au]').forEach(bindVnGestures); // voice notes and recordings (decision 29)
+  if(!UI.wide) scr.querySelectorAll('.vn[data-vn], .vn[data-au], .vn[data-bk]').forEach(bindVnGestures); // voice notes, recordings (decision 29) and local copies (decision 34)
+  if(!UI.wide) scr.querySelectorAll('.vn[data-bk] .cell').forEach(c=>bindLongPress(c, ()=>backupMenu(c.dataset.restore, {anchor:c}))); // decision 34: a copy's menu
   scr.querySelectorAll('[data-open-project]').forEach(b=>bindLongPress(b, src=>{ if(b.dataset.openProject!=='none') projectMenu(b.dataset.openProject, src); }));
   const s=$('[data-role=search]',scr); if(s) bindSearch(s, ()=>searchAround(s));
   bindBackSwipe(scr);
@@ -2104,6 +2175,8 @@ function onClick(e){
   const mc=e.target.closest('.minical [data-cal]'); if(mc){ UI.miniYM=shiftMonth(UI.miniYM||calAnchor().slice(0,7), +mc.dataset.cal); render(); return; }
   const wa=e.target.closest('[data-add-date]'); if(wa){ addSheet(wa.dataset.project||null,'',{date:wa.dataset.addDate}); return; } // R14: a day header in a project adds to that project
   const es=e.target.closest('[data-edit-space]'); if(es){ spaceSheet(es.dataset.editSpace); return; }
+  const bka=e.target.closest('[data-bkact]'); if(bka){ const r=bka.closest('[data-bk]'); if(r){ closeVn(r); deleteBackup(r.dataset.bk); } return; } // decision 34
+  const bkr=e.target.closest('.vn[data-bk]'); if(bkr&&bkr.dataset.open){ closeVn(bkr); return; } // a row showing Eliminar: a tap closes it
   const rb=e.target.closest('[data-restore]'); if(rb){ restoreBackup(rb.dataset.restore); return; }
   const pr=e.target.closest('[data-push-revoke]'); if(pr){ pushRevokeSheet(pr.dataset.pushRevoke); return; }
   const ua=e.target.closest('[data-unarchive]'); if(ua){ const p=proj(ua.dataset.unarchive); p.archived=false; p.modified=new Date().toISOString(); save(); render(); return; }
@@ -2171,6 +2244,7 @@ function onClick(e){
     case 'attAudio': if(detailId) recordSheet(detailId); break;
     case 'export': exportJSON(); break;
     case 'backupNow': dailyBackup(true); toast('Creando copia'); break;
+    case 'backupsClear': deleteAllBackups(); break;
     case 'shakeToggle': toggleShake(); break;
     case 'import': importSheet(); break;
     case 'exportFile': exportFile(); break;
@@ -2494,7 +2568,7 @@ function pmLayout(){ const m=PM, mn=pmEl.querySelector('.pm-menu'); const ins=sa
   mn.style.left=left+'px'; mn.style.top=top+'px'; mn.style.maxHeight=h+'px';
   mn.style.transformOrigin=Math.round(Math.max(0, Math.min(w, (a?(lift?ax:a.left+a.width/2):vw/2)-left)))+'px '+(fromTop?'0':h+'px'); }
 // pick: an option was chosen; the lifted copy fades where it is and the row shows again at once, for the action's own animation
-function closeMenu(instant, pick){ const m=PM; if(!m) return; PM=null; clearTimeout(m.subT); if(m.opener) m.opener.classList.remove('open');
+function closeMenu(instant, pick){ const m=PM; if(!m) return; PM=null; clearTimeout(m.subT); if(m.opener) m.opener.classList.remove('open'); if(m.spec&&m.spec.onClose) setTimeout(m.spec.onClose, 0); // onClose: the focus goes back where it was (decision 31)
   const finish=()=>{ if(pmFinish!==finish) return; pmFinish=null; pmEl.className='pm'; pmEl.innerHTML=''; pmHide.textContent=''; if(m.src) m.src.classList.remove('pm-src'); };
   pmFinish=finish; if(pick||RM.matches){ pmEl.classList.add('pick'); pmHide.textContent=''; if(m.src) m.src.classList.remove('pm-src'); }
   pmEl.classList.remove('on'); if(instant) finish(); else setTimeout(finish, 300);
@@ -2874,9 +2948,9 @@ function removeTasks(ids){ const set=new Set(ids); DB.tasks=DB.tasks.filter(x=>!
 /* New or edited project */
 function projectSheet(id){
   const p=id?proj(id):null; let color=p?p.color:COLORS[4];
-  openSheet(sheadHTML(p?'Editar proyecto':'Nuevo proyecto','Cancelar',p?'Guardar':'Crear')+'<input class="titlein" placeholder="Nombre" value="'+(p?esc(p.name):'')+'" autocomplete="off"><div class="colors">'+COLORS.map(c=>'<button data-col="'+c+'" style="background:'+c+'" class="'+(c===color?'on':'')+'" aria-label="Color"></button>').join('')+'</div>', s=>{
+  openSheet(sheadHTML(p?'Editar proyecto':'Nuevo proyecto','Cancelar',p?'Guardar':'Crear')+'<input class="titlein" placeholder="Nombre" value="'+(p?esc(p.name):'')+'" autocomplete="off"><div class="colors" role="radiogroup" aria-label="Color">'+COLORS.map((c,i)=>'<button data-col="'+c+'" style="background:'+c+'" class="'+(c===color?'on':'')+'" role="radio" aria-checked="'+(c===color)+'" aria-label="'+COLOR_NAMES[i]+'" title="'+COLOR_NAMES[i]+'"></button>').join('')+(COLORS.includes(color)?'':'<button data-col="'+esc(color)+'" style="background:'+esc(color)+'" class="on" role="radio" aria-checked="true" aria-label="Color actual" title="Color actual"></button>')+'</div>', s=>{
     const inp=$('.titlein',s); inp.focus();
-    s.onclick=e=>{ const cb=e.target.closest('[data-col]'); if(cb){ color=cb.dataset.col; s.querySelectorAll('[data-col]').forEach(b=>b.classList.toggle('on',b.dataset.col===color)); return; }
+    s.onclick=e=>{ const cb=e.target.closest('[data-col]'); if(cb){ color=cb.dataset.col; s.querySelectorAll('[data-col]').forEach(b=>{ b.classList.toggle('on',b.dataset.col===color); b.setAttribute('aria-checked', String(b.dataset.col===color)); }); return; }
       const b=e.target.closest('[data-x]'); if(!b) return; if(b.dataset.x==='cancel'){ closeSheet(); return; }
       const n=inp.value.trim(); if(!n){ inp.focus(); return; } if(p){ p.name=n; p.color=color; p.modified=new Date().toISOString(); save(); } else addProject(n,color); closeSheet(); render(); };
     inp.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); s.querySelector('[data-x=ok]').click(); } });
@@ -2939,13 +3013,15 @@ function reminderSheet(id, src){ const x=task(id); if(!x) return; const t=todayS
   const now=new Date(); const h1=new Date(Math.ceil((now.getTime()+36e5)/3e5)*3e5); const e18=new Date(); e18.setHours(18,0,0,0);
   let chips=[]; if(now.getHours()<17) chips.push([e18.toISOString(),'Hoy a las 18:00']); chips.push([tm.toISOString(),'Mañana a las 9:00'],[h1.toISOString(),'En una hora ('+fmtTime(h1.toISOString())+')']); if(x.reminder) chips.push(['','Quitar']); chips=uniqueBy(chips, c=>c[0]); // from 16:55 'En una hora' is 18:00 too
   const cur = x.reminder?new Date(x.reminder):tm; let day=localDay(cur.toISOString()), time=pad(cur.getHours())+':'+pad(cur.getMinutes()), ym=day.slice(0,7);
-  pickerPanel('Recordatorio', '<div class="chips" style="margin-top:0">'+chips.map(c=>'<button class="chip" data-r="'+c[0]+'">'+c[1]+'</button>').join('')+'</div><div id="calwrap">'+calendarHTML(ym, day)+'</div><div class="timerow"><span>Hora</span><input type="time" value="'+time+'"></div><div class="sheet-actions"><button class="btn primary" data-x="ok">Guardar</button></div>', id, src, 'pickReminder', (s, closeSheet)=>{ // closeSheet here closes the sheet or the popover that holds it
-    const inp=$('input[type=time]',s); const unwarn=()=>{ const w=$('.hint.warn',s); if(w) w.remove(); }; inp.addEventListener('input',unwarn);
-    inp.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); $('[data-x=ok]',s).click(); } }); // Enter in the time saves
+  pickerPanel('Recordatorio', '<div class="chips" style="margin-top:0">'+chips.map(c=>'<button class="chip" data-r="'+c[0]+'">'+c[1]+'</button>').join('')+'</div><div id="calwrap">'+calendarHTML(ym, day)+'</div>'+(UI.wide?timePickHTML(time):'<div class="timerow"><span>Hora</span><input type="time" value="'+time+'"></div>')+'<div class="sheet-actions"><button class="btn primary" data-x="ok">Guardar</button></div>', id, src, 'pickReminder', (s, closeSheet)=>{ // closeSheet here closes the sheet or the popover that holds it
+    const unwarn=()=>{ const w=$('.hint.warn',s); if(w) w.remove(); };
+    // Decision 32: the desktop has its own time picker; the iPhone keeps the native wheel
+    const tp=UI.wide?bindTimePick(s, {fresh:!x.reminder, onChange:unwarn, onEnter:()=>$('[data-x=ok]',s).click()}):null;
+    const inp=tp?tp.input:$('input[type=time]',s); if(!tp){ inp.addEventListener('input',unwarn); inp.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); $('[data-x=ok]',s).click(); } }); } // Enter in the time saves
     s.onclick=e=>{ const nav=e.target.closest('[data-cal]'); if(nav){ ym=shiftMonth(ym,+nav.dataset.cal); $('#calwrap',s).innerHTML=calendarHTML(ym, day); return; }
       const d=e.target.closest('[data-d]'); if(d){ day=d.dataset.d; ym=day.slice(0,7); $('#calwrap',s).innerHTML=calendarHTML(ym, day); unwarn(); haptic(4); return; }
       const c=e.target.closest('[data-r]'); if(c){ if(pickFresh(e)){ log('warn','Toque en el recordatorio ignorado justo al abrir'); return; } updTask(id,{reminder:c.dataset.r||null}); closeSheet(); render(); if(c.dataset.r) pushOfferSoon(); return; }
-      if(e.target.closest('[data-x=ok]')){ const [hh,mi]=(inp.value||time).split(':').map(Number); const dt=new Date(day+'T00:00:00'); dt.setHours(hh||0, mi||0, 0, 0); if(dt.getTime()<=Date.now()){ let w=$('.hint.warn',s); if(!w){ w=document.createElement('div'); w.className='hint warn'; $('.timerow',s).after(w); } w.textContent='Esa hora ya ha pasado'; haptic(10); return; } updTask(id,{reminder:dt.toISOString()}); closeSheet(); render(); pushOfferSoon(); } }; }); } // a past reminder could never notify: the sheet stays open, with a line above Guardar (a toast would cover the time field)
+      if(e.target.closest('[data-x=ok]')){ const [hh,mi]=(tp?hmStr(tp.value()):(inp.value||time)).split(':').map(Number); const dt=new Date(day+'T00:00:00'); dt.setHours(hh||0, mi||0, 0, 0); if(dt.getTime()<=Date.now()){ let w=$('.hint.warn',s); if(!w){ w=document.createElement('div'); w.className='hint warn'; $('.timerow, .tpk',s).after(w); } w.textContent='Esa hora ya ha pasado'; haptic(10); return; } updTask(id,{reminder:dt.toISOString()}); closeSheet(); render(); pushOfferSoon(); } }; }); } // a past reminder could never notify: the sheet stays open, with a line above Guardar (a toast would cover the time field)
 
 /* Plan the undated tasks one by one */
 function planStart(){ let ids=pendingFor('todas').filter(x=>!x.date); if(UI.projFilter!==null) ids=ids.filter(x=> UI.projFilter==='none' ? !x.projectId : x.projectId===UI.projFilter); ids=ids.map(x=>x.id); if(!ids.length) return; planStep(ids, 0, {done:0, skipped:0}); }
@@ -3032,6 +3108,8 @@ const BK = {
   async tx(mode, fn){ const db=await this.open(); return new Promise((res,rej)=>{ const t=db.transaction(['snapshots','meta'],mode); const out=fn(t.objectStore('snapshots'), t.objectStore('meta')); t.oncomplete=()=>{ db.close(); res(out&&out.result!==undefined?out.result:out); }; t.onerror=()=>{ db.close(); rej(t.error); }; }); },
   async list(){ const db=await this.open(); return new Promise((res,rej)=>{ const t=db.transaction('meta','readonly'); const r=t.objectStore('meta').getAll(); r.onsuccess=()=>{ db.close(); res((r.result||[]).sort((a,b)=>a.date<b.date?1:-1)); }; r.onerror=()=>{ db.close(); rej(r.error); }; }); },
   async get(date){ const db=await this.open(); return new Promise((res,rej)=>{ const t=db.transaction('snapshots','readonly'); const r=t.objectStore('snapshots').get(date); r.onsuccess=()=>{ db.close(); res(r.result); }; r.onerror=()=>{ db.close(); rej(r.error); }; }); },
+  del(date){ return this.tx('readwrite', (st,meta)=>{ st.delete(date); meta.delete(date); }); }, // decision 34
+  clear(){ return this.tx('readwrite', (st,meta)=>{ st.clear(); meta.clear(); }); },
   async put(date){ const snap={date, created:new Date().toISOString(), data:exportData()}; await this.tx('readwrite', (st,meta)=>{ st.put(snap); meta.put(BK.metaOf(snap)); });
     const old=(await this.list()).slice(7); if(old.length) await this.tx('readwrite', (st,meta)=>{ old.forEach(b=>{ st.delete(b.date); meta.delete(b.date); }); }); }
 };
@@ -3039,7 +3117,24 @@ let BACKUPS=[];
 async function refreshBackups(){ try{ BACKUPS=await BK.list(); }catch(e){ BACKUPS=[]; } }
 // Ajustes is on screen: the desktop settings view, or the iPhone tab with nothing pushed on top
 function onSettings(){ return UI.wide ? UI.deskView==='settings' : (UI.tab==='ajustes'&&!UI.stack.length); }
-async function dailyBackup(force){ try{ const t=todayStr(); if(force || !BACKUPS.some(b=>b.date===t)){ await BK.put(t); await refreshBackups(); log('info', force?'Copia local creada':'Copia local diaria', {date:t, tasks:DB.tasks.length}); if(onSettings()) render(); } }catch(e){ log('warn','Copia local no disponible: '+(e&&e.message||e)); } }
+/* Decision 34: a copy can be deleted (an iPhone row slides to Eliminar, or its menu; the desktop has the right click and a bin on hover), and all
+   of them at once. Always confirmed, never undone. A copy of today deleted by hand is not made again until tomorrow ('tareas-bk-skip') */
+const BK_SKIP='tareas-bk-skip';
+const bkWhen = date => date===todayStr()?'de hoy':date===addDays(todayStr(),-1)?'de ayer':'del '+fmtDate(date);
+const backupRowHTML = b => '<div class="vn bk" data-bk="'+b.date+'"><div class="vn-bg r"><button data-bkact="del">Eliminar</button></div><div class="vn-c bk-c"><button class="cell" data-restore="'+b.date+'"><span class="lbl">'+fmtDate(b.date)+'</span><span class="val">'+b.tasks+' tareas</span>'+I.chev.replace('<svg','<svg class="chev"')+'</button>'+
+  (UI.wide?'<button class="bk-del" data-bkact="del" aria-label="Borrar la copia '+bkWhen(b.date)+'" title="Borrar la copia">'+I.trash+'</button>':'')+'</div></div>';
+function backupMenu(date, at){ popMenu(Object.assign(at, {groups:[[{label:'Restaurar', icon:MI.undo, fn:()=>restoreBackup(date)}],[{label:'Borrar copia', icon:MI.trash, red:true, fn:()=>deleteBackup(date)}]]})); }
+function deleteBackup(date){ const b=BACKUPS.find(x=>x.date===date); if(!b) return; const dev=UI.wide?'este dispositivo':'este iPhone';
+  confirmSheet('Borrar copia', 'La copia '+bkWhen(date)+' ('+b.tasks+' tareas) se borrará de '+dev+'. No se puede deshacer.', async()=>{
+    try{ await BK.del(date); if(date===todayStr()) try{ localStorage.setItem(BK_SKIP, date); }catch(e){} await refreshBackups(); log('info','Copia local borrada', {date}); toast('Copia borrada'); }
+    catch(e){ log('error','No se pudo borrar la copia: '+(e&&e.message||e)); toast('No se pudo borrar la copia'); }
+    render(); }, 'Borrar'); }
+function deleteAllBackups(){ const n=BACKUPS.length; if(!n) return; const dev=UI.wide?'este dispositivo':'este iPhone';
+  confirmSheet('Borrar todas las copias', (n===1?'La copia':'Las '+n+' copias')+' de '+dev+' se borrarán. No se puede deshacer. La copia automática vuelve mañana.', async()=>{
+    try{ await BK.clear(); try{ localStorage.setItem(BK_SKIP, todayStr()); }catch(e){} await refreshBackups(); log('info','Copias locales borradas', {n}); toast(n===1?'Copia borrada':n+' copias borradas'); }
+    catch(e){ log('error','No se pudieron borrar las copias: '+(e&&e.message||e)); toast('No se pudieron borrar las copias'); }
+    render(); }, 'Borrar todas'); }
+async function dailyBackup(force){ try{ const t=todayStr(); let skip=null; try{ skip=localStorage.getItem(BK_SKIP); }catch(e){} if(!force&&skip===t) return; if(force || !BACKUPS.some(b=>b.date===t)){ await BK.put(t); await refreshBackups(); log('info', force?'Copia local creada':'Copia local diaria', {date:t, tasks:DB.tasks.length}); if(onSettings()) render(); } }catch(e){ log('warn','Copia local no disponible: '+(e&&e.message||e)); } }
 function restoreBackup(date){ const b=BACKUPS.find(x=>x.date===date); if(!b) return;
   const when = date===todayStr()?'de hoy':date===addDays(todayStr(),-1)?'de ayer':'del '+fmtDate(date);
   // Signed in, the copy applies to every device (agreed with Enric): restored records get a new modified so they win, and what the copy lacks is deleted everywhere by the next sync
@@ -3102,7 +3197,7 @@ const demoCount = () => DB.tasks.filter(x=>String(x.id).startsWith('demo-')).len
 function generateDemo(){
   let seed=20261031; const rnd=()=>{ seed=(seed*1103515245+12345)&0x7fffffff; return seed/0x7fffffff; }; const pick=a=>a[Math.floor(rnd()*a.length)];
   const batch=Date.now().toString(36); const sp=space().id; const now=new Date(); const t=todayStr();
-  const projNames=[['Cliente FLC',0],['Verifactu',4],['Cash Application',3],['Propuesta Iberdrola',5],['Formación del equipo',6],['Administración',7]];
+  const projNames=[['Cliente FLC',0],['Verifactu',4],['Cash Application',3],['Propuesta Iberdrola',10],['Formación del equipo',5],['Administración',7]]; // the same colours as before decision 33 reordered COLORS
   const projects=projNames.map((pn,i)=>({id:'demo-p-'+batch+'-'+i, spaceId:sp, name:pn[0], color:COLORS[pn[1]], order:DB.projects.length+i, archived:false, created:now.toISOString(), modified:now.toISOString()}));
   const verbs=['Preparar','Revisar','Enviar','Cerrar','Actualizar','Llamar a','Validar','Redactar','Planificar','Documentar','Confirmar','Analizar'];
   const objs=['comité de seguimiento','SOW con legal','acta del steering','plan de cutover','RAID log','Marta por el presupuesto','mapping de Verifactu','propuesta de fase 2','sesión de formación','backlog de defectos','escenarios de prueba UAT','calendario de go-live','informe de horas','presentación a dirección','integración con BTP','matriz de riesgos','contrato marco','facturas pendientes','ampliación del equipo','notas del taller'];
@@ -4337,7 +4432,7 @@ function deskSide(){
     '<button class="it add" data-act="newProject">'+I.plus+'<span>Nuevo proyecto</span></button>'+
     '<div class="grow"></div>'+it('settings',I.gear,'Ajustes',undefined,v==='settings')+'</aside>';
 }
-function addBarHTML(projectId){ return '<div class="addbar">'+I.plus+qinHTML('<input type="text" placeholder="Nueva tarea… mañana, a las 9, !! o #proyecto" data-role="addbar"'+(projectId?' data-project="'+projectId+'"':'')+' value="'+esc(UI.addDraft||'')+'" autocomplete="off" spellcheck="false">')+'<span class="kbd">N</span></div><div class="addhint" id="deskSaid"></div>'+pasteBoxHTML(projectId); }
+function addBarHTML(projectId){ return '<div class="addx'+(AX.open?' open':'')+'"><div class="addbar">'+I.plus+qinHTML('<input type="text" placeholder="Nueva tarea… mañana, a las 9, !! o #proyecto" data-role="addbar"'+(projectId?' data-project="'+projectId+'"':'')+' value="'+esc(UI.addDraft||'')+'" autocomplete="off" spellcheck="false">')+'<span class="kbd">N</span></div>'+(AX.open?addxPanelHTML(projectId):'<div class="addhint" id="deskSaid"></div>')+'</div>'+pasteBoxHTML(projectId); } // decision 31: open, the composer under the bar
 // The desktop add bar starts from today in Hoy and from the project in a project view; the title can say otherwise (R7)
 // Decision 27b: in Hoy it also takes the project of the active project filter (the list ignores the filter during a search, so does the bar)
 function deskAddBase(projectId){ const hoy=UI.deskView==='hoy', pf=hoy&&!projectId&&!UI.query?filterProject():null;
@@ -4495,7 +4590,7 @@ function renderDesktop(again){
   // Each view keeps its own scroll (per space), like the iPhone tabs; a view seen for the first time opens at the top
   const body=d.querySelector('.mbody'); if(body&&UI.deskKey) UI.deskScroll[UI.deskKey]=body.scrollTop; const side=d.querySelector('.side'); const sst=side?side.scrollTop:0;
   // The add bar or the search keep focus and caret across the rebuild (a click elsewhere has already taken the focus)
-  const ae=document.activeElement, fr=ae&&d.contains(ae)&&(ae.dataset.role==='addbar'||ae.dataset.role==='search'||ae.dataset.role==='rowedit') ? {role:ae.dataset.role, a:ae.selectionStart, b:ae.selectionEnd} : null;
+  const ae=document.activeElement, fr=ae&&d.contains(ae)&&/^(addbar|search|rowedit|addnotes|addvoice)$/.test(ae.dataset.role||'') ? {role:ae.dataset.role, a:ae.selectionStart, b:ae.selectionEnd} : null;
   const rowF=ae&&d.contains(ae)&&ae.classList.contains('row'), paneWas=UI.deskDetail; // R15: a focused row gives the focus to the selected row of the new markup
   const pop = isCalView(UI.deskView); // R17: in Semana the detail is a popover next to its card, so the seven columns keep their width
   const pane = deskPaneHTML();
@@ -4526,6 +4621,9 @@ function renderDesktop(again){
   if(pop&&UI.deskDetail){ placeWeekPop(d); const wk=d.querySelector('.week'); if(wk) wk.addEventListener('scroll', ()=>placeWeekPop(d), {passive:true, capture:true}); } // each column scrolls on its own
   const s=$('[data-role=search]',d); if(s) bindSearch(s, ()=>deskResults(d));
   bindAddBar(d);
+  // Decision 31: the composer just opened unfolds under the bar (a fade with Reduce Motion); its text areas take the height of their text
+  d.querySelectorAll('.axp textarea').forEach(axFit);
+  if(AX.opened){ AX.opened=false; const p=d.querySelector('.axp'); if(p&&p.animate) try{ p.animate(RM.matches?[{opacity:0},{opacity:1}]:[{opacity:0, transform:'translate3d(0,-6px,0)'},{opacity:1, transform:'none'}], {duration:RM.matches?160:200, easing:'cubic-bezier(.32,.72,0,1)'}); }catch(e){} }
   renderTabbar();
 }
 // R17: the week popover sits beside its card (right if it fits, else left), inside the window; it follows the card as the column scrolls.
@@ -4554,11 +4652,11 @@ function bindAddBar(d){
   const ab=$('[data-role=addbar]',d); if(!ab) return; const base=()=>deskAddBase(ab.dataset.project);
   const refocus=()=>{ const n=$('#desk [data-role=addbar]'); if(n){ n.focus(); const l=n.value.length; n.setSelectionRange(l,l); } };
   // R7: the recognised parts are tinted in the field and spelled out under it
-  const upd=()=>{ const said=$('#deskSaid',d), r=quickTask(ab.value, base()); paintQuick(ab, r.toks); const q=quickSaid(r);
+  const upd=()=>{ const said=$('#deskSaid',d), r=addxTask(ab.value, ab.dataset.project); paintQuick(ab, r.toks); const q=quickSaid(r); axPaint(r); // decision 31: the values chosen on the buttons count too
     if(said) said.innerHTML=(q.out.length?'Entendido: <b>'+esc(q.out.join(', '))+'</b>'+(q.warn.length?'. ':''):'')+(q.warn.length?'<span class="warn">'+esc(q.warn.join(' '))+'</span>':''); return r; };
   upd(); bindPasteBox(d, refocus); if(ab._ab) return; ab._ab=1; // R18: a bar kept by a merge keeps its listeners
   bindQuickScroll(ab);
-  ab.addEventListener('input',()=>{ UI.addDraft=ab.value; upd(); }); // a render keeps the half-typed task
+  ab.addEventListener('input',()=>{ UI.addDraft=ab.value; upd(); if(ab.value.trim()&&!AX.open&&!UI.addPaste) axOpen(); }); // a render keeps the half-typed task; typing opens the composer (decision 31)
   ab.addEventListener('paste',e=>{ const ls=pasteLines(e.clipboardData&&e.clipboardData.getData('text')); if(ls.length<2) return; e.preventDefault(); UI.addPaste=(UI.addPaste||[]).concat(ls); render(); refocus(); });
   ab.addEventListener('keydown',e=>{
     if(e.key==='Tab'&&!e.shiftKey&&!e.metaKey&&!e.ctrlKey&&!e.altKey){ if(completeProjectTag(ab)) e.preventDefault(); return; }
@@ -4566,12 +4664,144 @@ function bindAddBar(d){
     if(e.key!=='Enter') return; e.preventDefault();
     if(UI.addPaste){ const v=ab.value.trim(); if(v){ UI.addPaste.push(v); UI.addDraft=''; render(); refocus(); } return; } // with a pasted list waiting, Enter adds a line to it
     const r=upd(); if(!r.title) return;
-    const x=addTask({title:r.title, date:r.date, projectId:r.projectId, priority:r.priority, reminder:r.reminder}); UI.addDraft=''; haptic(6); renderAnimated(); toast('Añadida: '+x.title); refocus(); });
+    axSubmit(ab.dataset.project||null); }); // decision 31: with the notes, the buttons' values and the voice note
 }
 function bindPasteBox(d, refocus){ const pb=$('.pastebox',d), base=()=>{ const a=$('[data-role=addbar]',d); return deskAddBase(a&&a.dataset.project); }; if(pb&&!pb._pb){ pb._pb=1; pb.addEventListener('click',e=>{ const rm=e.target.closest('[data-paste-rm]'); if(rm){ UI.addPaste.splice(+rm.dataset.pasteRm,1); if(!UI.addPaste.length) UI.addPaste=null; render(); refocus(); return; }
     const b=e.target.closest('[data-paste]'); if(!b) return; if(b.dataset.paste==='cancel'){ UI.addPaste=null; render(); refocus(); return; }
     const ls=UI.addPaste.slice(); UI.addPaste=null; const ids=addMany(ls, base()); renderAnimated(); log('info','Tareas creadas desde una lista', {n:ids.length}); toast(ids.length===1?'1 tarea creada':ids.length+' tareas creadas', ()=>removeTasks(ids)); refocus(); }); }
 }
+/* ---------- Decision 32: the desktop time picker (the iPhone keeps the native wheel) ----------
+   A field that takes 9, 930, 9:30 or 21.15; under it, a list of half hours from 7:00 to 22:00 scrolled to the chosen time (or the
+   current one, marked); chips for the usual hours. The arrows add or take 15 minutes; Intro keeps the time typed and calls onEnter */
+var TP_CHIPS=['09:00','12:00','15:00','18:00']; // var and function declarations: the first render (above) runs before these lines
+function hmOk(h, m){ return h>=0&&h<=23&&m>=0&&m<=59 ? {h, m} : null; }
+function hmStr(o){ return String(o.h).padStart(2,'0')+':'+String(o.m).padStart(2,'0'); } // 09:30, as stored and compared
+function hmShow(o){ return o.h+':'+String(o.m).padStart(2,'0'); } // 9:30, as shown
+function parseHM(s){ s=String(s||'').trim().toLowerCase().replace(/\s*h(oras?)?$/,''); let m;
+  if((m=s.match(/^(\d{1,2})$/))) return hmOk(+m[1], 0);
+  if((m=s.match(/^(\d{1,2})\s*[:.,h ]\s*(\d{2})$/))) return hmOk(+m[1], +m[2]);
+  if((m=s.match(/^(\d{1,2})(\d{2})$/))) return hmOk(+m[1], +m[2]);
+  return null; }
+function timePickHTML(v){ const o=parseHM(v)||{h:9, m:0}, now=new Date(), nm=Math.floor((now.getHours()*60+now.getMinutes())/30)*30, opts=[];
+  for(let t=7*60; t<=22*60; t+=30) opts.push({h:Math.floor(t/60), m:t%60, now:t===nm});
+  return '<div class="tpk"><div class="tpk-row"><span class="tpk-lbl">Hora</span><div class="tpk-field"><input class="tpk-in" type="text" inputmode="numeric" value="'+hmShow(o)+'" data-v="'+hmStr(o)+'" aria-label="Hora" autocomplete="off" spellcheck="false">'+
+    '<button class="tpk-open" type="button" aria-label="Ver las horas" aria-expanded="false" title="Ver las horas">'+I.chevD+'</button></div></div>'+
+    '<div class="tpk-list" role="listbox" aria-label="Horas" hidden>'+opts.map(x=>'<button type="button" role="option" class="tpk-o'+(x.now?' now':'')+'" data-tv="'+hmStr(x)+'"'+(x.now?' title="Ahora"':'')+'>'+hmShow(x)+'</button>').join('')+'</div>'+
+    '<div class="tpk-chips">'+TP_CHIPS.map(c=>'<button type="button" class="chip" data-tq="'+c+'">'+hmShow(parseHM(c))+'</button>').join('')+'</div></div>'; }
+// Returns {value(): {h, m}}; onChange runs on every valid change, onEnter on Intro
+function bindTimePick(root, o){ o=o||{}; const box=$('.tpk', root); if(!box) return null; const inp=$('.tpk-in', box), list=$('.tpk-list', box), open=$('.tpk-open', box);
+  const val=()=>parseHM(inp.dataset.v)||{h:9, m:0};
+  const paint=()=>{ const v=inp.dataset.v; list.querySelectorAll('.tpk-o').forEach(b=>{ const on=b.dataset.tv===v; b.classList.toggle('on', on); b.setAttribute('aria-selected', String(on)); });
+    box.querySelectorAll('[data-tq]').forEach(b=>b.classList.toggle('on', b.dataset.tq===v)); };
+  const set=(x, typing)=>{ inp.dataset.v=hmStr(x); if(!typing) inp.value=hmShow(x); box.classList.remove('bad'); paint(); if(!list.hidden) reveal(); if(o.onChange) o.onChange(x); };
+  // The chosen half hour, or the nearest to it, in the middle of the list
+  const reveal=()=>{ const x=val(), mm=x.h*60+x.m; let best=null, bd=1e9; list.querySelectorAll('.tpk-o').forEach(b=>{ const y=parseHM(b.dataset.tv), d=Math.abs(y.h*60+y.m-mm); if(d<bd){ bd=d; best=b; } });
+    const t=list.querySelector('.tpk-o.on')||(o.fresh&&list.querySelector('.tpk-o.now'))||best; if(t) list.scrollTop=Math.max(0, t.offsetTop-list.clientHeight/2+t.offsetHeight/2); };
+  // A popover that grew with the list is placed again, so it stays inside the window
+  const show=on=>{ list.hidden=!on; open.setAttribute('aria-expanded', String(on)); box.classList.toggle('open', on); const L=PM&&PM.mac&&PM.levels[PM.levels.length-1]; if(L&&L.el.contains(box)) macPlace(L); if(on) reveal(); };
+  paint();
+  inp.addEventListener('input', ()=>{ const x=parseHM(inp.value); if(x) set(x, true); else box.classList.toggle('bad', !!inp.value.trim()); });
+  inp.addEventListener('blur', ()=>{ inp.value=hmShow(val()); box.classList.remove('bad'); });
+  inp.addEventListener('mousedown', ()=>{ if(list.hidden) setTimeout(()=>show(true), 0); });
+  inp.addEventListener('keydown', e=>{
+    if(e.key==='ArrowUp'||e.key==='ArrowDown'){ e.preventDefault(); const x=val(), t=(x.h*60+x.m+(e.key==='ArrowUp'?15:-15)+1440)%1440; set({h:Math.floor(t/60), m:t%60}); inp.select(); return; }
+    if(e.key==='Enter'&&!e.isComposing){ e.preventDefault(); const x=parseHM(inp.value); if(!x&&inp.value.trim()){ box.classList.add('bad'); haptic(10); return; } if(x) set(x); show(false); if(o.onEnter) o.onEnter(val()); } });
+  box.addEventListener('click', e=>{ const b=e.target.closest('[data-tv],[data-tq],.tpk-open'); if(!b) return; e.stopPropagation();
+    if(b.classList.contains('tpk-open')){ show(list.hidden); inp.focus(); return; }
+    set(parseHM(b.dataset.tv||b.dataset.tq)); if(b.dataset.tv) show(false); inp.focus(); });
+  return {value:val, input:inp}; }
+
+/* ---------- Decision 31: the desktop add bar opens into a composer ----------
+   Once something is typed, a panel unfolds under the bar (over the list, so nothing below moves): Notas, and buttons for Fecha, Proyecto,
+   Prioridad, Recordatorio and Nota de voz (dictated with the computer's microphone where the browser can, otherwise written). The words of
+   the title (mañana, #proyecto, !!, a las 9) still count and show on the buttons; a button chosen by hand takes that word out of the title.
+   Intro in the title or the notes adds everything (Mayúsculas e Intro is a new line in the notes); then the bar stays open and empty with
+   the date and project chosen by hand, for the next one. Esc folds it, asking first when there is something written (decision 28) */
+// AX: the composer's state, set up with UI (the first render reads it)
+function axHasText(){ return !!((UI.addDraft||'').trim()||AX.notes.trim()||AX.voice.trim()); }
+// The values chosen by hand over the view's own (deskAddBase); the title's words go over both (quickTask)
+function addxBase(projectId){ const b=deskAddBase(projectId); return {date:AX.date!==undefined?AX.date:b.date, projectId:AX.projectId!==undefined?AX.projectId:b.projectId, priority:AX.priority||b.priority}; }
+function addxTask(text, projectId){ const r=quickTask(text, addxBase(projectId));
+  if(!r.q.time&&AX.time){ r.reminder=quickReminder(AX.time, r.date); if(r.reminder&&!r.date) r.date=localDay(r.reminder); r.lateManual=!r.reminder; }
+  return r; }
+function axBtnsHTML(r){ const p=r.projectId&&proj(r.projectId), pr=r.priority, b=(k, ic, l, on, cls, tip)=>'<button class="axbt'+(on?' on':'')+(cls?' '+cls:'')+'" data-ax="'+k+'" title="'+tip+'" aria-haspopup="'+(k==='voice'?'false':'dialog')+'">'+ic+'<span>'+esc(l)+'</span></button>';
+  return b('date', I.cal, r.date?fmtDate(r.date):'Fecha', !!r.date, '', 'Fecha')+
+    b('proj', p?'<span class="pm-dot" style="background:'+p.color+'"></span>':I.folder, p?p.name:'Proyecto', !!p, '', 'Proyecto')+
+    b('pri', I.flag, pr==='high'?'Alta':pr==='mid'?'Media':'Prioridad', pr!=='none', pr==='high'?'high':pr==='mid'?'mid':'', 'Prioridad')+
+    b('rem', I.bell, r.reminder?(r.date&&localDay(r.reminder)===r.date?fmtTime(r.reminder):fmtDateTime(r.reminder)):'Recordatorio', !!r.reminder, '', 'Recordatorio')+
+    b('voice', I.mic, AX.rec?'Escuchando':'Nota de voz', !!(AX.rec||AX.voice.trim()), AX.rec?'rec':'', AX.rec?'Parar el dictado':'Nota de voz'); }
+function addxPanelHTML(projectId){ const r=addxTask(UI.addDraft||'', projectId);
+  return '<div class="axp" role="group" aria-label="Detalles de la nueva tarea"><textarea class="axn" data-role="addnotes" rows="1" placeholder="Notas">'+esc(AX.notes)+'</textarea>'+
+    (AX.voiceOn||AX.voice?'<div class="axv">'+I.mic+'<textarea class="axvt" data-role="addvoice" rows="1" placeholder="'+(AX.rec?'Escuchando. Habla y se escribirá aquí':'Nota de voz')+'">'+esc(AX.voice)+'</textarea><button class="axx" data-ax="voiceClear" aria-label="Quitar la nota de voz" title="Quitar la nota de voz">'+XICON+'</button></div>':'')+
+    '<div class="axb"><span class="axbs">'+axBtnsHTML(r)+'</span><span class="grow"></span><button class="axadd" data-ax="add"'+(r.title?'':' disabled')+'>Añadir</button></div><div class="addhint" id="deskSaid"></div></div>'; }
+function axBar(){ return $('#desk [data-role=addbar]'); }
+function axFocus(){ const n=axBar(); if(n){ n.focus({preventScroll:true}); const l=n.value.length; n.setSelectionRange(l,l); } }
+// The written word of that kind leaves the title: the button chosen by hand says it now
+function axStrip(kind){ const ab=axBar(); if(!ab) return; const q=parseQuick(ab.value), ts=q.tokens.filter(t=>t.kind===kind); if(!ts.length) return;
+  let v=ab.value; ts.slice().reverse().forEach(t=>{ v=v.slice(0,t.start)+v.slice(t.end); }); v=v.replace(/\s{2,}/g,' ').replace(/^\s+/,''); ab.value=v; UI.addDraft=v; }
+function axOpen(){ if(AX.open) return; AX.open=true; AX.opened=true; log('info','Alta ampliada abierta'); render(); }
+// Folds the composer (with a short fade and lift) and forgets everything it held
+function axCollapse(){ axStopVoice(); const p=$('#desk .axp'); const done=()=>{ Object.assign(AX, {open:false, notes:'', voice:'', voiceOn:false, date:undefined, projectId:undefined, priority:undefined, time:null}); UI.addDraft=''; const ab=axBar(); if(ab) ab.value=''; render(); };
+  if(p&&p.animate&&!RM.matches){ try{ const a=p.animate([{opacity:1, transform:'none'},{opacity:0, transform:'translate3d(0,-6px,0)'}], {duration:140, easing:'ease-in', fill:'forwards'}); a.onfinish=done; return; }catch(e){} }
+  done(); }
+function axEscape(){ if(!axHasText()){ axCollapse(); const ab=axBar(); if(ab) ab.blur(); return; }
+  macAlert({title:'La tarea no se ha añadido.', text:'Lo escrito se perderá.', ok:'Descartar tarea', cancel:'Seguir editando', fn:()=>{ log('info','Alta ampliada descartada con texto'); axCollapse(); }}); }
+function axSubmit(projectId){ const ab=axBar(), r=addxTask(ab?ab.value:UI.addDraft||'', projectId); if(!r.title){ axFocus(); return false; }
+  const x=addTask({title:r.title, date:r.date, projectId:r.projectId, priority:r.priority, reminder:r.reminder, notes:AX.notes.replace(/\s+$/,'')});
+  axStopVoice(); const v=AX.voice.trim(); if(v){ DB.voiceNotes.push({id:uid(), taskId:x.id, text:v, created:new Date().toISOString()}); save(); }
+  log('info','Tarea añadida desde el alta ampliada', {notas:!!x.notes, voz:!!v, recordatorio:!!x.reminder});
+  // Ready for the next one: the date and project chosen by hand stay, the rest starts again
+  Object.assign(AX, {notes:'', voice:'', voiceOn:false, priority:undefined, time:null}); UI.addDraft=''; if(ab) ab.value=''; document.querySelectorAll('#desk .axp textarea').forEach(t=>{ t.value=''; }); // a merge keeps a typed field's value
+  haptic(6); renderAnimated(); toast('Añadida: '+x.title); axFocus(); if(x.reminder) pushOfferSoon(); return true; }
+// Dictation: the browser's recognizer where it exists (Chrome, Edge, Safari); otherwise the field to write it
+function axVoice(){ if(AX.rec){ axStopVoice(); render(); return; } AX.voiceOn=true;
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){ render(); const t=$('#desk [data-role=addvoice]'); if(t) t.focus(); return; }
+  let r; try{ r=new SR(); }catch(e){ render(); return; } const base=AX.voice.trim()?AX.voice.trim()+' ':''; let final='';
+  r.lang='es-ES'; r.continuous=true; r.interimResults=true;
+  r.onresult=ev=>{ if(AX.rec!==r) return; let interim=''; for(let i=ev.resultIndex;i<ev.results.length;i++){ const x=ev.results[i]; if(x.isFinal) final+=x[0].transcript+' '; else interim+=x[0].transcript; }
+    AX.voice=(base+final+interim).trim(); const t=$('#desk [data-role=addvoice]'); if(t&&t.value!==AX.voice){ t.value=AX.voice; axFit(t); } };
+  r.onerror=e=>{ if(AX.rec!==r) return; const er=e&&e.error; if(er==='no-speech') return; log('warn','Dictado de la nota de voz: '+er);
+    axStopVoice(); render(); toast(er==='not-allowed'||er==='service-not-allowed'?'Sin permiso para el micrófono. Escribe la nota.':'Dictado no disponible. Escribe la nota.'); const t=$('#desk [data-role=addvoice]'); if(t) t.focus(); };
+  r.onend=()=>{ if(AX.rec===r){ try{ r.start(); }catch(e){ axStopVoice(); render(); } } }; // continuous: the engine stops on its own after a silence
+  try{ r.start(); AX.rec=r; log('info','Dictado de nota de voz iniciado'); }catch(e){ log('warn','Dictado no disponible: '+(e&&e.message||e)); }
+  render(); }
+function axStopVoice(){ const r=AX.rec; if(!r) return; AX.rec=null; try{ r.stop(); }catch(e){} }
+function axFit(t){ t.style.height='auto'; t.style.height=Math.min(t.scrollHeight+2, 160)+'px'; }
+// The buttons follow what is typed in the title, without a redraw
+function axPaint(r){ const bs=$('#desk .axbs'); if(bs){ const h=axBtnsHTML(r); if(bs._h!==h){ bs.innerHTML=h; bs._h=h; } } const ad=$('#desk .axadd'); if(ad) ad.disabled=!r.title; }
+function axPick(kind, src, projectId){ const r=addxTask((axBar()||{}).value||'', projectId), back=()=>setTimeout(axFocus, 0), redo=()=>{ render(); back(); };
+  const at={anchor:src, align:'left', onClose:back};
+  if(kind==='proj'){ const dot=c=>'<span class="pm-dot" style="background:'+c+'"></span>', set=v=>{ AX.projectId=v; axStrip('proj'); redo(); };
+    popMenu(Object.assign(at, {groups:[[{label:'Ninguno', icon:dot('var(--ink3)'), on:!r.projectId, fn:()=>set(null)}].concat(activeProjects().map(p=>({label:p.name, icon:dot(p.color), on:r.projectId===p.id, fn:()=>set(p.id)})))]})); return; }
+  if(kind==='pri'){ const set=v=>{ AX.priority=v; axStrip('pri'); redo(); };
+    popMenu(Object.assign(at, {groups:[[['high','Alta',MI.p3,'1'],['mid','Media',MI.p2,'2'],['none','Ninguna',MI.p0,'0']].map(([k,l,ic,key])=>({label:l, icon:ic, key, on:r.priority===k, fn:()=>set(k)}))]})); return; }
+  if(kind==='date'){ const t=todayStr(), dow=new Date(t+'T00:00:00').getDay(), chips=[[t,'Hoy'],[addDays(t,1),'Mañana']]; if(dow>=1&&dow<=4) chips.push([nextWeekday(5,true),'Este viernes']); chips.push([nextWeekday(1,true),'Próxima semana'],['','Sin fecha']);
+    let ym=(r.date||t).slice(0,7);
+    popMenu(Object.assign(at, {html:'<div class="chips" style="margin-top:0">'+uniqueBy(chips, c=>c[0]).map(c=>'<button class="chip'+((r.date||'')===c[0]?' on':'')+'" data-d="'+c[0]+'">'+c[1]+'</button>').join('')+'</div><div id="calwrap">'+calendarHTML(ym, r.date)+'</div>', bind:el=>{
+      el.onclick=e=>{ const nav=e.target.closest('[data-cal]'); if(nav){ ym=shiftMonth(ym,+nav.dataset.cal); $('#calwrap',el).innerHTML=calendarHTML(ym, r.date); return; }
+        const c=e.target.closest('[data-d]'); if(!c||ghostClick(e)) return; AX.date=c.dataset.d||null; axStrip('date'); closeMenu(false, true); redo(); }; }})); return; }
+  if(kind==='rem'){ const cur=r.reminder?new Date(r.reminder):null, v=cur?hmStr({h:cur.getHours(), m:cur.getMinutes()}):'09:00';
+    popMenu(Object.assign(at, {html:'<div class="axrem-day">'+(r.date?'Día de la tarea: '+fmtDate(r.date).toLowerCase():'Sin fecha: hoy, o mañana si esa hora ya ha pasado')+'</div>'+timePickHTML(v)+'<div class="sheet-actions">'+(r.reminder?'<button class="btn" data-x="clear">Quitar</button>':'')+'<span style="flex:1"></span><button class="btn primary" data-x="ok">Guardar</button></div>', bind:el=>{
+      const ok=x=>{ const rem=quickReminder(x, r.date); if(!rem){ let w=$('.hint.warn',el); if(!w){ w=document.createElement('div'); w.className='hint warn'; $('.tpk',el).after(w); } w.textContent='Esa hora ya ha pasado'; haptic(10); return; }
+        AX.time=x; axStrip('time'); closeMenu(false, true); redo(); };
+      const tp=bindTimePick(el, {fresh:!cur, onEnter:ok, onChange:()=>{ const w=$('.hint.warn',el); if(w) w.remove(); }});
+      el.onclick=e=>{ const b=e.target.closest('[data-x]'); if(!b) return; if(b.dataset.x==='clear'){ AX.time=null; axStrip('time'); closeMenu(false, true); redo(); return; } ok(tp.value()); };
+      setTimeout(()=>{ tp.input.focus(); tp.input.select(); }, 0); }})); return; } }
+// Once per desktop element (bindDeskEvents): clicks, typing and keys of the composer
+function axBind(d){
+  d.addEventListener('click', e=>{ const b=e.target.closest('.axp [data-ax]'); if(!b) return; e.stopPropagation(); const k=b.dataset.ax, pid=(axBar()||{dataset:{}}).dataset.project||null;
+    if(k==='add'){ axSubmit(pid); return; }
+    if(k==='voice'){ axVoice(); return; }
+    if(k==='voiceClear'){ axStopVoice(); AX.voice=''; AX.voiceOn=false; render(); axFocus(); return; }
+    axPick(k, b, pid); }, true);
+  d.addEventListener('input', e=>{ const t=e.target, role=t.dataset&&t.dataset.role; if(role==='addnotes'){ AX.notes=t.value; axFit(t); } else if(role==='addvoice'){ if(AX.rec){ axStopVoice(); render(); } AX.voice=t.value; axFit(t); } });
+  d.addEventListener('keydown', e=>{ const t=e.target, role=t.dataset&&t.dataset.role; if(!/^(addbar|addnotes|addvoice)$/.test(role||'')||e.isComposing) return;
+    if(e.key==='Escape'&&AX.open){ e.preventDefault(); e.stopPropagation(); axEscape(); return; }
+    if(e.key==='Enter'&&!e.shiftKey&&role!=='addbar'&&!UI.addPaste){ e.preventDefault(); e.stopPropagation(); axSubmit(axBar()&&axBar().dataset.project||null); } }, true);
+  // Leaving it empty folds it; with something written it waits, as a draft
+  d.addEventListener('focusout', ()=>{ setTimeout(()=>{ if(!AX.open||deskRedraw||menuOpen()||alertOn()) return; const x=$('#desk .addx'), ae=document.activeElement; if(x&&ae&&x.contains(ae)) return;
+    if(!axHasText()&&!AX.rec) axCollapse(); }, 120); }); }
 // A dropped card: a slot sets the date and a reminder at that time; "Todo el día" keeps the date and drops the time; a day or the mini month
 // set the date and take a reminder on the old day along (decision 25, dayPatch); "Sin fecha" clears the date. All with Deshacer
 function dropTask(id, z){ const x=task(id); if(!x) return; const old={date:x.date, carried:x.carried, reminder:x.reminder}; let patch, msg;
@@ -4584,13 +4814,15 @@ function dropTask(id, z){ const x=task(id); if(!x) return; const old={date:x.dat
   releaseHold(id); updTask(id, patch); haptic(6); renderAnimated(); log('info','Tarea movida en el calendario', {date:patch.date, time:!!patch.reminder});
   toast(msg, ()=>updTask(id, old)); }
 function bindDeskEvents(d){
-  attBindDrop(d); // decision 29: photos dragged from the computer onto the inspector
+  attBindDrop(d);
+  axBind(d); // decision 31: the add bar's composer // decision 29: photos dragged from the computer onto the inspector
   // Right click opens the row menu, and on a sidebar project the project menu (the iPhone long press)
   // R17: each one opens at the pointer, as a Mac context menu; text fields keep the browser's own
   d.addEventListener('contextmenu', e=>{ if(e.target.closest('input,textarea')) return; const pt={x:e.clientX, y:e.clientY};
     const pj=e.target.closest('.side [data-view^="project:"]'); if(pj){ e.preventDefault(); if(pj.dataset.view!=='project:none') projectMenu(pj.dataset.view.slice(8), pt); return; }
     const dh=e.target.closest('[data-day-head]'); if(dh){ e.preventDefault(); dayHeadMenu(dh, pt); return; } // R14: a day header of Todas
-    const ph=e.target.closest('.att-ph[data-att]'); if(ph){ e.preventDefault(); photoMenu(ph.dataset.att, e); return; } // decision 29: a photo or a recording of the inspector
+    const ph=e.target.closest('.att-ph[data-att]'); if(ph){ e.preventDefault(); photoMenu(ph.dataset.att, e); return; }
+    const bk=e.target.closest('.vn[data-bk]'); if(bk){ e.preventDefault(); backupMenu(bk.dataset.bk, pt); return; } // decision 34: a local copy of Ajustes // decision 29: a photo or a recording of the inspector
     const au=e.target.closest('.vn[data-au]'); if(au){ e.preventDefault(); audioMenu(au.dataset.au, e); return; }
     const row=e.target.closest('.row[data-id], .wcard[data-id]'); if(!row) return; e.preventDefault(); rowMenu(row.dataset.id, pt); });
   // R17: the week popover closes on a press anywhere outside it, as a Mac popover; the click itself still acts (another card opens its own).

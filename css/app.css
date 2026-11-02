@@ -1301,3 +1301,87 @@ body.resizing,body.resizing *{cursor:col-resize !important;-webkit-user-select:n
 .step:hover .smore,.step:hover .sgrip,.step:focus-within .smore,.step.lifted .sgrip{opacity:1;}
 body.sdragging,body.sdragging *{cursor:grabbing !important;-webkit-user-select:none;user-select:none;}
 .app.desktop .pane .step.lifted > .vn-c{background:var(--dmain);}
+
+/* Decision 47: project notes. The segment Tareas and Notas, the list of notes, the note (title, date, text drawn with its lists and
+   boxes, or the text area while it is written) and Crear tareas; the desktop shows the list and the open note side by side */
+.seg.pseg{margin:6px 0 14px;}
+.nrow .vn-c{white-space:normal;padding:9px 16px 10px;cursor:pointer;}
+.nrow .vn-c:active{background:var(--press);}
+.nr-t{display:flex;align-items:center;gap:6px;font-weight:600;font-size:1rem;line-height:1.3;min-width:0;}
+.nr-tt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;}
+.npin{flex:none;display:flex;color:var(--orange);}
+.npin svg{width:14px;height:14px;}
+.nr-s{display:flex;align-items:center;gap:7px;font-size:.824rem;color:var(--ink2);margin-top:2px;white-space:nowrap;overflow:hidden;min-width:0;}
+.nr-d{flex:none;color:var(--ink);opacity:.72;}
+.nr-pj{flex:none;display:inline-flex;align-items:center;gap:4px;color:var(--ink2);}
+.nr-pj .dot{width:8px;height:8px;border-radius:50%;}
+.nr-pv{overflow:hidden;text-overflow:ellipsis;min-width:0;}
+.nedit-g{padding:14px 16px 18px;}
+.nedit .ntitle{width:100%;font-size:1.294rem;font-weight:700;background:none;border:0;outline:0;padding:0;resize:none;overflow:hidden;line-height:1.25;display:block;min-height:1.25em;letter-spacing:-.2px;}
+.nedit .ntitle::placeholder,.nedit .nbody::placeholder{color:var(--ink3);}
+.nmeta{font-size:.765rem;color:var(--ink2);margin:4px 0 12px;}
+.nmeta:empty{display:none;}
+.nbw .nbody{display:none;}
+.nbw.editing .nbody{display:block;}
+.nbw.editing .nview{display:none;}
+.nedit .nbody{width:100%;min-height:160px;background:none;border:0;outline:0;resize:none;padding:0;margin:0;line-height:1.45;overflow:hidden;font-size:max(16px,1rem);}
+.nview{min-height:160px;line-height:1.45;font-size:max(16px,1rem);white-space:pre-wrap;overflow-wrap:anywhere;cursor:text;}
+.nview a{color:var(--blue);text-decoration:none;}
+.nph{color:var(--ink3);}
+.nl{min-height:1.45em;padding-left:calc(var(--ind,0) * 20px);}
+.nl.li,.nl.ck{display:flex;align-items:flex-start;gap:9px;}
+.nl .nt{flex:1;min-width:0;}
+.nl .nb{flex:none;width:14px;height:1.45em;display:flex;align-items:center;justify-content:center;}
+.nl .nb::before{content:"";width:5px;height:5px;border-radius:50%;background:currentColor;}
+.ncheck{flex:none;position:relative;width:20px;height:20px;margin-top:calc((1.45em - 20px) / 2);border-radius:50%;border:1.5px solid var(--ink3);display:flex;align-items:center;justify-content:center;color:#fff;transition:background-color .2s,border-color .2s;}
+.ncheck::before{content:"";position:absolute;inset:-12px;} /* R2: 44 points to tap */
+.ncheck svg{width:12px;height:12px;opacity:0;transform:scale(.6);transition:opacity .2s,transform .2s;}
+.ncheck.done{background:var(--blue);border-color:var(--blue);}
+.ncheck.done svg{opacity:1;transform:none;}
+.nl.ck.done .nt{color:var(--ink2);}
+.ntasks .cell svg{flex:none;}
+.ntlist{max-height:340px;overflow-y:auto;margin-bottom:0;}
+.ntl .ntl-c{flex:none;width:22px;height:22px;border-radius:50%;border:1.5px solid var(--ink3);display:flex;align-items:center;justify-content:center;color:#fff;}
+.ntl .ntl-c svg{width:13px;height:13px;opacity:0;}
+.ntl.on .ntl-c{background:var(--blue);border-color:var(--blue);}
+.ntl.on .ntl-c svg{opacity:1;}
+.ntl .lbl{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.btn:disabled{opacity:.45;}
+@media (prefers-reduced-motion: reduce){ .ncheck,.ncheck svg{transition:opacity .2s;} .ncheck svg{transform:none;} }
+/* Desktop: the segment in the column head, and the list beside the open note, each scrolling on its own */
+.app.desktop .main .mhead .pseg{margin:0;flex:none;width:176px;padding:2px;border-radius:7px;background:var(--dfield);}
+.app.desktop .main .mhead .pseg button{height:22px;font-size:12px;border-radius:5px;}
+.app.desktop .main .mhead .pseg button .n{font-size:11px;}
+.app.desktop .main .mbody.notesbody{overflow:hidden;display:flex;flex-direction:column;padding-bottom:16px;}
+.app.desktop .main .mbody.notesbody .inner{flex:1;min-height:0;max-width:none;display:flex;}
+.nsplit{flex:1;min-height:0;display:grid;grid-template-columns:260px minmax(0,1fr);border:.5px solid var(--dline);border-radius:10px;overflow:hidden;background:var(--dmain);}
+.nlist{overflow-y:auto;background:var(--dgroup);border-right:.5px solid var(--dline);padding:8px;}
+.nnew{display:flex;align-items:center;gap:6px;width:100%;height:30px;padding:0 8px;border-radius:7px;color:var(--blue);font-size:13px;font-weight:500;margin-bottom:2px;}
+.nnew:hover{background:var(--dhov);}
+.nnew svg{width:14px;height:14px;flex:none;}
+.nnew .kbd{margin-left:auto;font-size:11px;color:var(--ink3);border:.5px solid var(--sep);border-radius:5px;padding:0 6px;font-weight:400;}
+.ngt{font-size:11px;font-weight:600;color:var(--ink2);text-transform:uppercase;letter-spacing:.3px;padding:10px 10px 4px;}
+.nlempty{font-size:13px;color:var(--ink2);padding:14px 10px;}
+.nli{display:block;width:100%;text-align:left;padding:7px 10px;border-radius:7px;}
+.nli:hover{background:var(--dhov);}
+.nli.on{background:var(--dsel);}
+.nli .nr-t{font-size:13px;}
+.nli .nr-s{font-size:12px;margin-top:1px;}
+.nli .npin svg{width:12px;height:12px;}
+.app.desktop .main .nhits .nli{padding:6px 10px;}
+.ned{overflow-y:auto;padding:12px 32px 40px;}
+.ned .empty{padding-top:80px;}
+.ntools{display:flex;align-items:center;gap:2px;margin:0 -10px 8px;}
+.ntools .grow{flex:1;}
+.ntb{height:28px;min-width:28px;padding:0 7px;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;gap:5px;color:var(--ink2);font-size:13px;}
+.ntb:hover{background:var(--dhov);color:var(--ink);}
+.ntb svg{width:16px;height:16px;flex:none;}
+.ntb.on{color:var(--orange);}
+.app.desktop .ned .ntitle{font-size:22px;}
+.app.desktop .ned .nview,.app.desktop .ned .nbody{font-size:14px;line-height:1.5;min-height:240px;}
+.app.desktop .ned .nl{min-height:1.5em;}
+.app.desktop .ned .nview{-webkit-user-select:text;user-select:text;} /* lines are selected with the mouse for Crear tareas */
+.app.desktop .ned .ncheck{width:16px;height:16px;margin-top:calc((1.5em - 16px) / 2);}
+.app.desktop .ned .ncheck svg{width:10px;height:10px;}
+.app.desktop .ned .ncheck::before{inset:-4px;}
+.app.desktop .ned .nmeta{font-size:12px;}

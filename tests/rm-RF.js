@@ -421,10 +421,10 @@ async function desktop(browser){
 }
 
 /* ======================= 5. Sync ======================= */
-const TABLES = ['spaces','projects','tasks','voice_notes','attachments','subtasks']; // decision 46: the app syncs the steps too (0005_subtasks.sql)
+const TABLES = ['spaces','projects','tasks','voice_notes','attachments','subtasks','project_notes']; // decisions 46 and 47: the app syncs the steps and the project notes too (0005, 0006)
 const COLS = { spaces:['name','sort_order','members'], projects:['space_id','name','color','sort_order','archived'],
   tasks:['space_id','project_id','title','date','reminder','priority','status','notes','carried','assignees','completed','repeat','focus','waiting_for'], voice_notes:['task_id','text'],
-  attachments:['task_id','kind','path','mime','size','width','height','duration_ms','purged'], subtasks:['task_id','title','done','sort_order'] };
+  attachments:['task_id','kind','path','mime','size','width','height','duration_ms','purged'], subtasks:['task_id','title','done','sort_order'], project_notes:['project_id','title','body','pinned'] };
 // rm-S's in-memory server (0001's trigger and RLS), plus the columns of 0004. noCol: a database where 0004 has not run; an upload naming one of
 // its columns is refused whole, with PostgREST's message, one column at a time
 const NEWCOLS=['repeat','focus','waiting_for'];

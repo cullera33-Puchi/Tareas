@@ -128,12 +128,12 @@ function reloadFromStorage(src){ // src 'sync': the data came from the server (b
   applyTheme(); dataVer++; // screens drawn before this show stale data
   // Typing still waiting for its save is put back and saved as planned. Not saved here: a second write from the other window
   // may already be on its way, and this one would cover it
-  if(ep){ const rec=ep.step?stepRec(ep.id):task(ep.id); if(rec) Object.assign(rec, ep.patch); else { clearTimeout(editSaveT); editSaveT=null; editPatch=null; } } // a step's title too (decision 46)
+  if(ep){ const rec=ep.step?stepRec(ep.id):ep.note?noteRec(ep.id):task(ep.id); if(rec) Object.assign(rec, ep.patch); else { clearTimeout(editSaveT); editSaveT=null; editPatch=null; } } // a step's title too (decision 46), and a project note (decision 47)
   if(DB.spaces.some(sp=>sp.id===keep.activeSpace)) DB.settings.activeSpace=keep.activeSpace;
   else if(DB.spaces.length&&!DB.spaces.some(sp=>sp.id===DB.settings.activeSpace)){ DB.settings.activeSpace=DB.spaces.slice().sort((a,b)=>a.order-b.order)[0].id; resetListState(); } // decision 28a: the space on screen was deleted elsewhere
   DB.settings.filter=keep.filter;
   const n=UI.stack.length;
-  UI.stack=UI.stack.filter(s=>{ const ok=s.kind==='detail'?!!task(s.id):(s.id==='none'||!!proj(s.id)); if(!ok) s.el.remove(); return ok; });
+  UI.stack=UI.stack.filter(s=>{ const ok=s.kind==='detail'?!!task(s.id):s.kind==='note'?!!noteRec(s.id):(s.id==='none'||!!proj(s.id)); if(!ok) s.el.remove(); return ok; });
   if(UI.select) UI.select.ids.forEach(id=>{ if(!task(id)) UI.select.ids.delete(id); });
   if(UI.projFilter && UI.projFilter!=='none' && !proj(UI.projFilter)) UI.projFilter=null;
   if(src!=='sync' && Date.now()-reloadLoggedAt>6e4){ reloadLoggedAt=Date.now(); log('info','Datos recargados: otra ventana los ha cambiado'); }

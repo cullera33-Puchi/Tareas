@@ -7,7 +7,7 @@ with checks(orden, pieza, ok) as (
   union all select 4,  'Tabla voice_notes', to_regclass('public.voice_notes') is not null
   union all select 5,  'Reglas de acceso activas en las tablas', not exists (
       select 1 from pg_class c join pg_namespace n on n.oid=c.relnamespace
-      where n.nspname='public' and c.relname in ('spaces','projects','tasks','voice_notes','attachments','subtasks','push_subscriptions','push_keys') and not c.relrowsecurity)
+      where n.nspname='public' and c.relname in ('spaces','projects','tasks','voice_notes','attachments','subtasks','project_notes','push_subscriptions','push_keys') and not c.relrowsecurity)
   union all select 6,  'Notificaciones: tabla push_subscriptions (0002)', to_regclass('public.push_subscriptions') is not null
   union all select 7,  'Notificaciones: tabla privada push_keys (0002)', to_regclass('public.push_keys') is not null
   union all select 8,  'Notificaciones: columna tasks.reminder_sent (0002)', exists (select 1 from information_schema.columns where table_schema='public' and table_name='tasks' and column_name='reminder_sent')
@@ -20,7 +20,8 @@ with checks(orden, pieza, ok) as (
   union all select 15, 'Por confirmar: columna tasks.waiting_for (0004)', exists (select 1 from information_schema.columns where table_schema='public' and table_name='tasks' and column_name='waiting_for')
   union all select 16, 'Por confirmar: estado waiting admitido (0004)', exists (select 1 from pg_constraint where conname='tasks_status_check' and pg_get_constraintdef(oid) like '%waiting%')
   union all select 17, 'Pasos: tabla subtasks (0005)', to_regclass('public.subtasks') is not null
-  union all select 18, 'Tiempo real: tablas publicadas', (select count(*) from pg_publication_tables where pubname='supabase_realtime' and schemaname='public' and tablename in ('spaces','projects','tasks','voice_notes','attachments','subtasks')) = 6
+  union all select 18, 'Notas de proyecto: tabla project_notes (0006)', to_regclass('public.project_notes') is not null
+  union all select 19, 'Tiempo real: tablas publicadas', (select count(*) from pg_publication_tables where pubname='supabase_realtime' and schemaname='public' and tablename in ('spaces','projects','tasks','voice_notes','attachments','subtasks','project_notes')) = 7
 )
 select orden as "N.º", pieza as "Pieza", case when ok then 'OK' else 'FALTA' end as "Estado"
 from checks order by orden;

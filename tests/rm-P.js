@@ -215,7 +215,7 @@ async function fnTests(st){
 
 /* ======================= Fake sync server (rm-S's, plus reminder_sent and push_subscriptions) ======================= */
 // Updated by decision 29 (attachments): the app syncs a fifth table, so the fake server has it too
-const TABLES = ['spaces','projects','tasks','voice_notes','attachments','subtasks']; // decision 46: the app syncs the steps too (0005_subtasks.sql)
+const TABLES = ['spaces','projects','tasks','voice_notes','attachments','subtasks','project_notes']; // decisions 46 and 47: the app syncs the steps and the project notes too (0005, 0006)
 class Fake {
   constructor(){ this.t={}; TABLES.concat(['push_subscriptions']).forEach(x=>this.t[x]=new Map()); this.last=0; this.subs=new Map(); this.down=new Set(); this.calls=[]; this.upserts=[]; }
   ts(){ this.last=Math.max(Date.now(), this.last+1); return new Date(this.last).toISOString(); }

@@ -20,7 +20,7 @@ window.addEventListener('unhandledrejection', e => log('error', 'Promesa rechaza
 const _consoleError = console.error.bind(console);
 console.error = (...a) => { log('error', a.map(x=>x&&x.message||String(x)).join(' ')); _consoleError(...a); };
 function logText(){
-  const d = (typeof DB!=='undefined'&&DB) ? ' | espacios '+DB.spaces.length+', proyectos '+DB.projects.length+', tareas '+DB.tasks.length+', notas de voz '+DB.voiceNotes.length+', adjuntos '+(DB.attachments||[]).length+', pasos '+(DB.subtasks||[]).length : '';
+  const d = (typeof DB!=='undefined'&&DB) ? ' | espacios '+DB.spaces.length+', proyectos '+DB.projects.length+', tareas '+DB.tasks.length+', notas de voz '+DB.voiceNotes.length+', adjuntos '+(DB.attachments||[]).length+', pasos '+(DB.subtasks||[]).length+', notas de proyecto '+(DB.projectNotes||[]).length : '';
   let st='?'; try{ st = (navigator.standalone===true||matchMedia('(display-mode: standalone)').matches)?'instalada':'navegador'; }catch(e){}
   const head = 'Tareas v'+APP_VERSION+' | '+st+' | '+navigator.userAgent+' | '+new Date().toString()+d;
   const lines = LOG.map(e=>{ const t=e.t.replace('T',' ').slice(5,19); return t+' ['+e.l+'] '+e.m+(e.x?' | '+e.x:''); });
@@ -197,14 +197,14 @@ const KEY = 'tareas-v1';
 let DB = null;
 function blank(){
   const t=new Date().toISOString();
-  return { spaces:[{id:'trabajo',name:'Trabajo',order:0,created:t},{id:'personal',name:'Personal',order:1,created:t}], projects:[], tasks:[], voiceNotes:[], attachments:[], subtasks:[], settings:{activeSpace:'trabajo', summaryState:'auto', filter:'hoy', doneOpen:false, theme:'auto', tipsSeen:false, shakeUndo:false, allGroup:'date', hoyGroup:'date'} };
+  return { spaces:[{id:'trabajo',name:'Trabajo',order:0,created:t},{id:'personal',name:'Personal',order:1,created:t}], projects:[], tasks:[], voiceNotes:[], attachments:[], subtasks:[], projectNotes:[], settings:{activeSpace:'trabajo', summaryState:'auto', filter:'hoy', doneOpen:false, theme:'auto', tipsSeen:false, shakeUndo:false, allGroup:'date', hoyGroup:'date'} };
 }
 let lastRaw = null; // the stored text this window last read or wrote; another window may have changed it since
 function load(){
   let raw=null; try{ raw=localStorage.getItem(KEY); }catch(e){ log('error','No se pudieron leer los datos: '+(e&&e.message||e)); }
   lastRaw=raw; if(!raw) return blank();
   let d=null; try{ d=JSON.parse(raw); }catch(e){}
-  const b=blank(), lists=['spaces','projects','tasks','voiceNotes','attachments','subtasks']; // subtasks: decision 46
+  const b=blank(), lists=['spaces','projects','tasks','voiceNotes','attachments','subtasks','projectNotes']; // subtasks: decision 46; projectNotes: decision 47
   if(!d || typeof d!=='object' || Array.isArray(d) || !lists.some(k=>Array.isArray(d[k]))){
     // Unreadable data: keep the raw text aside before the first save replaces it
     try{ localStorage.setItem(KEY+'-corrupt', raw); }catch(e){}
@@ -539,12 +539,12 @@ function addSpace(name){ const t=new Date().toISOString(); const sp={id:uid(), n
 /* Decision 28a: a space goes with everything in it: its projects (archived too), its tasks (completed long ago too) and their voice notes.
    spaceLoad lists them; deleteSpace takes them out in one save and returns what puts them back (null for the only space) */
 function spaceLoad(id){ const ps=DB.projects.filter(p=>p.spaceId===id), pids=new Set(ps.map(p=>p.id)); const ts=DB.tasks.filter(x=>x.spaceId===id||(x.projectId&&pids.has(x.projectId))), tids=new Set(ts.map(x=>x.id));
-  return {ps, ts, vs:DB.voiceNotes.filter(v=>tids.has(v.taskId)), as:DB.attachments.filter(a=>tids.has(a.taskId)), ss:DB.subtasks.filter(s=>tids.has(s.taskId))}; }
+  return {ps, ts, vs:DB.voiceNotes.filter(v=>tids.has(v.taskId)), as:DB.attachments.filter(a=>tids.has(a.taskId)), ss:DB.subtasks.filter(s=>tids.has(s.taskId)), ns:DB.projectNotes.filter(n=>pids.has(n.projectId))}; } // ns: decision 47, the notes of its projects
 function deleteSpace(id){ const i=DB.spaces.findIndex(sp=>sp.id===id); if(DB.spaces.length<2||i<0) return null;
   const sp=DB.spaces[i], L=spaceLoad(id), was=DB.settings.activeSpace===id, P=new Set(L.ps), T=new Set(L.ts), V=new Set(L.vs), AT=new Set(L.as), SS=new Set(L.ss);
-  DB.spaces.splice(i,1); DB.projects=DB.projects.filter(p=>!P.has(p)); DB.tasks=DB.tasks.filter(x=>!T.has(x)); DB.voiceNotes=DB.voiceNotes.filter(v=>!V.has(v)); DB.attachments=DB.attachments.filter(a=>!AT.has(a)); DB.subtasks=DB.subtasks.filter(s=>!SS.has(s));
+  DB.spaces.splice(i,1); DB.projects=DB.projects.filter(p=>!P.has(p)); DB.tasks=DB.tasks.filter(x=>!T.has(x)); DB.voiceNotes=DB.voiceNotes.filter(v=>!V.has(v)); DB.attachments=DB.attachments.filter(a=>!AT.has(a)); DB.subtasks=DB.subtasks.filter(s=>!SS.has(s)); cutNotes(new Set(L.ps.map(p=>p.id)));
   L.ts.forEach(x=>HELD.delete(x.id)); if(was){ DB.settings.activeSpace=DB.spaces.slice().sort((a,b)=>a.order-b.order)[0].id; resetListState(); } save();
   return ()=>{ if(DB.spaces.some(x=>x.id===id)) return; DB.spaces.splice(Math.min(i, DB.spaces.length), 0, sp);
-    const has=(list, o)=>list.some(x=>x.id===o.id); L.ps.forEach(p=>{ if(!has(DB.projects,p)) DB.projects.push(p); }); L.ts.forEach(x=>{ if(!has(DB.tasks,x)) DB.tasks.push(x); }); L.vs.forEach(v=>{ if(!has(DB.voiceNotes,v)) DB.voiceNotes.push(v); }); L.as.forEach(a=>{ if(!has(DB.attachments,a)) DB.attachments.push(a); }); putSteps(L.ss);
+    const has=(list, o)=>list.some(x=>x.id===o.id); L.ps.forEach(p=>{ if(!has(DB.projects,p)) DB.projects.push(p); }); L.ts.forEach(x=>{ if(!has(DB.tasks,x)) DB.tasks.push(x); }); L.vs.forEach(v=>{ if(!has(DB.voiceNotes,v)) DB.voiceNotes.push(v); }); L.as.forEach(a=>{ if(!has(DB.attachments,a)) DB.attachments.push(a); }); putSteps(L.ss); putNotes(L.ns);
     if(was){ DB.settings.activeSpace=id; resetListState(); } save(); }; }
 function addProject(name, color){ const t=new Date().toISOString(); const p={id:uid(), spaceId:space().id, name, color, order:DB.projects.length, archived:false, created:t, modified:t}; DB.projects.push(p); save(); return p; }

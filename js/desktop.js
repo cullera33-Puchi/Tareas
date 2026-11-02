@@ -4,7 +4,7 @@
    listeners run at load; the start itself (first screen, timers, sync, service worker) is in boot.js, the last file. */
 /* ---------- Desktop layout ---------- */
 function mondayOf(d){ const x=new Date(d+'T00:00:00'); return addDays(d, -((x.getDay()+6)%7)); }
-function setDeskView(v){ if(v==='project:none') v='project:none'; UI.deskView=v; UI.deskDetail=null; UI.dsel.ids.clear(); UI.dsel.mode=false; UI.dsel.edit=null; UI.query=''; UI.searchDone=false; UI.sumFilter=null; if(v==='hoy'||v==='todas'){ DB.settings.filter=v; save(); } render(); } // another list starts with nothing selected (R16)
+function setDeskView(v){ if(v==='project:none') v='project:none'; if(UI.noteOpen&&v!==UI.deskView) noteLeft(UI.noteOpen); UI.deskView=v; UI.deskDetail=null; UI.dsel.ids.clear(); UI.dsel.mode=false; UI.dsel.edit=null; UI.query=''; UI.searchDone=false; UI.sumFilter=null; if(v==='hoy'||v==='todas'){ DB.settings.filter=v; save(); } render(); } // another list starts with nothing selected (R16)
 /* ---------- R15, R16: the desktop lists' selected row, keyboard and multiple selection ----------
    UI.dsel.cur is the selected row, apart from the hover (the inspector, when open, shows it); arrows or J and K move it and the inspector
    follows, as in Mail. ids is the multiple selection (Comando clic, Mayúsculas clic, Comando A, Mayúsculas y flechas): it counts from two
@@ -12,7 +12,7 @@ function setDeskView(v){ if(v==='project:none') v='project:none'; UI.deskView=v;
    order and idx remember the list as last drawn, so a row that leaves it (done, moved, deleted) hands the selection to its neighbour.
    The iPhone keeps its own selection mode (UI.select) */
 function deskMulti(){ return UI.wide && (UI.dsel.mode || UI.dsel.ids.size>1); }
-function deskListView(){ const v=UI.deskView; return v==='hoy'||v==='todas'||v==='ahora'||v==='waiting'||v.startsWith('project:'); } // decisions 39 and 41: Ahora and Por confirmar are lists too
+function deskListView(){ const v=UI.deskView; return v==='hoy'||v==='todas'||v==='ahora'||v==='waiting'||(v.startsWith('project:')&&!deskNotesOn()); } // decision 47: a project's Notas is not a list of tasks // decisions 39 and 41: Ahora and Por confirmar are lists too
 // The rows of the visible list in order, with the placeholders of a long one; "Lo primero" repeats rows and is left out
 function deskOrder(){ return [...document.querySelectorAll('#desk .main .mbody .row[data-id], #desk .main .mbody .rph[data-id]')].filter(r=>!r.closest('.first')).map(r=>r.dataset.id); }
 function deskRow(id){ return id?document.querySelector('#desk .main .mbody .row[data-id="'+CSS.escape(id)+'"]:not(.first .row)'):null; }
@@ -160,7 +160,7 @@ function dropMany(ids, z){ if(ids.length===1) return dropTask(ids[0], z); const 
   toast(bulkN(xs.length)+msg, ()=>batch(()=>prev.forEach(o=>updTask(o.id,{date:o.date, carried:o.carried, reminder:o.reminder})))); }
 function applyWide(){ const w=wideMQ.matches; if(w===UI.wide) return; closeMenu(true); UI.wide=w; document.documentElement.classList.toggle('wide', w); document.body.classList.toggle('desktop', w); app.classList.toggle('desktop', w);
   if(w){ // the pushed iPhone screens map onto the desktop: a project becomes the view and the last detail the pane
-    let pr=null; UI.deskDetail=null; UI.stack.forEach(s=>{ if(s.kind==='project') pr=s.id; else UI.deskDetail=s.id; s.el.remove(); }); UI.stack=[];
+    let pr=null; UI.deskDetail=null; UI.stack.forEach(s=>{ if(s.kind==='project') pr=s.id; else if(s.kind==='note'){ const n=noteRec(s.id); if(n){ pr=n.projectId; UI.projTab[pr]='notes'; UI.noteOpen=n.id; } } else UI.deskDetail=s.id; s.el.remove(); }); UI.stack=[]; // decision 47: a note opens in its project's Notas
     if(UI.select){ UI.select=null; app.classList.remove('selecting'); closeSheet(); } // an open bulk menu would act on nothing
     Object.assign(UI.dsel, {ids:new Set(), mode:false, edit:null, follow:false});
     if(pr) UI.deskView='project:'+pr; else if(UI.tab==='ajustes') UI.deskView='settings';
@@ -170,7 +170,7 @@ function applyWide(){ const w=wideMQ.matches; if(w===UI.wide) return; closeMenu(
     const v=UI.deskView; UI.tab = v==='settings'?'ajustes' : v.startsWith('project:')?'proyectos' : 'tareas';
     // The desktop project view and pane become pushed screens, already in place (no slide-in)
     const put=(kind,id)=>{ const el=document.createElement('div'); el.className='screen pushed-screen shown '+kind; el.dataset.kind=kind; app.appendChild(el); UI.stack.push({kind,id,el}); };
-    if(v.startsWith('project:')){ const id=v.slice(8); if(id==='none'||proj(id)) put('project', id); }
+    if(v.startsWith('project:')){ const id=v.slice(8); if(id==='none'||proj(id)) put('project', id); const n=projTab(id)==='notes'&&noteRec(UI.noteOpen); if(n&&n.projectId===id&&proj(id)) put('note', n.id); } // decision 47: the open note stays open
     if(UI.deskDetail&&task(UI.deskDetail)) put('detail', UI.deskDetail);
     UI.deskDetail=null; } // the stack holds it now; a later widen maps it back
   log('info', w?'Modo escritorio':'Modo móvil'); render(); }
@@ -201,15 +201,16 @@ function pfDropHTML(){ if(UI.query||!activeProjects().length) return ''; const f
 function projFilterMenu(src){ const dot=c=>'<span class="pm-dot" style="background:'+c+'"></span>', set=v=>{ UI.projFilter=v; render(); };
   popMenu({anchor:src, align:'right', groups:[[{label:'Todos', on:UI.projFilter===null, fn:()=>set(null)}], activeProjects().map(p=>({label:p.name, icon:dot(p.color), on:UI.projFilter===p.id, fn:()=>set(p.id)})), [{label:'Sin proyecto', icon:dot('var(--ink3)'), on:UI.projFilter==='none', fn:()=>set('none')}]]}); }
 function deskMain(){
-  const v=UI.deskView; let title='', body='', search=true, pf=false;
+  const v=UI.deskView; let title='', body='', search=true, pf=false, seg='', notes=false;
   if(v==='hoy'||v==='todas'){ const f=v; title=f==='hoy'?'Hoy':'Todas'; pf=true;
     body = addBarHTML(null)+(UI.query?'':ahoraHTML())+(f==='hoy'&&!UI.query?summaryHTML():'')+
       listHTML(UI.query?'todas':f); }
   else if(v==='ahora'){ title='Ahora'; body=ahoraViewHTML(); } // decision 39
   else if(v==='waiting'){ title='Por confirmar'; body=waitingViewHTML(); } // decision 41
   else if(isCalView(v)){ title={day:'Día',week:'Semana',month:'Mes'}[v]; pf=true; body=weekHTML(); } // the project filter applies here too, so it stays visible and clearable
-  else if(v.startsWith('project:')){ const id=v.slice(8); const p=id==='none'?null:proj(id); if(id!=='none'&&(!p||p.archived||p.spaceId!==space().id)){ UI.deskView=DB.settings.filter||'hoy'; return deskMain(); } /* gone, archived or in another space */ title=p?p.name:'Sin proyecto'; body=addBarHTML(p?p.id:null)+listHTML('todas', p?p.id:null); }
+  else if(v.startsWith('project:')){ const id=v.slice(8); const p=id==='none'?null:proj(id); if(id!=='none'&&(!p||p.archived||p.spaceId!==space().id)){ UI.deskView=DB.settings.filter||'hoy'; return deskMain(); } /* gone, archived or in another space */ title=p?p.name:'Sin proyecto';
+    if(p){ seg=projSegHTML(p); notes=projTab(p.id)==='notes'; } body=notes?deskNotesHTML(p):addBarHTML(p?p.id:null)+listHTML('todas', p?p.id:null); } // decision 47: Tareas or Notas
   else if(v==='settings'){ title='Ajustes'; search=false; const h=viewAjustes(); body=h.slice(h.indexOf('<div class="scroll">')); }
   const cal=isCalView(v);
-  return '<main class="main'+(v==='hoy'?' with-agenda':'')+'"><div class="mhead'+(cal?' wide-head':'')+'"><h1>'+esc(title)+'</h1>'+(pf?'<span class="pfslot">'+pfDropHTML()+'</span>':'')+(search?'<div class="searchbar"><div class="search">'+I.search+'<input type="search" placeholder="Buscar" value="'+esc(UI.query)+'" data-role="search" autocomplete="off"></div>'+(UI.query?'<button class="cancel" data-act="clearSearch">Cancelar</button>':'')+'</div>':'')+(v==='hoy'||v==='todas'||v.startsWith('project:')?'<button class="mopts" data-act="viewMenu" aria-label="Opciones de vista" title="Opciones de vista">'+I.more+'</button>':'')+'</div><div class="mbody'+(cal?' calbody':'')+'"><div class="inner'+(cal?' week-inner':v==='settings'?' settings':'')+'">'+body+'</div></div>'+(v==='hoy'?agendaHTML():'')+'</main>';
+  return '<main class="main'+(v==='hoy'?' with-agenda':'')+'"><div class="mhead'+(cal?' wide-head':'')+'"><h1>'+esc(title)+'</h1>'+seg+(pf?'<span class="pfslot">'+pfDropHTML()+'</span>':'')+(search?'<div class="searchbar"><div class="search">'+I.search+'<input type="search" placeholder="Buscar" value="'+esc(UI.query)+'" data-role="search" autocomplete="off"></div>'+(UI.query?'<button class="cancel" data-act="clearSearch">Cancelar</button>':'')+'</div>':'')+(v==='hoy'||v==='todas'||(v.startsWith('project:')&&!notes)?'<button class="mopts" data-act="viewMenu" aria-label="Opciones de vista" title="Opciones de vista">'+I.more+'</button>':'')+'</div><div class="mbody'+(cal?' calbody':notes?' notesbody':'')+'"><div class="inner'+(cal?' week-inner':v==='settings'?' settings':notes?' notes-inner':'')+'">'+body+'</div></div>'+(v==='hoy'?agendaHTML():'')+'</main>';
 }

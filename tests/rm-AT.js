@@ -163,7 +163,7 @@ async function fnTests(){
 
 /* ======================= 3. The app ======================= */
 // rm-S's fake server, with the attachments table and a fake Storage (signed URLs served on another origin, as Supabase's are)
-const TABLES = ['spaces','projects','tasks','voice_notes','attachments','subtasks']; // decision 46: the app syncs the steps too (0005_subtasks.sql)
+const TABLES = ['spaces','projects','tasks','voice_notes','attachments','subtasks','project_notes']; // decisions 46 and 47: the app syncs the steps and the project notes too (0005, 0006)
 const STORE = new Map(), TOKENS = new Map(); let downloads = [];
 class Fake {
   constructor(){ this.t={}; TABLES.forEach(x=>this.t[x]=new Map()); this.last=0; this.subs=new Map(); this.down=new Set(); this.calls=[]; }

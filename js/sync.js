@@ -18,7 +18,7 @@
      matched by name, the newest copy of each record wins and the rest goes up (decision 5). */
 const SYNC_KEY='tareas-sync', SUPABASE_JS='vendor/supabase-js-2.117.3.umd.js';
 const SYNC_PAGE=1000, SYNC_CHUNK=200, SYNC_OVERLAP=30e3, SYNC_DEBOUNCE=1500, EPOCH='1970-01-01T00:00:00.000Z';
-const SYNC_TABLES=[{list:'spaces', table:'spaces'},{list:'projects', table:'projects'},{list:'tasks', table:'tasks'},{list:'voiceNotes', table:'voice_notes'},{list:'attachments', table:'attachments'},{list:'subtasks', table:'subtasks'}]; // attachments and steps after tasks (decisions 29 and 46)
+const SYNC_TABLES=[{list:'spaces', table:'spaces'},{list:'projects', table:'projects'},{list:'tasks', table:'tasks'},{list:'voiceNotes', table:'voice_notes'},{list:'attachments', table:'attachments'},{list:'subtasks', table:'subtasks'},{list:'projectNotes', table:'project_notes'}]; // attachments and steps after tasks (decisions 29 and 46); project notes after projects (decision 47)
 const INITIAL_SPACES=['trabajo','personal'];
 // Local field, column and kind; id, created and modified are common to all.
 // tsOpt (block 9, reminder_sent): sent only when set, so the tasks' signatures from before block 9 stay the same and nothing is sent again;
@@ -34,7 +34,9 @@ const SYNC_FIELDS={
   // Decision 29 (0003_attachments.sql): the record of a photo or a recording; its file goes to Storage first (attFlush)
   attachments:[['taskId','task_id','id'],['kind','kind','kind'],['path','path','id'],['mime','mime','id'],['size','size','int'],['width','width','int'],['height','height','int'],['durationMs','duration_ms','int']],
   // Decision 46 (0005_subtasks.sql): the steps of a task, one row each
-  subtasks:[['taskId','task_id','id'],['title','title','text'],['done','done','bool'],['order','sort_order','int']] };
+  subtasks:[['taskId','task_id','id'],['title','title','text'],['done','done','bool'],['order','sort_order','int']],
+  // Decision 47 (0006_project_notes.sql): the notes of a project, one row each
+  project_notes:[['projectId','project_id','id'],['title','title','text'],['body','body','text'],['pinned','pinned','bool']] };
 const syncTs = v => { if(!v) return null; const d=new Date(v); return isNaN(d) ? null : d.toISOString(); };
 const SYNC_TO={ id:v=>v==null||v===''?null:String(v), text:v=>v==null?'':String(v), int:v=>v==null||v===''||isNaN(+v)?null:Math.round(+v), bool:v=>!!v,
   day:v=>/^\d{4}-\d{2}-\d{2}$/.test(String(v||''))?v:null, ts:syncTs, tsOpt:syncTs, tsN:syncTs, textN:v=>v==null||v===''?null:String(v), pri:v=>['high','mid','none'].includes(v)?v:'none', status:v=>['pending','done','waiting'].includes(v)?v:'pending', kind:v=>['photo','audio'].includes(v)?v:null };
@@ -64,9 +66,10 @@ const syncSig = row => syncHash(JSON.stringify(row));
 const syncDemoId = id => String(id).startsWith('demo-');
 // Records that never go up: demo data, notes and attachments of demo tasks, the initial spaces until they get their real id, and an attachment
 // whose file has not reached Storage yet (no path: attFlush gives it one once uploaded)
-const syncSkip = (table, rec) => syncDemoId(rec.id) || (table==='spaces'&&INITIAL_SPACES.includes(rec.id)) || ((table==='voice_notes'||table==='attachments'||table==='subtasks')&&syncDemoId(rec.taskId)) || (table==='attachments'&&!rec.path);
-// A table the database does not have yet (attachments before 0003_attachments.sql ran, subtasks before 0005_subtasks.sql): left out of this session's sync
-const SYNC_LATE={attachments:['0003_attachments.sql','Los adjuntos se quedan en este dispositivo'], subtasks:['0005_subtasks.sql','Los pasos se quedan en este dispositivo']};
+const syncSkip = (table, rec) => syncDemoId(rec.id) || (table==='spaces'&&INITIAL_SPACES.includes(rec.id)) || ((table==='voice_notes'||table==='attachments'||table==='subtasks')&&syncDemoId(rec.taskId)) || (table==='project_notes'&&syncDemoId(rec.projectId)) || (table==='attachments'&&!rec.path);
+// A table the database does not have yet (attachments before 0003_attachments.sql ran, subtasks before 0005_subtasks.sql, project_notes before
+// 0006_project_notes.sql): left out of this session's sync
+const SYNC_LATE={attachments:['0003_attachments.sql','Los adjuntos se quedan en este dispositivo'], subtasks:['0005_subtasks.sql','Los pasos se quedan en este dispositivo'], project_notes:['0006_project_notes.sql','Las notas de proyecto se quedan en este dispositivo']};
 // Whether a request failed because the table is not there (PostgREST's PGRST205, PostgreSQL's 42P01). The first time it is noted in missing and logged
 function syncAbsent(missing, table, error){ if(!SYNC_LATE[table]||!error) return false; const m=String(error.message||'')+' '+String(error.code||'');
   if(!/42P01|PGRST20[0-9]|does not exist|could not find the table|schema cache/i.test(m)) return false;
@@ -175,7 +178,8 @@ function syncMerge(W, st, table, rows, stats){
     known[id]=rsig; // what the server holds now: a local copy that stays different goes up afterwards
     if(!takeRemote) return;
     if(!remote){ W[list][i]=null; removed=true; stats.removed++;
-      if(table==='tasks'){ W.voiceNotes.forEach((v,j)=>{ if(v&&v.taskId===id){ W.voiceNotes[j]=null; } }); W.attachments.forEach((a,j)=>{ if(a&&a.taskId===id){ W.attachments[j]=null; } }); W.subtasks.forEach((s,j)=>{ if(s&&s.taskId===id){ W.subtasks[j]=null; } }); } return; } // a task deleted elsewhere takes its notes, attachments and steps
+      if(table==='tasks'){ W.voiceNotes.forEach((v,j)=>{ if(v&&v.taskId===id){ W.voiceNotes[j]=null; } }); W.attachments.forEach((a,j)=>{ if(a&&a.taskId===id){ W.attachments[j]=null; } }); W.subtasks.forEach((s,j)=>{ if(s&&s.taskId===id){ W.subtasks[j]=null; } }); }
+      if(table==='projects') W.projectNotes.forEach((n,j)=>{ if(n&&n.projectId===id){ W.projectNotes[j]=null; } }); return; } // a task deleted elsewhere takes its notes, attachments and steps; a project its notes (decision 47)
     const keep={}; Object.keys(local).forEach(k=>{ if(!(k in lrow) && !SYNC_FIELDS[table].some(f=>f[0]===k)) keep[k]=local[k]; }); // fields this model does not sync stay
     SYNC_FIELDS[table].forEach(([f,c,k])=>{ if(syncNullable(k)&&!(c in row)&&local[f]!=null) keep[f]=local[f]; }); // and a column the server lacks keeps the device's value
     W[list][i]=Object.assign(keep, remote); stats.updated++;
@@ -187,7 +191,7 @@ function syncMerge(W, st, table, rows, stats){
    pulled: {table: rows}; o.cursor moves the tables' cursors (a pull; realtime events do not); o.pool runs the space matching */
 function syncApply(pulled, o){ o=o||{};
   const st=syncState(), stats={added:0, updated:0, removed:0, conflicts:[], remaps:[]};
-  const W={spaces:DB.spaces.map(x=>Object.assign({},x)), projects:DB.projects.map(x=>Object.assign({},x)), tasks:DB.tasks.map(x=>Object.assign({},x)), voiceNotes:DB.voiceNotes.map(x=>Object.assign({},x)), attachments:DB.attachments.map(x=>Object.assign({},x)), subtasks:DB.subtasks.map(x=>Object.assign({},x)), settings:Object.assign({}, DB.settings)};
+  const W={spaces:DB.spaces.map(x=>Object.assign({},x)), projects:DB.projects.map(x=>Object.assign({},x)), tasks:DB.tasks.map(x=>Object.assign({},x)), voiceNotes:DB.voiceNotes.map(x=>Object.assign({},x)), attachments:DB.attachments.map(x=>Object.assign({},x)), subtasks:DB.subtasks.map(x=>Object.assign({},x)), projectNotes:DB.projectNotes.map(x=>Object.assign({},x)), settings:Object.assign({}, DB.settings)};
   if(o.pool || W.spaces.some(s=>INITIAL_SPACES.includes(s.id))) stats.remaps=syncRemapSpaces(W, o.pool||null);
   SYNC_TABLES.forEach(({table})=>{ const rows=pulled[table]||[]; if(rows.length) syncMerge(W, st, table, rows, stats);
     if(o.cursor) rows.forEach(r=>{ if(syncTime(r.server_ts)>syncTime(st.cursor[table])) st.cursor[table]=r.server_ts; }); });

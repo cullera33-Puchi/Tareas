@@ -151,6 +151,7 @@ function bindDeskEvents(d){
   // Right click opens the row menu, and on a sidebar project the project menu (the iPhone long press)
   // R17: each one opens at the pointer, as a Mac context menu; text fields keep the browser's own
   d.addEventListener('contextmenu', e=>{ if(e.target.closest('input,textarea')) return; const pt={x:e.clientX, y:e.clientY};
+    const nt=e.target.closest('[data-pn]'); if(nt){ e.preventDefault(); noteMenu(nt.dataset.pn, pt); return; } // decision 47: a note of the list or of a search
     const pj=e.target.closest('.side [data-view^="project:"]'); if(pj){ e.preventDefault(); if(pj.dataset.view!=='project:none') projectMenu(pj.dataset.view.slice(8), pt); return; }
     const dh=e.target.closest('[data-day-head]'); if(dh){ e.preventDefault(); dayHeadMenu(dh, pt); return; } // R14: a day header of Todas
     const ph=e.target.closest('.att-ph[data-att]'); if(ph){ e.preventDefault(); photoMenu(ph.dataset.att, e); return; }

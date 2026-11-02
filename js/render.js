@@ -178,7 +178,7 @@ function renderNow(){
   if(UI.wide){ renderDesktop(); return; }
   if(touchDrag){ renderPending=true; renderPendingFlip=renderPendingFlip||FLIP; return; }
   renderPending=false; renderPendingFlip=false;
-  UI.stack=UI.stack.filter(s=>s.kind!=='detail'||task(s.id)||(s.el.remove(),false)); // a detail whose task is gone would be a blank screen with no Atrás
+  UI.stack=UI.stack.filter(s=>(s.kind==='detail'?!!task(s.id):s.kind==='note'?!!noteRec(s.id):true)||(s.el.remove(),false)); // a detail whose task is gone (or a note, decision 47) would be a blank screen with no Atrás
   const fresh=!app.querySelector('.screen.root[data-root="'+UI.tab+'"]'); const scr = rootScreen(UI.tab);
   app.querySelectorAll('.screen.root').forEach(s=>{ s.classList.remove('dragging'); if(s!==scr){ hideRoot(s); s.style.transform=''; } });
   // Only what can be seen is drawn. A root covered by a pushed screen is marked and drawn before it shows again
@@ -195,7 +195,8 @@ function renderNow(){
   if(UI.stack.length) scheduleRefresh();
 }
 function renderPushed(s){ drawing(()=>renderPushedNow(s)); }
-function renderPushedNow(s){ const osc=s.el.querySelector('.scroll'), ost=osc?osc.scrollTop:0; swapHTML(s.el, s.kind==='detail'?viewDetail(s.id):viewProject(s.id), s.kind==='project');
+function renderPushedNow(s){ const osc=s.el.querySelector('.scroll'), ost=osc?osc.scrollTop:0; swapHTML(s.el, s.kind==='detail'?viewDetail(s.id):s.kind==='note'?viewNote(s.id):viewProject(s.id), s.kind==='project');
+  if(s.kind==='note'){ bindNote(s.el); const sc=s.el.querySelector('.scroll'); if(sc) sc.scrollTop=ost; return; } // decision 47
   if(s.kind==='detail'){ bindDetail(s.el, s.id); const sc=s.el.querySelector('.scroll'); if(sc) sc.scrollTop=ost; attHydrate(s.el); } } // restored once the text areas have their full height, or a long note would clamp it to the top
 // A root put away keeps its scroll in UI.scroll; it is drawn anew when it comes back and gets it back there
 function hideRoot(s){ if(s.classList.contains('hidden-tab')) return; const sc=s.querySelector('.scroll'), pc=s.querySelector('.pchips');
@@ -414,13 +415,14 @@ function listHTML(filter, projectId){
   if(root && filter==='hoy' && !UI.query && UI.sumFilter) list = list.filter(x=> UI.sumFilter==='carried' ? x.carried : x.priority==='high');
   if(root && !UI.query && UI.projFilter!==null) list = list.filter(x=> UI.projFilter==='none' ? !x.projectId : x.projectId===UI.projFilter);
   const done = doneList(projectId); const dm = UI.query ? done.filter(queryMatcher(UI.query)) : [];
+  const nm = UI.query ? noteHits(UI.query, projectId) : []; // decision 47: the notes found, in a group of their own
   // R3: no project capsule inside a project or under a project filter (a search ignores the filter, so it shows them)
   const noProj = projectId!==undefined || (root && !UI.query && UI.projFilter!==null);
   const R = (x,o)=>rowHTML(x, Object.assign({noProj}, o));
   const addBtn = '<button class="btn-link" data-act="add"'+(projectId!==undefined?' data-project="'+(projectId||'')+'"':'')+'>Añadir tarea</button>';
   const byProject = root && DB.settings[filter==='hoy'?'hoyGroup':'allGroup']==='project'; // R13: each view keeps its own grouping
   let h='';
-  if(!list.length){ if(!(UI.query && UI.searchDone && dm.length)){ // the completed matches are listed below: no "Sin resultados" above them
+  if(!list.length){ if(!(UI.query && UI.searchDone && dm.length) && !nm.length){ // the completed matches (or notes) are listed below: no "Sin resultados" above them
     let title, sub, acts;
     if(UI.query){ title='Sin resultados'; sub='Prueba con otra palabra'; acts='<button class="btn-link" data-act="clearSearch">Borrar búsqueda</button>'; }
     else if(root && filter==='hoy' && UI.sumFilter){ title=UI.sumFilter==='carried'?'Sin aplazadas':'Sin prioritarias'; sub='Hoy no hay ninguna'; acts='<button class="btn-link" data-sum="all">Quitar filtro</button>'; }
@@ -430,7 +432,7 @@ function listHTML(filter, projectId){
     h += '<div class="empty">'+I.inbox+'<b>'+title+'</b>'+sub+'<div class="acts">'+acts+'</div></div>';
   } }
   else if(UI.query){ h += '<div class="group-title">'+list.length+(list.length===1?' resultado':' resultados')+'</div><div class="group">'+list.map(x=>R(x)).join('')+'</div>'; }
-  if(UI.query){ if(dm.length){ h += UI.searchDone ? '<div class="group-title">Completadas</div><div class="group">'+dm.map(x=>R(x)).join('')+'</div>' : '<div class="empty" style="padding:8px 0 16px"><div class="acts"><button class="btn-link" data-act="searchDone">Incluir '+dm.length+(dm.length===1?' completada':' completadas')+'</button></div></div>'; } return h; }
+  if(UI.query){ h += noteHitsHTML(nm); if(dm.length){ h += UI.searchDone ? '<div class="group-title">Completadas</div><div class="group">'+dm.map(x=>R(x)).join('')+'</div>' : '<div class="empty" style="padding:8px 0 16px"><div class="acts"><button class="btn-link" data-act="searchDone">Incluir '+dm.length+(dm.length===1?' completada':' completadas')+'</button></div></div>'; } return h; }
   else if(!list.length){}
   else if(byProject) h += projectGroupsHTML(list, R, filter);
   else if(filter==='todas') h += dayGroupsHTML(list, R, root, projectId);
@@ -488,9 +490,10 @@ function viewProyectos(){
 function viewProject(id){
   const p = id==='none'?null:proj(id); const title=p?p.name:'Sin proyecto';
   if(UI.select && UI.select.scope==='project') return selectNav()+'<div class="scroll">'+listHTML('todas', p?p.id:null)+'</div>';
-  return '<header class="nav"><div class="nav-row"><button class="back" data-act="back">'+I.back+'Atrás</button><div class="nav-title">'+(p?'<span class="pdot" style="width:10px;height:10px;border-radius:50%;background:'+p.color+';display:inline-block;margin-right:6px;vertical-align:1px"></span>':'')+esc(title)+'</div>'+'<button class="action vopts" data-act="viewMenu" aria-label="Opciones de vista">'+I.more+'</button>'+'</div></header>'+
-   '<div class="scroll">'+listHTML('todas', p?p.id:null)+'</div>'+
-   '<button class="fab" data-act="add" data-project="'+(p?p.id:'')+'" aria-label="Añadir tarea">'+I.plus+'</button>';
+  const notes=!!p&&projTab(p.id)==='notes'; // decision 47: a real project has the segment Tareas and Notas
+  return '<header class="nav"><div class="nav-row"><button class="back" data-act="back">'+I.back+'Atrás</button><div class="nav-title">'+(p?'<span class="pdot" style="width:10px;height:10px;border-radius:50%;background:'+p.color+';display:inline-block;margin-right:6px;vertical-align:1px"></span>':'')+esc(title)+'</div>'+(notes?'<span class="action"></span>':'<button class="action vopts" data-act="viewMenu" aria-label="Opciones de vista">'+I.more+'</button>')+'</div></header>'+
+   '<div class="scroll">'+(p?projSegHTML(p):'')+(notes?notesListHTML(p):listHTML('todas', p?p.id:null))+'</div>'+
+   (notes?'<button class="fab" data-act="newNote" data-project="'+p.id+'" aria-label="Nueva nota">'+I.plus+'</button>':'<button class="fab" data-act="add" data-project="'+(p?p.id:'')+'" aria-label="Añadir tarea">'+I.plus+'</button>');
 }
 
 /* ---------- Settings view ---------- */

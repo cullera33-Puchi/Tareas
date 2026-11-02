@@ -6,6 +6,7 @@
 function bindRows(box){
   if(!UI.select) box.querySelectorAll('.row:not(.first .row)').forEach(bindRowGestures);
   box.querySelectorAll('[data-day-head]').forEach(h=>bindLongPress(h, ()=>dayHeadMenu(h))); // R14: a long press on a day header moves its tasks
+  bindNoteRows(box); // decision 47: the rows of the project notes (and the notes a search found)
   box.querySelectorAll('.first .row').forEach(r=>{ if(r._fc) return; r._fc=1; r.addEventListener('click',e=>{ if(e.target.closest('[data-act=check]')) return; if(HELD.has(r.dataset.id)) toggleHold(r.dataset.id); else openDetail(r.dataset.id); }); }); }
 function bindCommon(scr){
   scr.addEventListener('click', onClick);
@@ -44,6 +45,7 @@ function searchAroundNow(s){ const bar=s.closest('.searchbar'), sc=bar&&bar.pare
 function onClick(e){
   const scr=e.currentTarget;
   const entry=UI.wide?null:UI.stack.find(x=>x.el===scr); if(!UI.wide&&scr.classList.contains('pushed-screen')&&!entry) return; // a popped screen still sliding out takes no taps
+  if(noteClick(e)) return; // decision 47: the segment Tareas and Notas, the notes' rows, boxes and buttons
   const f=e.target.closest('[data-filter]'); if(f){ DB.settings.filter=f.dataset.filter; UI.sumFilter=null; if(UI.wide) UI.deskView=f.dataset.filter; save(); render(); return; }
   const sm=e.target.closest('[data-sum]'); if(sm){ const k=sm.dataset.sum; UI.sumFilter=(k==='all'||UI.sumFilter===k)?null:k; haptic(6); render(); return; }
   const th=e.target.closest('button[data-theme]'); if(th){ DB.settings.theme=th.dataset.theme; save(); applyTheme(); render(); return; } // only the Tema buttons: <html> carries data-theme too
@@ -170,6 +172,7 @@ function pop(){
   s.el.classList.remove('shown','dragging'); if(!RM.matches) s.el.style.transform=''; s.el.classList.add('pushed'); // with Reduce Motion it fades where the finger left it
   // The screen below shows again: drawn now if a render was asked while it was covered; if only the data changed (typing in the detail), after the slide
   let under = underScreen(); if(!under){ under=rootScreen(UI.tab); under.classList.remove('hidden-tab'); restoreRootScroll(under); } // never a blank screen behind
+  if(s.kind==='note'){ noteLeft(s.id); if(UI.noteEdit===s.id) UI.noteEdit=null; under.dataset.dirty='1'; } // decision 47: a note left empty goes; the list behind shows the note as it is now, in its place
   drawIfDirty(under); under.classList.remove('under','dragging-under','dragging'); under.style.transform='';
   setTimeout(()=>{ s.el.remove(); fuGCSoon(); const u=underScreen(); if(!UI.stack.length&&typingIn(u)){ renderTabbar(); return; } if(u&&(u.dataset.dirty||+u.dataset.ver!==dataVer)) render(); },RM.matches?220:520); // a search tapped meanwhile keeps its keyboard
 }

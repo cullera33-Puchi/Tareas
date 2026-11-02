@@ -255,10 +255,10 @@ function projectSheet(id){
 }
 /* New or edited space */
 // What goes with a space, in words: "3 proyectos, 42 tareas y 5 notas de voz" (archived projects and old completed tasks count too)
-function spaceLoadText(L){ const n=(k,one,many)=>k?k+' '+(k===1?one:many):''; const parts=[n(L.ps.length,'proyecto','proyectos'), n(L.ts.length,'tarea','tareas'), n(L.vs.length,'nota de voz','notas de voz')].filter(Boolean);
+function spaceLoadText(L){ const n=(k,one,many)=>k?k+' '+(k===1?one:many):''; const parts=[n(L.ps.length,'proyecto','proyectos'), n((L.ns||[]).length,'nota de proyecto','notas de proyecto'), n(L.ts.length,'tarea','tareas'), n(L.vs.length,'nota de voz','notas de voz')].filter(Boolean); // decision 47: the notes of its projects
   return parts.length>1 ? parts.slice(0,-1).join(', ')+' y '+parts[parts.length-1] : parts.join(''); }
 // Decision 28a: confirmation with what goes, a local copy first (as before the first sync), then one Deshacer for everything
-function confirmDeleteSpace(sp){ const L=spaceLoad(sp.id), n=L.ps.length+L.ts.length+L.vs.length;
+function confirmDeleteSpace(sp){ const L=spaceLoad(sp.id), n=L.ps.length+L.ts.length+L.vs.length+L.ns.length;
   const text = n ? 'Se '+(n===1?'eliminará ':'eliminarán ')+spaceLoadText(L)+' del espacio "'+sp.name+'". Podrás deshacerlo durante unos segundos.' : 'El espacio "'+sp.name+'" está vacío.';
   confirmSheet('Eliminar espacio', text, async()=>{ flushEdits();
     try{ await Promise.race([BK.put(todayStr()), new Promise((_,rej)=>setTimeout(()=>rej(new Error('tiempo agotado')), 4000))]); await refreshBackups(); log('info','Copia local antes de eliminar un espacio', {space:sp.name, tasks:DB.tasks.length}); }
@@ -439,19 +439,20 @@ function restoreBackup(date){ const b=BACKUPS.find(x=>x.date===date); if(!b) ret
   const when = date===todayStr()?'de hoy':date===addDays(todayStr(),-1)?'de ayer':'del '+fmtDate(date);
   // Signed in, the copy applies to every device (agreed with Enric): restored records get a new modified so they win, and what the copy lacks is deleted everywhere by the next sync
   const synced=!!(typeof SY!=='undefined'&&SY&&SY.user);
-  confirmSheet('Restaurar copia '+when, synced?'Se sustituyen espacios, proyectos, tareas, pasos, notas de voz y adjuntos por los de esa copia ('+b.tasks+' tareas) en todos tus dispositivos. Lo creado después de esa copia se eliminará también en ellos.':'Se sustituyen espacios, proyectos, tareas, pasos, notas de voz y adjuntos por los de esa copia ('+b.tasks+' tareas). Podrás deshacerlo durante unos segundos.', async()=>{
-    try{ const snap=await BK.get(date); if(!snap) return; const prev={spaces:DB.spaces, projects:DB.projects, tasks:DB.tasks, voiceNotes:DB.voiceNotes, attachments:DB.attachments, subtasks:DB.subtasks}, prevActive=DB.settings.activeSpace;
+  confirmSheet('Restaurar copia '+when, synced?'Se sustituyen espacios, proyectos, notas de proyecto, tareas, pasos, notas de voz y adjuntos por los de esa copia ('+b.tasks+' tareas) en todos tus dispositivos. Lo creado después de esa copia se eliminará también en ellos.':'Se sustituyen espacios, proyectos, notas de proyecto, tareas, pasos, notas de voz y adjuntos por los de esa copia ('+b.tasks+' tareas). Podrás deshacerlo durante unos segundos.', async()=>{
+    try{ const snap=await BK.get(date); if(!snap) return; const prev={spaces:DB.spaces, projects:DB.projects, tasks:DB.tasks, voiceNotes:DB.voiceNotes, attachments:DB.attachments, subtasks:DB.subtasks, projectNotes:DB.projectNotes}, prevActive=DB.settings.activeSpace;
       DB.spaces=snap.data.spaces||prev.spaces; DB.projects=snap.data.projects||[]; DB.tasks=snap.data.tasks||[]; DB.voiceNotes=snap.data.voiceNotes||[];
       // Decision 29.5: the copy's attachment records (their files are on the device or in Storage for 24 hours more); a copy from before them keeps those of its tasks
       { const tids=new Set(DB.tasks.map(x=>x.id)); DB.attachments=Array.isArray(snap.data.attachments)?snap.data.attachments:prev.attachments.filter(a=>tids.has(a.taskId));
-        DB.subtasks=Array.isArray(snap.data.subtasks)?snap.data.subtasks:prev.subtasks.filter(o=>tids.has(o.taskId)); } // decision 46: the copy's steps; a copy from before them keeps those of its tasks
-      if(synced){ const now=new Date().toISOString(); [DB.spaces,DB.projects,DB.tasks,DB.voiceNotes,DB.attachments,DB.subtasks].forEach(a=>a.forEach(r=>{ r.modified=now; })); log('info','Copia restaurada con sesión iniciada: se aplicará en todos los dispositivos', {date}); }
+        DB.subtasks=Array.isArray(snap.data.subtasks)?snap.data.subtasks:prev.subtasks.filter(o=>tids.has(o.taskId)); // decision 46: the copy's steps; a copy from before them keeps those of its tasks
+        const pids=new Set(DB.projects.map(p=>p.id)); DB.projectNotes=Array.isArray(snap.data.projectNotes)?snap.data.projectNotes:prev.projectNotes.filter(n=>pids.has(n.projectId)); } // decision 47: the same for the project notes
+      if(synced){ const now=new Date().toISOString(); [DB.spaces,DB.projects,DB.tasks,DB.voiceNotes,DB.attachments,DB.subtasks,DB.projectNotes].forEach(a=>a.forEach(r=>{ r.modified=now; })); log('info','Copia restaurada con sesión iniciada: se aplicará en todos los dispositivos', {date}); }
       if(!DB.spaces.some(sp=>sp.id===DB.settings.activeSpace)){ DB.settings.activeSpace=DB.spaces[0].id; resetListState(); } save(); rollOver(); render(); haptic(10);
-      log('info','Copia restaurada', {date, tasks:DB.tasks.length}); toast('Copia '+when+' restaurada', ()=>{ Object.assign(DB, prev); if(synced){ const now=new Date().toISOString(); [DB.spaces,DB.projects,DB.tasks,DB.voiceNotes,DB.attachments,DB.subtasks].forEach(a=>a.forEach(r=>{ r.modified=now; })); } DB.settings.activeSpace=prevActive; save(); });
+      log('info','Copia restaurada', {date, tasks:DB.tasks.length}); toast('Copia '+when+' restaurada', ()=>{ Object.assign(DB, prev); if(synced){ const now=new Date().toISOString(); [DB.spaces,DB.projects,DB.tasks,DB.voiceNotes,DB.attachments,DB.subtasks,DB.projectNotes].forEach(a=>a.forEach(r=>{ r.modified=now; })); } DB.settings.activeSpace=prevActive; save(); });
     }catch(e){ log('error','Restaurar copia falló: '+(e&&e.message||e)); toast('No se pudo restaurar'); } }, 'Restaurar'); }
 
 /* Export and import */
-function exportData(){ return { app:'tareas', version:APP_VERSION, exported:new Date().toISOString(), spaces:DB.spaces, projects:DB.projects, tasks:DB.tasks, voiceNotes:DB.voiceNotes, attachments:DB.attachments, subtasks:DB.subtasks }; } // decision 29.5: the list of attachments, not their files; decision 46: the steps
+function exportData(){ return { app:'tareas', version:APP_VERSION, exported:new Date().toISOString(), spaces:DB.spaces, projects:DB.projects, tasks:DB.tasks, voiceNotes:DB.voiceNotes, attachments:DB.attachments, subtasks:DB.subtasks, projectNotes:DB.projectNotes }; } // decision 29.5: the list of attachments, not their files; decision 46: the steps; decision 47: the project notes
 function exportJSON(){ const t=JSON.stringify(exportData(),null,2); if(navigator.share){ navigator.share({title:'Tareas (copia)', text:t}).catch(()=>copyText(t,'Copia JSON en el portapapeles')); } else copyText(t,'Copia JSON en el portapapeles'); }
 // CSV for Excel in Spanish locales: semicolon separated, UTF-8 with BOM, one row per task.
 // A cell that starts with = + - or @ gets a leading apostrophe: Excel runs it as a formula even when quoted.
@@ -481,7 +482,7 @@ function importData(text){
   const d=JSON.parse(text); if(!d||typeof d!=='object') throw new Error('Formato no reconocido');
   let added=0, updated=0;
   const merge=(arr,src)=>{ (Array.isArray(src)?src:[]).forEach(it=>{ if(!it||!it.id) return; const i=arr.findIndex(a=>a.id===it.id); if(i<0){ arr.push(it); added++; } else if((it.modified||'')>(arr[i].modified||'')){ arr[i]=it; updated++; } }); };
-  merge(DB.spaces,d.spaces); merge(DB.projects,d.projects); merge(DB.tasks,d.tasks); merge(DB.voiceNotes,d.voiceNotes); merge(DB.attachments,d.attachments); merge(DB.subtasks,d.subtasks);
+  merge(DB.spaces,d.spaces); merge(DB.projects,d.projects); merge(DB.tasks,d.tasks); merge(DB.voiceNotes,d.voiceNotes); merge(DB.attachments,d.attachments); merge(DB.subtasks,d.subtasks); merge(DB.projectNotes,d.projectNotes);
   DB.tasks.forEach(x=>{ if(x.carried===undefined) x.carried=false; });
   save(); rollOver(); log('info','Importación', {added, updated, spaces:(d.spaces||[]).length, projects:(d.projects||[]).length, tasks:(d.tasks||[]).length});
   return {added, updated};
@@ -529,7 +530,7 @@ function clearDemo(){
     // Your own tasks filed in a test project stay, with no project; notes of removed tasks go with them
     const pids=new Set(DB.projects.map(p=>p.id)), tids=new Set(DB.tasks.map(x=>x.id)), now=new Date().toISOString(); let moved=0;
     DB.tasks.forEach(x=>{ if(x.projectId&&!pids.has(x.projectId)){ x.projectId=null; x.modified=now; moved++; } });
-    const vn=DB.voiceNotes.length; DB.voiceNotes=DB.voiceNotes.filter(v=>tids.has(v.taskId)); DB.attachments=DB.attachments.filter(a=>tids.has(a.taskId)); DB.subtasks=DB.subtasks.filter(o=>tids.has(o.taskId));
+    const vn=DB.voiceNotes.length; DB.voiceNotes=DB.voiceNotes.filter(v=>tids.has(v.taskId)); DB.attachments=DB.attachments.filter(a=>tids.has(a.taskId)); DB.subtasks=DB.subtasks.filter(o=>tids.has(o.taskId)); DB.projectNotes=DB.projectNotes.filter(n=>pids.has(n.projectId)); // decision 47: notes of a test project go with it
     save(); render(); haptic(10);
     log('info','Datos de prueba eliminados', {tasks:n, unfiled:moved, voiceNotes:vn-DB.voiceNotes.length}); toast('Datos de prueba eliminados');
   });

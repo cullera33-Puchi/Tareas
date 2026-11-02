@@ -1,0 +1,24 @@
+# Supabase de Tareas: guía rápida
+
+Todo lo que necesita el proyecto `tareas` de Supabase para que la app funcione. Si alguna vez dudas de si falta algo, sigue los pasos 1 y 2.
+
+## 1. Comprobar
+SQL Editor, **+ New query**, pega `check.sql` y pulsa **Run**. Sale una fila por pieza con **OK** o **FALTA**.
+
+## 2. Poner al día
+Si alguna fila dice FALTA: SQL Editor, **+ New query**, pega `all.sql` entero y pulsa **Run**. Se puede ejecutar todas las veces que haga falta sin romper nada. Después vuelve a ejecutar `check.sql`.
+
+## 3. La función de notificaciones
+Edge Functions, `send-reminders` (el nombre exacto). Pega `functions/send-reminders/index.ts`, pulsa **Deploy** y comprueba que **Verify JWT** está desactivado. Hay que repetirlo cada vez que cambie ese archivo (lo indica el CHANGELOG).
+
+## Qué hay en cada migración
+
+| Archivo | Qué crea | Versión |
+| --- | --- | --- |
+| `migrations/0001_init.sql` | Espacios, proyectos, tareas y notas de voz, con reglas de acceso por propietario | v0.16.0 |
+| `migrations/0002_push.sql` | Dispositivos de notificaciones, claves, aviso enviado y tarea cada minuto | v0.17.0 |
+| `migrations/0003_attachments.sql` | Adjuntos, carpeta privada de archivos y borrado a las 24 horas | v0.19.0 |
+| `migrations/0004_repeat_focus.sql` | Repetir, «Ahora» y «Por confirmar» | v0.22.1 |
+| `migrations/0005_subtasks.sql` | Pasos dentro de una tarea | v0.23.0 |
+
+`all.sql` es la suma de las cinco en orden. Las claves de la app (URL y clave pública) no van aquí: están en los secretos del repositorio de GitHub.

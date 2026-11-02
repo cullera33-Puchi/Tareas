@@ -1,5 +1,13 @@
 # Registro de cambios
 
+## v0.23.0. Pasos dentro de una tarea (2 de noviembre de 2026)
+
+- Grupo «Pasos» en el detalle, en el iPhone y en el ordenador: lista de casillas con «3 de 4». Intro añade el siguiente sin cerrar el teclado; pegar varias líneas crea varios pasos. Se reordenan arrastrando y se borran deslizando a la izquierda o con Supr, con Deshacer.
+- Al marcar el último paso aparece «Todos los pasos hechos» con «Completar tarea»; la tarea no se completa sola. Si se completa con pasos sin marcar, se quedan como están.
+- En la lista y en las tarjetas del calendario, «3/4» con un pequeño círculo de progreso.
+- Una tarea que se repite, o una duplicada, llega con los pasos sin marcar. La búsqueda encuentra el texto de los pasos; compartir y exportar a CSV los incluyen.
+- Supabase: migración `0005_subtasks.sql` y, para no perder nada, `supabase/all.sql` (todas las migraciones), `check.sql` (comprueba que está todo) y una guía en `supabase/README.md`.
+
 ## v0.22.1. Tareas que se repiten, «Ahora», «Por confirmar» y ajustes (2 de noviembre de 2026)
 
 - Incluye todo lo de la v0.22.0, que no llegó a publicarse: las pruebas de GitHub pararon la publicación por una comprobación demasiado ajustada al tiempo, no por un fallo de la app.

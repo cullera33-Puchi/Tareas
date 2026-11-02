@@ -64,7 +64,12 @@ async function open(browser, opts, n, setup){
 }
 const rowSel = '.screen.root:not(.hidden-tab) .scroll .row[data-id]';
 const pick = (page, k) => page.evaluate(k=>{ const rs=[...document.querySelectorAll('.screen.root:not(.hidden-tab) .scroll .group .row[data-id]')].filter(x=>!x.closest('.first')); return rs[k].dataset.id; }, k);
-const settle = page => page.waitForTimeout(600); // a FLIP slide is over (batch I: 450 ms since v0.14.5, was 350)
+// A FLIP slide is over (batch I: 450 ms since v0.14.5, was 350). Fixed waits alone left no margin: the slide ends 450 ms after a render that
+// itself takes time, so a slower machine (the CI runner) compared rows mid-slide (class flip). They now also wait for the slide to be over.
+// exitSettled: the same after R1 marks, which leave 1500 ms after the tap, then 240 ms of exit before the render
+const slid = () => !document.querySelector('.row.flip, .row.enter, .row.leaving') && ![...document.querySelectorAll('.row')].some(r=>r._flip);
+const settle = async page => { await page.waitForTimeout(600); await page.waitForFunction(slid, null, {timeout:8000, polling:50}); };
+const exitSettled = page => page.waitForFunction(s=>!HELD.size && new Function('return ('+s+')()')(), slid.toString(), {timeout:8000, polling:50});
 
 async function timeIt(page, label, setup, act, fullAct){
   const cdp = await page.context().newCDPSession(page); await cdp.send('Emulation.setCPUThrottlingRate', {rate:4});
@@ -112,7 +117,7 @@ async function timeIt(page, label, setup, act, fullAct){
   id = await pick(page, 2);
   const before = await page.evaluate(()=>({hoy:pendingFor('hoy').length, seg:document.querySelector('.screen.root:not(.hidden-tab) .seg [data-filter=hoy] .n').textContent}));
   await page.evaluate(()=>mark('.screen.root .row'));
-  await page.click('.screen.root:not(.hidden-tab) .scroll .group .row[data-id="'+id+'"] .check'); await page.waitForTimeout(1500+240+450);
+  await page.click('.screen.root:not(.hidden-tab) .scroll .group .row[data-id="'+id+'"] .check'); await page.waitForTimeout(1500+240+450); await exitSettled(page);
   r.done = await page.evaluate(id=>({gone:!document.querySelector('.screen.root:not(.hidden-tab) .scroll .group .row[data-id="'+id+'"]'), status:task(id).status, seg:document.querySelector('.screen.root:not(.hidden-tab) .seg [data-filter=hoy] .n').textContent, hoy:pendingFor('hoy').length, fresh:fresh('.screen.root:not(.hidden-tab) .scroll .group:not(.first) .row[data-id]').length, toast:document.querySelector('#toastText').textContent}), id);
   check('M_complete_same', await page.evaluate(()=>sameRoot()) === true, await page.evaluate(()=>sameRoot()));
   check('M_complete_incremental', r.done.gone && r.done.status==='done' && +r.done.seg===before.hoy-1 && r.done.hoy===before.hoy-1 && r.done.fresh<=1 && r.done.toast==='Tarea completada', {r:r.done, before});
@@ -205,7 +210,7 @@ async function timeIt(page, label, setup, act, fullAct){
   await swipe(kept, 140);
   r.g2 = await page.evaluate(id=>HELD.has(id), kept);
   check('M_gestures_onMergedRows', r.g1==='1' && r.g2===true, {open:r.g1, held:r.g2});
-  await page.waitForTimeout(1500+240+450);
+  await page.waitForTimeout(1500+240+450); await exitSettled(page);
   check('M_gestures_after', await page.evaluate(id=>task(id).status==='done', kept) && await page.evaluate(()=>sameRoot())===true, await page.evaluate(()=>sameRoot()));
   await page.screenshot({path:path.join(OUT,'h-mobile-dark.png')});
   await ctx.close();

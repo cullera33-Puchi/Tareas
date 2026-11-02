@@ -73,7 +73,7 @@ document.addEventListener('gesturestart',e=>e.preventDefault());
 document.addEventListener('touchmove',e=>{ if(e.touches.length>1) e.preventDefault(); },{passive:false});
 
 /* Badge (when the browser supports it) */
-function badge(){ try{ if(!navigator.setAppBadge) return; const t=todayStr(); const n=DB.tasks.filter(x=>x.status!=='done'&&x.date&&x.date<=t).length; /* pending, and waiting on its review day (decision 41), as send-reminders counts */ n?navigator.setAppBadge(n):navigator.clearAppBadge(); }catch(e){} }
+function badge(){ try{ if(!navigator.setAppBadge) return; const t=todayStr(); const n=DB.tasks.filter(x=>x.status!=='done'&&((x.date&&x.date<=t)||(x.deadline&&x.deadline<=t))).length; /* pending, and waiting on its review day (decision 41), as send-reminders counts; and (decision 48a) once, an open task whose deadline has come */ n?navigator.setAppBadge(n):navigator.clearAppBadge(); }catch(e){} }
 /* Day change while the app stays open: pending tasks roll over to today and the daily backup is taken.
    render() checks first, so whatever redraws after midnight already shows the new day. */
 let renderedDay='', renderedClock='', backupChain=Promise.resolve();

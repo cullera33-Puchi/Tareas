@@ -41,6 +41,7 @@ const MI = {
   star:mi('<path d="M12 3.2l2.7 5.5 6 .9-4.35 4.25 1.03 6L12 17l-5.38 2.85 1.03-6L3.3 9.6l6-.9z"/>'),
   starOff:mi('<path d="M12 3.2l2.7 5.5 6 .9-4.35 4.25 1.03 6L12 17l-5.38 2.85 1.03-6L3.3 9.6l6-.9z"/><path d="M4 4l16 16"/>'),
   repeat:mi('<path d="M17 3l3 3-3 3M4 11.5V10a4 4 0 014-4h12M7 21l-3-3 3-3M20 12.5V14a4 4 0 01-4 4H4"/>'),
+  flag:mi('<path d="M5.5 21V4M5.5 4.5h11.5l-2.5 4.25 2.5 4.25H5.5"/>'), // decision 48a: Fecha límite
 };
 const pmEl=$('#pmenu');
 const pmHide=document.createElement('style'); document.head.appendChild(pmHide); // hides the lifted row while its copy is up, also once a render has replaced it
@@ -202,7 +203,7 @@ window.addEventListener('keydown', e=>{ const m=PM; if(!m||!m.mac) return; const
 // else the date column of the task's row, else its week card
 function taskAnchor(id, act){ if(!UI.wide) return null; const q=CSS.escape(id);
   const pc=document.querySelector('#desk .pane[data-task="'+q+'"] [data-act='+(act||'pickDate')+']'); if(pc) return {anchor:pc, align:'left'};
-  const r=document.querySelector('#desk .main .row[data-id="'+q+'"]:not(.first .row) .rc-date')||document.querySelector('#desk .wcard[data-id="'+q+'"]');
+  const r=document.querySelector('#desk .main .row[data-id="'+q+'"]:not(.first .row) '+(act==='pickDeadline'?'.row-meta':'.rc-date'))||document.querySelector('#desk .wcard[data-id="'+q+'"]'); // the deadline column may be hidden: the row's columns
   return r?{anchor:r, align:'right'}:{}; }
 // R17: on the desktop a date or a reminder is chosen in a popover under its control; on the iPhone in a bottom sheet.
 // bind(panel, done) wires the content; done closes whichever it is
@@ -233,15 +234,20 @@ function setTaskDate(id, d){ const x=task(id); if(!x||(x.date===d&&!x.carried)) 
 function dateMenu(id){ const x=task(id); if(!x) return null; const t=todayStr();
   const ds=uniqueBy([['Hoy',t,'H'],['Mañana',addDays(t,1),'M'],['Viernes',nextWeekday(5,true),'V'],['Próxima semana',nextWeekday(1,true),'S']], o=>o[1]);
   return {title:'Fecha', groups:[ds.map(([l,d,k])=>({label:l, key:k, on:x.date===d, fn:()=>setTaskDate(id,d)})), [{label:'Sin fecha', on:!x.date, fn:()=>setTaskDate(id,null)}], [{label:'Elegir fecha…', key:'F', fn:()=>dateSheet(id)}]]}; }
+/* Decision 48a: the Fecha límite submenu (iPhone row menu, desktop menu): the quick days with a check on the current one, the calendar and Quitar */
+function deadlineMenu(id){ const x=task(id); if(!x) return null; const t=todayStr();
+  const ds=uniqueBy([['Hoy',t],['Mañana',addDays(t,1)],['Viernes',nextWeekday(5,true)],['Próxima semana',nextWeekday(1,true)]], o=>o[1]);
+  return {title:'Fecha límite', groups:[ds.map(([l,d])=>({label:l, sub:UI.wide||fmtDate(d)===l||l==='Mañana'?'':fmtDate(d), icon:MI.flag, on:x.deadline===d, fn:()=>setDeadline(id,d)})),
+    [{label:UI.wide?'Elegir fecha…':'Elegir fecha', icon:MI.calPick, fn:()=>deadlineSheet(id)}].concat(x.deadline?[{label:'Quitar', icon:MI.p0, fn:()=>setDeadline(id,null)}]:[])]}; }
 /* R17: the desktop menu of a task (right click, its three dots): Completar, then Fecha, Prioridad and Proyecto as submenus with a check
    on the current value, Mover a otro espacio, Duplicar and Eliminar, each with the key that acts on the selected row (R15) */
 function deskTaskMenu(id){ const x=task(id); if(!x) return null; const done=x.status==='done';
   return {groups:[
     [{label:done?'Marcar pendiente':'Completar', key:'C', fn:()=>{ releaseHold(id); leaveRows(id); setTimeout(()=>{ completeTask(id); renderAnimated(); },200); }}].concat(x.status==='pending'?[{label:x.focus?'Quitar de Ahora':'Ahora', key:'A', fn:()=>toggleFocus(id)}]:[]).concat(waitItems(x)), // decisions 39 and 41
-    [{label:'Fecha', menu:()=>dateMenu(id)}, {label:'Prioridad', menu:()=>({title:'Prioridad', groups:[prioItems(x, id)]})}, {label:'Proyecto', key:'P', menu:()=>projectPickMenu(id)}].concat(DB.spaces.length>1?[{label:'Mover a otro espacio', menu:()=>spaceMoveMenu(id)}]:[]),
+    [{label:'Fecha', menu:()=>dateMenu(id)}].concat(x.status!=='done'?[{label:'Fecha límite', menu:()=>deadlineMenu(id)}]:[], [{label:'Prioridad', menu:()=>({title:'Prioridad', groups:[prioItems(x, id)]})}, {label:'Proyecto', key:'P', menu:()=>projectPickMenu(id)}]).concat(DB.spaces.length>1?[{label:'Mover a otro espacio', menu:()=>spaceMoveMenu(id)}]:[]),
     [{label:'Duplicar', fn:()=>duplicateTask(id)}],
     [{label:'Eliminar', key:'Supr', red:true, fn:()=>confirmDelete(id)}] ]}; }
-function duplicateTask(id){ const x=task(id); if(!x) return; const n=addTask({title:x.title, projectId:x.projectId, priority:x.priority, notes:x.notes, spaceId:x.spaceId}); copySteps(id, n.id); /* decision 46: the steps, unchecked */ haptic(8); renderAnimated(); toast('Tarea duplicada'); openDetail(n.id); }
+function duplicateTask(id){ const x=task(id); if(!x) return; const n=addTask(Object.assign({title:x.title, projectId:x.projectId, priority:x.priority, notes:x.notes, spaceId:x.spaceId}, x.deadline?{deadline:x.deadline}:{})); /* decision 48a: the deadline too */ copySteps(id, n.id); /* decision 46: the steps, unchecked */ haptic(8); renderAnimated(); toast('Tarea duplicada'); openDetail(n.id); }
 function leaveRows(id){ document.querySelectorAll('.row[data-id="'+id+'"]').forEach(r=>r.classList.add('leaving')); }
 function confirmDelete(id, after){ const x=task(id); if(!x) return; releaseHold(id);
   const go=fn=>()=>{ leaveRows(id); setTimeout(()=>{ fn(); after?after():renderAnimated(); },200); };

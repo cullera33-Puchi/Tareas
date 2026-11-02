@@ -1385,3 +1385,15 @@ body.sdragging,body.sdragging *{cursor:grabbing !important;-webkit-user-select:n
 .app.desktop .ned .ncheck svg{width:10px;height:10px;}
 .app.desktop .ned .ncheck::before{inset:-4px;}
 .app.desktop .ned .nmeta{font-size:12px;}
+/* Decision 48a: Fecha límite. "Entrega jueves" grey, orange from two days before, red on the day and after; a done task has no colour */
+.row-meta .dl{color:var(--ink2);}
+.dl-soon,.row-meta .dl.dl-soon,.cell .val.dl-soon{color:var(--orange);font-weight:500;}
+.dl-due,.row-meta .dl.dl-due,.cell .val.dl-due{color:var(--red);font-weight:500;}
+.rc-dl{width:108px;}
+.app.desktop.has-pane .rc-dl{width:100px;}
+.app.desktop .main:not(:has(.row .rc-dl:not(:empty))) .rc-dl{display:none;}
+.app.desktop .row.done .rc-dl{color:inherit;font-weight:400;}
+.wcard .cic.cdl svg{width:11px;height:11px;}
+.wcard .cic.cdl.dl-soon{color:var(--orange);}
+.wcard .cic.cdl.dl-due{color:var(--red);}
+.dlhint{margin-top:10px;}

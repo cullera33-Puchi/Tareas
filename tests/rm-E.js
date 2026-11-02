@@ -97,7 +97,7 @@ const rowSel = id => '#desk .main .group .row[data-id="'+id+'"]';
   m = await menu(page); r.ctx=m;
   check('R17_ctxAtPointer', m.open && m.mac && !m.lift && Math.abs(m.levels[0].box.left-px)<=1 && (Math.abs(m.levels[0].box.top-py)<=1 || Math.abs(m.levels[0].box.bottom-py)<=1), {m, px, py});
   // Updated by decisions 39 (Ahora) and 41 (Por confirmar): two items after Completar
-  check('R17_ctxItems', JSON.stringify(m.levels[0].items)===JSON.stringify(['Completar [C]','Ahora [A]','Por confirmar…','Fecha >','Prioridad >','Proyecto [P] >','Mover a otro espacio >','Duplicar','Eliminar [Supr]']), m.levels[0].items);
+  check('R17_ctxItems', JSON.stringify(m.levels[0].items)===JSON.stringify(['Completar [C]','Ahora [A]','Por confirmar…','Fecha >','Fecha límite >','Prioridad >','Proyecto [P] >','Mover a otro espacio >','Duplicar','Eliminar [Supr]']), m.levels[0].items);
   check('R17_macStyle', m.levels[0].font==='13px' && /rgba\(0, 0, 0, 0\)|transparent/.test(m.back), {font:m.levels[0].font, back:m.back});
   // Hover: highlight, then the submenu opens to the side with a check on the current value and the keys
   c = await item(page, 0, 'Prioridad'); await page.mouse.move(c.x, c.y); await page.waitForTimeout(400);
@@ -125,7 +125,7 @@ const rowSel = id => '#desk .main .group .row[data-id="'+id+'"]';
   check('R17_keyRight', m.levels.length===2 && m.levels[1].hl==='Hoy', m.levels.map(l=>l.hl));
   await page.keyboard.press('ArrowLeft'); await page.waitForTimeout(120); m = await menu(page);
   check('R17_keyLeft', m.levels.length===1 && m.levels[0].hl==='Fecha', m.levels.map(l=>l.hl));
-  await page.keyboard.press('ArrowDown'); await page.keyboard.press('ArrowRight'); await page.waitForTimeout(100); // Prioridad, Alta
+  await page.keyboard.press('ArrowDown'); await page.keyboard.press('ArrowDown'); await page.keyboard.press('ArrowRight'); await page.waitForTimeout(100); // Fecha límite (decision 48a), Prioridad, Alta
   await page.keyboard.press('ArrowDown'); await page.keyboard.press('Enter'); await page.waitForTimeout(400); // Media
   r.kb = await page.evaluate(t=>({p:task(t).priority, menu:menuOpen()}), t2);
   check('R17_keyEnter', r.kb.p==='mid' && !r.kb.menu, r.kb);
@@ -191,7 +191,7 @@ const rowSel = id => '#desk .main .group .row[data-id="'+id+'"]';
   const tid = await page.evaluate(()=>{ const x=pendingFor('hoy').find(x=>!x.carried&&x.priority==='none'&&x.projectId); return x.id; });
   await page.click('#desk .main .row[data-id="'+tid+'"] .row-title'); await page.waitForTimeout(350);
   r.insp = await page.evaluate(()=>({close:!!document.querySelector('#desk .pane .ihead .ix[data-act=back]'), seg:[...document.querySelectorAll('#desk .pane .iseg button')].map(b=>b.textContent+(b.classList.contains('on')?'*':'')), pops:[...document.querySelectorAll('#desk .pane .ipop')].map(b=>b.dataset.act), foot:document.querySelector('#desk .pane .ifoot').textContent, w:Math.round(document.querySelector('#desk .pane').getBoundingClientRect().width), grip:!!document.querySelector('#desk .pane .igrip')}));
-  check('R17_inspector', r.insp.close && JSON.stringify(r.insp.seg)===JSON.stringify(['Ninguna*','!!Media','!!!Alta']) && r.insp.pops.join()==='pickProject,pickDate,pickReminder,pickRepeat' && /Creada .*Modificada /.test(r.insp.foot) && r.insp.w===400 && r.insp.grip, r.insp);
+  check('R17_inspector', r.insp.close && JSON.stringify(r.insp.seg)===JSON.stringify(['Ninguna*','!!Media','!!!Alta']) && r.insp.pops.join()==='pickProject,pickDate,pickDeadline,pickReminder,pickRepeat' && /Creada .*Modificada /.test(r.insp.foot) && r.insp.w===400 && r.insp.grip, r.insp);
   await page.screenshot({path:OUT+'/e-light-inspector.png'});
   await page.click('#desk .pane .iseg [data-pr=mid]'); await page.waitForTimeout(300);
   check('R17_segment', await page.evaluate(id=>task(id).priority==='mid' && document.querySelector('#desk .pane .iseg .on').dataset.pr==='mid', tid));

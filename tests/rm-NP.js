@@ -85,9 +85,10 @@ async function sqlTests(){
   // all.sql: every migration in order, twice, on a fresh database; then check.sql says OK on every row
   db = await pgSetup(); const all = strip(fs.readFileSync(path.join(ROOT, 'supabase/all.sql'), 'utf8'));
   err = null; try { await db.exec(all); await db.exec(all); } catch(e){ err = e.message; }
-  check('sql_all_twice', !err && /0001 a 0006/.test(all.split('\n')[0]) && (all.match(/^-- ========== migrations\//mg)||[]).length===fs.readdirSync(path.join(ROOT,'supabase/migrations')).filter(f=>f.endsWith('.sql')).length, err);
+  check('sql_all_twice', !err && /0001 a 00\d\d/.test(all.split('\n')[0]) && (all.match(/^-- ========== migrations\//mg)||[]).length===fs.readdirSync(path.join(ROOT,'supabase/migrations')).filter(f=>f.endsWith('.sql')).length, err);
   let rows = []; try { rows = (await db.query(fs.readFileSync(path.join(ROOT, 'supabase/check.sql'), 'utf8'))).rows; } catch(e){ err = e.message; }
-  check('sql_check_all_ok', rows.length===19 && rows.every(x=>x.Estado==='OK') && rows.some(x=>/project_notes/.test(x.Pieza)), {err, bad:rows.filter(x=>x.Estado!=='OK')});
+  check('sql_check_all_ok', rows.length>=19 && // later migrations add rows (0007: Fecha límite)
+     rows.every(x=>x.Estado==='OK') && rows.some(x=>/project_notes/.test(x.Pieza)), {err, bad:rows.filter(x=>x.Estado!=='OK')});
   await db.close();
 }
 

@@ -306,11 +306,13 @@ function rowHTML(x, opts={}){
   const done=x.status==='done';
   const held=HELD.has(x.id), shownDone=held?HELD.get(x.id):done; // R1: a marked row shows the state it is about to take
   const meta=[]; if(p&&!opts.noProj) meta.push('<span class="tag">'+esc(p.name)+'</span>');
+  const dl=x.deadline&&!opts.compact?'<span class="dl'+(dlLevel(x)?' dl-'+dlLevel(x):'')+'">'+dlText(x.deadline)+'</span>':''; // decision 48a: "Entrega jueves"
   if(opts.compact){}
-  else if(done){ if(x.completed) meta.push('<span>'+(opts.byDay?fmtTime(x.completed):'Hecha '+fmtDateTime(x.completed))+'</span>'); }
+  else if(done){ if(x.completed) meta.push('<span>'+(opts.byDay?fmtTime(x.completed):'Hecha '+fmtDateTime(x.completed))+'</span>'); if(dl) meta.push(dl); }
   else { if(x.date){ if(waitDue(x)) meta.push('<span class="review">Revisar</span>'); // decision 41: its review day has come
       else if(x.carried&&x.date<=t){ if(!opts.hideCarried) meta.push('<span class="carried">Aplazada</span>'); }
-      else if(!(opts.noToday&&x.date===t) && x.date!==opts.day) meta.push('<span class="'+(x.date<t?'over':'')+'">'+fmtDate(x.date)+'</span>'); }
+      else if(!(opts.noToday&&x.date===t) && x.date!==opts.day && x.date!==x.deadline) meta.push('<span class="'+(x.date<t?'over':'')+'">'+fmtDate(x.date)+'</span>'); } // a date that is the deadline says it once
+    if(dl) meta.push(dl);
     if(x.status==='waiting'&&x.waitingFor) meta.push('<span class="waitfor">Esperando a '+esc(x.waitingFor)+'</span>');
     if(x.reminder) meta.push('<span class="bell">'+I.bell+(x.date&&localDay(x.reminder)===x.date?fmtTime(x.reminder):fmtDateTime(x.reminder))+'</span>'); } // the reminder's own day when it is not the task's date (moved task, no date)
   const ind=opts.compact?'':(x.focus&&!done&&!opts.simple?'<span class="ist" title="En Ahora">'+I.starF+'</span>':'')+(x.notes&&x.notes.trim()?I.note:'')+(DB.voiceNotes.some(v=>v.taskId===x.id)?I.mic:'')+(hasAtt(x.id)?I.clip:'')+(x.repeat&&repParse(x.repeat)?'<span class="irp" title="'+esc(repSummary(x.repeat))+'">'+I.repeat+'</span>':''); // decision 29: a paperclip when it has photos or audio
@@ -326,7 +328,7 @@ function rowHTML(x, opts={}){
 }
 /* R11: a desktop row is one line of 32 px: circle, title and project capsule, then right-aligned columns for the notes and voice
    indicators, the date (or "Aplazada", or when it was done), the reminder and the priority. The R3 rules decide what each column says */
-function deskRowHTML(x, opts, v){ const t=v.t; let date='', dcls='', rem='';
+function deskRowHTML(x, opts, v){ const t=v.t; let date='', dcls='', rem=''; const dl=x.deadline?dlText(x.deadline):'', dlc=dlLevel(x); // decision 48a: a column of its own
   if(v.done){ if(x.completed) date=opts.byDay?fmtTime(x.completed):fmtDateTime(x.completed); }
   else { if(x.date){ if(waitDue(x)){ date='Revisar'; dcls=' review'; } else if(x.carried&&x.date<=t){ if(!opts.hideCarried){ date='Aplazada'; dcls=' carried'; } }
       else if(!(opts.noToday&&x.date===t) && x.date!==opts.day){ date=fmtDate(x.date); if(x.date<t) dcls=' over'; } }
@@ -339,7 +341,7 @@ function deskRowHTML(x, opts, v){ const t=v.t; let date='', dcls='', rem='';
   return '<div class="row'+(v.done?' done':'')+(v.held?' held':'')+(opts.byDay?' byday':'')+(sel?' selected':'')+(cur?' cur':'')+'" data-id="'+x.id+'"'+(v.pc?' style="'+tagVars(v.pc)+'"':'')+' role="option" aria-selected="'+(sel||cur)+'" tabindex="'+(own&&ds.cur===x.id?0:-1)+'"'+(edit?'':' draggable="true"')+'>'+
     '<div class="row-content">'+(v.selecting?'<span class="selbox">'+I.check+'</span>':'<button class="check'+(v.shownDone?' done':x.status==='waiting'?' waiting':'')+'" data-act="check" aria-label="Completar" tabindex="-1">'+I.check+'</button>')+pcol+
     '<div class="row-text">'+(edit?'<input class="rowedit" data-role="rowedit" type="text" value="'+esc(ds.edit.text)+'" aria-label="Título" autocomplete="off" spellcheck="false">':'<div class="row-title" title="'+esc(x.title||'')+'">'+esc(x.title||'Sin título')+'</div>')+(x.status==='waiting'&&x.waitingFor&&!v.done?'<span class="wtag" title="Esperando a '+esc(x.waitingFor)+'">'+esc(x.waitingFor)+'</span>':'')+'</div>'+ // decision 41
-    '<span class="inds">'+v.ind+'</span><span class="rsteps">'+v.prog+'</span><span class="row-meta"><span class="rc rc-date'+dcls+'"'+(date?' title="'+esc(date)+'"':'')+'>'+date+'</span><span class="rc rc-rem"'+(rem?' title="Recordatorio: '+esc(rem)+'"':'')+'>'+(rem?I.bell+rem:'')+'</span></span>'+
+    '<span class="inds">'+v.ind+'</span><span class="rsteps">'+v.prog+'</span><span class="row-meta"><span class="rc rc-date'+dcls+'"'+(date?' title="'+esc(date)+'"':'')+'>'+date+'</span><span class="rc rc-dl'+(dlc?' dl-'+dlc:'')+'"'+(dl?' title="Fecha límite: '+esc(fmtDate(x.deadline))+'"':'')+'>'+dl+'</span><span class="rc rc-rem"'+(rem?' title="Recordatorio: '+esc(rem)+'"':'')+'>'+(rem?I.bell+rem:'')+'</span></span>'+
     '<span class="pri'+(v.pri?(x.priority==='high'?' high':' mid'):'')+'">'+(v.pri?(x.priority==='high'?'!!!':'!!'):'')+'</span>'+
     (v.selecting?'':opts.simple?'<span class="rowmore" aria-hidden="true"></span>':'<button class="rowmore" data-act="rowMenu" aria-label="Más" title="Más" tabindex="-1">'+I.more+'</button>')+'</div></div>'; } // "Lo primero" keeps the columns aligned with the list
 /* Decision 39: the Ahora block. iPhone: at the top of Hoy, above the summary, compact rows (circle, title, project, priority) that open the
@@ -357,7 +359,7 @@ function clockKey(){ const o=soonReminder(); return (o?o.x.id+o.x.reminder:'')+'
 function summaryCollapsed(n){ const st=DB.settings.summaryState||'auto'; if(st==='auto' && UI.summaryFirst) return false; return st==='closed' || (st==='auto' && n>20); }
 function summaryHTML(){
   const t=todayStr(); const hoy=pendingFor('hoy');
-  const carried=hoy.filter(x=>x.carried).length, deHoy=hoy.length, prio=hoy.filter(x=>x.priority==='high').length; const doneToday=spaceTasks().filter(x=>x.status==='done'&&x.completed&&localDay(x.completed)===t).length;
+  const carried=hoy.filter(carriedOn).length, deHoy=hoy.length, prio=hoy.filter(x=>x.priority==='high').length; const doneToday=spaceTasks().filter(x=>x.status==='done'&&x.completed&&localDay(x.completed)===t).length;
   // Only today's high-priority tasks; the list below already shows the rest.
   const first = hoy.filter(x=>x.priority==='high').slice(0,3);
   const soon = soonReminder(); const folded=summaryCollapsed(hoy.length), late=hoy.length&&new Date().getHours()>=19;
@@ -393,7 +395,7 @@ function monthTitle(ym){ const [y,m]=ym.split('-').map(Number), n=MESES_FULL[m-1
    then one per month, then Sin fecha. A day header adds with its date (+) and, on a long press or a right click, moves its tasks.
    Keys sort as text: a day 'YYYY-MM-DD', a month 'YYYY-MM-~' (after its days), no date '~' (last) */
 function dayGroupsHTML(list, R, root, projectId){ const t=todayStr(), lim=addDays(t,14), by=new Map(); let h='';
-  list.forEach(x=>{ const k=!x.date?'~':x.date<=t?t:x.date<=lim?x.date:x.date.slice(0,7)+'-~'; if(!by.has(k)) by.set(k,[]); by.get(k).push(x); });
+  list.forEach(x=>{ const k=dlDue(x)||(x.date&&x.date<=t)?t:!x.date?'~':x.date<=lim?x.date:x.date.slice(0,7)+'-~'; /* decision 48a: a deadline that has come puts it in Hoy */ if(!by.has(k)) by.set(k,[]); by.get(k).push(x); });
   [...by.keys()].sort().forEach(k=>{ const xs=by.get(k); let head;
     if(k==='~') head=root&&!UI.select ? gtitle('Sin fecha', null, '<button class="gx" data-act="plan">Planificar ('+xs.length+')</button>') : gtitle('Sin fecha', xs.length);
     else if(k.length===10) head=gtitle(dayTitle(k), xs.length, UI.select?'':'<button class="gadd" data-add-date="'+k+'"'+(projectId!==undefined?' data-project="'+(projectId||'')+'"':'')+' aria-label="Añadir con esta fecha">'+I.plus+'</button>', ' data-day-head="'+k+'"');
@@ -412,7 +414,7 @@ function projectGroupsHTML(list, R, filter){ const ps=activeProjects(), by={}; l
 function listHTML(filter, projectId){
   let list = pendingFor(filter, projectId, UI.query);
   const root = projectId===undefined;
-  if(root && filter==='hoy' && !UI.query && UI.sumFilter) list = list.filter(x=> UI.sumFilter==='carried' ? x.carried : x.priority==='high');
+  if(root && filter==='hoy' && !UI.query && UI.sumFilter) list = list.filter(x=> UI.sumFilter==='carried' ? carriedOn(x) : x.priority==='high');
   if(root && !UI.query && UI.projFilter!==null) list = list.filter(x=> UI.projFilter==='none' ? !x.projectId : x.projectId===UI.projFilter);
   const done = doneList(projectId); const dm = UI.query ? done.filter(queryMatcher(UI.query)) : [];
   const nm = UI.query ? noteHits(UI.query, projectId) : []; // decision 47: the notes found, in a group of their own
@@ -437,13 +439,13 @@ function listHTML(filter, projectId){
   else if(byProject) h += projectGroupsHTML(list, R, filter);
   else if(filter==='todas') h += dayGroupsHTML(list, R, root, projectId);
   // Hoy: the carried tasks first, under Aplazadas with "Repasar (N)" (R9); the aplazadas filter already says it, so it keeps a plain list
-  else if(filter==='hoy' && root && UI.sumFilter!=='carried' && list.some(x=>x.carried)){ const c=list.filter(x=>x.carried), d=list.filter(x=>!x.carried);
+  else if(filter==='hoy' && root && UI.sumFilter!=='carried' && list.some(carriedOn)){ const c=list.filter(carriedOn), d=list.filter(x=>!carriedOn(x)); /* decision 48a: a task here by its deadline is not Aplazada */
     h += gtitle('Aplazadas', null, UI.select?'':'<button class="gx" data-act="review">Repasar ('+c.length+')</button>')+'<div class="group">'+c.map(x=>R(x,{noToday:true,hideCarried:true})).join('')+'</div>'+
       (d.length?'<div class="group-title"'+gdrop('day',todayStr())+'>Hoy</div><div class="group"'+gdrop('day',todayStr())+'>'+d.map(x=>R(x,{noToday:true})).join('')+'</div>':''); } // decision 36: an Aplazada dropped on Hoy is confirmed for today
   else h += '<div class="group">'+list.map(x=>R(x,{noToday:filter==='hoy', hideCarried:root&&filter==='hoy'&&UI.sumFilter==='carried'})).join('')+'</div>';
   // R8: from 19:00 the day can be closed from the end of Hoy too, whatever the summary shows
   if(root && filter==='hoy' && !UI.select && new Date().getHours()>=19){ const n=pendingFor('hoy').length; if(n) h += '<div class="group"><button class="cell link closecell" data-act="closeDay">'+I.cal+'<span class="lbl">Cerrar el día</span><span class="val">'+n+(n===1?' pendiente':' pendientes')+'</span></button></div>'; }
-  if(root && filter==='hoy' && !UI.sumFilter){ const tm=pendingFor('todas').filter(x=>x.date===addDays(todayStr(),1)).length; if(tm) h += '<button class="preview" data-filter="todas"><span>Mañana: '+tm+(tm===1?' tarea':' tareas')+'</span>'+I.chev+'</button>'; }
+  if(root && filter==='hoy' && !UI.sumFilter){ const tmd=addDays(todayStr(),1), tm=pendingFor('todas').filter(x=>!inHoy(x)&&(x.date===tmd||x.deadline===tmd)).length; /* decision 48a: a deadline tomorrow brings it tomorrow */ if(tm) h += '<button class="preview" data-filter="todas"><span>Mañana: '+tm+(tm===1?' tarea':' tareas')+'</span>'+I.chev+'</button>'; }
   h += waitingBlockHTML(root, projectId, R);
   if(done.length){ const dt=done.filter(x=>x.completed&&localDay(x.completed)===todayStr()).length;
     if(!DB.settings.doneOpen){ h += '<div class="group"><button class="cell link" data-act="toggleDone" style="justify-content:center"><span>Mostrar completadas ('+done.length+(dt?', '+dt+' hoy':'')+')</span></button></div>'; }
@@ -460,7 +462,7 @@ function waitingBlockHTML(root, projectId, R){ let ws=waitingList(projectId);
   return '<div class="group wblock"><button class="cell link" data-act="toggleWaiting" aria-expanded="'+open+'" style="justify-content:center"><span>'+(open?'Ocultar por confirmar':'Por confirmar ('+ws.length+')')+'</span></button></div>'+
     (open?gsec(gtitle('Por confirmar', ws.length), ws.map(x=>R(x)).join(''), ' data-waiting=""'):''); }
 function waitingViewHTML(){ let xs=spaceTasks().filter(x=>x.status==='waiting'); if(UI.query) xs=xs.filter(queryMatcher(UI.query));
-  xs=orderTasks(xs.filter(waitDue)).concat(waitingList().filter(x=>xs.includes(x)));
+  xs=orderTasks(xs.filter(waitIn)).concat(waitingList().filter(x=>xs.includes(x)));
   if(!xs.length) return '<div class="empty">'+MI.wait.replace('<svg','<svg style="width:44px;height:44px"')+'<b>'+(UI.query?'Sin resultados':'Nada por confirmar')+'</b>'+(UI.query?'Prueba con otra palabra':'Marca una tarea Por confirmar desde su menú cuando dependa de otra persona.')+'</div>';
   return '<div class="group">'+xs.map(x=>rowHTML(x)).join('')+'</div><div class="footnote">Cada una vuelve a Hoy en su día de revisión, marcada Revisar.</div>'; }
 function selectNav(){ const n=UI.select.ids.size; return '<header class="nav"><div class="nav-row"><button class="action" data-act="selAll">'+(UI.select.all?'Ninguna':'Todas')+'</button><div class="nav-title" id="selTitle">'+(n?n+(n===1?' seleccionada':' seleccionadas'):'Seleccionar')+'</div><button class="action strong" data-act="selDone">OK</button></div></header>'; }
@@ -532,6 +534,7 @@ function viewDetail(id){
    '<div class="group"><div class="cell input"><textarea class="titlein" data-role="title" rows="1" placeholder="Título" enterkeyhint="done">'+esc(x.title)+'</textarea></div><div class="cell input"><textarea data-role="notes" placeholder="Notas">'+esc(x.notes)+'</textarea></div>'+(links.length?'<div class="links">'+linksHTML(links)+'</div>':'')+convertHTML(x)+'</div>'+
    '<div class="group"><button class="cell" data-act="pickProject"><span class="lbl">Proyecto</span><span class="val">'+(p?'<span class="dot" style="background:'+p.color+'"></span>'+esc(p.name):'Ninguno')+'</span>'+chev+'</button>'+
    '<button class="cell" data-act="pickDate"><span class="lbl">Fecha</span><span class="val">'+(x.date?fmtDate(x.date):'Sin fecha')+'</span>'+chev+'</button>'+
+   (x.status!=='done'||x.deadline?'<button class="cell" data-act="pickDeadline"><span class="lbl">Fecha límite</span><span class="val'+(dlLevel(x)?' dl-'+dlLevel(x):'')+'">'+(x.deadline?fmtDate(x.deadline):'Ninguna')+'</span>'+chev+'</button>':'')+ // decision 48a
    '<button class="cell" data-act="pickReminder"><span class="lbl">Recordatorio</span><span class="val">'+(x.reminder?fmtDateTime(x.reminder):'Ninguno')+'</span>'+chev+'</button>'+
    (x.status==='waiting'?'<button class="cell" data-act="pickWaiting"><span class="lbl">Por confirmar</span><span class="val">'+(x.waitingFor?'Esperando a '+esc(x.waitingFor):'Sí')+'</span>'+chev+'</button>':'')+ // decision 41
    '<button class="cell" data-act="pickRepeat"><span class="lbl">Repetir</span><span class="val">'+(repParse(x.repeat)?esc(repSummary(x.repeat)):'Nunca')+'</span>'+chev+'</button>'+ // decision 38
@@ -555,6 +558,7 @@ function inspectorHTML(x, p, vns, links){
    '<div class="group igroup"><div class="cell input"><textarea class="titlein" data-role="title" rows="1" placeholder="Título" enterkeyhint="done">'+esc(x.title)+'</textarea></div><div class="cell input"><textarea data-role="notes" placeholder="Notas">'+esc(x.notes)+'</textarea></div>'+(links.length?'<div class="links">'+linksHTML(links)+'</div>':'')+convertHTML(x)+'</div>'+
    '<div class="iform"><span class="ilbl">Proyecto</span>'+pop('pickProject', p?esc(p.name):'Ninguno', !p, UPDOWN, p?'<span class="dot" style="background:'+p.color+'"></span>':'')+
    '<span class="ilbl">Fecha</span>'+pop('pickDate', x.date?(x.carried&&x.date<=todayStr()?'Hoy, aplazada':fmtDate(x.date)):'Sin fecha', !x.date, I.cal)+
+   (x.status!=='done'||x.deadline?'<span class="ilbl">Fecha límite</span>'+pop('pickDeadline', x.deadline?'<span class="'+(dlLevel(x)?'dl-'+dlLevel(x):'')+'">'+fmtDate(x.deadline)+'</span>':'Ninguna', !x.deadline, MI.flag):'')+ // decision 48a
    '<span class="ilbl">Recordatorio</span>'+pop('pickReminder', x.reminder?fmtDateTime(x.reminder):'Ninguno', !x.reminder, I.bell)+
    (x.status==='waiting'?'<span class="ilbl">Por confirmar</span>'+pop('pickWaiting', x.waitingFor?'Esperando a '+esc(x.waitingFor):'Sí', false, MI.wait):'')+ // decision 41
    '<span class="ilbl">Repetir</span>'+pop('pickRepeat', repParse(x.repeat)?esc(repSummary(x.repeat)):'Nunca', !repParse(x.repeat), I.repeat)+ // decision 38

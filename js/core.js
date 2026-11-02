@@ -266,7 +266,7 @@ const PRI = {high:0, mid:1, none:2};
 
 function orderTasks(list){
   const t = todayStr();
-  const grp = x => { if(x.date && x.date<t) return 0; if(x.date===t) return 1; if(x.priority==='high') return 2; return 3; };
+  const grp = x => { if(x.date && x.date<t) return 0; if(x.date===t || dlDue(x)) return 1; if(x.priority==='high') return 2; return 3; }; // decision 48a: a deadline that has come counts as today
   return list.slice().sort((a,b)=>{
     const ga=grp(a), gb=grp(b); if(ga!==gb) return ga-gb;
     if(ga===0||ga===1){ const pa=PRI[a.priority], pb=PRI[b.priority]; if(pa!==pb) return pa-pb; }
@@ -286,9 +286,9 @@ function pendingFor(filter, projectId, query){ if(!PF) return pendingCalc(filter
   const k=filter+'|'+projectId+'|'+(query||''); let v=PF.get(k); if(!v){ v=pendingCalc(filter, projectId, query); PF.set(k,v); } return v; }
 function pendingCalc(filter, projectId, query){
   const t=todayStr();
-  let list = spaceTasks().filter(x=>x.status==='pending' || (x.status==='waiting' && (query || waitDue(x)))); // decision 41: a task waiting for confirmation joins the lists on its review day (and in a search)
+  let list = spaceTasks().filter(x=>x.status==='pending' || (x.status==='waiting' && (query || waitIn(x)))); // decision 41: a task waiting for confirmation joins the lists on its review day (and in a search); decision 48a: or once its deadline has come
   if(projectId!==undefined) list = list.filter(x=> projectId===null ? !x.projectId : x.projectId===projectId);
-  if(filter==='hoy') list = list.filter(x=>x.date && x.date<=t);
+  if(filter==='hoy') list = list.filter(x=>(x.date && x.date<=t) || dlDue(x)); // decision 48a: its deadline brings it, once
   if(query) list = list.filter(queryMatcher(query));
   return orderTasks(list);
 }
@@ -297,8 +297,18 @@ function pendingCalc(filter, projectId, query){
    date, or after it: rollOver never carries it), marked Revisar. The rest of the time it counts nowhere */
 const waitDue = x => x.status==='waiting' && !!x.date && x.date<=todayStr();
 const isOpen = x => x.status!=='done'; // pending or waiting: not done
+/* Decision 48a: Fecha límite. Task.deadline (Supabase tasks.deadline) is the day the task is due, a date apart from its work date; null when none.
+   An open task comes to Hoy on that day and stays there after it, whatever its date (later, postponed, or none), once and never marked Aplazada;
+   it counts in para hoy and in the badge. rollOver, Aplazar and the calendar move the date only; a new date never changes the deadline.
+   The rows say "Entrega jueves": grey, orange from two days before, red on the day and after; no colour once done. No notification of its own */
+const dlDue = x => !!x.deadline && x.deadline<=todayStr() && isOpen(x);
+const inHoy = x => (!!x.date && x.date<=todayStr()) || dlDue(x); // pending or waiting, in Hoy (a waiting one also needs waitIn)
+const waitIn = x => waitDue(x) || (x.status==='waiting' && dlDue(x)); // a waiting task in the lists: its review day or its deadline has come
+const carriedOn = x => !!x.carried && !!x.date && x.date<=todayStr(); // Aplazada: by its date, never by a deadline
+function dlLevel(x){ if(!x.deadline||x.status==='done') return ''; const t=todayStr(); return x.deadline<=t?'due':x.deadline<=addDays(t,2)?'soon':''; }
+const dlText = d => { const s=fmtDate(d); return 'Entrega '+s[0].toLowerCase()+s.slice(1); }; // "Entrega hoy", "Entrega jueves", "Entrega 12 nov"
 // The block Por confirmar: the waiting tasks of the space (of a project, or under the project filter) whose review day has not come
-function waitingList(projectId){ let list=spaceTasks().filter(x=>x.status==='waiting'&&!waitDue(x));
+function waitingList(projectId){ let list=spaceTasks().filter(x=>x.status==='waiting'&&!waitIn(x));
   if(projectId!==undefined) list=list.filter(x=> projectId===null ? !x.projectId : x.projectId===projectId);
   return list.sort((a,b)=>(a.date||'9999')<(b.date||'9999')?-1:(a.date||'9999')>(b.date||'9999')?1:a.created<b.created?-1:1); }
 function doneList(projectId){
@@ -403,7 +413,8 @@ function spawnNext(x){ const r=repParse(x.repeat); if(!r) return null;
   if(r.series&&DB.tasks.some(o=>o!==x&&isOpen(o)&&repSeries(o.repeat)===r.series)) return null; // pending or waiting (decision 41)
   const t=todayStr(), date=repNext(r, x.date&&x.date>t?x.date:t); if(!date) return null;
   let reminder=null; if(x.reminder){ const a=new Date(x.reminder), d=new Date(date+'T00:00:00'); d.setHours(a.getHours(), a.getMinutes(), 0, 0); reminder=d.toISOString(); }
-  const n=addTask({title:x.title, spaceId:x.spaceId, projectId:x.projectId, priority:x.priority, notes:x.notes||'', date, reminder, repeat:x.repeat});
+  const dl=dlShift(x, date); // decision 48a: its deadline as far from its date as the completed one's; none when that one had no date
+  const n=addTask(Object.assign({title:x.title, spaceId:x.spaceId, projectId:x.projectId, priority:x.priority, notes:x.notes||'', date, reminder, repeat:x.repeat}, dl?{deadline:dl}:{}));
   copySteps(x.id, n.id); // decision 46: its steps, unchecked
   log('info','Siguiente tarea de la serie', {date}); return n; }
 // Reopening a completed task of a series (Deshacer, or marking it pending again) takes back the next one it created, while nobody has touched it
@@ -413,8 +424,8 @@ function dropNext(x){ const s=repSeries(x.repeat); if(!s||!x.completed) return [
   return out; }
 // "Eliminar solo esta": the task moves to the next date of its series, with Deshacer (it also leaves Ahora). quiet: the caller gives the feedback
 function skipOccurrence(id, quiet){ const x=task(id); if(!x) return null; const r=repParse(x.repeat); if(!r) return null; const t=todayStr(), d=repNext(r, x.date&&x.date>t?x.date:t); if(!d) return null;
-  const old=Object.assign(daySnap(x), {focus:x.focus||null}); releaseHold(id); updTask(id, dayPatch(x, d, {carried:false, focus:null})); log('info','Eliminada solo esta de una serie', {to:d});
-  const undo=()=>updTask(id, {date:old.date, carried:old.carried, reminder:old.reminder, focus:old.focus});
+  const old=Object.assign(daySnap(x), {focus:x.focus||null, deadline:x.deadline||null}), dl=dlShift(x, d); releaseHold(id); updTask(id, dayPatch(x, d, Object.assign({carried:false, focus:null}, dl?{deadline:dl}:{}))); log('info','Eliminada solo esta de una serie', {to:d}); // decision 48a: the deadline goes along, as for the next one
+  const undo=()=>updTask(id, Object.assign({date:old.date, carried:old.carried, reminder:old.reminder, focus:old.focus}, dl?{deadline:old.deadline}:{}));
   if(!quiet){ haptic(14); toast('Eliminada solo esta, la siguiente '+dayWords(d), undo); } return undo; }
 /* Two devices that complete the same task of a series while offline each create its next one. When their data meets (a sync, or the
    start), two pending tasks of the same series on the same date are one: the one with the lowest id stays (the same choice on every
@@ -528,6 +539,12 @@ function flushHeld(quiet){ clearTimeout(heldT); heldT=null; if(!HELD.size) retur
     if(n) toast(doneText(n, nx), ()=>batch(()=>prev.forEach(undoDone))); }
   if(quiet||!items.length){ render(); return; }
   items.forEach(([id])=>leaveRows(id)); setTimeout(renderAnimated, 240); }
+/* Decision 48a: set or clear the deadline (null clears it), with Deshacer (the pickers offer no past day). The work date, its Aplazada mark and the reminder stay */
+function setDeadline(id, d){ const x=task(id); d=d||null; if(!x||(x.deadline||null)===d) return; const old=x.deadline||null; releaseHold(id);
+  updTask(id, {deadline:d}); haptic(8); renderAnimated(); log('info', d?'Fecha límite':'Fecha límite quitada', d?{d}:undefined);
+  toast(d?'Entrega '+dayWords(d):'Sin fecha límite', ()=>updTask(id, {deadline:old})); }
+// Decision 48a: a task of a series keeps its deadline as far from its date as the one before: the deadline for a new date (null without one)
+const dlShift = (x, date) => x.deadline&&x.date&&date ? addDays(date, dayNum(x.deadline)-dayNum(x.date)) : null;
 function rescheduleTask(id, date, label){ const x=task(id); if(!x) return; const old=daySnap(x); updTask(id, dayPatch(x, date)); haptic(10); toast('Aplazada a '+label, ()=>undoDay(old)); } // undo gives back the Aplazadas mark and the reminder too
 function tomorrowTask(id){ const x=task(id); if(!x) return; const old=daySnap(x); updTask(id, dayPatch(x, addDays(todayStr(),1))); haptic(10); toast('Aplazada a mañana', ()=>undoDay(old)); }
 function deleteTask(id){

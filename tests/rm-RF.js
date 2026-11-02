@@ -362,7 +362,7 @@ async function desktop(browser){
   await page.click('#desk .pane [data-act=pickRepeat]'); await sleep(400); await shot(page, 'd4-repeat-menu');
   await menuItem(page, 'Cada mes').click(); await sleep(400);
   x = await ev(page, ()=>({rep:task('r1').repeat, val:document.querySelector('#desk .pane [data-act=pickRepeat] .val').textContent}));
-  check('desk_repeat_menu', iv==='Proyecto,Fecha,Recordatorio,Repetir,Prioridad|Nunca' && /^M1:4@2026-11-04#/.test(x.rep) && x.val==='Cada mes, el día 4', {iv, x});
+  check('desk_repeat_menu', iv==='Proyecto,Fecha,Fecha límite,Recordatorio,Repetir,Prioridad|Nunca' && /^M1:4@2026-11-04#/.test(x.rep) && x.val==='Cada mes, el día 4', {iv, x});
   await page.click('#desk .pane [data-act=pickRepeat]'); await sleep(400); await menuItem(page, 'Personalizada…').click(); await sleep(500);
   for(const k of ['u:W','d:3','d:2','d:5','n+']){ await page.click('#pmenu .pm-pop [data-rp="'+k+'"]'); await sleep(80); }
   const ps = await ev(page, ()=>document.querySelector('#pmenu .pm-pop .rpsum').textContent); await shot(page, 'd5-repeat-custom');
@@ -481,7 +481,7 @@ async function syncTests(browser){
   const fake = new Fake(false); let x;
   const A = await open(browser, {tag:'SA', fake, seed, clock:false}), B = await open(browser, {tag:'SB', fake, seed:Object.assign({}, seed, {tasks:[]}), clock:false, desk:true});
   // A task without the new fields keeps the signature it had before them: no new keys in its row
-  const sig = await ev(A.page, ()=>{ const row=syncToRow('tasks', task('s1')); return {keys:Object.keys(row).join(), sent:Object.keys(syncSendRow('tasks', row)).slice(-3).join()}; });
+  const sig = await ev(A.page, ()=>{ const row=syncToRow('tasks', task('s1')); return {keys:Object.keys(row).join(), sent:Object.keys(syncSendRow('tasks', row)).slice(-4,-1).join()}; }); // -1: deadline (decision 48a), after them
   check('sync_signature_unchanged', sig.keys==='id,created,space_id,project_id,title,date,reminder,priority,status,notes,carried,completed,modified,deleted' && sig.sent==='repeat,focus,waiting_for', sig);
   await ev(A.page, ()=>syncSignIn()); check('sync_A_first', await synced(A.page));
   await ev(B.page, ()=>syncSignIn()); check('sync_B_first', await synced(B.page));

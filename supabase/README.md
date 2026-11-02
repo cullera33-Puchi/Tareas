@@ -21,5 +21,6 @@ Edge Functions, `send-reminders` (el nombre exacto). Pega `functions/send-remind
 | `migrations/0004_repeat_focus.sql` | Repetir, «Ahora» y «Por confirmar» | v0.22.1 |
 | `migrations/0005_subtasks.sql` | Pasos dentro de una tarea | v0.23.0 |
 | `migrations/0006_project_notes.sql` | Notas de proyecto | v0.24.0 |
+| `migrations/0007_deadline.sql` | Fecha límite de una tarea | v0.25.0 |
 
-`all.sql` es la suma de las seis en orden. Las claves de la app (URL y clave pública) no van aquí: están en los secretos del repositorio de GitHub.
+`all.sql` es la suma de las siete en orden. Las claves de la app (URL y clave pública) no van aquí: están en los secretos del repositorio de GitHub.

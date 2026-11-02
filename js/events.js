@@ -124,6 +124,7 @@ function onClick(e){
     case 'postpone': closeRow(row); postponeSheet(row.dataset.id, row); break;
     case 'pickDate': dateSheet(detailId, act); break; // on the desktop a popover anchored to the control (R17)
     case 'pickReminder': reminderSheet(detailId, act); break;
+    case 'pickDeadline': if(detailId) deadlineSheet(detailId, act); break; // decision 48a
     case 'pickWaiting': if(detailId) waitingMenu(detailId, UI.wide?act:act.querySelector('.val')||act); break; // decision 41
     case 'toggleWaiting': UI.waitOpen=!UI.waitOpen; render(); break;
     case 'pickRepeat': if(detailId) repeatMenu(detailId, UI.wide?act:act.querySelector('.val')||act); break; // decision 38

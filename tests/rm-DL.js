@@ -199,6 +199,17 @@ async function iphone(browser){
   check('repeat_offset', x.n1==='2026-11-11|2026-11-13', x);
   check('repeat_no_date', x.n2==='2026-11-05|null', x);
   check('repeat_skip', x.sk.date==='2026-11-18' && x.sk.dl==='2026-11-20' && x.back==='2026-11-11|2026-11-13', x);
+  // A carried occurrence (Monday 2, deadline Wednesday 4, carried to today by rollOver) keeps its offset from the series date, not from today
+  x = await ev(page, ()=>{ DB.tasks.push(Object.assign({}, task('r1'), {id:'rc', title:'Acta semanal', repeat:'W1:MO@2026-11-02#serc', date:'2026-11-04', carried:true, deadline:'2026-11-04', status:'pending'})); save();
+    completeTask('rc'); const n=DB.tasks.find(o=>o.id!=='rc'&&repSeries(o.repeat)==='serc'); const r=n&&n.date+'|'+n.deadline; undoFn(); return r; });
+  check('repeat_carried_no_drift', x==='2026-11-09|2026-11-11', x);
+  await ev(page, ()=>{ DB.tasks=DB.tasks.filter(o=>repSeries(o.repeat)!=='serc'); save(); render(); });
+  // Cerrar el día leaves the tasks whose deadline has come in Hoy (their work date is not pulled earlier) and says so
+  x = await ev(page, ()=>{ const t=todayStr(); DB.tasks.push(Object.assign({}, task('r1'), {id:'cd1', title:'Entrega hoy', repeat:null, date:'2026-11-20', deadline:t, carried:false, status:'pending'}), Object.assign({}, task('r1'), {id:'cd2', title:'Normal de hoy', repeat:null, date:t, deadline:null, carried:false, status:'pending'})); save(); render();
+    closeDaySheet(); const sh=document.querySelector('#sheet'); const foot=[...sh.querySelectorAll('.cdfoot')].map(e=>e.textContent).join('|'); sh.querySelector('[data-cd=all]').click();
+    const r={foot, cd1:task('cd1').date, cd2:task('cd2').date}; undoFn(); DB.tasks=DB.tasks.filter(o=>!['cd1','cd2'].includes(o.id)); save(); render(); return r; });
+  check('close_day_keeps_deadline', /tareas? con entrega hoy o vencida se queda/.test(x.foot) && x.cd1==='2026-11-20' && x.cd2==='2026-11-05', x);
+  await ev(page, ()=>{ closeSheet(); document.querySelector('#toast').classList.remove('on'); }); await sleep(600);
   await calm(page);
   // Duplicar copies it; share text, CSV and export say it
   x = await ev(page, ()=>{ const n0=DB.tasks.length; duplicateTask('d3'); const c=DB.tasks[DB.tasks.length-1]; return {n:DB.tasks.length-n0, dl:c.deadline, t:c.title, id:c.id}; });

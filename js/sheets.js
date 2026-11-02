@@ -37,20 +37,21 @@ function tomorrowLine(){ const tm=addDays(todayStr(),1), xs=spaceTasks().filter(
 /* R8: close the day. What was done today, what is left and three ways out: all to tomorrow, only the non-priority ones,
    or one by one (the review walk). Each bulk move has its Deshacer (rescheduleMany); the foot says what tomorrow starts with */
 function closeDaySheet(){ flushHeld(true); const t=todayStr(), tm=addDays(t,1); const hoy=pendingFor('hoy'); if(!hoy.length) return;
-  const high=hoy.filter(x=>x.priority==='high'), rest=hoy.filter(x=>x.priority!=='high');
+  const due=hoy.filter(dlDue), mov=hoy.filter(x=>!dlDue(x)); // decision 48a: a task whose deadline has come stays in Hoy; moving its work date would only pull it earlier
+  const high=hoy.filter(x=>x.priority==='high'), rest=mov.filter(x=>x.priority!=='high'), movHigh=mov.filter(x=>x.priority==='high');
   const done=spaceTasks().filter(x=>x.status==='done'&&x.completed&&localDay(x.completed)===t).sort((a,b)=>a.completed<b.completed?-1:1);
   const li=(x,d)=>'<div class="pl"><span class="t">'+esc(x.title||'Sin título')+'</span>'+(d?'':x.priority==='high'?'<span class="pri high">!!!</span>':x.priority==='mid'?'<span class="pri mid">!!</span>':'')+'</div>';
   const n=k=>k+(k===1?' tarea':' tareas');
   openSheet('<h2>Cerrar el día</h2><div class="cdnums"><div><b>'+done.length+'</b><span>'+(done.length===1?'hecha':'hechas')+' hoy</span></div><div><b>'+hoy.length+'</b><span>'+(hoy.length===1?'queda':'quedan')+'</span></div><div class="'+(high.length?'red':'')+'"><b>'+high.length+'</b><span>prioritarias</span></div></div>'+
     '<div class="plhead"><span>Queda</span></div><div class="plist cdlist">'+hoy.map(x=>li(x)).join('')+'</div>'+
     (done.length?'<div class="plhead"><span>Hecho hoy</span></div><div class="plist cdlist done">'+done.map(x=>li(x,true)).join('')+'</div>':'')+
-    '<div class="list cdacts"><button class="cell" data-cd="all"><span class="lbl">Todo a mañana</span><span class="val">'+n(hoy.length)+'</span></button>'+
-    (high.length&&rest.length?'<button class="cell" data-cd="rest"><span class="lbl">Solo las no prioritarias</span><span class="val">'+n(rest.length)+'</span></button>':'')+
+    '<div class="list cdacts">'+(mov.length?'<button class="cell" data-cd="all"><span class="lbl">Todo a mañana</span><span class="val">'+n(mov.length)+'</span></button>':'')+
+    (movHigh.length&&rest.length?'<button class="cell" data-cd="rest"><span class="lbl">Solo las no prioritarias</span><span class="val">'+n(rest.length)+'</span></button>':'')+
     '<button class="cell" data-cd="one"><span class="lbl">Decidir una a una</span>'+I.chev.replace('<svg','<svg class="chev"')+'</button></div>'+
-    '<div class="hint cdfoot">'+tomorrowLine()+'</div>', s=>{
+    (due.length?'<div class="hint cdfoot">'+(due.length===1?'La tarea con entrega hoy o vencida se queda en Hoy.':'Las '+due.length+' tareas con entrega hoy o vencida se quedan en Hoy.')+'</div>':'')+'<div class="hint cdfoot">'+tomorrowLine()+'</div>', s=>{
     s.onclick=e=>{ const b=e.target.closest('[data-cd]'); if(!b) return; const k=b.dataset.cd;
       if(k==='one'){ reviewStart('close'); return; }
-      closeSheet(); rescheduleMany(k==='all'?hoy:rest, tm, 'mañana'); }; }); }
+      closeSheet(); rescheduleMany(k==='all'?mov:rest, tm, 'mañana'); }; }); }
 /* R9 and R8: review tasks one by one. 'carried': the Aplazadas of Hoy (under the project filter, as the list shows them);
    'close': all of Hoy, from Cerrar el día. Each decision applies at once, so the list behind stays current;
    the balance at the end has one Deshacer for all of them. No field is added: "aplazada desde" was not approved */

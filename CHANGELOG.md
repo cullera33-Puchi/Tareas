@@ -1,5 +1,14 @@
 # Registro de cambios
 
+## v0.25.0. Fecha límite y «Volver a pendiente» más a mano (2 de noviembre de 2026)
+
+- Fecha límite aparte de la fecha de trabajo, en el detalle, el inspector, la pulsación larga y el clic derecho. En la fila se lee «Entrega jueves»: en gris, en naranja desde 2 días antes y en rojo el día de entrega y después. En las tarjetas del calendario, una banderita del mismo color.
+- El día de entrega la tarea entra en Hoy aunque esté aplazada, tenga otra fecha o esté por confirmar, cuenta en «para hoy» y en la insignia, y no se marca como aplazada. Sin notificación propia.
+- «Cerrar el día» deja en Hoy las tareas con entrega hoy o vencida y lo indica al pie.
+- Una tarea que se repite lleva la fecha límite a la siguiente con la misma distancia a su fecha, también si se había aplazado. Duplicar la copia; compartir y CSV la incluyen.
+- «Por confirmar»: la hoja «Cambiar Por confirmar» lleva al pie «Volver a pendiente», y en el iPhone deslizar a la izquierda una tarea por confirmar muestra «Pendiente» en lugar de «Aplazar». Las dos con Deshacer.
+- Supabase: migración `0007_deadline.sql`, incluida en `supabase/all.sql`, y una fila nueva en `check.sql`. Sin ella, la fecha límite se queda en cada dispositivo y el resto sincroniza. La función `send-reminders` no cambia.
+
 ## v0.24.1. Borrar el registro (2 de noviembre de 2026)
 
 - En Ajustes, sección Registro, «Borrar registro» vacía el registro de este dispositivo para empezar de cero, tras confirmar y con Deshacer. Lo que se registre mientras tanto se conserva al deshacer. El botón Borrar de «Ver registro» también tiene Deshacer.

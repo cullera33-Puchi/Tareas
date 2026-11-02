@@ -122,6 +122,7 @@ function onClick(e){
     case 'pickProject': pickProjectSheet(detailId, UI.wide?act:act.querySelector('.val')||act); break; // R10: the menu hangs from the value, as an iOS pop-up button
     case 'pickPriority': priorityMenu(detailId, act.querySelector('.val')||act); break;
     case 'postpone': closeRow(row); postponeSheet(row.dataset.id, row); break;
+    case 'unwait': if(row){ const id=row.dataset.id; closeRow(row); leaveRows(id); setTimeout(()=>{ unWait(id); renderAnimated(); },200); } break; // decision 50: a waiting row's swipe goes back to pending, with Deshacer
     case 'pickDate': dateSheet(detailId, act); break; // on the desktop a popover anchored to the control (R17)
     case 'pickReminder': reminderSheet(detailId, act); break;
     case 'pickDeadline': if(detailId) deadlineSheet(detailId, act); break; // decision 48a

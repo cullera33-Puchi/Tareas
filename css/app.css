@@ -229,6 +229,7 @@ body.desktop .toast{left:auto;right:28px;bottom:28px;width:360px;}
 :root[data-theme="dark"] .row.armed .row-bg.left{background:#28C250;}
 .row-bg.right button{width:80px;color:#fff;font-size:0.882rem;font-weight:500;}
 .row-bg.right .b-tomorrow{background:var(--orange);}
+.row-bg.right .b-unwait{background:var(--blue);}
 .row-bg.right .b-delete{background:var(--red);}
 .row-content{position:relative;background:var(--card);display:flex;align-items:center;gap:12px;padding:10px 16px 10px 16px;min-height:52px;transition:transform .4s cubic-bezier(.32,.72,0,1);}
 .row-content.drag{transition:none;}
@@ -1233,6 +1234,8 @@ body.resizing,body.resizing *{cursor:col-resize !important;-webkit-user-select:n
 .wsheet .wfor{width:100%;height:44px;border:0;border-radius:10px;background:var(--bg);color:var(--ink);padding:0 12px;font-size:max(16px,1rem);outline:0;}
 .wsheet .chips{margin:0;}
 .wsheet .wline{margin:2px 0 0;}
+.wsheet .wback{margin-top:10px;min-height:44px;border:0;border-radius:10px;background:var(--card);color:var(--blue);font:inherit;font-size:1rem;font-weight:500;}
+.app.desktop .wsheet .wback{min-height:28px;margin-top:6px;font-size:13px;background:transparent;text-align:left;padding:0;}
 .pm-pop .wtitle{padding:0 0 8px;font-weight:600;font-size:13px;color:var(--ink);}
 .pm-pop .wsheet{gap:6px;}
 .pm-pop .wsheet .wlbl{font-size:11px;}

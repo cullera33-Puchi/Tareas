@@ -270,6 +270,26 @@ async function iphone(browser){
   x = await ev(page, ()=>({st:task('a6').status, who:task('a6').waitingFor, t:document.querySelector('#toastText').textContent}));
   check('wait_back_pending', wm.includes('Volver a pendiente') && wm.includes('Cambiar Por confirmar') && !wm.includes('Ahora') && x.st==='pending' && !x.who && x.t==='Vuelve a pendiente', {wm, x});
   await page.tap('#toastBtn'); await sleep(300); await ev(page, ()=>unWait('a6')); await sleep(200);
+  // Decision 50: Volver a pendiente at the foot of Cambiar Por confirmar, and in the swipe of a waiting row (in place of Aplazar), both with Deshacer
+  await ev(page, ()=>{ setWaiting('a6', 'Ramiro', undefined); render(); }); await sleep(500);
+  await ev(page, ()=>waitingSheet('a6')); await sleep(800);
+  const wb = await ev(page, ()=>{ const b=document.querySelector('#sheet [data-x=unwait]'); return b&&b.textContent; });
+  await shot(page, 'm14b-waiting-sheet-back');
+  await page.tap('#sheet [data-x=unwait]'); await sleep(700);
+  x = await ev(page, ()=>({st:task('a6').status, who:task('a6').waitingFor, t:document.querySelector('#toastText').textContent, sheet:document.querySelector('#sheet').classList.contains('on')}));
+  await page.tap('#toastBtn'); await sleep(400);
+  check('wait_sheet_back', wb==='Volver a pendiente' && x.st==='pending' && !x.who && x.t==='Vuelve a pendiente' && !x.sheet && await ev(page, ()=>task('a6').status==='waiting'&&task('a6').waitingFor==='Ramiro'), {wb, x});
+  await ev(page, ()=>{ UI.waitOpen=true; render(); }); await sleep(400);
+  const wrow = L+' .row[data-id=a6]';
+  x = await ev(page, s=>{ const r=document.querySelector(s); if(!r) return null; r.scrollIntoView({block:'center'}); const b=r.querySelector('.row-bg.right button'); return b&&(b.dataset.act+'|'+b.textContent); }, wrow); await sleep(200);
+  const wbb = await ev(page, s=>{ const b=document.querySelector(s).getBoundingClientRect(); return {x:b.x+b.width-60, y:b.y+b.height/2}; }, wrow);
+  { const c=await page.context().newCDPSession(page); const T=(type,xx)=>c.send('Input.dispatchTouchEvent',{type, touchPoints:type==='touchEnd'?[]:[{x:xx, y:wbb.y}]});
+    await T('touchStart', wbb.x); for(let i=1;i<=10;i++){ await T('touchMove', wbb.x-150*i/10); await sleep(16); } await T('touchEnd'); await c.detach(); }
+  await sleep(500); await page.tap(wrow+' .row-bg.right [data-act=unwait]'); await sleep(700);
+  const sw = await ev(page, ()=>({st:task('a6').status, t:document.querySelector('#toastText').textContent}));
+  await page.tap('#toastBtn'); await sleep(400);
+  check('wait_swipe_back', x==='unwait|Pendiente' && sw.st==='pending' && sw.t==='Vuelve a pendiente' && await ev(page, ()=>task('a6').status==='waiting'), {x, sw});
+  await ev(page, ()=>unWait('a6')); await sleep(200);
 
   // 3d. Ahora
   await ev(page, ()=>rowMenu('a1')); await sleep(600);

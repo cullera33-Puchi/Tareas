@@ -319,15 +319,16 @@ function waitingSheet(id, src){ const x=task(id); if(!x||x.status==='done') retu
   const chips=()=>days.map(o=>'<button class="chip'+(sel===o[0]?' on':'')+'" data-wd="'+o[0]+'">'+o[2]+'</button>').join('');
   const line=()=>{ const d=sel?days.find(o=>o[0]===sel)[1]:x.date; return d?'Vuelve a Hoy '+dayWords(d)+', marcada Revisar.':'Sin día de revisión: queda en Por confirmar.'; };
   const field='<input type="text" class="wfor" data-role="waitfor" placeholder="Nombre o motivo (opcional)" value="'+esc(x.waitingFor||'')+'" autocomplete="off" enterkeyhint="done"'+(UI.wide?' autofocus':'')+'>';
+  const back=x.status==='waiting'?'<button class="wback" data-x="unwait">Volver a pendiente</button>':''; // decision 50
   const body='<div class="wsheet"><label class="wlbl">Esperando a</label>'+field+'<div class="wlbl">Revisar</div><div class="chips wchips">'+chips()+'</div><div class="hint wline">'+line()+'</div>';
   const save=(close, s)=>{ const v=$('[data-role=waitfor]', s).value; close(); setWaiting(id, v, sel?days.find(o=>o[0]===sel)[1]:undefined); renderAnimated(); };
   const bind=(s, close)=>{ const inp=$('[data-role=waitfor]', s);
     inp.addEventListener('keydown', e=>{ if(e.key==='Enter'&&!e.isComposing){ e.preventDefault(); save(close, s); } });
     s.onclick=e=>{ const c=e.target.closest('[data-wd]'); if(c){ sel=c.dataset.wd; $('.wchips', s).innerHTML=chips(); $('.wline', s).textContent=line(); haptic(4); return; }
-      const b=e.target.closest('[data-x]'); if(!b) return; if(b.dataset.x==='ok') save(close, s); else close(); }; };
+      const b=e.target.closest('[data-x]'); if(!b) return; if(b.dataset.x==='ok') save(close, s); else if(b.dataset.x==='unwait'){ close(); unWait(id); renderAnimated(); } else close(); }; };
   const title=x.status==='waiting'?'Cambiar Por confirmar':'Por confirmar';
-  if(UI.wide){ pickerPanel(title, '<div class="pm-title wtitle">'+title+'</div>'+body+'<div class="sheet-actions"><button class="btn" data-x="cancel">Cancelar</button><button class="btn primary" data-x="ok">Guardar</button></div></div>', id, src&&src.isConnected?src:null, 'menu', bind); return; }
-  openSheet(sheadHTML(title, 'Cancelar', 'Guardar')+body+'</div>', s=>bind(s, closeSheet)); }
+  if(UI.wide){ pickerPanel(title, '<div class="pm-title wtitle">'+title+'</div>'+body+back+'<div class="sheet-actions"><button class="btn" data-x="cancel">Cancelar</button><button class="btn primary" data-x="ok">Guardar</button></div></div>', id, src&&src.isConnected?src:null, 'menu', bind); return; }
+  openSheet(sheadHTML(title, 'Cancelar', 'Guardar')+body+back+'</div>', s=>bind(s, closeSheet)); }
 // The Por confirmar row of the detail and the inspector: Volver a pendiente, or Cambiar (who and the review day)
 function waitingMenu(id, src){ const x=task(id); if(!x||x.status!=='waiting') return; const at=src?{anchor:src, align:UI.wide?'left':'right'}:taskAnchor(id, 'pickWaiting')||{};
   popMenu(Object.assign(at, {groups:[waitItems(x, MI, src)]})); }

@@ -322,7 +322,7 @@ function rowHTML(x, opts={}){
   const selecting = UI.select && !opts.simple; const selected = selecting && UI.select.ids.has(x.id);
   if(UI.wide) return deskRowHTML(x, opts, {p, t, done, held, shownDone, ind, pri, pc, selecting, selected, prog});
   return '<div class="row'+(done?' done':'')+(held?' held':'')+(opts.byDay?' byday':'')+(selected?' selected':'')+'" data-id="'+x.id+'"'+(pc?' style="'+tagVars(pc)+'"':'')+'>'+
-    (opts.simple||selecting?'':'<div class="row-bg left"><span>'+I.check+'</span></div><div class="row-bg right"><button class="b-tomorrow" data-act="postpone">Aplazar</button><button class="b-delete" data-act="delete">Eliminar</button></div>')+
+    (opts.simple||selecting?'':'<div class="row-bg left"><span>'+I.check+'</span></div><div class="row-bg right">'+(x.status==='waiting'?'<button class="b-tomorrow b-unwait" data-act="unwait">Pendiente</button>':'<button class="b-tomorrow" data-act="postpone">Aplazar</button>')+'<button class="b-delete" data-act="delete">Eliminar</button></div>')+
     '<div class="row-content">'+(selecting?'<span class="selbox">'+I.check+'</span>':'<button class="check'+(shownDone?' done':x.status==='waiting'?' waiting':'')+'" data-act="check" aria-label="Completar">'+I.check+'</button>')+
     '<div class="row-text"><div class="row-title">'+esc(x.title||'Sin título')+'</div>'+(meta.length?'<div class="row-meta">'+meta.join('')+'</div>':'')+'</div>'+(ind||prog?'<span class="inds">'+ind+prog+'</span>':'')+pri+(UI.wide&&!selecting&&!opts.simple?'<button class="rowmore" data-act="rowMenu" aria-label="Más">'+I.more+'</button>':'')+'</div></div>';
 }
@@ -331,7 +331,7 @@ function rowHTML(x, opts={}){
 function deskRowHTML(x, opts, v){ const t=v.t; let date='', dcls='', rem=''; const dl=x.deadline?dlText(x.deadline):'', dlc=dlLevel(x); // decision 48a: a column of its own
   if(v.done){ if(x.completed) date=opts.byDay?fmtTime(x.completed):fmtDateTime(x.completed); }
   else { if(x.date){ if(waitDue(x)){ date='Revisar'; dcls=' review'; } else if(x.carried&&x.date<=t){ if(!opts.hideCarried){ date='Aplazada'; dcls=' carried'; } }
-      else if(!(opts.noToday&&x.date===t) && x.date!==opts.day){ date=fmtDate(x.date); if(x.date<t) dcls=' over'; } }
+      else if(!(opts.noToday&&x.date===t) && x.date!==opts.day && x.date!==x.deadline){ date=fmtDate(x.date); if(x.date<t) dcls=' over'; } } // a deadline on the same day says it once, as on the iPhone
     if(x.reminder) rem=x.date&&localDay(x.reminder)===x.date?fmtTime(x.reminder):fmtDateTime(x.reminder); }
   // The project goes in a fixed column on the left, so titles start aligned and keep the room on the right; a list of one project has no column
   const pcol=opts.noProj?'':'<span class="pcol">'+(v.p?'<span class="tag" title="'+esc(v.p.name)+'">'+esc(v.p.name)+'</span>':'')+'</span>';

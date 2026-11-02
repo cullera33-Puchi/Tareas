@@ -2,7 +2,7 @@
 /* Tareas. Core: version, log, utilities, data (DB in localStorage), UI state, Deshacer toast and the task actions.
    A classic script: index.html loads every file of js/ in order and they share their global names. Only declarations and
    listeners run at load; the start itself (first screen, timers, sync, service worker) is in boot.js, the last file. */
-const APP_VERSION = '0.24.1';
+const APP_VERSION = '0.25.0';
 let pendingSW = null; // service worker installed and waiting to take over
 let updateRequested = false; // the user asked for the waiting worker to take over
 
@@ -544,7 +544,10 @@ function setDeadline(id, d){ const x=task(id); d=d||null; if(!x||(x.deadline||nu
   updTask(id, {deadline:d}); haptic(8); renderAnimated(); log('info', d?'Fecha límite':'Fecha límite quitada', d?{d}:undefined);
   toast(d?'Entrega '+dayWords(d):'Sin fecha límite', ()=>updTask(id, {deadline:old})); }
 // Decision 48a: a task of a series keeps its deadline as far from its date as the one before: the deadline for a new date (null without one)
-const dlShift = (x, date) => x.deadline&&x.date&&date ? addDays(date, dayNum(x.deadline)-dayNum(x.date)) : null;
+// The offset is measured from the occurrence's own series date (the last one on or before its date), not from a date rollOver or
+// Aplazar moved forward: a task carried from Monday to Wednesday keeps its Monday plus two, and the series does not drift
+function repOn(x){ const r=repParse(x.repeat); if(!r||!x.date) return x.date; for(let d=x.date, k=0; k<400; k++, d=addDays(d,-1)){ if(r.anchor&&d<r.anchor) break; if(repHas(r, d)) return d; } return x.date; }
+const dlShift = (x, date) => { if(!(x.deadline&&x.date&&date)) return null; const base=repOn(x); return addDays(date, dayNum(x.deadline)-dayNum(base)); };
 function rescheduleTask(id, date, label){ const x=task(id); if(!x) return; const old=daySnap(x); updTask(id, dayPatch(x, date)); haptic(10); toast('Aplazada a '+label, ()=>undoDay(old)); } // undo gives back the Aplazadas mark and the reminder too
 function tomorrowTask(id){ const x=task(id); if(!x) return; const old=daySnap(x); updTask(id, dayPatch(x, addDays(todayStr(),1))); haptic(10); toast('Aplazada a mañana', ()=>undoDay(old)); }
 function deleteTask(id){

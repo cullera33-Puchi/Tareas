@@ -1036,6 +1036,9 @@ body.resizing,body.resizing *{cursor:col-resize !important;-webkit-user-select:n
 .app.desktop .pane .au-top{font-size:11px;margin-bottom:4px;}
 .app.desktop .pane .au-bar{cursor:pointer;}
 .app.desktop .pane .att-group .cell.link svg{width:16px;height:16px;}
+/* The two links of Adjuntos start at the same place (owner feedback): the second keeps the inset separator but not the iPhone's 16 px */
+.app.desktop .pane .att-group .cell + .cell{margin-left:12px;padding-left:0;width:calc(100% - 12px);border-top-color:var(--dline);}
+.att-group .cell.link svg{width:18px;height:18px;flex:none;}
 .app.desktop .pane .att-note{margin-top:-6px;padding:0 0 12px;}
 /* A photo dragged from the computer onto the inspector */
 .app.desktop .pane.filedrop::after{content:'Suelta las fotos para añadirlas';position:absolute;inset:6px;border:2px dashed var(--blue);border-radius:10px;background:color-mix(in srgb,var(--blue) 10%,transparent);display:flex;align-items:center;justify-content:center;color:var(--blue);font-size:13px;font-weight:600;pointer-events:none;z-index:5;}
@@ -1142,10 +1145,12 @@ body.resizing,body.resizing *{cursor:col-resize !important;-webkit-user-select:n
 /* Decision 34: a local copy of Ajustes slides to Eliminar (iPhone); on the desktop a bin shows on hover */
 .bk-c{padding:0;display:flex;align-items:center;}
 .bk-c .cell{flex:1;min-width:0;}
-.bk-group .vn.bk + .cell,.bk-group .vn.bk:first-child{border-top:0;}
-.bk-group .vn.bk + .vn.bk{border-top:.5px solid var(--sep);margin-left:16px;}
-.bk-group .vn.bk + .vn.bk .vn-c{margin-left:-16px;padding-left:16px;}
+.bk-group .vn.bk{border-top:0;}
+.bk-group .vn.bk + .vn.bk::before{content:'';position:absolute;top:0;left:16px;right:0;border-top:.5px solid var(--sep);z-index:1;pointer-events:none;} /* inset, as between cells */
 .bk-group .vn.bk + .cell{border-top:.5px solid var(--sep);margin-left:16px;padding-left:0;width:calc(100% - 16px);}
+.app.desktop .bk-group .vn.bk + .vn.bk::before{left:12px;border-top-color:var(--dline);}
+.app.desktop .bk-group .vn.bk + .cell{margin-left:12px;width:calc(100% - 12px);border-top-color:var(--dline);}
+.wide .bk-c{background:none;}
 .bk-del{flex:none;width:28px;height:28px;margin-right:6px;border-radius:6px;color:var(--red);display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .15s;}
 .bk-del svg{width:15px;height:15px;}
 .wide .bk:hover .bk-del,.wide .bk-del:focus-visible{opacity:1;} .wide .bk-del:hover{background:var(--dhov);}
@@ -3121,11 +3126,11 @@ function onSettings(){ return UI.wide ? UI.deskView==='settings' : (UI.tab==='aj
    of them at once. Always confirmed, never undone. A copy of today deleted by hand is not made again until tomorrow ('tareas-bk-skip') */
 const BK_SKIP='tareas-bk-skip';
 const bkWhen = date => date===todayStr()?'de hoy':date===addDays(todayStr(),-1)?'de ayer':'del '+fmtDate(date);
-const backupRowHTML = b => '<div class="vn bk" data-bk="'+b.date+'"><div class="vn-bg r"><button data-bkact="del">Eliminar</button></div><div class="vn-c bk-c"><button class="cell" data-restore="'+b.date+'"><span class="lbl">'+fmtDate(b.date)+'</span><span class="val">'+b.tasks+' tareas</span>'+I.chev.replace('<svg','<svg class="chev"')+'</button>'+
+const backupRowHTML = b => '<div class="vn bk" data-bk="'+b.date+'"><div class="vn-bg r"><button data-bkact="del">Eliminar</button></div><div class="vn-c bk-c"><button class="cell" data-restore="'+b.date+'"><span class="lbl">'+fmtDate(b.date)+'</span><span class="val">'+b.tasks+(b.tasks===1?' tarea':' tareas')+'</span>'+I.chev.replace('<svg','<svg class="chev"')+'</button>'+
   (UI.wide?'<button class="bk-del" data-bkact="del" aria-label="Borrar la copia '+bkWhen(b.date)+'" title="Borrar la copia">'+I.trash+'</button>':'')+'</div></div>';
 function backupMenu(date, at){ popMenu(Object.assign(at, {groups:[[{label:'Restaurar', icon:MI.undo, fn:()=>restoreBackup(date)}],[{label:'Borrar copia', icon:MI.trash, red:true, fn:()=>deleteBackup(date)}]]})); }
 function deleteBackup(date){ const b=BACKUPS.find(x=>x.date===date); if(!b) return; const dev=UI.wide?'este dispositivo':'este iPhone';
-  confirmSheet('Borrar copia', 'La copia '+bkWhen(date)+' ('+b.tasks+' tareas) se borrará de '+dev+'. No se puede deshacer.', async()=>{
+  confirmSheet('Borrar copia', 'La copia '+bkWhen(date)+' ('+b.tasks+(b.tasks===1?' tarea':' tareas')+') se borrará de '+dev+'. No se puede deshacer.', async()=>{
     try{ await BK.del(date); if(date===todayStr()) try{ localStorage.setItem(BK_SKIP, date); }catch(e){} await refreshBackups(); log('info','Copia local borrada', {date}); toast('Copia borrada'); }
     catch(e){ log('error','No se pudo borrar la copia: '+(e&&e.message||e)); toast('No se pudo borrar la copia'); }
     render(); }, 'Borrar'); }
@@ -4738,7 +4743,7 @@ function axBar(){ return $('#desk [data-role=addbar]'); }
 function axFocus(){ const n=axBar(); if(n){ n.focus({preventScroll:true}); const l=n.value.length; n.setSelectionRange(l,l); } }
 // The written word of that kind leaves the title: the button chosen by hand says it now
 function axStrip(kind){ const ab=axBar(); if(!ab) return; const q=parseQuick(ab.value), ts=q.tokens.filter(t=>t.kind===kind); if(!ts.length) return;
-  let v=ab.value; ts.slice().reverse().forEach(t=>{ v=v.slice(0,t.start)+v.slice(t.end); }); v=v.replace(/\s{2,}/g,' ').replace(/^\s+/,''); ab.value=v; UI.addDraft=v; }
+  let v=ab.value; ts.slice().reverse().forEach(t=>{ v=v.slice(0,t.start)+v.slice(t.end); }); v=v.replace(/\s{2,}/g,' ').trim(); ab.value=v; UI.addDraft=v; }
 function axOpen(){ if(AX.open) return; AX.open=true; AX.opened=true; log('info','Alta ampliada abierta'); render(); }
 // Folds the composer (with a short fade and lift) and forgets everything it held
 function axCollapse(){ axStopVoice(); const p=$('#desk .axp'); const done=()=>{ Object.assign(AX, {open:false, notes:'', voice:'', voiceOn:false, date:undefined, projectId:undefined, priority:undefined, time:null}); UI.addDraft=''; const ab=axBar(); if(ab) ab.value=''; render(); };

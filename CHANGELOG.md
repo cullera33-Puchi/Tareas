@@ -1,5 +1,16 @@
 # Registro de cambios
 
+## v0.19.0. Fotos y notas de audio en las tareas (2 de noviembre de 2026)
+
+- El detalle de cada tarea tiene un grupo Adjuntos, en el iPhone y en el panel del escritorio.
+- «Añadir foto» abre la cámara o la biblioteca del iPhone, con varias fotos a la vez. En el ordenador se elige un archivo o se arrastra la imagen al panel.
+- Las fotos se reducen a 2.048 píxeles por lado, se enderezan según la orientación de la cámara y pierden los datos de ubicación.
+- Visor a pantalla completa: pasar de una foto a otra, pellizcar para ampliar, doble toque, arrastrar hacia abajo para cerrar, Compartir y Eliminar con Deshacer. En el ordenador también funciona con las flechas, Esc y Supr.
+- «Grabar audio» abre una hoja con botón grande, contador, parada automática a los 10 minutos, escucha previa y Guardar o Descartar. Los audios se reproducen con barra de progreso y se eliminan deslizando a la izquierda, con Deshacer. Se graban en m4a para que el iPhone reproduzca también lo grabado en el ordenador.
+- Un clip en la fila indica que la tarea tiene adjuntos. Al eliminar la tarea se eliminan sus adjuntos, y Deshacer los devuelve.
+- Sin conexión o sin sesión, lo capturado se guarda en el dispositivo y se sube después. Cada dispositivo guarda una copia de hasta 200 MB y borra lo más antiguo; lo pendiente de subir nunca se borra.
+- Supabase: tabla `attachments`, carpeta privada de archivos por usuario y borrado definitivo de los archivos a las 24 horas, a cargo de la función `send-reminders`.
+
 ## v0.18.0. Decisiones del 2 de noviembre y orden de proyectos en escritorio (2 de noviembre de 2026)
 
 Ajustes rápidos

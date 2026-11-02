@@ -1103,7 +1103,7 @@ body.resizing,body.resizing *{cursor:col-resize !important;-webkit-user-select:n
 <script src="config.js"></script>
 <script>
 'use strict';
-const APP_VERSION = '0.18.0';
+const APP_VERSION = '0.19.0';
 let pendingSW = null; // service worker installed and waiting to take over
 let updateRequested = false; // the user asked for the waiting worker to take over
 
@@ -3372,7 +3372,7 @@ function photoMenu(id, ev){ const a=att(id); if(!a) return; const at=ev&&ev.clie
 /* ---------- Recording ---------- */
 // Decision 29.2: m4a (AAC) where the browser records it, which every device plays; WebM with Opus otherwise
 function recMime(){ const MR=window.MediaRecorder; if(!MR||!MR.isTypeSupported) return '';
-  const list=isSafari()?['audio/mp4;codecs=mp4a.40.2','audio/mp4','audio/aac','audio/webm;codecs=opus','audio/webm']:['audio/webm;codecs=opus','audio/webm','audio/ogg;codecs=opus','audio/mp4;codecs=mp4a.40.2','audio/mp4'];
+  const list=['audio/mp4;codecs=mp4a.40.2','audio/mp4','audio/aac','audio/webm;codecs=opus','audio/webm']; // m4a (AAC) first on every browser that records it, so an iPhone always plays what the computer recorded
   return list.find(t=>{ try{ return MR.isTypeSupported(t); }catch(e){ return false; } })||''; }
 const playerHTML = () => '<div class="au-c"><button class="au-play" data-x="play" aria-label="Reproducir">'+I.play+I.pause+'</button><div class="au-body"><div class="au-top"><span class="au-name">Grabación</span><span class="au-t"><span class="au-cur">0:00</span> de <span class="au-dur">0:00</span></span></div><div class="au-bar" data-x="seek"><i></i></div></div></div>';
 // The sheet: elapsed time, a big button that records and stops, then the recording to listen to before Guardar. Up to REC_MAX_MS, then it

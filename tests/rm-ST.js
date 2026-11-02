@@ -176,6 +176,16 @@ async function iphone(browser){
   const t2 = await toastOn(page), del = await ev(page, id=>!stepRec(id), id6);
   await page.click('#toastBtn'); await calm(page);
   check('m_swipe_delete', x.open==='l' && x.btn==='Eliminar' && x.vis==='block' && t2 && t2.t==='Paso eliminado' && del && await ev(page, id=>!!stepRec(id), id6), {x, t2, del});
+  // Several deletions in a row, one of them while editing the step's title: each one leaves the screen too (v0.23.1, the row stayed on screen)
+  { const seq=[]; for(let k=0;k<3;k++){ await hideToast(page);
+      const sid=await ev(page, D=>[...document.querySelectorAll(D+' .steps > .step[data-st]')].map(e=>e.dataset.st).filter(i=>!/^s[1-4]$/.test(i)).pop(), D); const sel=D+' .steps > .step[data-st="'+sid+'"]';
+      await ev(page, s=>document.querySelector(s).scrollIntoView({block:'center'}), sel); await sleep(100);
+      b = await box(page, sel); if(k===1){ await tapAt(page, b.x+b.w/2, b.cy); await sleep(300); b = await box(page, sel); }
+      await swipe(page, b.x+b.w-60, b.cy, -140, 0); await sleep(500);
+      const bb = await box(page, sel+' .vn-bg.r button'); if(bb) await tapAt(page, bb.cx, bb.cy); await sleep(500);
+      seq.push(await ev(page, ([D,id])=>({gone:!stepRec(id), inDom:!!document.querySelector(D+' .step[data-st="'+id+'"]'), data:stepsOf('t1').length, dom:document.querySelectorAll(D+' .steps > .step[data-st]').length}), [D, sid])); }
+    await hideToast(page);
+    check('m_delete_in_a_row', seq.every(q=>q.gone && !q.inDom && q.data===q.dom) && seq[2].data===seq[0].data-2, seq); }
   // Long press lifts a step and the same finger moves it; Deshacer puts it back
   const order0 = await steps(page, 't1');
   b = await box(page, D+' .steps > .step:nth-child(1)'); const h = b.h;

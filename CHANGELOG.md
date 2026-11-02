@@ -1,5 +1,15 @@
 # Registro de cambios
 
+## v0.16.0. Bloque 8: cuenta y sincronización con Supabase (2 de noviembre de 2026)
+
+- Ajustes tiene una sección Cuenta: «Iniciar sesión con Google», el correo, cuándo se sincronizó por última vez, los cambios pendientes, «Sincronizar ahora» y «Cerrar sesión». Cerrar sesión deja los datos en el dispositivo y deja de sincronizar.
+- La sincronización va en segundo plano y nunca bloquea la pantalla: al abrir la app, poco después de cada cambio, al recuperar la conexión, al volver a la app y al tirar hacia abajo de la lista en el iPhone. Los cambios de otro dispositivo llegan casi al momento, sin cerrar hojas ni perder lo que se está escribiendo.
+- Sin conexión todo funciona igual; los cambios se guardan y se suben al volver. Si una misma tarea cambia en dos sitios, gana la modificación más reciente.
+- Lo eliminado se elimina también en los otros dispositivos, y Deshacer lo recupera en todos.
+- Primera conexión: copia local de seguridad, después los espacios Trabajo y Personal se emparejan por nombre con los de la cuenta, para que no se dupliquen, y se suben los datos. Los datos de prueba y los ajustes no se suben.
+- Con la sesión iniciada, restaurar una copia local se aplica en todos los dispositivos, con aviso previo.
+- Supabase: tablas de espacios, proyectos, tareas y notas de voz con reglas de acceso por usuario (`supabase/migrations/0001_init.sql`). Las claves llegan desde los secretos del repositorio al publicar, nunca en el código.
+
 ## v0.15.1. Escritorio: proyecto a la izquierda y más sitio para el título (1 de noviembre de 2026)
 
 - La etiqueta del proyecto pasa a una columna fija a la izquierda, justo después del círculo. Todos los títulos empiezan a la misma altura. Dentro de un proyecto o con un filtro de proyecto no se muestra la columna.

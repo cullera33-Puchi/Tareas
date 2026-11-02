@@ -1,5 +1,9 @@
 # Registro de cambios
 
+## v0.20.1. Recordatorio en escritorio: elegir día y hora (2 de noviembre de 2026)
+
+- En el ordenador, al elegir el día en la ventana de Recordatorio, la ventana se cerraba antes de poder poner la hora. El calendario se redibuja para marcar el día y el clic se tomaba como hecho fuera. Ahora el día queda marcado, la ventana sigue abierta y Guardar aplica día y hora. Lo mismo para cualquier ventana anclada que se redibuje al hacer clic.
+
 ## v0.20.0. Escritorio más completo, 16 colores y copias que se pueden borrar (2 de noviembre de 2026)
 
 Escritorio

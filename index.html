@@ -1191,7 +1191,7 @@ body.resizing,body.resizing *{cursor:col-resize !important;-webkit-user-select:n
 <script src="config.js"></script>
 <script>
 'use strict';
-const APP_VERSION = '0.20.0';
+const APP_VERSION = '0.20.1';
 let pendingSW = null; // service worker installed and waiting to take over
 let updateRequested = false; // the user asked for the waiting worker to take over
 
@@ -2625,7 +2625,9 @@ pmEl.addEventListener('touchmove', e=>{ const m=PM; if(!m||m.mac) return; if(m.g
 pmEl.addEventListener('touchend', e=>{ const m=PM; if(!m||m.mac) return; if(e.cancelable) e.preventDefault(); if(m.ghost){ m.ghost=false; return; } if(m.scroll){ m.scroll=false; return; } const t=e.changedTouches[0];
   if(m.hl){ menuRelease(t.clientX, t.clientY); return; } const el=document.elementFromPoint(t.clientX, t.clientY); if(!(el&&el.closest('.pm-menu'))) closeMenu(); });
 pmEl.addEventListener('touchcancel', ()=>{ if(PM&&!PM.mac) pmHighlight(null); });
-pmEl.addEventListener('click', e=>{ if(!PM) return; if(ghostClick(e)){ log('warn','Clic en el menú ignorado justo al abrir'); return; } const b=e.target.closest('.pm-menu [data-mi]'); if(b){ if(PM.mac) macActivate(b); else pmActivate(b.dataset.mi); return; } if(!e.target.closest('.pm-menu')) closeMenu(); }); // a mouse, or a tap that touchend let through
+pmEl.addEventListener('click', e=>{ if(!PM) return; if(ghostClick(e)){ log('warn','Clic en el menú ignorado justo al abrir'); return; } const b=e.target.closest('.pm-menu [data-mi]'); if(b){ if(PM.mac) macActivate(b); else pmActivate(b.dataset.mi); return; } if(!inMenuPath(e)) closeMenu(); }); // a mouse, or a tap that touchend let through
+// A click inside a menu or popover whose handler redrew part of it (a calendar day) has a detached target: the path taken at dispatch still knows it came from inside
+function inMenuPath(e){ if(e.target.isConnected) return !!e.target.closest('.pm-menu'); return (e.composedPath?e.composedPath():[]).some(n=>n.classList&&n.classList.contains('pm-menu')); }
 addEventListener('resize', ()=>{ if(PM) closeMenu(true); });
 /* ---------- R17: macOS menus and popovers (desktop) ----------
    popMenu's spec drawn as a Mac menu: at the pointer (x, y: a right click) or under its control (anchor), 13 px, no lift and no dimming.

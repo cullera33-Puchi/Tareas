@@ -247,6 +247,8 @@ Orden acordado con Enric: primero Siri y el Atajo de iOS (decisión pendiente 1)
 
 M7, condición de Enric: **sin ningún coste**. Se descartan los servicios de pago. Vía propuesta: transcripción en el propio dispositivo con un modelo Whisper que se ejecuta en el navegador (gratis y sin que el audio salga del equipo, lo que además encaja con la política de datos de clientes), primero en el ordenador y en el iPhone si el rendimiento lo permite; la descarga del modelo pesa entre 40 y 250 MB según la calidad. Se diseña con Enric antes de construir.
 
+**Límite de alcance y posible evolución (Enric, 2 de noviembre).** Tareas sigue siendo un gestor personal: la fase 2 se limita a Enric y a las personas que trabajan con él, compartiendo tareas concretas, no a gestionar un proyecto completo con un equipo. Queda anotada para más adelante la idea de una evolución de esta app, o de una app distinta solo para gestión de proyectos (equipo, actividades del proyecto, seguimiento), que reutilice lo ya construido: modelo de datos, sincronización con Supabase, notificaciones, adjuntos, calendario de escritorio y el diseño iOS y Mac. No se mezcla con el roadmap actual.
+
 ---
 
 # Gestor de tareas personal. Diseño funcional v1

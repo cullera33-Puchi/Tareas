@@ -76,6 +76,8 @@ function syncAbsent(missing, table, error){ if(!SYNC_LATE[table]||!error) return
   if(!/42P01|PGRST20[0-9]|does not exist|could not find the table|schema cache/i.test(m)) return false;
   if(!missing.has(table)){ missing.add(table); log('warn','La base de datos no tiene todavía la tabla '+table+': falta '+SYNC_LATE[table][0]+'. '+SYNC_LATE[table][1]); } return true; }
 const syncMissing = table => !!(SY&&SY.remote&&SY.remote.missing&&SY.remote.missing.has(table));
+// The columns this version syncs, per table: a change makes the next run pull that table whole (see syncRun)
+const syncFieldsSig = () => Object.fromEntries(SYNC_TABLES.map(({table})=>[table, (SYNC_FIELDS[table]||[]).map(f=>f[1]).join(',')]));
 function syncState(){ let s=null; try{ s=JSON.parse(localStorage.getItem(SYNC_KEY)||'null'); }catch(e){}
   if(!s||typeof s!=='object') s={}; ['known','cursor','del'].forEach(k=>{ if(!s[k]||typeof s[k]!=='object') s[k]={}; });
   SYNC_TABLES.forEach(({table})=>{ s.known[table]=s.known[table]||{}; s.del[table]=s.del[table]||{}; }); return s; }
@@ -274,12 +276,16 @@ function syncRun(reason){
       try{ flushEdits(); await BK.put(todayStr()); await refreshBackups(); log('info','Copia local antes de la primera sincronización', {tasks:DB.tasks.length, projects:DB.projects.length}); }
       catch(e){ log('warn','Copia local antes de sincronizar no disponible: '+(e&&e.message||e)); }
       st=syncState(); st.firstFor=user.id; st.known={}; st.cursor={}; st.del={}; syncWrite(st); st=syncState(); }
+    // A device that pulled rows with an older version kept only the columns it knew (focus, repeat, deadline...) and its cursor moved past
+    // them: when this version syncs more columns of a table than the last run did, that table is pulled whole once, so the new columns arrive
+    const fsig=syncFieldsSig(); if(!first){ const old=st.fields||{}, again=Object.keys(fsig).filter(t=>old[t]!==fsig[t]&&st.cursor[t]);
+      if(again.length){ again.forEach(t=>{ delete st.cursor[t]; }); syncWrite(st); st=syncState(); log('info','Sincronización completa por campos nuevos', {tablas:again}); } }
     const pulled=await syncPull(first?null:st.cursor);
     if(!SY.user || SY.user.id!==user.id) return false; // signed out meanwhile
     const pool=first?(pulled.spaces||[]).filter(r=>!r.deleted).map(r=>syncFromRow('spaces', r)):null;
     const a=syncApply(pulled, {cursor:true, pool});
     const p=await syncPush(syncCollect(false));
-    st=syncState(); if(first){ st.owner=user.id; log('info','Primera conexión completada', {spaces:DB.spaces.length, projects:DB.projects.length, tasks:DB.tasks.length, remaps:a.remaps.length}); }
+    st=syncState(); st.fields=fsig; if(first){ st.owner=user.id; log('info','Primera conexión completada', {spaces:DB.spaces.length, projects:DB.projects.length, tasks:DB.tasks.length, remaps:a.remaps.length}); }
     st.lastSync=new Date().toISOString(); syncWrite(st); SY.lastSync=st.lastSync; SY.retry=0;
     log('info','Sincronización ('+reason+')', {recibidas:a.added+a.updated, eliminadas:a.removed, conflictos:a.conflicts.length, enviadas:p.pushed, borradas:p.deleted, mantenidas:p.kept, ms:Date.now()-t0});
     return true; };

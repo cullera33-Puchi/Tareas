@@ -1,5 +1,10 @@
 # Registro de cambios
 
+## v0.27.1. Tareas de «Ahora» que no llegaban al ordenador (3 de noviembre de 2026)
+
+- Un dispositivo que sincronizó con una versión antigua (en el ordenador, la v0.21.0 esta mañana) recibió las tareas sin los datos que esa versión no conocía, como «Ahora», y ya no volvía a pedirlas. Ahora, cuando una versión sincroniza datos nuevos, vuelve a pedir una vez todas las filas de esa tabla y los recupera, sin enviar nada de vuelta.
+- Prueba nueva `rm-RP`.
+
 ## v0.27.0. Resumen de estado para compartir (3 de noviembre de 2026)
 
 - «Compartir estado» en el menú de cada proyecto (pantalla del proyecto, pulsación larga en Proyectos y clic derecho en la barra lateral) y «Compartir estado de la semana» en el menú de tres puntos de Tareas, para todos los proyectos del espacio.

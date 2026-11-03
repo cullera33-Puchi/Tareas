@@ -115,7 +115,8 @@ async function cards(browser){
   c = await col(page);
   check('c_fit', c.total===34 && c.cards.length>3 && c.cards.length<34 && c.all==='Ver todas (34)' && c.lastBottom<=c.listBottom, c);
   const fewer = c.cards.length;
-  await page.setViewportSize({width:1440, height:1300}); await until(page, async()=>true); await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
+  await page.setViewportSize({width:1440, height:1300}); // the resize handler refits on the next frame; on a slow runner that can take a while
+  for(let t0=Date.now(); Date.now()-t0<5000; await sleep(100)){ c = await col(page); if(c.cards.length>fewer) break; } await calm(page);
   c = await col(page); check('c_fit_resize', c.cards.length>fewer && c.lastBottom<=c.listBottom, {now:c.cards.length, before:fewer});
   await page.setViewportSize({width:1440, height:900}); await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
   c = await col(page); check('c_fit_back', c.cards.length===fewer, {now:c.cards.length, fewer});

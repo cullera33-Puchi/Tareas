@@ -1,5 +1,9 @@
 # Registro de cambios
 
+## v0.28.2. Personas por confirmar legibles en el ordenador (3 de noviembre de 2026)
+
+- En las filas del escritorio, la etiqueta «Esperando a» se ve entera; si falta sitio, se acorta el título de la tarea.
+
 ## v0.28.1. «Hoy» como día de revisión en «Por confirmar» (3 de noviembre de 2026)
 
 - Al pasar una tarea a «Por confirmar», los días de revisión empiezan por «Hoy»: la tarea queda esperando a la persona, pero se mantiene en «Revisar hoy», arriba de la lista, para cerrarla en el día. Una tarea de hoy sigue proponiendo «Mañana» por defecto.

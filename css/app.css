@@ -1174,7 +1174,7 @@ body.resizing,body.resizing *{cursor:col-resize !important;-webkit-user-select:n
 .app.desktop .rc-date.review{color:var(--orange);font-weight:500;}
 .app.desktop .row-text:has(.wtag){display:flex;align-items:center;gap:8px;}
 .app.desktop .row-text:has(.wtag) .row-title{flex:0 1 auto;min-width:0;}
-.wtag{flex:0 1 auto;min-width:0;max-width:40%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:var(--ink2);background:var(--fill);border-radius:5px;padding:1px 6px;}
+.wtag{flex:0 0 auto;min-width:0;max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:var(--ink2);background:var(--fill);border-radius:5px;padding:1px 6px;}
 .wtag::before{content:"Esperando a ";}
 .wsheet{display:flex;flex-direction:column;gap:8px;}
 .wsheet .wlbl{font-size:0.765rem;color:var(--ink2);margin-top:4px;}

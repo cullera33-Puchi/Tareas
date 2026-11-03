@@ -240,6 +240,7 @@ const realClock = page => page.evaluate(()=>{ if(window.__RD) window.Date=window
   await page.evaluate(()=>{ DB.settings.filter='hoy'; DB.settings.hoyGroup='project'; save(); render(); }); await page.waitForTimeout(300); await page.screenshot({path:OUT+'/c-dark-hoy-proyecto.png'});
   await page.evaluate(()=>{ DB.settings.hoyGroup='date'; save(); render(); }); await at1930(page); await page.tap(HOY+' [data-act=closeDay]'); await page.waitForTimeout(400); await page.screenshot({path:OUT+'/c-dark-cerrar.png'});
   await page.evaluate(()=>closeSheet()); await page.waitForTimeout(300); await realClock(page);
+  await page.evaluate(H=>document.querySelector(H+' [data-act=review]').scrollIntoView({block:'center'}), HOY); // decision 52: Cerrar el día is the cell at the foot, so the list was scrolled down
   await page.tap(HOY+' [data-act=review]'); await page.waitForTimeout(400); await page.screenshot({path:OUT+'/c-dark-repasar.png'});
   r.errors_dark=errors.slice(); await ctx.close();
 

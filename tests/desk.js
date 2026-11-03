@@ -19,7 +19,8 @@ const srv = http.createServer((req,res)=>{ let p = decodeURIComponent(req.url.sp
   await page.keyboard.press('n'); r.addbarFocused = await page.evaluate(()=>document.activeElement&&document.activeElement.dataset.role==='addbar');
   await page.keyboard.type('Preparar comité viernes'); await page.keyboard.press('Enter'); await page.waitForTimeout(300);
   r.added = await page.evaluate(()=>{ const x=DB.tasks.find(t=>t.title==='Preparar comité'); return x?{date:x.date===nextWeekday(5,true)?'friday':x.date}:null; });
-  // Detail pane
+  // Detail pane. The open add bar (decision 31) lies over the top of the list, which the day summary line used to push down (decision 52): Esc folds it first
+  await page.keyboard.press('Escape'); await page.waitForFunction(()=>!document.querySelector('#desk .addx.open'));
   await page.click('#desk .group .row .row-title'); await page.waitForTimeout(300);
   r.pane = await page.evaluate(()=>({has:document.querySelector('#app').classList.contains('has-pane'), title:(document.querySelector('.pane [data-role=title]')||{}).value, close:(document.querySelector('.pane .back')||{}).textContent}));
   await page.screenshot({path:OUT+'/d2-pane.png'});

@@ -1,5 +1,13 @@
 # Registro de cambios
 
+## v0.25.1. «Revisar hoy» y «Por confirmar más adelante» (3 de noviembre de 2026)
+
+- En Hoy, las tareas por confirmar cuyo día de revisión ha llegado (o con la entrega hoy) van en un grupo propio «Revisar hoy» al principio de la lista, con «Esperando a» en cada fila. Siguen contando en «para hoy».
+- El bloque de abajo pasa a llamarse «Por confirmar más adelante» y solo lleva las que aún no toca revisar, con su día. El enlace «Mostrar las que esperan» u «Ocultar las que esperan» lo pliega.
+- En Todas y en la pantalla de cada proyecto, el bloque «Por confirmar» reúne todas las tareas por confirmar, primero las de hoy; ya no se repiten en los grupos de días. El contador de Todas deja de contarlas.
+- En el escritorio, igual en la columna; el grupo «Revisar hoy» no acepta tareas arrastradas.
+- Prueba nueva `rm-RH`.
+
 ## v0.25.0. Fecha límite y «Volver a pendiente» más a mano (2 de noviembre de 2026)
 
 - Fecha límite aparte de la fecha de trabajo, en el detalle, el inspector, la pulsación larga y el clic derecho. En la fila se lee «Entrega jueves»: en gris, en naranja desde 2 días antes y en rojo el día de entrega y después. En las tarjetas del calendario, una banderita del mismo color.

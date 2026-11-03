@@ -1,5 +1,12 @@
 # Registro de cambios
 
+## v0.29.0. Escritorio: lista a todo el ancho, columnas ajustables y notas al lado (3 de noviembre de 2026)
+
+- Las listas del ordenador ocupan todo el ancho de la ventana; el título se queda con el espacio libre, en una línea, con el título completo al pasar el ratón.
+- Cabecera de columnas (Proyecto, Tarea, Fecha, Entrega, Recordatorio, Tiempo): cada separador se arrastra para cambiar el ancho; doble clic lo devuelve al de origen. Los anchos se guardan en ese ordenador.
+- Dentro de un proyecto, con la ventana ancha, columna «Notas» a la derecha con las notas como post-it: las que caben y «Ver todas», una tarjeta para escribir una nota nueva con Intro, edición en el sitio, casillas que se marcan con un clic y menú con el botón derecho. Se pliega y se oculta al abrir el detalle de una tarea.
+- Pruebas nuevas `rm-COL` y `rm-PIT`.
+
 ## v0.28.2. Personas por confirmar legibles en el ordenador (3 de noviembre de 2026)
 
 - En las filas del escritorio, la etiqueta «Esperando a» se ve entera; si falta sitio, se acorta el título de la tarea.

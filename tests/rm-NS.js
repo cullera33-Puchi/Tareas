@@ -95,7 +95,7 @@ async function iphone(browser, h, m, theme){
   if(theme){ await ctx.close(); return; }
   // The view menu: no summary option
   await page.tap('.screen.root[data-root=tareas] .nav .vopts'); await until(page, ()=>menuOpen()); x = await menuLabels(page);
-  check(tag+'_view_menu', x.length===4 && !x.some(l=>/resumen/i.test(l)), x); await ev(page, ()=>closeMenu()); await until(page, ()=>!menuOpen()); await sleep(500);
+  check(tag+'_view_menu', x.length===5 && /^Compartir estado de la semana/.test(x[4]) && !x.some(l=>/resumen/i.test(l)), x); // M4: Compartir estado de la semana last await ev(page, ()=>closeMenu()); await until(page, ()=>!menuOpen()); await sleep(500);
   // Repasar still opens the review of the carried tasks, one by one
   await ev(page, L=>document.querySelector(L+' [data-act=review]').scrollIntoView({block:'center'}), L); await page.tap(L+' [data-act=review]');
   check(tag+'_repasar', await until(page, ()=>sheet.classList.contains('on') && /Llamar a Luis/.test((document.querySelector('#sheet .plan-title')||{}).textContent||'')));
@@ -119,7 +119,7 @@ async function desktop(browser, h, m, theme){
   check(tag+'_ahora_after_addbar', await ev(page, ()=>{ const a=document.querySelector('#desk .main .ahora'); return !!a && a.previousElementSibling && a.previousElementSibling.matches('.addbar,.addwrap,form,div') && !a.nextElementSibling.matches('.summary'); }));
   await sleep(2000); /* for the picture only: a fade of the first paint settles */ await shot(page, 'd-hoy-'+(h>=19?'1930':'1000')+'-'+(theme||'light'));
   if(!theme && h<19){ await page.click('#desk .mhead .mopts'); await until(page, ()=>menuOpen()); x = await menuLabels(page);
-    check(tag+'_view_menu', x.length===4 && !x.some(l=>/resumen/i.test(l)), x); await ev(page, ()=>closeMenu()); }
+    check(tag+'_view_menu', x.length===5 && /^Compartir estado de la semana/.test(x[4]) && !x.some(l=>/resumen/i.test(l)), x); // M4: Compartir estado de la semana last await ev(page, ()=>closeMenu()); }
   if(h>=19){ await page.click('#desk .closecell'); check(tag+'_close_sheet', await until(page, ()=>sheet.classList.contains('on') && (document.querySelector('#sheet h2')||{}).textContent==='Cerrar el día')); }
   await ctx.close();
 }

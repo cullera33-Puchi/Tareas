@@ -57,7 +57,7 @@ function onClick(e){
   const od=e.target.closest('[data-open-day]'); if(od){ openCalDay(od.dataset.openDay); return; }
   const mn=e.target.closest('[data-mini]'); if(mn){ openCalWeek(mn.dataset.mini); return; } // the sidebar's mini month
   const mc=e.target.closest('.minical [data-cal]'); if(mc){ UI.miniYM=shiftMonth(UI.miniYM||calAnchor().slice(0,7), +mc.dataset.cal); render(); return; }
-  const wa=e.target.closest('[data-add-date]'); if(wa){ addSheet(wa.dataset.project||null,'',{date:wa.dataset.addDate}); return; } // R14: a day header in a project adds to that project
+  const wa=e.target.closest('[data-add-date]'); if(wa){ addSheet(wa.dataset.project!==undefined?wa.dataset.project||null:(UI.query?null:filterProject()),'',{date:wa.dataset.addDate}); return; } // R14: a day header in a project adds to that project; elsewhere, to the project of the active filter
   const es=e.target.closest('[data-edit-space]'); if(es){ spaceSheet(es.dataset.editSpace); return; }
   const bka=e.target.closest('[data-bkact]'); if(bka){ const r=bka.closest('[data-bk]'); if(r){ closeVn(r); deleteBackup(r.dataset.bk); } return; } // decision 34
   const bkr=e.target.closest('.vn[data-bk]'); if(bkr&&bkr.dataset.open){ closeVn(bkr); return; } // a row showing Eliminar: a tap closes it

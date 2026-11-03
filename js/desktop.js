@@ -188,8 +188,8 @@ function deskSide(){
 }
 function addBarHTML(projectId){ return '<div class="addx'+(AX.open?' open':'')+'"><div class="addbar">'+I.plus+qinHTML('<input type="text" placeholder="Nueva tarea… mañana, a las 9, !! o #proyecto" data-role="addbar"'+(projectId?' data-project="'+projectId+'"':'')+' value="'+esc(UI.addDraft||'')+'" autocomplete="off" spellcheck="false">')+'<span class="kbd">N</span></div>'+(AX.open?addxPanelHTML(projectId):'<div class="addhint" id="deskSaid"></div>')+'</div>'+pasteBoxHTML(projectId); } // decision 31: open, the composer under the bar
 // The desktop add bar starts from today in Hoy and from the project in a project view; the title can say otherwise (R7)
-// Decision 27b: in Hoy it also takes the project of the active project filter (the list ignores the filter during a search, so does the bar)
-function deskAddBase(projectId){ const hoy=UI.deskView==='hoy', pf=hoy&&!projectId&&!UI.query?filterProject():null;
+// Decision 27b: in Hoy and Todas it also takes the project of the active project filter (the list ignores the filter during a search, so does the bar)
+function deskAddBase(projectId){ const hoy=UI.deskView==='hoy', pf=(hoy||UI.deskView==='todas')&&!projectId&&!UI.query?filterProject():null;
   return {date:hoy?todayStr():null, projectId:projectId||pf, priority:'none'}; }
 // R6: a list pasted into the desktop add bar waits under it until it is created or dropped
 function pasteBoxHTML(projectId){ const ls=UI.addPaste; if(!ls||!ls.length) return ''; const b=deskAddBase(projectId); const n=ls.length+' '+(ls.length===1?'tarea':'tareas');

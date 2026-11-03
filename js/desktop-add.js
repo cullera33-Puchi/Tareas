@@ -231,7 +231,7 @@ function bindDeskEvents(d){
   d.addEventListener('focusin', e=>{ const r=e.target; if(!r.classList||!r.classList.contains('row')||r.closest('.first')||deskMulti()||UI.dsel.cur===r.dataset.id||!r.matches(':focus-visible')) return; UI.dsel.cur=r.dataset.id; if(UI.deskDetail){ UI.deskDetail=r.dataset.id; deskSelPane(); } else paintSel(); });
   // Double click on an empty part of a month day adds a task with that date (a past day cannot take one)
   d.addEventListener('dblclick', e=>{ const md=e.target.closest('.mday'); if(!md||e.target.closest('.wcard,button')) return; const day=md.dataset.day;
-    if(day<todayStr()){ toast('No se puede añadir a un día pasado'); return; } addSheet(null,'',{date:day}); });
+    if(day<todayStr()){ toast('No se puede añadir a un día pasado'); return; } addSheet(UI.query?null:filterProject(),'',{date:day}); }); // with a project filter, in that project
   // Week cards open the detail on click
   // R17: in a popover beside the card; a click on the card whose popover that same press closed leaves it closed (a toggle)
   d.addEventListener('click', e=>{ const sh=d._popShut; d._popShut=null; const c=e.target.closest('.wcard'); if(!c||e.target.closest('[data-act]')) return;

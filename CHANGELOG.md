@@ -1,5 +1,12 @@
 # Registro de cambios
 
+## v0.29.2. Nueva tarea con el proyecto del filtro (3 de noviembre de 2026)
+
+- Con un filtro de proyecto activo, Nueva tarea propone ese proyecto también en Todas (antes solo en Hoy), en iPhone y ordenador.
+- Lo mismo con el + de la cabecera de cada día en una lista filtrada y con el doble clic en un día del Mes.
+- Dentro de la pantalla de un proyecto ya se proponía su proyecto; no cambia. Una búsqueda no propone nada.
+- Prueba nueva `rm-PF`.
+
 ## v0.29.1. Notas de proyecto sin duplicar en el ordenador (3 de noviembre de 2026)
 
 - Con la columna de notas a la vista, desaparece el segmento Tareas y Notas de la cabecera del proyecto: la columna es el acceso a las notas.

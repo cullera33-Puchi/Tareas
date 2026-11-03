@@ -167,10 +167,10 @@ function sheadHTML(title, cancel, ok){ return '<div class="shead"><button class=
    Pasting two or more lines (R6) turns the sheet into a list that Añadir creates in one go. A long press on Añadir adds and opens. */
 // The project of the active project filter, if it still exists ('none', Sin proyecto, gives no project)
 const filterProject = () => { const f=UI.projFilter; return f&&f!=='none'&&activeProjects().some(p=>p.id===f)?f:null; };
-/* Decision 27b: on the iPhone, the + and Añadir tarea of the Tareas list showing Hoy (not a search) propose today and the project of the
-   active filter, as removable tokens; Todas proposes nothing */
+/* Decision 27b: on the iPhone, the + and Añadir tarea of the Tareas list propose the project of the active filter, as a removable token,
+   and in Hoy also today (v0.29.2: Todas proposes the filter's project too); a search proposes nothing */
 function addFromList(){ const hoy=UI.wide?UI.deskView==='hoy':UI.tab==='tareas'&&DB.settings.filter==='hoy';
-  if(!hoy||UI.query){ addSheet(null); return; } addSheet(filterProject(), '', {date:todayStr()}); }
+  if(UI.query){ addSheet(null); return; } addSheet(filterProject(), '', hoy?{date:todayStr()}:{}); }
 function addSheet(projectId){
   const prefill=arguments[1]||'', preset=arguments[2]||{};
   const st={date:preset.date||null, projectId:projectId||null, priority:'none', estimate:null, open:null, ym:null, lines:null, added:0, msg:'', warn:false};

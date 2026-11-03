@@ -142,11 +142,43 @@ function pushNote(x){ if(!x||!x.reminder||x.status==='done') return ''; const de
     signedOut:'Inicia sesión en Ajustes para que el recordatorio avise.', denied:'Sin permiso de notificaciones: el recordatorio no avisará en '+dev+'.', off:'Activa las notificaciones en Ajustes para que el recordatorio avise.'}[pushStatus()]||''; }
 
 /* ---------- A tap on a notification ---------- */
-function openTaskFromPush(id, how){ if(!id) return; log('info','Notificación abierta', {how}); hiddenAt=0; // a tap on a notification is no return after hours away
-  const go=()=>{ if(!task(id)) return false; closeSheet(); closeMenu(true); if(UI.select) endSelect();
-    if(detailTaskId()===id){ render(); return true; }
-    if(UI.wide && UI.deskView==='settings') setDeskView('hoy');
-    openDetail(id); return true; };
+// snz: the minutes of a desktop notification's action (10 or 60, sw.js), applied here with Deshacer since the service worker has no localStorage.
+// A plain tap opens the task with the bar Posponer recordatorio (decision 55), until a choice or until the task is left
+function openTaskFromPush(id, how, snz){ if(!id) return; log('info','Notificación abierta', Object.assign({how}, snz?{posponer:snz}:{})); hiddenAt=0; // a tap on a notification is no return after hours away
+  const go=()=>{ const x=task(id); if(!x) return false; closeSheet(); closeMenu(true); if(UI.select) endSelect();
+    const bar=!snz&&!!x.reminder&&isOpen(x);
+    if(detailTaskId()===id){ UI.snooze=bar?id:null; render(); }
+    else { if(UI.wide && UI.deskView==='settings') setDeskView('hoy'); openDetail(id, {snooze:bar}); }
+    if(snz) snoozeFromPush(id, snz); return true; };
   if(go()) return;
   // Made on another device and not here yet: after a sync
   if(SY&&SY.user) syncRun('notificación').then(()=>{ if(!go()) toast('La tarea ya no existe'); }); else toast('La tarea ya no existe'); }
+
+/* ---------- Decision 55: Posponer recordatorio ----------
+   One tap moves the reminder to 10 minutos, 1 hora, Esta tarde a las 17:00 (until 16:30) or Mañana a las 9:00 from now; Elegir opens the
+   Recordatorio picker. It rewrites reminder and empties reminderSent, so send-reminders notifies again at the new time; Deshacer puts both
+   back. The task's date never changes, as in the Recordatorio picker, where a reminder may fall on another day than the task.
+   From the bar of a task opened from its notification (snoozeBarHTML), the row menu (iPhone) and the task menu (desktop), and the actions
+   10 min and 1 h of a desktop notification (sw.js, ?snooze=) */
+const SNOOZE_LATE=16*60+30; // from 16:30, Esta tarde a las 17:00 is not offered
+const snoozeIn = m => new Date(Math.floor((Date.now()+m*6e4)/6e4)*6e4).toISOString(); // m minutes from now, on the minute
+function snoozeOpts(){ const n=new Date(), o=[['10','10 minutos',snoozeIn(10)],['60','1 hora',snoozeIn(60)]];
+  if(n.getHours()*60+n.getMinutes()<SNOOZE_LATE){ const e=new Date(); e.setHours(17,0,0,0); o.push(['pm','Esta tarde a las 17:00',e.toISOString()]); }
+  const tm=new Date(); tm.setDate(tm.getDate()+1); tm.setHours(9,0,0,0); o.push(['tm','Mañana a las 9:00',tm.toISOString()]); return o; }
+const canSnooze = x => !!x && !!x.reminder && isOpen(x);
+const remWords = iso => { const d=localDay(iso), t=todayStr(); return (d===t?'':d===addDays(t,1)?'mañana ':fmtDate(d).toLowerCase()+' ')+'a las '+fmtTime(iso); }; // "a las 10:20", "mañana a las 09:00"
+function snoozeReminder(id, iso, how){ const x=task(id); if(!canSnooze(x)||!iso) return false; const old={reminder:x.reminder||null, reminderSent:x.reminderSent||null};
+  releaseHold(id); UI.snooze=null; updTask(id, {reminder:iso, reminderSent:null}); haptic(6); render();
+  log('info','Recordatorio pospuesto', {how, de:fmtDateTime(old.reminder), a:fmtDateTime(iso)});
+  toast('Recordatorio '+remWords(iso), ()=>{ updTask(id, old); log('info','Recordatorio pospuesto deshecho'); }); return true; }
+function snoozeFromPush(id, snz){ const m=Math.round(+snz); if(!(m>0&&m<=1440)) return; if(!snoozeReminder(id, snoozeIn(m), 'aviso, '+m+' min')) log('warn','Posponer desde el aviso: la tarea no tiene recordatorio'); }
+// A choice of the bar: an option, or Elegir (the picker anchored to the chip on the desktop)
+function snoozePick(id, key, src){ if(key==='pick'){ UI.snooze=null; reminderSheet(id, UI.wide?src:undefined); return; } // the bar goes with the redraw once the picker saves
+  const o=snoozeOpts().find(q=>q[0]===key); if(o) snoozeReminder(id, o[2], o[1]); }
+// The submenu Posponer recordatorio of the row menu (iPhone) and of the task menu (desktop)
+function snoozeMenu(id){ const x=task(id); if(!canSnooze(x)) return null;
+  return {title:'Posponer recordatorio', groups:[snoozeOpts().map(o=>({label:o[1], icon:MI.bell, fn:()=>snoozeReminder(id, o[2], o[1])})), [{label:UI.wide?'Elegir…':'Elegir', icon:MI.calPick, fn:()=>reminderSheet(id)}]]}; }
+// The bar on top of the detail and the inspector of a task opened from its notification; leaving the task (pop, another one) drops it
+function snoozeBarHTML(x){ if(UI.snooze&&(UI.snooze!==x.id||detailTaskId()!==x.id)) UI.snooze=null; if(!UI.snooze||!canSnooze(x)) return '';
+  return '<div class="snzbar" role="group" aria-label="Posponer recordatorio"><div class="snzh">'+I.bell+'<b>Posponer recordatorio</b><span class="snzt">'+esc(fmtDateTime(x.reminder))+'</span></div><div class="chips">'+
+    snoozeOpts().map(o=>'<button class="chip" data-act="snooze" data-snz="'+o[0]+'">'+o[1]+'</button>').join('')+'<button class="chip" data-act="snooze" data-snz="pick">Elegir…</button></div></div>'; }

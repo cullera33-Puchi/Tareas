@@ -83,7 +83,7 @@ function axSubmit(projectId){ const ab=axBar(), r=addxTask(ab?ab.value:UI.addDra
   axStopVoice(); log('info','Tarea añadida desde el alta ampliada', {notas:!!x.notes, recordatorio:!!x.reminder});
   // Ready for the next one: the date and project chosen by hand stay, the rest starts again
   Object.assign(AX, {notes:'', priority:undefined, estimate:undefined, time:null}); UI.addDraft=''; if(ab) ab.value=''; document.querySelectorAll('#desk .axp textarea').forEach(t=>{ t.value=''; }); // a merge keeps a typed field's value
-  haptic(6); renderAnimated(); toast('Añadida: '+x.title); axFocus(); if(x.reminder) pushOfferSoon(); return true; }
+  haptic(6); renderAnimated(); toast((UI.deskView==='hoy'&&forTomorrow([x.date])?'Añadida para mañana: ':'Añadida: ')+x.title); /* the evening rule: not in the list */ axFocus(); if(x.reminder) pushOfferSoon(); return true; }
 // Decision 49: dictation writes into Notas, after what is there. The browser's recognizer where it exists (Chrome, Edge, Safari)
 const axSR = () => window.SpeechRecognition||window.webkitSpeechRecognition||null;
 const axNotesEl = () => $('#desk [data-role=addnotes]');

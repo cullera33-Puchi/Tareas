@@ -129,9 +129,11 @@ async function openRowSwipe(page, id){ await page.evaluate(s=>document.querySele
   await page.evaluate(()=>pop()); await page.waitForTimeout(700);
   // Añadir tarea in an empty Hoy (Personal has nothing)
   await page.evaluate(()=>{ DB.settings.activeSpace='personal'; resetListState(); save(); render(); }); await page.waitForTimeout(400);
-  const hasLink = await page.$('.screen.root:not(.hidden-tab) .btn-link[data-act=add]');
-  if(hasLink){ await tapSel(page, '.screen.root:not(.hidden-tab) .btn-link[data-act=add]'); await page.waitForTimeout(700); }
-  as = await addState(); check('b_link_empty_hoy', !!hasLink && as.toks.join('|')==='date:Hoy', as); await closeSheetNow(page);
+  // Owner, 3 November: the empty Hoy is one line without links; the + proposes today (tomorrow from 18:30, the evening rule)
+  const hasLink = await page.$('.screen.root:not(.hidden-tab) .fab[data-act=add]'), noLink = !(await page.$('.screen.root:not(.hidden-tab) .btn-link[data-act=add]'));
+  if(hasLink){ await tapSel(page, '.screen.root:not(.hidden-tab) .fab[data-act=add]'); await page.waitForTimeout(700); }
+  const want = await page.evaluate(()=>'date:'+fmtDate(hoyAddDate()));
+  as = await addState(); check('b_link_empty_hoy', !!hasLink && noLink && as.toks.join('|')===want, {as, want}); await closeSheetNow(page);
   await page.evaluate(()=>{ DB.settings.activeSpace='trabajo'; resetListState(); save(); render(); }); await page.waitForTimeout(400);
 
   // ---- (d) the row's gray line ----

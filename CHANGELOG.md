@@ -1,5 +1,15 @@
 # Registro de cambios
 
+## v0.30.0. Carga en horas, tareas olvidadas, posponer recordatorios y cerrar el día (3 de noviembre de 2026)
+
+- Carga del día en horas: Hoy suma el tiempo estimado de lo que muestra («5 h 45»), en gris, naranja desde las horas de trabajo y rojo desde 1,5 veces. Las horas de trabajo se ajustan por espacio en Ajustes (6 h de inicio). En Semana y Día, la barra de carga mide horas.
+- Tareas olvidadas: las tareas sin fecha que llevan 30 días sin cambios se repasan con «Repasar N olvidadas» en Sin fecha: darles fecha, completarlas o eliminarlas, con Deshacer.
+- Posponer recordatorio: 10 minutos, 1 hora, esta tarde a las 17:00 (hasta las 16:30), mañana a las 9:00 o elegir, con Deshacer. En una barra al abrir la tarea desde el aviso y en el menú de la tarea; en el ordenador, también con botones en el propio aviso cuando el navegador lo permite.
+- Desde las 18:30, las tareas nuevas de Hoy se proponen para mañana y aparece «Cerrar el día».
+- Cerrar el día deja el día cerrado en todos los dispositivos: Hoy pasa a mostrar las tareas de mañana, con «Reabrir hoy». A medianoche vuelve solo.
+- Hoy sin tareas: una sola línea, «Todo hecho por hoy, N completadas», sin icono ni enlaces.
+- Supabase: columna `closed_day` en `spaces` (`0009_closed_day.sql`), ya aplicada. Prueba nueva `rm-LH`.
+
 ## v0.29.3. Iconos de las filas alineados en el ordenador (3 de noviembre de 2026)
 
 - La estrella de «Ahora», el icono de notas, el clip y el de repetición tienen cada uno su propia columna fija en las filas del ordenador: ya no se desplazan según los demás iconos de la fila. Una columna que ninguna fila usa no ocupa sitio.

@@ -26,8 +26,10 @@ async function open(browser, opts){
     addTask({id:'tB', title:'Aplazada de ayer', date:t, carried:true, projectId:q.id});
     addTask({id:'tE', title:'Madrugón', date:t, reminder:at(t,6,0)});
     addTask({id:'tC', title:'Tarea del jueves', date:addDays(t,1)});
-    for(let i=0;i<10;i++) addTask({id:'fri'+i, title:'Viernes '+i, date:addDays(t,2)});
-    for(let i=0;i<25;i++) addTask({id:'sat'+i, title:'Sábado cargado número '+i+' con un título bastante largo', date:addDays(t,3), priority:i<3?'high':'none', projectId:i%2?p.id:null});
+    // Decision 60a: the load bar measures estimated hours (6 h of work by default): today 1 h 30, Friday 6 h 20 (orange), Saturday 12 h 30 (red)
+    task('tA').estimate=60; task('tF').estimate=30;
+    for(let i=0;i<10;i++) addTask({id:'fri'+i, title:'Viernes '+i, date:addDays(t,2), estimate:i<8?30:i===8?60:80});
+    for(let i=0;i<25;i++) addTask({id:'sat'+i, title:'Sábado cargado número '+i+' con un título bastante largo', date:addDays(t,3), priority:i<3?'high':'none', projectId:i%2?p.id:null, estimate:30});
     for(let i=0;i<45;i++) addTask({id:'u'+i, title:'Sin fecha '+i});
     const d=addTask({id:'tD', title:'Hecha ayer', date:addDays(t,-1)}); d.status='done'; d.completed=new Date(Date.now()-864e5).toISOString();
     save(); setDeskView('week'); });
@@ -57,9 +59,11 @@ const clickItem = (page, label) => page.evaluate(l=>{ const b=[...document.query
   check('R12_next7Default', r.wk.days.length===7 && r.wk.days[0]===r.wk.today && r.wk.first && r.wk.h2==='Semana del 4 al 10 de noviembre' && r.wk.mode==='Siete días desde hoy', r.wk);
   check('R12_columnFillsNoPageScroll', r.wk.mbody.sh<=r.wk.mbody.ch+1, r.wk.mbody);
   // Headers: count, high-priority count, load bar (orange above 8, red above 12)
-  r.heads = await page.evaluate(()=>[...document.querySelectorAll('#desk .wday')].slice(0,4).map(d=>({wc:d.querySelector('.wc').textContent, wp:(d.querySelector('.wp')||{}).textContent||'', ld:d.querySelector('.ld').className, sc:+d.querySelector('.ld i').style.transform.replace(/[^0-9.]/g,'')})));
+  r.heads = await page.evaluate(()=>[...document.querySelectorAll('#desk .wday')].slice(0,4).map(d=>({wc:d.querySelector('.wc').textContent, wp:(d.querySelector('.wp')||{}).textContent||'', wh:(d.querySelector('.wh')||{}).textContent||'', ld:d.querySelector('.ld').className, sc:+d.querySelector('.ld i').style.transform.replace(/[^0-9.]/g,''), tip:d.querySelector('.dh').title})));
   check('R12_headCounts', r.heads[0].wc==='4 tareas' && r.heads[0].wp==='1 !!!' && r.heads[1].wc==='1 tarea' && r.heads[3].wc==='25 tareas' && r.heads[3].wp==='3 !!!', r.heads);
-  check('R12_loadBar', r.heads[0].ld==='ld' && r.heads[2].ld==='ld orange' && r.heads[3].ld==='ld red' && r.heads[3].sc===1 && Math.abs(r.heads[0].sc-4/12)<.01, r.heads);
+  // Decision 60a (replaces the bar by count): full at 9 h (half as much again as 6 h), orange from 6 h, red from 9 h; the line and the tooltip say the hours
+  check('R12_loadBar', r.heads[0].ld==='ld' && r.heads[2].ld==='ld orange' && r.heads[3].ld==='ld red' && r.heads[3].sc===1 && Math.abs(r.heads[0].sc-90/540)<.01 && r.heads[1].sc===0 && r.heads[1].wh==='', r.heads);
+  check('LH_headHours', r.heads[0].wh==='1 h 30' && r.heads[2].wh==='6 h 20' && r.heads[3].wh==='12 h 30' && r.heads[3].tip==='25 tareas, 3 prioritarias, 12 h 30 estimadas de 6 h' && r.heads[1].tip==='1 tarea', r.heads);
   // Each column scrolls on its own under its fixed header
   r.colScroll = await page.evaluate(()=>{ const d=[...document.querySelectorAll('#desk .wday')][3], wl=d.querySelector('.wl'), h0=d.querySelector('.dh').getBoundingClientRect().top; wl.scrollTop=200;
     return {ov:getComputedStyle(wl).overflowY, scrolls:wl.scrollHeight>wl.clientHeight, moved:wl.scrollTop>0, headStays:d.querySelector('.dh').getBoundingClientRect().top===h0, cards:wl.querySelectorAll('.wcard').length}; });

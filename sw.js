@@ -1,6 +1,6 @@
 /* Service worker: app shell cache and update notice.
    Bump CACHE on every release so installed devices pick up the new version. */
-const CACHE = 'tareas-v0.29.3';
+const CACHE = 'tareas-v0.30.0';
 // Every file the app loads: a missing one would leave the installed app unable to start offline (index.html lists the scripts in order)
 const SHELL = ['./', './index.html', './css/app.css',
   './js/core.js', './js/render.js', './js/events.js', './js/menus.js', './js/sheets.js', './js/attachments.js', './js/steps.js', './js/notes.js', './js/status.js', './js/suggest.js', './js/sync.js', './js/push.js', './js/lifecycle.js', './js/desktop.js', './js/desktop-calendar.js', './js/desktop-render.js', './js/desktop-add.js', './js/boot.js',
@@ -63,7 +63,9 @@ self.addEventListener('push', e => {
   try { d = e.data ? e.data.json() : {}; } catch (err) { d = { body: e.data ? e.data.text() : '' }; }
   const data = d.data && typeof d.data === 'object' ? d.data : {};
   const icon = new URL('icons/icon-192.png', self.registration.scope).href;
-  const shown = self.registration.showNotification(d.title || 'Tareas', { body: d.body || '', icon, badge: icon, tag: d.tag || data.taskId || 'tareas', data, timestamp: Date.now() });
+  // Decision 55: where the browser shows buttons on a notification (desktop browsers; iOS shows none), a reminder offers 10 min and 1 h
+  const acts = data.taskId && !data.test && self.Notification && Notification.maxActions > 0 ? { actions: [{ action: 'snooze10', title: '10 min' }, { action: 'snooze60', title: '1 h' }] } : {};
+  const shown = self.registration.showNotification(d.title || 'Tareas', Object.assign({ body: d.body || '', icon, badge: icon, tag: d.tag || data.taskId || 'tareas', data, timestamp: Date.now() }, acts));
   // The icon's count, worked out by the server when it sent the reminder (the app sets it again when it opens)
   const badged = typeof d.badge === 'number' && self.navigator && self.navigator.setAppBadge
     ? (d.badge > 0 ? self.navigator.setAppBadge(d.badge) : self.navigator.clearAppBadge()).catch(() => {}) : Promise.resolve();
@@ -76,11 +78,13 @@ self.addEventListener('push', e => {
 self.addEventListener('notificationclick', e => {
   e.notification.close();
   const data = e.notification.data || {}, id = data.taskId || null, scope = self.registration.scope;
-  const target = new URL(id ? './?task=' + encodeURIComponent(id) : './', scope).href;
+  // Decision 55: an action postpones the reminder; this worker has no localStorage, so the app does it (with Deshacer) from ?snooze= or the message
+  const snooze = id && e.action === 'snooze10' ? 10 : id && e.action === 'snooze60' ? 60 : null;
+  const target = new URL(id ? './?task=' + encodeURIComponent(id) + (snooze ? '&snooze=' + snooze : '') : './', scope).href;
   e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
     const c = list.find(w => w.url.startsWith(scope));
     if (c) {
-      if (id) c.postMessage({ type: 'openTask', taskId: id });
+      if (id) c.postMessage({ type: 'openTask', taskId: id, snooze });
       return c.focus ? c.focus().catch(() => self.clients.openWindow(target)) : self.clients.openWindow(target);
     }
     return self.clients.openWindow(target);

@@ -102,8 +102,9 @@ async function iphone(browser, h, m, theme){
   await ev(page, ()=>closeSheet()); await calm(page);
   // Hoy all done: the empty state says so (it was a line of the summary)
   await ev(page, ()=>{ ['c1','h1','d1','a1','n2'].forEach(id=>completeTask(id,true)); task('w1').status='done'; task('w1').completed=new Date().toISOString(); save(); render(); }); await calm(page);
-  x = await ev(page, L=>({b:(document.querySelector(L+' .empty b')||{}).textContent, t:(document.querySelector(L+' .empty')||{}).textContent, summary:!!document.querySelector(L+' .summary')}), L);
-  check(tag+'_all_done', x.b==='Todo hecho por hoy' && /7 tareas completadas/.test(x.t) && !x.summary, x);
+  // Owner, 3 November: one discreet line, no icon and no links
+  x = await ev(page, L=>({line:(document.querySelector(L+' .hoydone')||{}).textContent, big:!!document.querySelector(L+' .empty'), summary:!!document.querySelector(L+' .summary')}), L);
+  check(tag+'_all_done', x.line==='Todo hecho por hoy, 7 completadas' && !x.big && !x.summary, x);
   await shot(page, 'm-hoy-done');
   await ctx.close();
 }

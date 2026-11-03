@@ -57,11 +57,13 @@ function calCardHTML(x, kind, style){ const p=x.projectId?proj(x.projectId):null
     (kind==='mc'?'<span class="mdot"></span>':'<button class="check'+(done?' done':x.status==='waiting'?' waiting':'')+'" data-act="wcheck" aria-label="Completar">'+I.check+'</button>')+
     (kind==='hb'?'<span class="tm">'+tm+'</span>':'')+'<div class="t">'+(x.priority==='high'?'<span class="pri high">!!!</span>':x.priority==='mid'?'<span class="pri mid">!!</span>':'')+esc(x.title)+'</div>'+
     dl+(x.focus&&!done?'<span class="cic ist">'+I.starF+'</span>':'')+(repParse(x.repeat)?'<span class="cic irp">'+I.repeat+'</span>':'')+(stepStats(x.id)?'<span class="cic">'+stepProgHTML(x)+'</span>':'')+(tm&&kind!=='hb'?'<span class="tm">'+tm+'</span>':'')+'</div>'; } // decisions 38, 39 and 46: repeats, in Ahora, its steps
-// R12: a day's header: name and date, pending count, high-priority count and a load bar, orange above 8 tasks and red above 12
+// R12: a day's header: name and date, pending count, high-priority count and a load bar. Decision 60a: the bar measures the estimated hours
+// of the day's open tasks (its line says them too): full at half as much again as the space's working hours, orange from them, red from there
 function dayHeadHTML(d, xs){ const t=todayStr(), dd=new Date(d+'T00:00:00'), pend=xs.filter(isOpen), n=pend.length, hi=pend.filter(x=>x.priority==='high').length, dn=xs.length-n;
   const what=n?n+(n===1?' tarea':' tareas'):dn?dn+(dn===1?' hecha':' hechas'):'Sin tareas'; // a past day only has done tasks
-  return '<div class="dh" title="'+what+(hi?', '+hi+(hi===1?' prioritaria':' prioritarias'):'')+'"><div class="dt"><b>'+DIAS_FULL[dd.getDay()].slice(0,3)+'<small>'+dd.getDate()+(dd.getDate()===1?' '+MESES[dd.getMonth()]:'')+'</small></b>'+(d<t?'':'<button data-add-date="'+d+'" aria-label="Añadir" title="Añadir">'+I.plus+'</button>')+'</div>'+
-    '<div class="dm"><span class="wc">'+what+'</span>'+(hi?'<span class="wp">'+hi+' !!!</span>':'')+'</div><div class="ld'+(n>12?' red':n>8?' orange':'')+'"><i style="transform:scaleX('+Math.min(1,n/12).toFixed(3)+')"></i></div></div>'; }
+  const m=estSum(pend), lim=dayHours()*60, lv=loadLevel(m), ht=hoursText(m);
+  return '<div class="dh" title="'+what+(hi?', '+hi+(hi===1?' prioritaria':' prioritarias'):'')+(ht?', '+ht+' estimadas de '+dayHours()+' h':'')+'"><div class="dt"><b>'+DIAS_FULL[dd.getDay()].slice(0,3)+'<small>'+dd.getDate()+(dd.getDate()===1?' '+MESES[dd.getMonth()]:'')+'</small></b>'+(d<t?'':'<button data-add-date="'+d+'" aria-label="Añadir" title="Añadir">'+I.plus+'</button>')+'</div>'+
+    '<div class="dm"><span class="wc">'+what+'</span>'+(ht?'<span class="wh'+(lv?' '+lv:'')+'">'+ht+'</span>':'')+(hi?'<span class="wp">'+hi+' !!!</span>':'')+'</div><div class="ld'+(lv?' '+lv:'')+'"><i style="transform:scaleX('+Math.min(1,m/(lim*1.5)).toFixed(3)+')"></i></div></div>'; }
 // Past days are narrower (only their done tasks show); one day alone takes the width
 function calCols(days){ const t=todayStr(); return days.map(d=>days.length>1&&d<t?'minmax(0,.55fr)':'minmax(0,1fr)').join(' '); }
 function dayCls(d){ const t=todayStr(); return (d===t?' today':'')+(d<t?' past':''); }

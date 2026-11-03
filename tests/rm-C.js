@@ -123,7 +123,7 @@ const realClock = page => page.evaluate(()=>{ if(window.__RD) window.Date=window
   // No new data field
   check('R9_noNewField', await page.evaluate(()=>DB.tasks.every(x=>Object.keys(x).every(k=>['id','title','spaceId','projectId','date','reminder','priority','status','notes','carried','created','modified','completed','postponed','carriedSince'].includes(k)))));
 
-  // R8: before 19:00 nothing new; at 19:30 the cell at the end of Hoy (decision 52: the only entry)
+  // R8: before 18:30 (the evening rule, it was 19:00) nothing new; at 19:30 the cell at the end of Hoy (decision 52: the only entry)
   await page.evaluate(()=>{ window.__RD=Date; const RD=Date; const fixed=new RD(); fixed.setHours(12,0,0,0); window.Date=class extends RD{ constructor(...a){ super(...(a.length?a:[fixed.getTime()])); } static now(){ return fixed.getTime(); } }; render(); });
   check('R8_notBefore19', await page.evaluate(()=>!document.querySelector('.screen.root[data-root=tareas] [data-act=closeDay]')));
   await at1930(page);
@@ -136,10 +136,11 @@ const realClock = page => page.evaluate(()=>{ if(window.__RD) window.Date=window
   check('R8_sheet', r.cd.h==='Cerrar el día' && r.cd.nums.join('|')==='1hecha hoy|5quedan|1prioritarias' && r.cd.left===5 && r.cd.done.join()==='Hecha hoy' && r.cd.acts.join('|')==='Todo a mañana5 tareas|Solo las no prioritarias4 tareas|Decidir una a una' && r.cd.foot==='Mañana empieza con 1 tarea.', r.cd);
   await page.screenshot({path:OUT+'/c-light-cerrar.png'});
   await page.tap('#sheet [data-cd=rest]'); await page.waitForTimeout(500);
-  r.cdRest = await page.evaluate(()=>({hoy:pendingFor('hoy').map(x=>x.title), toast:document.querySelector('#toastText').textContent, tm:DB.tasks.filter(x=>x.date===addDays(todayStr(),1)).length}));
-  check('R8_rest', r.cdRest.hoy.join()==='Prioritaria' && r.cdRest.tm===5 && r.cdRest.toast==='4 tareas pasadas a mañana', r.cdRest);
+  r.cdRest = await page.evaluate(()=>({hoy:pendingFor('hoy').map(x=>x.title), toast:document.querySelector('#toastText').textContent, tm:DB.tasks.filter(x=>x.date===addDays(todayStr(),1)).length, closed:isClosed()}));
+  // Closing the day on every device (owner, 3 November): the way out also closes the day; Deshacer opens it again
+  check('R8_rest', r.cdRest.hoy.join()==='Prioritaria' && r.cdRest.tm===5 && r.cdRest.toast==='4 tareas pasadas a mañana, día cerrado' && r.cdRest.closed, r.cdRest);
   await page.tap('#toastBtn'); await page.waitForTimeout(300);
-  check('R8_restUndo', await page.evaluate(()=>pendingFor('hoy').length===5 && pendingFor('hoy').filter(x=>x.carried).length===2));
+  check('R8_restUndo', await page.evaluate(()=>pendingFor('hoy').length===5 && pendingFor('hoy').filter(x=>x.carried).length===2 && !isClosed()));
   // One by one from the cell at the end of Hoy
   await page.$eval(HOY+' .closecell', e=>e.scrollIntoView()); await page.tap(HOY+' .closecell'); await page.waitForTimeout(400); await page.tap('#sheet [data-cd=one]'); await page.waitForTimeout(400);
   r.cdOne = await page.evaluate(()=>({h:document.querySelector('#sheet h2').textContent, hint:document.querySelector('#sheet .hint').textContent}));

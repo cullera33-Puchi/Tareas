@@ -36,47 +36,59 @@ function tomorrowLine(){ const tm=addDays(todayStr(),1), xs=spaceTasks().filter(
   return xs.length ? 'Mañana empieza con '+xs.length+(xs.length===1?' tarea':' tareas')+(p?', '+p+(p===1?' prioritaria':' prioritarias'):'')+'.' : 'Mañana empieza sin tareas.'; }
 /* R8: close the day. What was done today, what is left and three ways out: all to tomorrow, only the non-priority ones,
    or one by one (the review walk). Each bulk move has its Deshacer (rescheduleMany); the foot says what tomorrow starts with */
-function closeDaySheet(){ flushHeld(true); const t=todayStr(), tm=addDays(t,1); const hoy=pendingFor('hoy'); if(!hoy.length) return;
+/* Closing the day on every device (owner, 3 November): each way out also sets the space's closedDay (setClosedDay), so Hoy turns to tomorrow
+   here and on the other devices once they sync; with nothing left the sheet offers just Cerrar el día. Deshacer opens it again */
+function closeDayMove(xs, how){ const tm=addDays(todayStr(),1), prev=xs.map(daySnap);
+  batch(()=>{ xs.forEach(x=>updTask(x.id, dayPatch(x, tm))); setClosedDay(true, how); }); renderAnimated(); haptic(8); if(xs.length) log('info','Aplazadas en bloque: '+xs.length+' a '+tm);
+  toast((xs.length?xs.length+(xs.length===1?' tarea pasada':' tareas pasadas')+' a mañana, día cerrado':'Día cerrado'), ()=>batch(()=>{ prev.forEach(undoDay); setClosedDay(false, 'Deshacer'); })); }
+function reopenDay(){ if(!isClosed()) return; setClosedDay(false, 'Reabrir hoy'); haptic(6); renderAnimated(); toast('Día reabierto', ()=>setClosedDay(true, 'Deshacer')); }
+function closeDaySheet(){ flushHeld(true); const t=todayStr(), tm=addDays(t,1); const hoy=pendingFor('hoy'); if(isClosed()) return;
   const due=hoy.filter(dlDue), mov=hoy.filter(x=>!dlDue(x)); // decision 48a: a task whose deadline has come stays in Hoy; moving its work date would only pull it earlier
   const high=hoy.filter(x=>x.priority==='high'), rest=mov.filter(x=>x.priority!=='high'), movHigh=mov.filter(x=>x.priority==='high');
   const done=spaceTasks().filter(x=>x.status==='done'&&x.completed&&localDay(x.completed)===t).sort((a,b)=>a.completed<b.completed?-1:1);
   const li=(x,d)=>'<div class="pl"><span class="t">'+esc(x.title||'Sin título')+'</span>'+(d?'':x.priority==='high'?'<span class="pri high">!!!</span>':x.priority==='mid'?'<span class="pri mid">!!</span>':'')+'</div>';
   const n=k=>k+(k===1?' tarea':' tareas');
   openSheet('<h2>Cerrar el día</h2><div class="cdnums"><div><b>'+done.length+'</b><span>'+(done.length===1?'hecha':'hechas')+' hoy</span></div><div><b>'+hoy.length+'</b><span>'+(hoy.length===1?'queda':'quedan')+'</span></div><div class="'+(high.length?'red':'')+'"><b>'+high.length+'</b><span>prioritarias</span></div></div>'+
-    '<div class="plhead"><span>Queda</span></div><div class="plist cdlist">'+hoy.map(x=>li(x)).join('')+'</div>'+
+    (hoy.length?'<div class="plhead"><span>Queda</span></div><div class="plist cdlist">'+hoy.map(x=>li(x)).join('')+'</div>':'')+
     (done.length?'<div class="plhead"><span>Hecho hoy</span></div><div class="plist cdlist done">'+done.map(x=>li(x,true)).join('')+'</div>':'')+
     '<div class="list cdacts">'+(mov.length?'<button class="cell" data-cd="all"><span class="lbl">Todo a mañana</span><span class="val">'+n(mov.length)+'</span></button>':'')+
     (movHigh.length&&rest.length?'<button class="cell" data-cd="rest"><span class="lbl">Solo las no prioritarias</span><span class="val">'+n(rest.length)+'</span></button>':'')+
-    '<button class="cell" data-cd="one"><span class="lbl">Decidir una a una</span>'+I.chev.replace('<svg','<svg class="chev"')+'</button></div>'+
+    (hoy.length?'<button class="cell" data-cd="one"><span class="lbl">Decidir una a una</span>'+I.chev.replace('<svg','<svg class="chev"')+'</button>':'')+(mov.length?'':'<button class="cell" data-cd="close"><span class="lbl">Cerrar el día</span></button>')+'</div>'+
     (due.length?'<div class="hint cdfoot">'+(due.length===1?'La tarea con entrega hoy o vencida se queda en Hoy.':'Las '+due.length+' tareas con entrega hoy o vencida se quedan en Hoy.')+'</div>':'')+'<div class="hint cdfoot">'+tomorrowLine()+'</div>', s=>{
     s.onclick=e=>{ const b=e.target.closest('[data-cd]'); if(!b) return; const k=b.dataset.cd;
       if(k==='one'){ reviewStart('close'); return; }
-      closeSheet(); rescheduleMany(k==='all'?mov:rest, tm, 'mañana'); }; }); }
+      closeSheet(); closeDayMove(k==='all'?mov:k==='rest'?rest:[], k==='all'?'Cerrar el día, todo a mañana':k==='rest'?'Cerrar el día, las no prioritarias':'Cerrar el día'); }; }); }
 /* R9 and R8: review tasks one by one. 'carried': the Aplazadas of Hoy (under the project filter, as the list shows them);
    'close': all of Hoy, from Cerrar el día. Each decision applies at once, so the list behind stays current;
    the balance at the end has one Deshacer for all of them. Decision 56b: a task that keeps being put off says so under its title ("Aplazada
    4 veces", "Desde el martes 27") and is offered Partir en pasos, which ends the walk there (the rest counts as skipped) and opens the task
    with Añadir paso ready, inside the same tap so the iPhone keyboard comes up (decision 18) */
-function reviewStart(kind){ flushHeld(true); let xs=kind==='carried'?pendingFor('hoy').filter(carriedOn):pendingFor('hoy');
-  if(kind==='carried'&&UI.projFilter!==null) xs=xs.filter(x=> UI.projFilter==='none' ? !x.projectId : x.projectId===UI.projFilter);
-  if(!xs.length) return; log('info', kind==='carried'?'Repasar aplazadas':'Cerrar el día una a una', {n:xs.length});
+/* Decision 60b: kind 'forgot' walks the forgotten tasks of Sin fecha (isForgot) with the same steps: a quick day or one of the calendar,
+   Completar, Eliminar, Saltar, Terminar, and the balance with Deshacer. It offers no Sin fecha: they have none already */
+function reviewStart(kind){ flushHeld(true); let xs=kind==='carried'?pendingFor('hoy').filter(carriedOn):kind==='forgot'?pendingFor('todas').filter(isForgot):pendingFor('hoy');
+  if(kind!=='close'&&UI.projFilter!==null) xs=xs.filter(x=> UI.projFilter==='none' ? !x.projectId : x.projectId===UI.projFilter);
+  if(!xs.length) return; log('info', kind==='carried'?'Repasar aplazadas':kind==='forgot'?'Repasar olvidadas':'Cerrar el día una a una', {n:xs.length});
   reviewStep(xs.map(x=>x.id), 0, {kind, prev:new Map(), removed:[], tally:{}}); }
-const REVIEW_OUT=[['hoy','para hoy','para hoy'],['man','a mañana','a mañana'],['vie','al viernes','al viernes'],['nsem','a la próxima semana','a la próxima semana'],['none','sin fecha','sin fecha'],['done','completada','completadas'],['del','eliminada','eliminadas'],['skip','saltada','saltadas']];
+const REVIEW_OUT=[['hoy','para hoy','para hoy'],['man','a mañana','a mañana'],['vie','al viernes','al viernes'],['nsem','a la próxima semana','a la próxima semana'],['none','sin fecha','sin fecha'],['done','completada','completadas'],['del','eliminada','eliminadas'],['cal','a otro día','a otro día'],['skip','saltada','saltadas']];
 function reviewStep(ids, i, st){
   if(i>=ids.length){ sheetOnClose=null; reviewEnd(st, true); return; }
   const x=task(ids[i]); if(!x||x.status!=='pending'){ reviewStep(ids, i+1, st); return; } // completed or removed meanwhile
-  const t=todayStr(); const opts=uniqueBy([['hoy',t,'Hoy'],['man',addDays(t,1),'Mañana'],['vie',nextWeekday(5,true),'Viernes'],['nsem',nextWeekday(1,true),'Próxima semana']], o=>o[1]).concat([['none',null,'Sin fecha']]);
+  const t=todayStr(), fg=st.kind==='forgot'; const opts=uniqueBy([['hoy',t,'Hoy'],['man',addDays(t,1),'Mañana'],['vie',nextWeekday(5,true),'Viernes'],['nsem',nextWeekday(1,true),'Próxima semana']], o=>o[1]).concat(fg?[]:[['none',null,'Sin fecha']]);
+  let ym=t.slice(0,7); // decision 60b: the forgotten ones may take any day of the calendar too
   const p=x.projectId?proj(x.projectId):null; const tally=k=>{ st.tally[k]=(st.tally[k]||0)+1; };
   const keep=()=>{ if(!st.prev.has(x.id)) st.prev.set(x.id, Object.assign({date:x.date, carried:x.carried, reminder:x.reminder||null, status:x.status, completed:x.completed, postponed:x.postponed||null, carriedSince:x.carriedSince||null}, x.focus?{focus:x.focus}:{})); }; // decision 56b: the counters too
   const next=()=>{ haptic(6); render(); reviewStep(ids, i+1, st); };
   const dg=dragText(x);
-  openSheet('<h2>'+(st.kind==='close'?'Cerrar el día':'Repasar aplazadas')+'</h2><div class="hint" style="margin-top:-6px">'+(i+1)+' de '+ids.length+(p?', '+esc(p.name):'')+'</div><div class="plan-title">'+esc(x.title||'Sin título')+'</div>'+(dg?'<div class="rvdrag">'+esc(dg)+'</div>':'')+
-    '<div class="chips rvchips">'+opts.map(o=>'<button class="chip" data-rv="'+o[0]+'">'+o[2]+'</button>').join('')+'</div>'+
+  openSheet('<h2>'+(st.kind==='close'?'Cerrar el día':fg?'Repasar olvidadas':'Repasar aplazadas')+'</h2><div class="hint" style="margin-top:-6px">'+(i+1)+' de '+ids.length+(p?', '+esc(p.name):'')+'</div><div class="plan-title">'+esc(x.title||'Sin título')+'</div>'+(dg?'<div class="rvdrag">'+esc(dg)+'</div>':'')+
+    (fg?'<div class="hint rvsince">'+esc(forgotSince(x))+'</div>':'')+
+    '<div class="chips rvchips">'+opts.map(o=>'<button class="chip" data-rv="'+o[0]+'">'+o[2]+'</button>').join('')+'</div>'+(fg?'<div id="calwrap">'+calendarHTML(ym, null)+'</div>':'')+
     '<div class="sheet-actions"><button class="btn" data-x="done">'+I.check+'Completar</button><button class="btn redtext" data-x="del">'+I.trash+'Eliminar</button></div>'+
     (dg?'<div class="sheet-actions" style="margin-top:10px"><button class="btn" data-x="split">'+I.list+'Partir en pasos</button></div>':'')+
     '<div class="sheet-actions" style="margin-top:10px"><button class="btn" data-x="skip">Saltar</button><button class="btn" data-x="end">Terminar</button></div>', s=>{
     sheetOnClose=()=>{ st.tally.skip=(st.tally.skip||0)+ids.length-i; reviewEnd(st, false); }; // closed with a tap outside or a drag: as Terminar, the balance as a toast
-    s.onclick=e=>{ const c=e.target.closest('[data-rv]'); if(c){ const o=opts.find(q=>q[0]===c.dataset.rv); keep(); updTask(x.id, dayPatch(x, o[1], {carried:false})); tally(o[0]); next(); return; } // Hoy confirms the task and clears its Aplazada mark
+    s.onclick=e=>{ const nav=e.target.closest('[data-cal]'); if(nav){ ym=shiftMonth(ym,+nav.dataset.cal); $('#calwrap',s).innerHTML=calendarHTML(ym, null); return; }
+      const cd=e.target.closest('[data-d]'); if(cd&&cd.dataset.d){ keep(); updTask(x.id, dayPatch(x, cd.dataset.d, {carried:false})); const o=opts.find(q=>q[1]===cd.dataset.d); tally(o?o[0]:'cal'); next(); return; }
+      const c=e.target.closest('[data-rv]'); if(c){ const o=opts.find(q=>q[0]===c.dataset.rv); keep(); updTask(x.id, dayPatch(x, o[1], {carried:false})); tally(o[0]); next(); return; } // Hoy confirms the task and clears its Aplazada mark
       const b=e.target.closest('[data-x]'); if(!b) return; const k=b.dataset.x;
       if(k==='done'){ keep(); applyDone(x.id, true); tally('done'); next(); }
       else if(k==='del'){ const go=()=>{ const j=DB.tasks.indexOf(x); if(j>=0){ DB.tasks.splice(j,1); const vn=DB.voiceNotes.filter(v=>v.taskId===x.id); DB.voiceNotes=DB.voiceNotes.filter(v=>v.taskId!==x.id); st.removed.push({x, vn, at:cutAttachments(new Set([x.id])), ss:cutSteps(new Set([x.id]))}); save(); } tally('del'); haptic(10); next(); };
@@ -85,6 +97,9 @@ function reviewStep(ids, i, st){
       else if(k==='split'){ st.tally.skip=(st.tally.skip||0)+ids.length-i-1; sheetOnClose=null; closeSheet(); reviewEnd(st, false); log('info','Partir en pasos desde el repaso'); openStepAdd(x.id); }
       else { st.tally.skip=(st.tally.skip||0)+ids.length-i; sheetOnClose=null; reviewEnd(st, true); } }; });
 }
+// Decision 60b: how long a forgotten task has been still, "Sin cambios desde el 2 de octubre"
+function forgotSince(x){ const d=localDay(x.modified||x.created||new Date().toISOString()), dd=new Date(d+'T00:00:00'), t=todayStr();
+  return 'Sin cambios desde el '+dd.getDate()+' de '+MESES_FULL[dd.getMonth()]+(d.slice(0,4)!==t.slice(0,4)?' de '+d.slice(0,4):''); }
 // Decision 56b: the task open (the detail on the iPhone, the inspector on the desktop) with the focus in Añadir paso, at once: called inside a tap
 function openStepAdd(id){ if(!task(id)) return; openDetail(id); const scope=UI.wide?$('#desk .pane'):(UI.stack.length?UI.stack[UI.stack.length-1].el:null);
   const ta=scope&&scope.querySelector('[data-role=stepadd]'); if(!ta) return false;
@@ -93,10 +108,11 @@ function openStepAdd(id){ if(!task(id)) return; openDetail(id); const scope=UI.w
   return true; }
 // Deshacer of a review: a task completed in it takes back the next one of its series (decision 38)
 function reviewEnd(st, asSheet){ const T=st.tally, decided=Object.keys(T).some(k=>k!=='skip'&&T[k]);
-  const undo=()=>batch(()=>{ st.prev.forEach((o,id)=>{ const x=task(id); if(!x) return; if(x.status==='done'&&o.status!=='done') dropNext(x); updTask(id, o); }); st.removed.forEach(r=>{ if(!task(r.x.id)){ DB.tasks.push(r.x); DB.voiceNotes.push(...r.vn); putAttachments(r.at); putSteps(r.ss); } }); save(); });
+  const closing=st.kind==='close'&&asSheet; if(closing) setClosedDay(true, 'Cerrar el día una a una'); // walked to its end or Terminar: the day is closed; a sheet dismissed is not
+  const undo=()=>batch(()=>{ if(closing) setClosedDay(false, 'Deshacer'); st.prev.forEach((o,id)=>{ const x=task(id); if(!x) return; if(x.status==='done'&&o.status!=='done') dropNext(x); updTask(id, o); }); st.removed.forEach(r=>{ if(!task(r.x.id)){ DB.tasks.push(r.x); DB.voiceNotes.push(...r.vn); putAttachments(r.at); putSteps(r.ss); } }); save(); });
   const parts=REVIEW_OUT.filter(o=>T[o[0]]).map(o=>T[o[0]]+' '+(T[o[0]]===1?o[1]:o[2]));
-  log('info', st.kind==='carried'?'Repaso de aplazadas':'Día cerrado una a una', T);
-  if(!decided){ if(asSheet) closeSheet(); renderAnimated(); return; }
+  log('info', st.kind==='carried'?'Repaso de aplazadas':st.kind==='forgot'?'Repaso de olvidadas':'Día cerrado una a una', T);
+  if(!decided){ if(asSheet) closeSheet(); renderAnimated(); if(closing) toast('Día cerrado', ()=>setClosedDay(false, 'Deshacer')); return; }
   renderAnimated();
   if(!asSheet){ toast(parts.join(', '), undo); return; }
   openSheet('<h2>'+(st.kind==='close'?'Día cerrado':'Repaso terminado')+'</h2><div class="list">'+REVIEW_OUT.filter(o=>T[o[0]]).map(o=>'<div class="cell"><span class="lbl">'+(o[0]==='done'||o[0]==='del'||o[0]==='skip'?o[2][0].toUpperCase()+o[2].slice(1):o[1][0].toUpperCase()+o[1].slice(1))+'</span><span class="val">'+T[o[0]]+'</span></div>').join('')+'</div>'+
@@ -137,7 +153,7 @@ function rowMenu(id, src){ const x=task(id); if(!x) return; releaseHold(id);
   { // R10: the row lifts and the menu opens next to it
     const row=src&&src.row||visibleRow(id), b=row&&row.getBoundingClientRect();
     return popMenu({lift:row, x:src&&src.x||(b?b.left+b.width/2:0), y:src&&src.y||0, prio:{cur:x.priority, fn:pr=>setPriority(id,pr)}, groups:[
-      [{label:'Aplazar', icon:MI.postpone, menu:()=>postponeMenu(id)}].concat(x.status!=='done'?[{label:'Fecha límite', icon:MI.flag, menu:()=>deadlineMenu(id)}, {label:'Tiempo', icon:MI.est, menu:()=>estimateMenu(id)}]:[], [{label:'Mover a proyecto', icon:MI.folder, menu:()=>projectPickMenu(id)}]).concat(DB.spaces.length>1?[{label:'Mover a otro espacio', icon:MI.space, menu:()=>spaceMoveMenu(id)}]:[]), // decision 48a: Fecha límite next to Aplazar
+      [{label:'Aplazar', icon:MI.postpone, menu:()=>postponeMenu(id)}].concat(x.status!=='done'?[{label:'Fecha límite', icon:MI.flag, menu:()=>deadlineMenu(id)}, {label:'Tiempo', icon:MI.est, menu:()=>estimateMenu(id)}]:[], canSnooze(x)?[{label:'Posponer recordatorio', icon:MI.bell, menu:()=>snoozeMenu(id)}]:[], [{label:'Mover a proyecto', icon:MI.folder, menu:()=>projectPickMenu(id)}]).concat(DB.spaces.length>1?[{label:'Mover a otro espacio', icon:MI.space, menu:()=>spaceMoveMenu(id)}]:[]), // decision 48a: Fecha límite next to Aplazar
       [{label:x.status==='done'?'Marcar pendiente':'Completar', icon:x.status==='done'?MI.undo:MI.done, fn:()=>{ leaveRows(id); setTimeout(()=>{ completeTask(id); renderAnimated(); },200); }}]
        .concat(x.status==='pending'?[{label:x.focus?'Quitar de Ahora':'Ahora', icon:x.focus?MI.starOff:MI.star, fn:()=>toggleFocus(id)}]:[]) // decision 39
        .concat(waitItems(x, MI)) // decision 41
@@ -170,10 +186,10 @@ const filterProject = () => { const f=UI.projFilter; return f&&f!=='none'&&activ
 /* Decision 27b: on the iPhone, the + and Añadir tarea of the Tareas list propose the project of the active filter, as a removable token,
    and in Hoy also today (v0.29.2: Todas proposes the filter's project too); a search proposes nothing */
 function addFromList(){ const hoy=UI.wide?UI.deskView==='hoy':UI.tab==='tareas'&&DB.settings.filter==='hoy';
-  if(UI.query){ addSheet(null); return; } addSheet(filterProject(), '', hoy?{date:todayStr()}:{}); }
+  if(UI.query){ addSheet(null); return; } addSheet(filterProject(), '', hoy?{date:hoyAddDate(), fromHoy:true}:{}); } // the evening rule: tomorrow from 18:30
 function addSheet(projectId){
   const prefill=arguments[1]||'', preset=arguments[2]||{};
-  const st={date:preset.date||null, projectId:projectId||null, priority:'none', estimate:null, open:null, ym:null, lines:null, added:0, msg:'', warn:false};
+  const st={date:preset.date||null, projectId:projectId||null, priority:'none', estimate:null, open:null, ym:null, lines:null, added:0, msg:'', warn:false, fromHoy:!!preset.fromHoy, dates:[]};
   // Quick date chips, each a different date: on a Thursday 'Viernes' is tomorrow and on a Sunday 'Próx. semana' is, so they are left out
   const quick=()=>{ const t=todayStr(); return uniqueBy([['hoy',t,'Hoy'],['man',addDays(t,1),'Mañana'],['vie',nextWeekday(5,true),'Viernes'],['nsem',nextWeekday(1,true),'Próx. semana']], q=>q[1]); };
   const base=()=>({date:st.date, projectId:st.projectId, priority:st.priority, estimate:st.estimate});
@@ -215,15 +231,15 @@ function addSheet(projectId){
     if(prefill){ const ls=pasteLines(prefill); if(ls.length>1) takeLines(ls); else inp.value=ls[0]||''; }
     draw();
     const add=()=>{ const r=quickTask(inp.value, base()); if(!r.title) return false;
-      lastId=addTask(Object.assign({title:r.title, date:r.date, projectId:r.projectId, priority:r.priority, reminder:r.reminder}, r.estimate?{estimate:r.estimate}:{})).id; st.added++; haptic(8); return r.title; };
+      lastId=addTask(Object.assign({title:r.title, date:r.date, projectId:r.projectId, priority:r.priority, reminder:r.reminder}, r.estimate?{estimate:r.estimate}:{})).id; st.added++; st.dates.push(r.date); haptic(8); return r.title; };
     // The list behind the sheet is drawn once, when the sheet closes (any way it closes), not after every Enter
     sheetOnClose=()=>{ if(st.added) render(); };
     // Decision 28b: a typed title or a pasted list not yet added asks before the sheet goes
     sheetGuard=()=>{ const n=st.lines?many().length:(inp.value.trim()?1:0); if(!n) return null;
       return {title:n>1?'Las tareas no se han añadido.':'La tarea no se ha añadido.', label:n>1?'Descartar tareas':'Descartar tarea', field:inp}; };
-    const finish=()=>{ closeSheet(); if(st.added) toast(st.added===1?'Tarea añadida':st.added+' tareas añadidas'); };
+    const finish=()=>{ closeSheet(); if(!st.added) return; const tm=st.fromHoy&&forTomorrow(st.dates); toast(st.added===1?(tm?'Añadida para mañana':'Tarea añadida'):st.added+' tareas añadidas'+(tm?' para mañana':'')); }; // the evening rule: not in the list behind
     const createList=()=>{ const ls=many(); if(!ls.length){ st.lines=null; draw(); inp.focus(); return; } const ids=addMany(ls, base()); st.added=0; closeSheet(); renderAnimated();
-      log('info','Tareas creadas desde una lista', {n:ids.length}); toast(ids.length===1?'1 tarea creada':ids.length+' tareas creadas', ()=>removeTasks(ids)); };
+      log('info','Tareas creadas desde una lista', {n:ids.length}); const tm=st.fromHoy&&forTomorrow(ids.map(i=>(task(i)||{}).date)); toast((ids.length===1?'1 tarea creada':ids.length+' tareas creadas')+(tm?' para mañana':''), ()=>removeTasks(ids)); };
     const ok=()=>{ if(st.lines){ createList(); return; } if(!add()){ if(st.added) finish(); else inp.focus(); return; } finish(); };
     const okAndNext=()=>{ if(st.lines){ const v=inp.value.trim(); if(v){ st.lines.push(v); inp.value=''; draw(); } inp.focus(); return; }
       const t=add(); if(!t){ finish(); return; } inp.value=''; st.open=null; st.ym=null; st.msg=st.added+(st.added===1?' añadida: ':' añadidas. Última: ')+t; draw(); inp.focus(); };

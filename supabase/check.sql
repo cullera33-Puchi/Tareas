@@ -25,7 +25,8 @@ with checks(orden, pieza, ok) as (
   union all select 20, 'Tiempo estimado: columna tasks.estimate (0008)', exists (select 1 from information_schema.columns where table_schema='public' and table_name='tasks' and column_name='estimate')
   union all select 21, 'Aplazamientos: columna tasks.postponed (0008)', exists (select 1 from information_schema.columns where table_schema='public' and table_name='tasks' and column_name='postponed')
   union all select 22, 'Aplazamientos: columna tasks.carried_since (0008)', exists (select 1 from information_schema.columns where table_schema='public' and table_name='tasks' and column_name='carried_since')
-  union all select 23, 'Tiempo real: tablas publicadas', (select count(*) from pg_publication_tables where pubname='supabase_realtime' and schemaname='public' and tablename in ('spaces','projects','tasks','voice_notes','attachments','subtasks','project_notes')) = 7
+  union all select 23, 'Día cerrado: columna spaces.closed_day (0009)', exists (select 1 from information_schema.columns where table_schema='public' and table_name='spaces' and column_name='closed_day')
+  union all select 24, 'Tiempo real: tablas publicadas', (select count(*) from pg_publication_tables where pubname='supabase_realtime' and schemaname='public' and tablename in ('spaces','projects','tasks','voice_notes','attachments','subtasks','project_notes')) = 7
 )
 select orden as "N.º", pieza as "Pieza", case when ok then 'OK' else 'FALTA' end as "Estado"
 from checks order by orden;

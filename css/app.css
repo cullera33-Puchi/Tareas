@@ -1485,3 +1485,47 @@ body.desktop .sgopen svg{width:6px;height:11px;}
 @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .pitcard{background:color-mix(in srgb, var(--pc) 22%, var(--dmain));} :root:not([data-theme="light"]) .pitcard:hover,:root:not([data-theme="light"]) .pitcard.open:hover{background:color-mix(in srgb, var(--pc) 27%, var(--dmain));} }
 :root[data-theme="dark"] .pitcard{background:color-mix(in srgb, var(--pc) 22%, var(--dmain));}
 :root[data-theme="dark"] .pitcard:hover,:root[data-theme="dark"] .pitcard.open:hover{background:color-mix(in srgb, var(--pc) 27%, var(--dmain));}
+
+/* Decision 60a: the hours of Hoy (beside the count in the iPhone segment, in the desktop title) and in the day heads of Semana */
+.seg button .lh{display:inline-flex;align-items:center;gap:2px;margin-left:7px;font-weight:400;font-size:.706rem;color:var(--ink2);font-variant-numeric:tabular-nums;vertical-align:1px;}
+.lh svg{width:11px;height:11px;flex:none;}
+.lh.orange,.seg button .lh.orange{color:var(--orange);font-weight:600;}
+.lh.red,.seg button .lh.red{color:var(--red);font-weight:600;}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .seg button.on .lh:not(.orange):not(.red){color:rgba(235,235,245,.6);}}
+:root[data-theme="dark"] .seg button.on .lh:not(.orange):not(.red){color:rgba(235,235,245,.6);}
+.main .mhead h1 .lh{display:inline-flex;align-items:center;gap:3px;margin-left:10px;font-size:13px;font-weight:500;letter-spacing:0;color:var(--ink2);vertical-align:3px;font-variant-numeric:tabular-nums;}
+.main .mhead h1 .lh svg{width:12px;height:12px;}
+.main .mhead h1 .lh.orange,.main .mhead h1 .lh.red{font-weight:600;}
+.main .mhead h1 .lh.orange{color:var(--orange);}
+.main .mhead h1 .lh.red{color:var(--red);}
+.dh .dm .wh{flex:none;color:var(--ink2);}
+.dh .dm .wh.orange{color:var(--orange);font-weight:600;}
+.dh .dm .wh.red{color:var(--red);font-weight:600;}
+.dh .dm .wc{flex:1;min-width:0;}
+/* Decision 60b: Repasar N olvidadas beside Planificar in the head of Sin fecha */
+.gh .gx.gforgot{margin-right:10px;}
+.rvsince{text-align:center;margin:-4px 0 8px;}
+/* Decision 55: the bar Posponer recordatorio on top of a task opened from its notification */
+.snzbar{background:var(--card);border-radius:10px;padding:12px 14px 12px;margin:0 0 16px;}
+.snzh{display:flex;align-items:center;gap:8px;font-size:0.882rem;}
+.snzh svg{width:18px;height:18px;flex:none;color:var(--orange);}
+.snzh b{font-weight:600;}
+.snzh .snzt{margin-left:auto;color:var(--ink2);font-size:0.824rem;white-space:nowrap;}
+.snzbar .chips{margin:10px 0 0;}
+.snzbar .chip{color:var(--blue);}
+.app.desktop .snzbar{background:var(--dfield);border-radius:8px;padding:10px 12px;margin:0 0 12px;}
+.app.desktop .snzh{font-size:13px;}
+.app.desktop .snzh svg{width:15px;height:15px;}
+.app.desktop .snzh .snzt{font-size:12px;}
+.app.desktop .snzbar .chips{gap:6px;margin-top:8px;}
+.app.desktop .snzbar .chip{height:24px;padding:0 10px;font-size:12px;border-radius:12px;background:var(--dmain);border:.5px solid var(--dline);}
+.app.desktop .snzbar .chip:hover{background:var(--dhov);}
+/* Owner, 3 November: Hoy with nothing left is one discreet line; a closed day puts its line on top of tomorrow's tasks */
+.hoydone{color:var(--ink2);font-size:0.882rem;text-align:center;padding:18px 16px 14px;}
+.dayclosed{display:flex;align-items:center;gap:8px;min-height:36px;padding:0 4px 6px;color:var(--ink2);font-size:0.824rem;}
+.dayclosed .dcl{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.dayclosed .gx{flex:none;position:relative;color:var(--blue);font-weight:600;font-size:0.765rem;height:30px;}
+.dayclosed .gx::after{content:"";position:absolute;left:-7px;right:-7px;top:-7px;bottom:-7px;}
+.app.desktop .hoydone{font-size:13px;text-align:left;padding:12px 4px;}
+.app.desktop .dayclosed{font-size:13px;min-height:30px;}
+.app.desktop .dayclosed .gx{font-size:12px;height:26px;}

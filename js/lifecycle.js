@@ -87,7 +87,7 @@ const _render=render; render=function(){ staleView=false; checkDay(); _render();
 // A redraw while something is being typed or picked would close the keyboard or the sheet
 const busyEditing=()=>sheet.classList.contains('on')||asheet.classList.contains('on')||menuOpen()||!!UI.select||/^(INPUT|TEXTAREA)$/.test((document.activeElement||{}).tagName||'');
 // Checked every minute rather than with one timer at midnight, which a computer asleep at that hour would delay
-// Hoy gone stale with the clock (the cell Cerrar el día from 19:00) is redrawn too, unless something is being typed, picked or swiped
+// Hoy gone stale with the clock (the cell Cerrar el día from 18:30) is redrawn too, unless something is being typed, picked or swiped
 const clockStale=()=>(clockKey()!==renderedClock||staleView) && !busyEditing() && !openRow;
 setInterval(()=>{ if(todayStr()!==renderedDay){ checkDay(); if(!busyEditing()) render(); } else if(!document.hidden && clockStale()) render(); }, 6e4);
 window.addEventListener('focus',()=>{ if((todayStr()!==renderedDay && !busyEditing()) || clockStale()) render(); });

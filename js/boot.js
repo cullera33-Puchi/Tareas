@@ -11,7 +11,7 @@ if(foldVoiceNotes(DB)) save(); // decision 49: dictated voice notes go into thei
 { const n=rollOver(); if(n) log('info','Tareas pasadas a hoy: '+n); } if(wideMQ.matches) applyWide(); else render(); // a desktop start never builds the iPhone screens
 backupChain=refreshBackups().then(()=>{ if(onSettings()) render(); return dailyBackup(false); }).catch(()=>{});
 (function(){ // Entry from the iOS Shortcut: ?add=texto opens the new-task sheet with the text
-  try{ const tk=new URLSearchParams(location.search).get('task'); if(tk){ history.replaceState(null,'',location.pathname); setTimeout(()=>openTaskFromPush(tk,'inicio'),300); return; } }catch(e){} // block 9: a notification tapped with the app closed (sw.js)
+  try{ const q=new URLSearchParams(location.search), tk=q.get('task'), snz=q.get('snooze'); if(tk){ history.replaceState(null,'',location.pathname); setTimeout(()=>openTaskFromPush(tk,'inicio',snz),300); return; } }catch(e){} // block 9: a notification tapped with the app closed (sw.js); decision 55: snooze, its action 10 min or 1 h
   try{ const q=new URLSearchParams(location.search); const add=q.get('add'); if(add!==null){ history.replaceState(null,'',location.pathname); log('info','Entrada por URL', add.slice(0,80)); setTimeout(()=>addSheet(null, add.trim()),250); return; } }catch(e){}
   if(!DB.settings.tipsSeen) setTimeout(tipsSheet, 400);
 })();
@@ -39,7 +39,7 @@ if('serviceWorker' in navigator){
   // Only that first claim is skipped; a later update, or any the user asked for, reloads.
   // Block 9: a tap on a notification while the app is open, and every push received (sw.js)
   navigator.serviceWorker.addEventListener('message', e=>{ const d=e.data||{};
-    if(d.type==='openTask') openTaskFromPush(d.taskId, 'app abierta');
+    if(d.type==='openTask') openTaskFromPush(d.taskId, 'app abierta', d.snooze);
     else if(d.type==='push') log('info','Notificación recibida', {tarea:!!d.taskId, prueba:!!d.test}); });
   let hadController = !!navigator.serviceWorker.controller;
   navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(reloading) return; if(!hadController && !updateRequested){ hadController=true; return; } reloading=true; location.reload(); });

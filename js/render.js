@@ -367,8 +367,8 @@ function ahoraHTML(){ const xs=ahoraTasks(); if(!xs.length) return '';
 function ahoraViewHTML(){ let xs=ahoraTasks(); if(UI.query) xs=xs.filter(queryMatcher(UI.query));
   if(!xs.length) return '<div class="empty" data-drop-ahora="">'+I.star.replace('<svg','<svg style="width:44px;height:44px"')+'<b>'+(UI.query?'Sin resultados':'Nada en Ahora')+'</b>'+(UI.query?'Prueba con otra palabra':'Arrastra aquí las tareas que vas a hacer ya, o pulsa A en una tarea. Caben '+AHORA_MAX+'.')+'</div>';
   return '<div class="group ahoralist" data-drop-ahora="">'+xs.map(x=>rowHTML(x)).join('')+'</div><div class="footnote">Hasta '+AHORA_MAX+' tareas. Se vacía al empezar el día; las que queden siguen en su sitio.</div>'; }
-// What Hoy shows that changes with the clock alone (the cell Cerrar el día from 19:00, R8): the minute timer redraws when it differs
-function clockKey(){ return String(new Date().getHours()>=19); }
+// What Hoy shows that changes with the clock alone (the cell Cerrar el día from 18:30, R8 and the evening rule): the minute timer redraws when it differs
+function clockKey(){ return String(isEvening()); }
 /* Group headers. R14: in Todas, a project, Hoy by project and Completadas each header sits in a .gsec with its group,
    so it stays at the top of the list (sticky, translucent) while its own rows scroll under it and the next one pushes it away */
 function gtitle(label, n, right, attrs){ return '<div class="group-title gh"'+(attrs||'')+'><span class="gl">'+label+(n!=null?'<span class="gn">'+n+'</span>':'')+'</span>'+(right||'')+'</div>'; }
@@ -384,7 +384,7 @@ function monthTitle(ym){ const [y,m]=ym.split('-').map(Number), n=MESES_FULL[m-1
 function dayGroupsHTML(list, R, root, projectId){ const t=todayStr(), lim=addDays(t,14), by=new Map(); let h='';
   list.forEach(x=>{ const k=dlDue(x)||(x.date&&x.date<=t)?t:!x.date?'~':x.date<=lim?x.date:x.date.slice(0,7)+'-~'; /* decision 48a: a deadline that has come puts it in Hoy */ if(!by.has(k)) by.set(k,[]); by.get(k).push(x); });
   [...by.keys()].sort().forEach(k=>{ const xs=by.get(k); let head;
-    if(k==='~') head=root&&!UI.select ? gtitle('Sin fecha', null, '<button class="gx" data-act="plan">Planificar ('+xs.length+')</button>') : gtitle('Sin fecha', xs.length);
+    if(k==='~'){ const nf=xs.filter(isForgot).length; /* decision 60b */ head=root&&!UI.select ? gtitle('Sin fecha', null, (nf?'<button class="gx gforgot" data-act="forgot">Repasar '+nf+(nf===1?' olvidada':' olvidadas')+'</button>':'')+'<button class="gx" data-act="plan">Planificar ('+xs.length+')</button>') : gtitle('Sin fecha', xs.length); }
     else if(k.length===10) head=gtitle(dayTitle(k), xs.length, UI.select?'':'<button class="gadd" data-add-date="'+k+'"'+(projectId!==undefined?' data-project="'+(projectId||'')+'"':'')+' aria-label="Añadir con esta fecha">'+I.plus+'</button>', ' data-day-head="'+k+'"');
     else head=gtitle(monthTitle(k.slice(0,7)), xs.length);
     h+=gsec(head, xs.map(x=>R(x, k.length===10?{day:k, noToday:true}:{})).join(''), k==='~'?gdrop('day',''):k.length===10?gdrop('day',k):''); });
@@ -401,6 +401,7 @@ function projectGroupsHTML(list, R, filter){ const ps=activeProjects(), by={}; l
 function listHTML(filter, projectId){
   let list = pendingFor(filter, projectId, UI.query);
   const root = projectId===undefined;
+  const closed = filter==='hoy' && root && !UI.query && isClosed(); if(closed) list=closedHoyList(); // the day closed: Hoy shows tomorrow
   if(root && !UI.query && UI.projFilter!==null) list = list.filter(x=> UI.projFilter==='none' ? !x.projectId : x.projectId===UI.projFilter);
   const done = doneList(projectId); const dm = UI.query ? done.filter(queryMatcher(UI.query)) : [];
   const nm = UI.query ? noteHits(UI.query, projectId) : []; // decision 47: the notes found, in a group of their own
@@ -412,18 +413,17 @@ function listHTML(filter, projectId){
   /* Decision 51: in Hoy the waiting tasks whose review day (or deadline) has come go first, in their own group Revisar hoy; in Todas and
      in a project every waiting task is in the block Por confirmar at the foot, so none is listed twice. A search keeps them all in its results */
   let rv=[];
-  if(!UI.query){ if(filter==='hoy'){ rv=list.filter(x=>x.status==='waiting'); if(rv.length) list=list.filter(x=>x.status!=='waiting'); }
-    else list=list.filter(x=>x.status!=='waiting'); }
-  let h='';
+  if(!UI.query){ if(filter==='hoy'&&!closed){ rv=list.filter(x=>x.status==='waiting'); if(rv.length) list=list.filter(x=>x.status!=='waiting'); }
+    else if(!closed) list=list.filter(x=>x.status!=='waiting'); }
+  let h=closed?closedHeadHTML():'';
   if(rv.length) h += gtitle('Revisar hoy', rv.length, '', ' data-review-head=""')+'<div class="group" data-review="">'+rv.map(x=>R(x,{noToday:true,noReview:true})).join('')+'</div>'; // decision 36: not a drop target
   if(!list.length){ if(rv.length){} else if(!(UI.query && UI.searchDone && dm.length) && !nm.length){ // the completed matches (or notes) are listed below: no "Sin resultados" above them
     let title, sub, acts; const dt0=filter==='hoy'?spaceTasks().filter(x=>x.status==='done'&&x.completed&&localDay(x.completed)===todayStr()).length:0;
     if(UI.query){ title='Sin resultados'; sub='Prueba con otra palabra'; acts='<button class="btn-link" data-act="clearSearch">Borrar búsqueda</button>'; }
     else if(root && UI.projFilter!==null){ const pf=UI.projFilter==='none'?null:proj(UI.projFilter); title='Nada '+(pf?'de '+esc(pf.name):'sin proyecto'); sub=filter==='hoy'?'Hoy no hay ninguna':'No hay pendientes'; acts='<button class="btn-link" data-pf="">Quitar filtro</button>'; }
-    else if(filter==='hoy' && root && dt0){ title='Todo hecho por hoy'; sub=dt0+(dt0===1?' tarea completada':' tareas completadas'); acts='<button class="btn-link" data-filter="todas">Ver todas</button>'+addBtn; } // decision 52: the day done, once said by the summary
-    else if(filter==='hoy'){ title='Nada para hoy'; sub='Nada pendiente con fecha de hoy'; acts='<button class="btn-link" data-filter="todas">Ver todas</button>'+addBtn; }
+    else if(filter==='hoy' && root){ h += '<div class="hoydone">'+(closed?'Nada para mañana todavía':'Todo hecho por hoy'+(dt0?', '+dt0+(dt0===1?' completada':' completadas'):''))+'</div>'; title=null; } // a discreet line: the +, the add bar and Todas already do what its links did
     else { title='Sin tareas pendientes'; sub='Toca + o añade una desde aquí'; acts=addBtn; }
-    h += '<div class="empty">'+I.inbox+'<b>'+title+'</b>'+sub+'<div class="acts">'+acts+'</div></div>';
+    if(title) h += '<div class="empty">'+I.inbox+'<b>'+title+'</b>'+sub+'<div class="acts">'+acts+'</div></div>';
   } }
   else if(UI.query){ h += '<div class="group-title">'+list.length+(list.length===1?' resultado':' resultados')+'</div><div class="group">'+list.map(x=>R(x)).join('')+'</div>'; }
   if(UI.query){ h += noteHitsHTML(nm); if(dm.length){ h += UI.searchDone ? '<div class="group-title">Completadas</div><div class="group">'+dm.map(x=>R(x)).join('')+'</div>' : '<div class="empty" style="padding:8px 0 16px"><div class="acts"><button class="btn-link" data-act="searchDone">Incluir '+dm.length+(dm.length===1?' completada':' completadas')+'</button></div></div>'; } return h; }
@@ -434,10 +434,10 @@ function listHTML(filter, projectId){
   else if(filter==='hoy' && root && list.some(carriedOn)){ const c=list.filter(carriedOn), d=list.filter(x=>!carriedOn(x)); /* decision 48a: a task here by its deadline is not Aplazada */
     h += gtitle('Aplazadas', null, UI.select?'':'<button class="gx" data-act="review">Repasar ('+c.length+')</button>')+'<div class="group">'+c.map(x=>R(x,{noToday:true,hideCarried:true})).join('')+'</div>'+
       (d.length?'<div class="group-title"'+gdrop('day',todayStr())+'>Hoy</div><div class="group"'+gdrop('day',todayStr())+'>'+d.map(x=>R(x,{noToday:true})).join('')+'</div>':''); } // decision 36: an Aplazada dropped on Hoy is confirmed for today
-  else h += (rv.length?'<div class="group-title"'+gdrop('day',todayStr())+'>Hoy</div>':'')+'<div class="group"'+(rv.length?gdrop('day',todayStr()):'')+'>'+list.map(x=>R(x,{noToday:filter==='hoy'})).join('')+'</div>'; // below Revisar hoy, the rest under Hoy
-  // R8: from 19:00 the day is closed from the end of Hoy (decision 52: the only entry since the day summary went)
-  if(root && filter==='hoy' && !UI.select && new Date().getHours()>=19){ const n=pendingFor('hoy').length; if(n) h += '<div class="group"><button class="cell link closecell" data-act="closeDay">'+I.cal+'<span class="lbl">Cerrar el día</span><span class="val">'+n+(n===1?' pendiente':' pendientes')+'</span></button></div>'; }
-  if(root && filter==='hoy'){ const tmd=addDays(todayStr(),1), tm=pendingFor('todas').filter(x=>!inHoy(x)&&(x.date===tmd||x.deadline===tmd)).length; /* decision 48a: a deadline tomorrow brings it tomorrow */ if(tm) h += '<button class="preview" data-filter="todas"><span>Mañana: '+tm+(tm===1?' tarea':' tareas')+'</span>'+I.chev+'</button>'; }
+  else h += (rv.length?'<div class="group-title"'+gdrop('day',todayStr())+'>Hoy</div>':'')+'<div class="group"'+(rv.length?gdrop('day',todayStr()):closed?gdrop('day',addDays(todayStr(),1)):'')+'>'+list.map(x=>R(x,closed?{day:addDays(todayStr(),1)}:{noToday:filter==='hoy'})).join('')+'</div>'; // below Revisar hoy, the rest under Hoy
+  // R8: from 18:30 (EVENING_MIN) the day is closed from the end of Hoy (decision 52: the only entry since the day summary went)
+  if(root && filter==='hoy' && !UI.select && !UI.query && !closed && isEvening()){ const n=pendingFor('hoy').length; h += '<div class="group"><button class="cell link closecell" data-act="closeDay">'+I.cal+'<span class="lbl">Cerrar el día</span><span class="val">'+(n?n+(n===1?' pendiente':' pendientes'):'')+'</span></button></div>'; } // with nothing left it still closes the day
+  if(root && filter==='hoy' && !closed){ const tmd=addDays(todayStr(),1), tm=pendingFor('todas').filter(x=>!inHoy(x)&&(x.date===tmd||x.deadline===tmd)).length; /* decision 48a: a deadline tomorrow brings it tomorrow */ if(tm) h += '<button class="preview" data-filter="todas"><span>Mañana: '+tm+(tm===1?' tarea':' tareas')+'</span>'+I.chev+'</button>'; }
   h += waitingBlockHTML(root, projectId, R, filter==='hoy');
   if(done.length){ const dt=done.filter(x=>x.completed&&localDay(x.completed)===todayStr()).length;
     if(!DB.settings.doneOpen){ h += '<div class="group"><button class="cell link" data-act="toggleDone" style="justify-content:center"><span>Mostrar completadas ('+done.length+(dt?', '+dt+' hoy':'')+')</span></button></div>'; }
@@ -463,13 +463,20 @@ function waitingViewHTML(){ let xs=waitingAll(); if(UI.query) xs=xs.filter(query
   if(!xs.length) return '<div class="empty">'+MI.wait.replace('<svg','<svg style="width:44px;height:44px"')+'<b>'+(UI.query?'Sin resultados':'Nada por confirmar')+'</b>'+(UI.query?'Prueba con otra palabra':'Marca una tarea Por confirmar desde su menú cuando dependa de otra persona.')+'</div>';
   return '<div class="group">'+xs.map(x=>rowHTML(x)).join('')+'</div><div class="footnote">Cada una vuelve a Hoy en su día de revisión, en el grupo Revisar hoy.</div>'; }
 function selectNav(){ const n=UI.select.ids.size; return '<header class="nav"><div class="nav-row"><button class="action" data-act="selAll">'+(UI.select.all?'Ninguna':'Todas')+'</button><div class="nav-title" id="selTitle">'+(n?n+(n===1?' seleccionada':' seleccionadas'):'Seleccionar')+'</div><button class="action strong" data-act="selDone">OK</button></div></header>'; }
+/* Decision 60a: the hours of Hoy beside its count: the estimates of what the Hoy list shows (Revisar hoy included, the project filter not
+   applied, as the count), grey, orange from the space's working hours and red from half as much again. Nothing when no task says its time */
+// The line on top of Hoy while the day is closed: "Día cerrado. Mañana, jueves 5" and Reabrir hoy (with Deshacer)
+function closedHeadHTML(){ const d=new Date(addDays(todayStr(),1)+'T00:00:00');
+  return '<div class="dayclosed"><span class="dcl">Día cerrado. Mañana, '+DIAS_L[d.getDay()]+' '+d.getDate()+'</span><button class="gx" data-act="reopenDay">Reabrir hoy</button></div>'; }
+function hoyLoadHTML(){ const l=hoyShown(), m=estSum(l); if(!m) return ''; const lv=loadLevel(m), n=l.length; // closed, tomorrow's
+  return '<span class="lh'+(lv?' '+lv:'')+'" title="'+esc(hoursText(m)+' estimadas en '+n+(n===1?' tarea':' tareas')+'; '+dayHours()+' h de trabajo al día')+'">'+I.est+hoursText(m)+'</span>'; }
 function viewTareas(){
-  const f=DB.settings.filter; const nHoy=UI.query?0:pendingFor('hoy').length, nTodas=UI.query?0:pendingFor('todas').filter(x=>x.status!=='waiting').length; // a search hides the segment that shows them; decision 51: Todas lists its waiting tasks in the block at the foot, outside the count
+  const f=DB.settings.filter; const nHoy=UI.query?0:hoyShown().length, nTodas=UI.query?0:pendingFor('todas').filter(x=>x.status!=='waiting').length; // a search hides the segment that shows them; decision 51: Todas lists its waiting tasks in the block at the foot, outside the count
   if(UI.select && UI.select.scope==='root') return selectNav()+'<div class="scroll">'+listHTML(UI.query?'todas':f)+'</div>';
   return '<header class="nav"><div class="nav-row"><button class="title" data-act="spaceMenu" aria-label="Cambiar espacio">'+esc(space().name)+I.chevD+'</button>'+'<button class="action vopts" data-act="viewMenu" aria-label="Opciones de vista">'+I.more+'</button>'+'</div></header>'+
-   '<div class="scroll">'+(f==='hoy'&&!UI.query?ahoraHTML():'')+
+   '<div class="scroll">'+(f==='hoy'&&!UI.query&&!isClosed()?ahoraHTML():'')+
    '<div class="searchbar"><div class="search">'+I.search+'<input type="search" placeholder="Buscar" value="'+esc(UI.query)+'" data-role="search" autocomplete="off"></div>'+(UI.query?'<button class="cancel" data-act="clearSearch">Cancelar</button>':'')+'</div>'+
-   (UI.query?'':'<div class="seg"><button data-filter="hoy" class="'+(f==='hoy'?'on':'')+'">Hoy<span class="n">'+nHoy+'</span></button><button data-filter="todas" class="'+(f==='todas'?'on':'')+'">Todas<span class="n">'+nTodas+'</span></button></div>')+
+   (UI.query?'':'<div class="seg"><button data-filter="hoy" class="'+(f==='hoy'?'on':'')+'">'+(isClosed()?'Mañana':'Hoy')+'<span class="n">'+nHoy+'</span>'+hoyLoadHTML()+'</button><button data-filter="todas" class="'+(f==='todas'?'on':'')+'">Todas<span class="n">'+nTodas+'</span></button></div>')+
    (!UI.query&&activeProjects().length?'<div class="pchips">'+activeProjects().map(p=>'<button class="chip'+(UI.projFilter===p.id?' on':'')+'" data-pf="'+p.id+'"'+(UI.projFilter===p.id?' style="background:'+p.color+'"':'')+'><span class="dot" style="background:'+(UI.projFilter===p.id?'#fff':p.color)+'"></span>'+esc(p.name)+'</button>').join('')+'<button class="chip'+(UI.projFilter==='none'?' on':'')+'" data-pf="none"><span class="dot" style="background:'+(UI.projFilter==='none'?'#fff':'var(--ink3)')+'"></span>Sin proyecto</button></div>':'')+
    listHTML(UI.query?'todas':f)+'</div>'+
    '<button class="fab" data-act="add" aria-label="Añadir tarea">'+I.plus+'</button>';
@@ -503,6 +510,8 @@ function viewAjustes(){
    syncAccountHTML(dev)+pushSectionHTML(dev)+
    '<div class="group-title">Espacios</div><div class="group">'+DB.spaces.slice().sort((a,b)=>a.order-b.order).map(sp=>'<button class="cell" data-edit-space="'+sp.id+'"><span class="lbl">'+esc(sp.name)+'</span>'+(sp.id===space().id?'<span class="val">Activo</span>':'')+I.chev.replace('<svg','<svg class="chev"')+'</button>').join('')+'<button class="cell link" data-act="newSpace">'+I.plus.replace('<svg','<svg style="width:18px;height:18px"')+'<span class="lbl">Nuevo espacio</span></button></div>'+
    '<div class="footnote">Al eliminar un espacio se eliminan también sus proyectos, tareas y notas de voz.</div>'+
+   '<div class="group-title">Horas de trabajo al día</div><div class="group">'+DB.spaces.slice().sort((a,b)=>a.order-b.order).map(sp=>'<button class="cell" data-day-hours="'+sp.id+'" aria-haspopup="menu"><span class="lbl">'+esc(sp.name)+'</span><span class="val">'+dayHours(sp.id)+' h</span>'+I.chev.replace('<svg','<svg class="chev"')+'</button>').join('')+'</div>'+ // decision 60a
+   '<div class="footnote">Hoy y Semana suman el tiempo estimado de las tareas de cada día. La suma se ve en naranja al llegar a estas horas y en rojo a partir de vez y media.</div>'+
    '<div class="group-title">Datos</div><div class="group"><button class="cell" data-act="exportFile"><span class="lbl">Exportar a archivo</span><span class="val">JSON</span></button><button class="cell" data-act="exportCSV"><span class="lbl">Exportar a Excel</span><span class="val">CSV</span></button><button class="cell" data-act="importFile"><span class="lbl">Importar desde archivo</span><span class="val">JSON</span></button><button class="cell" data-act="import"><span class="lbl">Importar pegando texto</span></button></div>'+
    '<div class="footnote">Al importar, lo existente se actualiza si la copia es más reciente.</div>'+
    '<div class="group-title">Copias de seguridad</div><div class="group bk-group">'+(BACKUPS.length?BACKUPS.map(backupRowHTML).join(''):'<div class="cell"><span class="lbl" style="color:var(--ink2)">Todavía ninguna</span></div>')+'<button class="cell link" data-act="backupNow">'+I.plus.replace('<svg','<svg style="width:18px;height:18px"')+'<span class="lbl">Crear copia ahora</span></button>'+
@@ -527,7 +536,7 @@ function viewDetail(id){
   const pl={high:'Alta',mid:'Media',none:'Ninguna'}[x.priority]||'Ninguna'; const chev=I.chev.replace('<svg','<svg class="chev"'); const links=detailLinks(x.notes);
   if(UI.wide) return inspectorHTML(x, p, links);
   return '<header class="nav"><div class="nav-row"><button class="back" data-act="back">'+(UI.wide?'Cerrar':I.back+'Atrás')+'</button><div class="nav-title">Detalles</div><div class="actions">'+(x.status==='pending'?'<button class="action star'+(x.focus?' on':'')+'" data-act="focus" aria-label="'+(x.focus?'Quitar de Ahora':'Ahora')+'" aria-pressed="'+!!x.focus+'">'+(x.focus?I.starF:I.star)+'</button>':'')+'<button class="action" data-act="share" aria-label="Compartir">'+I.share+'</button><button class="action" data-act="menu" aria-label="Más">'+I.more+'</button></div></div></header>'+
-   '<div class="scroll">'+
+   '<div class="scroll">'+snoozeBarHTML(x)+
    '<div class="group"><div class="cell input"><textarea class="titlein" data-role="title" rows="1" placeholder="Título" enterkeyhint="done">'+esc(x.title)+'</textarea></div><div class="cell input"><textarea data-role="notes" placeholder="Notas">'+esc(x.notes)+'</textarea></div>'+(links.length?'<div class="links">'+linksHTML(links)+'</div>':'')+convertHTML(x)+'</div>'+
    '<div class="group"><button class="cell" data-act="pickProject"><span class="lbl">Proyecto</span><span class="val">'+(p?'<span class="dot" style="background:'+p.color+'"></span>'+esc(p.name):'Ninguno')+'</span>'+chev+'</button>'+
    '<button class="cell" data-act="pickDate"><span class="lbl">Fecha</span><span class="val">'+(x.date?fmtDate(x.date):'Sin fecha')+'</span>'+chev+'</button>'+
@@ -551,7 +560,7 @@ function inspectorHTML(x, p, links){
   const pop=(act, val, none, ic, extra)=>'<button class="ipop" data-act="'+act+'" aria-haspopup="'+(act==='pickProject'||act==='pickRepeat'||act==='pickEstimate'?'menu':'dialog')+'">'+(extra||'')+'<span class="val'+(none?' none':'')+'">'+val+'</span>'+ic+'</button>';
   const seg=[['none','Ninguna',''],['mid','Media','!!'],['high','Alta','!!!']].map(([k,l,mk])=>'<button class="'+k+(x.priority===k?' on':'')+'" data-act="setPri" data-pr="'+k+'" role="radio" aria-checked="'+(x.priority===k)+'">'+(mk?'<span class="pri '+k+'">'+mk+'</span>':'')+l+'</button>').join('');
   return '<header class="ihead"><button class="ix back" data-act="back" aria-label="Cerrar" title="Cerrar (Esc)">'+XICON+'</button><span class="grow"></span>'+(x.status==='pending'?'<button class="star'+(x.focus?' on':'')+'" data-act="focus" aria-label="'+(x.focus?'Quitar de Ahora':'Ahora')+'" aria-pressed="'+!!x.focus+'" title="'+(x.focus?'Quitar de Ahora (A)':'Ahora (A)')+'">'+(x.focus?I.starF:I.star)+'</button>':'')+'<button data-act="share" aria-label="Compartir" title="Compartir">'+I.share+'</button><button data-act="menu" aria-label="Más" title="Más">'+I.more+'</button></header>'+
-   '<div class="scroll">'+
+   '<div class="scroll">'+snoozeBarHTML(x)+
    '<div class="group igroup"><div class="cell input"><textarea class="titlein" data-role="title" rows="1" placeholder="Título" enterkeyhint="done">'+esc(x.title)+'</textarea></div><div class="cell input"><textarea data-role="notes" placeholder="Notas">'+esc(x.notes)+'</textarea></div>'+(links.length?'<div class="links">'+linksHTML(links)+'</div>':'')+convertHTML(x)+'</div>'+
    '<div class="iform"><span class="ilbl">Proyecto</span>'+pop('pickProject', p?esc(p.name):'Ninguno', !p, UPDOWN, p?'<span class="dot" style="background:'+p.color+'"></span>':'')+
    '<span class="ilbl">Fecha</span>'+pop('pickDate', x.date?(x.carried&&x.date<=todayStr()?'Hoy, aplazada':fmtDate(x.date)):'Sin fecha', !x.date, I.cal)+

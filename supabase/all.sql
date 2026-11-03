@@ -1,4 +1,4 @@
--- Tareas: todas las migraciones seguidas (0001 a 0008).
+-- Tareas: todas las migraciones seguidas (0001 a 0009).
 -- Se puede ejecutar entero tantas veces como haga falta: cada parte comprueba lo que ya existe.
 -- Generado a partir de supabase/migrations. Si se añade una migración, se regenera este archivo.
 
@@ -721,4 +721,24 @@ comment on column public.tasks.postponed is 'Decision 56: how many times the ope
 comment on column public.tasks.carried_since is 'Decision 56: the first day the task was due when it was first put off, null until then';
 
 -- PostgREST learns the new columns at once (otherwise it may take a moment to reload its schema cache)
+notify pgrst, 'reload schema';
+
+-- ========== migrations/0009_closed_day.sql ==========
+-- Tareas: the day closed on every device (Cerrar el día, owner's decision of 3 November).
+--
+-- What this adds to public.spaces:
+--   * closed_day: the day Cerrar el día was confirmed in that space, null when it is open. The day is closed while closed_day is today
+--     (on the device's clock): Hoy then shows tomorrow's tasks on every device, under «Día cerrado» and «Reabrir hoy». A value of a past
+--     day means open, so midnight opens the day again without anything to clean up. Setting or clearing it updates the space's modified.
+--
+-- Nothing else changes: the write trigger "newest modified wins", the row level security and realtime of 0001_init.sql already cover
+-- every column of the table. Until this runs, the app keeps the closed day on each device and syncs the rest as before.
+--
+-- Run after 0001_init.sql to 0008_estimate_postponed.sql, in the SQL Editor. Safe to run more than once.
+
+alter table public.spaces add column if not exists closed_day date;
+
+comment on column public.spaces.closed_day is 'The day Cerrar el día was confirmed in this space, null when open; closed while it is today';
+
+-- PostgREST learns the new column at once (otherwise it may take a moment to reload its schema cache)
 notify pgrst, 'reload schema';

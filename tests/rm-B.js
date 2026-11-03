@@ -16,6 +16,8 @@ const errors=[];
 
 async function open(browser, opts, url){
   const ctx = await browser.newContext(opts); const page = await ctx.newPage();
+  // Today at 10:00 local: from 18:30 Hoy proposes tomorrow for a new task (the evening rule), which these checks of today's default are not about
+  await page.clock.install({time:(()=>{ const d=new Date(); d.setHours(10,0,0,0); return d; })()});
   await page.addInitScript(s=>{ if(!localStorage.getItem('tareas-v1')) localStorage.setItem('tareas-v1', s); }, SEED);
   page.on('pageerror', e=>errors.push(e.message)); page.on('console', m=>{ if(m.type()==='error') errors.push(m.text()); });
   await page.goto(url||URL); await page.waitForTimeout(500); return {ctx, page};

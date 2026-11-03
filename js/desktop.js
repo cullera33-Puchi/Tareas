@@ -180,7 +180,7 @@ function deskSide(){
   const it=(view,ic,label,n,on,attr)=>'<button class="it'+(on?' on':'')+'" data-view="'+view+'"'+(attr||'')+'>'+ic+'<span>'+label+'</span>'+(n!==undefined?'<span class="n">'+n+'</span>':'')+'</button>';
   return '<aside class="side"><button class="sp" data-act="spaceMenu">'+esc(space().name)+I.chevD+'</button>'+
     it('ahora',I.star,'Ahora',ahoraTasks().length,v==='ahora',' data-drop-ahora=""')+ // decision 39: above Hoy, and rows dropped on it go into Ahora
-    it('hoy',I.list,'Hoy',pendingFor('hoy').length,v==='hoy',' data-day="'+todayStr()+'"')+it('todas',I.inbox.replace('viewBox="0 0 48 48"','viewBox="0 0 48 48" stroke-width="3"'),'Todas',pendingFor('todas').filter(x=>x.status!=='waiting').length,v==='todas')+it('waiting',MI.wait,'Por confirmar',spaceTasks().filter(x=>x.status==='waiting').length,v==='waiting')+it('week',I.cal,'Semana',undefined,isCalView(v))+miniMonthHTML()+ // decision 41
+    it('hoy',I.list,isClosed()?'Mañana':'Hoy',hoyShown().length,v==='hoy',' data-day="'+(isClosed()?addDays(todayStr(),1):todayStr())+'"')+it('todas',I.inbox.replace('viewBox="0 0 48 48"','viewBox="0 0 48 48" stroke-width="3"'),'Todas',pendingFor('todas').filter(x=>x.status!=='waiting').length,v==='todas')+it('waiting',MI.wait,'Por confirmar',spaceTasks().filter(x=>x.status==='waiting').length,v==='waiting')+it('week',I.cal,'Semana',undefined,isCalView(v))+miniMonthHTML()+ // decision 41
     '<div class="sec">Proyectos</div>'+ps.map(p=>'<button class="it'+(v==='project:'+p.id?' on':'')+'" data-view="project:'+p.id+'" data-drop-project="'+p.id+'" aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown"><span class="dot" style="background:'+p.color+'"></span><span>'+esc(p.name)+'</span><span class="n">'+cnt(p.id)+'</span></button>').join('')+
     '<button class="it'+(v==='project:none'?' on':'')+'" data-view="project:none" data-drop-project=""><span class="dot" style="background:var(--ink3)"></span><span>Sin proyecto</span><span class="n">'+cnt(null)+'</span></button>'+
     '<button class="it add" data-act="newProject">'+I.plus+'<span>Nuevo proyecto</span></button>'+
@@ -190,7 +190,7 @@ function addBarHTML(projectId){ return '<div class="addx'+(AX.open?' open':'')+'
 // The desktop add bar starts from today in Hoy and from the project in a project view; the title can say otherwise (R7)
 // Decision 27b: in Hoy and Todas it also takes the project of the active project filter (the list ignores the filter during a search, so does the bar)
 function deskAddBase(projectId){ const hoy=UI.deskView==='hoy', pf=(hoy||UI.deskView==='todas')&&!projectId&&!UI.query?filterProject():null;
-  return {date:hoy?todayStr():null, projectId:projectId||pf, priority:'none'}; }
+  return {date:hoy?hoyAddDate():null, projectId:projectId||pf, priority:'none'}; } // the evening rule: in Hoy from 18:30 it proposes tomorrow
 // R6: a list pasted into the desktop add bar waits under it until it is created or dropped
 function pasteBoxHTML(projectId){ const ls=UI.addPaste; if(!ls||!ls.length) return ''; const b=deskAddBase(projectId); const n=ls.length+' '+(ls.length===1?'tarea':'tareas');
   return '<div class="pastebox"><div class="plhead"><span>'+n+'</span></div><div class="plist">'+ls.map((l,i)=>{ const r=quickTask(l,b); return '<div class="pl"><span class="t">'+esc(r.title||l)+'</span><span class="m">'+esc(quickMeta(r))+'</span><button class="x" data-paste-rm="'+i+'" aria-label="Quitar">×</button></div>'; }).join('')+'</div><div class="sheet-actions"><button class="btn" data-paste="cancel">Cancelar</button><span style="flex:1"></span><button class="btn primary" data-paste="ok">Crear '+n+'</button></div></div>'; }
@@ -230,8 +230,8 @@ function bindColResize(d){
   d.addEventListener('click', e=>{ if(e.target.closest('.colhead')) e.stopPropagation(); }, true); } // the header is not a row: a click on it does nothing
 function deskMain(){
   const v=UI.deskView; let title='', body='', search=true, pf=false, seg='', notes=false, pit=null, pitProj=false;
-  if(v==='hoy'||v==='todas'){ const f=v; title=f==='hoy'?'Hoy':'Todas'; pf=true;
-    body = addBarHTML(null)+colHeadHTML()+(UI.query?'':ahoraHTML())+
+  if(v==='hoy'||v==='todas'){ const f=v; title=f==='hoy'?(isClosed()?'Mañana':'Hoy'):'Todas'; pf=true; // the day closed: Hoy shows tomorrow
+    body = addBarHTML(null)+colHeadHTML()+(UI.query||f==='hoy'&&isClosed()?'':ahoraHTML())+
       listHTML(UI.query?'todas':f); }
   else if(v==='ahora'){ title='Ahora'; body=colHeadHTML()+ahoraViewHTML(); } // decision 39
   else if(v==='waiting'){ title='Por confirmar'; body=colHeadHTML()+waitingViewHTML(); } // decision 41
@@ -242,5 +242,5 @@ function deskMain(){
   else if(v==='settings'){ title='Ajustes'; search=false; const h=viewAjustes(); body=h.slice(h.indexOf('<div class="scroll">')); }
   const cal=isCalView(v);
   const pitOn=pit&&!pitFolded();
-  return '<main class="main'+(v==='hoy'?' with-agenda':'')+(pitOn?' with-pit':'')+(pitProj?' pit-proj':'')+'"><div class="mhead'+(cal?' wide-head':'')+'"><h1>'+esc(title)+'</h1>'+seg+(pf?'<span class="pfslot">'+pfDropHTML()+'</span>':'')+(search?'<div class="searchbar"><div class="search">'+I.search+'<input type="search" placeholder="Buscar" value="'+esc(UI.query)+'" data-role="search" autocomplete="off"></div>'+(UI.query?'<button class="cancel" data-act="clearSearch">Cancelar</button>':'')+'</div>':'')+(pit?pitOpenBtnHTML(pit):'')+(v==='hoy'||v==='todas'||(v.startsWith('project:')&&!notes)?'<button class="mopts" data-act="viewMenu" aria-label="Opciones de vista" title="Opciones de vista">'+I.more+'</button>':'')+'</div><div class="mbody'+(cal?' calbody':notes?' notesbody':'')+'"><div class="inner'+(cal?' week-inner':v==='settings'?' settings':notes?' notes-inner':'')+'">'+body+'</div></div>'+(v==='hoy'?agendaHTML():'')+(pitOn?pitColHTML(pit):'')+'</main>';
+  return '<main class="main'+(v==='hoy'?' with-agenda':'')+(pitOn?' with-pit':'')+(pitProj?' pit-proj':'')+'"><div class="mhead'+(cal?' wide-head':'')+'"><h1>'+esc(title)+(v==='hoy'&&!UI.query?hoyLoadHTML():'')+'</h1>'+seg+(pf?'<span class="pfslot">'+pfDropHTML()+'</span>':'')+(search?'<div class="searchbar"><div class="search">'+I.search+'<input type="search" placeholder="Buscar" value="'+esc(UI.query)+'" data-role="search" autocomplete="off"></div>'+(UI.query?'<button class="cancel" data-act="clearSearch">Cancelar</button>':'')+'</div>':'')+(pit?pitOpenBtnHTML(pit):'')+(v==='hoy'||v==='todas'||(v.startsWith('project:')&&!notes)?'<button class="mopts" data-act="viewMenu" aria-label="Opciones de vista" title="Opciones de vista">'+I.more+'</button>':'')+'</div><div class="mbody'+(cal?' calbody':notes?' notesbody':'')+'"><div class="inner'+(cal?' week-inner':v==='settings'?' settings':notes?' notes-inner':'')+'">'+body+'</div></div>'+(v==='hoy'?agendaHTML():'')+(pitOn?pitColHTML(pit):'')+'</main>';
 }

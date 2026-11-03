@@ -43,6 +43,7 @@ const MI = {
   repeat:mi('<path d="M17 3l3 3-3 3M4 11.5V10a4 4 0 014-4h12M7 21l-3-3 3-3M20 12.5V14a4 4 0 01-4 4H4"/>'),
   flag:mi('<path d="M5.5 21V4M5.5 4.5h11.5l-2.5 4.25 2.5 4.25H5.5"/>'), // decision 48a: Fecha límite
   est:mi('<path d="M7 3h10M7 21h10M8 3v3a4.5 4.5 0 002 3.7L12 11l2-1.3A4.5 4.5 0 0016 6V3M8 21v-3a4.5 4.5 0 012-3.7l2-1.3 2 1.3a4.5 4.5 0 012 3.7v3"/>'), // decision 56: Tiempo
+  bell:mi('<path d="M6 9.5a6 6 0 0112 0v3.5l2 3H4l2-3zM10 19.5a2 2 0 004 0"/>'), // decision 55: Posponer recordatorio
   bulb:mi('<path d="M9 18h6M10 21h4M12 3a6 6 0 00-3.5 10.9c.6.5 1 1.2 1 2V16h5v-.1c0-.8.4-1.5 1-2A6 6 0 0012 3z"/>'), // decision 56: ¿Qué hago ahora?
 };
 const pmEl=$('#pmenu');
@@ -251,10 +252,13 @@ function setEstimate(id, m){ const x=task(id); m=+m||null; if(!x||(+x.estimate||
   toast(m?'Tiempo estimado: '+estLabel(m).toLowerCase():'Sin tiempo estimado', ()=>updTask(id, {estimate:old})); }
 /* R17: the desktop menu of a task (right click, its three dots): Completar, then Fecha, Prioridad and Proyecto as submenus with a check
    on the current value, Mover a otro espacio, Duplicar and Eliminar, each with the key that acts on the selected row (R15) */
+// Decision 60a: Horas de trabajo al día of a space (Ajustes), 4 to 10
+function dayHoursMenu(spaceId, src){ const cur=dayHours(spaceId);
+  popMenu({anchor:src, align:'right', groups:[DAY_HOURS.map(h=>({label:h+' h', on:cur===h, fn:()=>setDayHours(spaceId, h)}))]}); }
 function deskTaskMenu(id){ const x=task(id); if(!x) return null; const done=x.status==='done';
   return {groups:[
     [{label:done?'Marcar pendiente':'Completar', key:'C', fn:()=>{ releaseHold(id); leaveRows(id); setTimeout(()=>{ completeTask(id); renderAnimated(); },200); }}].concat(x.status==='pending'?[{label:x.focus?'Quitar de Ahora':'Ahora', key:'A', fn:()=>toggleFocus(id)}]:[]).concat(waitItems(x)), // decisions 39 and 41
-    [{label:'Fecha', menu:()=>dateMenu(id)}].concat(x.status!=='done'?[{label:'Fecha límite', menu:()=>deadlineMenu(id)}]:[], [{label:'Prioridad', menu:()=>({title:'Prioridad', groups:[prioItems(x, id)]})}].concat(x.status!=='done'?[{label:'Tiempo', menu:()=>estimateMenu(id)}]:[], [{label:'Proyecto', key:'P', menu:()=>projectPickMenu(id)}])).concat(DB.spaces.length>1?[{label:'Mover a otro espacio', menu:()=>spaceMoveMenu(id)}]:[]),
+    [{label:'Fecha', menu:()=>dateMenu(id)}].concat(x.status!=='done'?[{label:'Fecha límite', menu:()=>deadlineMenu(id)}]:[], canSnooze(x)?[{label:'Posponer recordatorio', menu:()=>snoozeMenu(id)}]:[], [{label:'Prioridad', menu:()=>({title:'Prioridad', groups:[prioItems(x, id)]})}].concat(x.status!=='done'?[{label:'Tiempo', menu:()=>estimateMenu(id)}]:[], [{label:'Proyecto', key:'P', menu:()=>projectPickMenu(id)}])).concat(DB.spaces.length>1?[{label:'Mover a otro espacio', menu:()=>spaceMoveMenu(id)}]:[]),
     [{label:'Duplicar', fn:()=>duplicateTask(id)}],
     [{label:'Eliminar', key:'Supr', red:true, fn:()=>confirmDelete(id)}] ]}; }
 function duplicateTask(id){ const x=task(id); if(!x) return; const n=addTask(Object.assign({title:x.title, projectId:x.projectId, priority:x.priority, notes:x.notes, spaceId:x.spaceId}, x.deadline?{deadline:x.deadline}:{}, x.estimate?{estimate:x.estimate}:{})); /* decision 48a: the deadline too; decision 56: the estimate, never the counters */ copySteps(id, n.id); /* decision 46: the steps, unchecked */ haptic(8); renderAnimated(); toast('Tarea duplicada'); openDetail(n.id); }

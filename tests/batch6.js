@@ -30,8 +30,9 @@ const srv = http.createServer((req,res)=>{ let p = decodeURIComponent(req.url.sp
   await page.evaluate(()=>{ completeTask(DB.tasks[1].id,true); render(); }); await page.waitForTimeout(200);
   r.doneLabel = await page.$eval('.screen.root[data-root=tareas] [data-act=toggleDone] span', e=>e.textContent);
   // Decision 52: the day done is said by the empty state of Hoy (the summary line is gone)
-  r.allDone = await page.evaluate(()=>({left:pendingFor('hoy').length, title:(document.querySelector('.screen.root[data-root=tareas] .empty b')||{}).textContent||null, sub:(document.querySelector('.screen.root[data-root=tareas] .empty')||{}).textContent||null}));
-  if(r.allDone.left===0 && !(r.allDone.title==='Todo hecho por hoy' && /1 tarea completada/.test(r.allDone.sub))) errors.push('all done: '+JSON.stringify(r.allDone));
+  // Owner, 3 November: one discreet line, no icon and no links
+  r.allDone = await page.evaluate(()=>({left:pendingFor('hoy').length, line:(document.querySelector('.screen.root[data-root=tareas] .hoydone')||{}).textContent||null, big:!!document.querySelector('.screen.root[data-root=tareas] .empty')}));
+  if(r.allDone.left===0 && !(r.allDone.line==='Todo hecho por hoy, 1 completada' && !r.allDone.big)) errors.push('all done: '+JSON.stringify(r.allDone));
   await page.screenshot({path:'30-alldone.png'});
   // 5) Shake toggle (Chromium: no requestPermission -> enables)
   await page.click('#tabbar [data-tab=ajustes]'); await page.waitForTimeout(200);

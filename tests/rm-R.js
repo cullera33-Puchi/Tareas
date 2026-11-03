@@ -29,6 +29,8 @@ function fakeSR(){ window.__srStarts=0; window.SpeechRecognition = window.webkit
 async function open(browser, o){
   const vp = o.desk ? {viewport:{width:1280,height:800}, deviceScaleFactor:1} : {viewport:{width:390,height:844}, deviceScaleFactor:2, isMobile:true, hasTouch:true};
   const ctx = await browser.newContext(Object.assign(vp, {colorScheme:o.dark?'dark':'light'})); const page = await ctx.newPage();
+  // Today at 10:00 local: from 18:30 the add bar of Hoy proposes tomorrow (the evening rule), which these checks are not about
+  await page.clock.install({time:(()=>{ const d=new Date(); d.setHours(10,0,0,0); return d; })()});
   page.on('pageerror', e=>errors.push((o.tag||'')+' pageerror: '+e.message)); page.on('console', m=>{ if(m.type()==='error') errors.push((o.tag||'')+' console: '+m.text()); });
   if(o.sr) await page.addInitScript(fakeSR);
   await page.addInitScript(s=>{ if(!localStorage.getItem('tareas-v1')) localStorage.setItem('tareas-v1', s); }, JSON.stringify(o.seed||SEED));
@@ -77,7 +79,7 @@ const aligned = o => Math.abs(o.icon[0]-o.icon[1])<=1 && Math.abs(o.text[0]-o.te
   check('ax_enter_in_notes_adds_all', x.title==='Comprar' && x.date===addD(today,1) && x.projectId==='p-casa' && x.priority==='high' && x.reminder && new Date(x.reminder).getHours()===10 && x.notes==='Primera línea\nSegunda línea llamar a Pedro' && !x.vn.length && await page.evaluate(()=>DB.voiceNotes.length===0), x);
   const after = await page.evaluate(()=>({open:AX.open, v:document.querySelector('#desk [data-role=addbar]').value, notes:document.querySelector('#desk [data-role=addnotes]').value, voice:!!document.querySelector('#desk [data-role=addvoice]'), focus:document.activeElement.dataset.role, toast:document.querySelector('#toastText').textContent}));
   b = await btns(page);
-  check('ax_series_ready', after.open && after.v==='' && after.notes==='' && !after.voice && after.focus==='addbar' && after.toast==='Añadida: Comprar' && b.proj.t==='Casa' && b.date.t==='Hoy' && b.pri.t==='Prioridad' && b.rem.t==='Recordatorio', {after, b}); // the project chosen by hand stays; the written date does not
+  check('ax_series_ready', after.open && after.v==='' && after.notes==='' && !after.voice && after.focus==='addbar' && after.toast==='Añadida para mañana: Comprar' /* written «mañana» from Hoy: not in the list, the toast says where it went */ && b.proj.t==='Casa' && b.date.t==='Hoy' && b.pri.t==='Prioridad' && b.rem.t==='Recordatorio', {after, b}); // the project chosen by hand stays; the written date does not
   // Fecha by hand, then two in a row with it
   await page.click('#desk .axbt[data-ax=date]'); await page.waitForTimeout(300);
   await page.click('#pmenu .pm-pop [data-d="'+addD(today,3)+'"]').catch(async()=>{ await page.evaluate(d=>{ const c=document.querySelector('#pmenu .pm-pop [data-d="'+d+'"]'); c&&c.click(); }, addD(today,3)); }); await page.waitForTimeout(300);

@@ -84,11 +84,11 @@ async function sqlTests(){
   await db.close();
   db = await pgSetup(); const all = strip(fs.readFileSync(path.join(ROOT, 'supabase/all.sql'), 'utf8'));
   err = null; try { await db.exec(all); await db.exec(all); } catch(e){ err = e.message; }
-  check('sql_all_twice', !err && /0001 a 0008/.test(all.split('\n')[0]) && /migrations\/0008_estimate_postponed\.sql/.test(all) && (all.match(/^-- ========== migrations\//mg)||[]).length===fs.readdirSync(path.join(ROOT,'supabase/migrations')).filter(f=>f.endsWith('.sql')).length, err);
+  check('sql_all_twice', !err && /0001 a 00\d\d/.test(all.split('\n')[0]) && /migrations\/0008_estimate_postponed\.sql/.test(all) && (all.match(/^-- ========== migrations\//mg)||[]).length===fs.readdirSync(path.join(ROOT,'supabase/migrations')).filter(f=>f.endsWith('.sql')).length, err);
   let rows = []; try { rows = (await db.query(fs.readFileSync(path.join(ROOT, 'supabase/check.sql'), 'utf8'))).rows; } catch(e){ err = e.message; }
   check('sql_check_all_ok', rows.length>=23 && rows.every(x=>x.Estado==='OK') && ['tasks\\.estimate \\(0008\\)','tasks\\.postponed \\(0008\\)','tasks\\.carried_since \\(0008\\)'].every(p=>rows.some(x=>new RegExp(p).test(x.Pieza))), {err, bad:rows.filter(x=>x.Estado!=='OK'), n:rows.length});
   const readme = fs.readFileSync(path.join(ROOT, 'supabase/README.md'), 'utf8');
-  check('sql_readme', /`migrations\/0008_estimate_postponed\.sql` \| .* \| v0\.28\.0/.test(readme) && /suma de las ocho/.test(readme), null);
+  check('sql_readme', /`migrations\/0008_estimate_postponed\.sql` \| .* \| v0\.28\.0/.test(readme) && /suma de las \w+ en orden/.test(readme), null);
   await db.close();
 }
 

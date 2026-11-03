@@ -29,7 +29,7 @@ const INITIAL_SPACES=['trabajo','personal'];
 // dayN (decision 48a, deadline): the same, for a date (0007_deadline.sql)
 // intN (decision 56, estimate and postponed): the same, for a whole number above zero (0 is none); carried_since is a dayN (0008_estimate_postponed.sql)
 const SYNC_FIELDS={
-  spaces:[['name','name','text'],['order','sort_order','int']],
+  spaces:[['name','name','text'],['order','sort_order','int'],['closedDay','closed_day','dayN']], // the day closed on every device (0009_closed_day.sql)
   projects:[['spaceId','space_id','id'],['name','name','text'],['color','color','id'],['order','sort_order','int'],['archived','archived','bool']],
   tasks:[['spaceId','space_id','id'],['projectId','project_id','id'],['title','title','text'],['date','date','day'],['reminder','reminder','ts'],['priority','priority','pri'],['status','status','status'],['notes','notes','text'],['carried','carried','bool'],['completed','completed','ts'],['reminderSent','reminder_sent','tsOpt'],['repeat','repeat','textN'],['focus','focus','tsN'],['waitingFor','waiting_for','textN'],['deadline','deadline','dayN'],['estimate','estimate','intN'],['postponed','postponed','intN'],['carriedSince','carried_since','dayN']],
   voice_notes:[['taskId','task_id','id'],['text','text','text']],
@@ -156,7 +156,7 @@ function syncRemapSpaces(W, pool){ const out=[], used=new Set();
     else { sp.id=nid; if(!sp.modified) sp.modified=sp.created||new Date().toISOString(); }
     W.projects.forEach(p=>{ if(p.spaceId===old) p.spaceId=nid; }); W.tasks.forEach(x=>{ if(x.spaceId===old) x.spaceId=nid; });
     if(W.settings && W.settings.activeSpace===old) W.settings.activeSpace=nid;
-    if(W.settings && W.settings.workWeek && old in W.settings.workWeek){ const w=Object.assign({}, W.settings.workWeek); w[nid]=w[old]; delete w[old]; W.settings.workWeek=w; } // decision 35: the space's calendar option follows its new id
+    ['workWeek','dayHours'].forEach(k=>{ if(W.settings && W.settings[k] && old in W.settings[k]){ const w=Object.assign({}, W.settings[k]); w[nid]=w[old]; delete w[old]; W.settings[k]=w; } }); // decisions 35 and 60a: the space's calendar option and working hours follow its new id
     out.push({from:old, to:nid, name:sp.name, found:!!match}); });
   return out; }
 // Server rows into the working copy W, newest modified first; st.known learns what the server holds. Returns what changed here
@@ -233,8 +233,8 @@ function syncColRefused(table, e){ const m=String(e&&(e.message||e.details||e)||
   if(!/PGRST204|42703|column|schema cache/i.test(m)) return null; return SYNC_NULLCOLS(table).find(c=>!syncNoCol(table,c)&&new RegExp('(^|\\W)'+c+'(\\W|$)').test(m))||null; }
 // The status check of 0001 (pending or done) refuses 'waiting' (decision 41) until 0004 widens it: from then on such tasks go up as pending
 const syncWaitRefused = (table, e) => { const m=String(e&&(e.message||e.details||e)||'')+' '+String(e&&e.code||''); return table==='tasks'&&!syncNoCol(table,'status:waiting')&&/23514|check constraint/i.test(m)&&/status/i.test(m); };
-const NOCOL_WHAT={repeat:'La repetición', focus:'Ahora', waiting_for:'Esperando a', deadline:'La fecha límite', estimate:'El tiempo estimado y las veces que se ha aplazado'},
-  NOCOL_FILE={deadline:'0007_deadline.sql', estimate:'0008_estimate_postponed.sql', postponed:'0008_estimate_postponed.sql', carried_since:'0008_estimate_postponed.sql'}; // the migration that adds each column (0004 unless said)
+const NOCOL_WHAT={repeat:'La repetición', focus:'Ahora', waiting_for:'Esperando a', deadline:'La fecha límite', estimate:'El tiempo estimado y las veces que se ha aplazado', closed_day:'El día cerrado'},
+  NOCOL_FILE={deadline:'0007_deadline.sql', estimate:'0008_estimate_postponed.sql', postponed:'0008_estimate_postponed.sql', carried_since:'0008_estimate_postponed.sql', closed_day:'0009_closed_day.sql'}; // the migration that adds each column (0004 unless said)
 async function syncUpsert(table, rows){ for(;;){ const send=rows.map(r=>{ let o=r; SYNC_NULLCOLS(table).forEach(c=>{ if(syncNoCol(table,c)&&c in o){ if(o===r) o=Object.assign({}, r); delete o[c]; } });
       if(o.status==='waiting'&&syncNoCol(table,'status:waiting')){ if(o===r) o=Object.assign({}, r); o.status='pending'; } return o; });
     try{ return await SY.remote.upsert(table, send); }

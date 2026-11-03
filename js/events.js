@@ -59,6 +59,7 @@ function onClick(e){
   const mc=e.target.closest('.minical [data-cal]'); if(mc){ UI.miniYM=shiftMonth(UI.miniYM||calAnchor().slice(0,7), +mc.dataset.cal); render(); return; }
   const wa=e.target.closest('[data-add-date]'); if(wa){ addSheet(wa.dataset.project!==undefined?wa.dataset.project||null:(UI.query?null:filterProject()),'',{date:wa.dataset.addDate}); return; } // R14: a day header in a project adds to that project; elsewhere, to the project of the active filter
   const es=e.target.closest('[data-edit-space]'); if(es){ spaceSheet(es.dataset.editSpace); return; }
+  const dh=e.target.closest('[data-day-hours]'); if(dh){ dayHoursMenu(dh.dataset.dayHours, dh.querySelector('.val')||dh); return; } // decision 60a
   const bka=e.target.closest('[data-bkact]'); if(bka){ const r=bka.closest('[data-bk]'); if(r){ closeVn(r); deleteBackup(r.dataset.bk); } return; } // decision 34
   const bkr=e.target.closest('.vn[data-bk]'); if(bkr&&bkr.dataset.open){ closeVn(bkr); return; } // a row showing Eliminar: a tap closes it
   const rb=e.target.closest('[data-restore]'); if(rb){ restoreBackup(rb.dataset.restore); return; }
@@ -88,6 +89,9 @@ function onClick(e){
     case 'closeDay': closeDaySheet(); break;
     case 'plan': planStart(); break;
     case 'review': reviewStart('carried'); break;
+    case 'forgot': reviewStart('forgot'); break; // decision 60b
+    case 'reopenDay': reopenDay(); break; // the day closed on every device: Reabrir hoy
+    case 'snooze': if(detailId) snoozePick(detailId, act.dataset.snz, act); break; // decision 55: the bar of a task opened from its notification
     case 'viewMenu': viewMenu(act); break;
     case 'exportCSV': exportCSV(); break;
     case 'selAll': selectAllVisible(); break;
@@ -160,12 +164,12 @@ function push(kind,id){
   const below=underScreen(); app.appendChild(el); navLock(); const s={kind,id,el}; UI.stack.push(s); renderPushed(s); if(below) below.classList.add('under');
   requestAnimationFrame(()=>requestAnimationFrame(()=>{ el.classList.remove('pushed'); el.classList.add('shown'); }));
 }
-function openDetail(id){ if(UI.wide){ const ds=UI.dsel, plain=deskPlain()&&!!deskRow(id); UI.deskDetail=id; ds.cur=ds.anchor=id; ds.ids.clear(); ds.mode=false; if(plain) deskSelPane(); else render(); return; } push('detail', id); } // R15: the task in the inspector is the selected row
+function openDetail(id, o){ UI.snooze=o&&o.snooze?id:null; /* decision 55: the bar Posponer recordatorio only follows the tap on a notification */ if(UI.wide){ const ds=UI.dsel, plain=deskPlain()&&!!deskRow(id); UI.deskDetail=id; ds.cur=ds.anchor=id; ds.ids.clear(); ds.mode=false; if(plain) deskSelPane(); else render(); return; } push('detail', id); } // R15: the task in the inspector is the selected row
 // R18: a desktop list with one selected row at most and no title being edited: opening, closing or moving the inspector changes only it and the highlight
 function deskPlain(){ return UI.wide && deskListView() && !deskMulti() && !UI.dsel.mode && !UI.dsel.edit && !!$('#desk .main .mbody') && $('#desk')._mainKind==='list'; }
 // The task the open detail shows: the desktop pane, or the top pushed screen on the iPhone
 function detailTaskId(){ if(UI.wide) return UI.deskDetail; const cur=UI.stack[UI.stack.length-1]; return cur&&cur.kind==='detail'?cur.id:null; }
-function pop(){
+function pop(){ UI.snooze=null; // decision 55: leaving the task drops its bar Posponer recordatorio
   if(UI.wide){ const plain=deskPlain(); UI.deskDetail=null; if(plain) deskSelPane(); else render(); return; }
   if(UI.select&&UI.select.scope==='project'){ UI.select=null; app.classList.remove('selecting'); }
   const s=UI.stack.pop(); if(!s) return; navLock();

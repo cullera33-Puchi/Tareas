@@ -116,5 +116,5 @@ function bindAddBar(d){
 }
 function bindPasteBox(d, refocus){ const pb=$('.pastebox',d), base=()=>{ const a=$('[data-role=addbar]',d); return deskAddBase(a&&a.dataset.project); }; if(pb&&!pb._pb){ pb._pb=1; pb.addEventListener('click',e=>{ const rm=e.target.closest('[data-paste-rm]'); if(rm){ UI.addPaste.splice(+rm.dataset.pasteRm,1); if(!UI.addPaste.length) UI.addPaste=null; render(); refocus(); return; }
     const b=e.target.closest('[data-paste]'); if(!b) return; if(b.dataset.paste==='cancel'){ UI.addPaste=null; render(); refocus(); return; }
-    const ls=UI.addPaste.slice(); UI.addPaste=null; const ids=addMany(ls, base()); renderAnimated(); log('info','Tareas creadas desde una lista', {n:ids.length}); toast(ids.length===1?'1 tarea creada':ids.length+' tareas creadas', ()=>removeTasks(ids)); refocus(); }); }
+    const ls=UI.addPaste.slice(); UI.addPaste=null; const ids=addMany(ls, base()); renderAnimated(); log('info','Tareas creadas desde una lista', {n:ids.length}); toast((ids.length===1?'1 tarea creada':ids.length+' tareas creadas')+(UI.deskView==='hoy'&&forTomorrow(ids.map(i=>(task(i)||{}).date))?' para mañana':''), ()=>removeTasks(ids)); refocus(); }); }
 }

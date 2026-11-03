@@ -2,7 +2,7 @@
 /* Tareas. Core: version, log, utilities, data (DB in localStorage), UI state, Deshacer toast and the task actions.
    A classic script: index.html loads every file of js/ in order and they share their global names. Only declarations and
    listeners run at load; the start itself (first screen, timers, sync, service worker) is in boot.js, the last file. */
-const APP_VERSION = '0.29.3';
+const APP_VERSION = '0.30.0';
 let pendingSW = null; // service worker installed and waiting to take over
 let updateRequested = false; // the user asked for the waiting worker to take over
 
@@ -319,6 +319,37 @@ const dlText = d => { const s=fmtDate(d); return 'Entrega '+s[0].toLowerCase()+s
    Four values of one tap: 15, 30, 60 and 240 (Medio día). The rows say it in grey; Sugerir (56c) reads it */
 const EST_VALUES=[15,30,60,240];
 const estLabel = m => { m=+m; if(!m) return ''; if(m===240) return 'Medio día'; if(m<60) return m+' min'; return Math.floor(m/60)+' h'+(m%60?' '+(m%60)+' min':''); }; // "15 min", "1 h", "Medio día"
+/* Decision 60a: the load of a day in hours. The estimates of the open tasks a day shows, added up (a task without one adds nothing):
+   next to the Hoy count (the segment on the iPhone, the title on the desktop) and in the day heads of Semana and Día, whose bar measures it.
+   The limit is the space's working hours (Ajustes, Horas de trabajo al día: 4 to 10, 6 when not set), a device preference in
+   settings.dayHours by space id, as settings.workWeek (decision 35). Orange once the load reaches the limit, red from half as much again */
+const DAY_HOURS=[4,5,6,7,8,9,10], DAY_HOURS_DEF=6;
+function dayHours(spaceId){ const h=DB.settings.dayHours, v=h&&typeof h==='object'?+h[spaceId||space().id]:0; return DAY_HOURS.includes(v)?v:DAY_HOURS_DEF; }
+function setDayHours(spaceId, h){ if(!DAY_HOURS.includes(h)||dayHours(spaceId)===h) return; DB.settings.dayHours=Object.assign({}, DB.settings.dayHours, {[spaceId]:h}); save();
+  log('info','Horas de trabajo al día: '+h, {space:(DB.spaces.find(o=>o.id===spaceId)||{}).name}); render(); }
+const estSum = xs => xs.reduce((s,x)=>s+(isOpen(x)?(+x.estimate||0):0), 0); // minutes; done tasks never count
+const hoursText = m => { m=Math.round(+m||0); if(m<=0) return ''; if(m<60) return m+' min'; const h=Math.floor(m/60), r=m%60; return h+' h'+(r?' '+String(r).padStart(2,'0'):''); }; // "45 min", "6 h", "5 h 30"
+function loadLevel(m, spaceId){ const lim=dayHours(spaceId)*60; return m>=lim*1.5?'red':m>=lim?'orange':''; }
+/* Evening rule (owner, 3 November): from 18:30 to midnight a task added from Hoy is proposed for tomorrow (the iPhone + and Añadir tarea,
+   the desktop add bar, its composer and pasted lists), and Cerrar el día shows at the end of Hoy (R8). One threshold for both */
+const EVENING_MIN=18*60+30;
+const isEvening = () => { const n=new Date(); return n.getHours()*60+n.getMinutes()>=EVENING_MIN; };
+const hoyAddDate = () => isEvening()?addDays(todayStr(),1):todayStr();
+// The toast after adding from Hoy: those that went to tomorrow are not in the list, so it says where they went
+const forTomorrow = dates => dates.length>0 && dates.every(d=>d===addDays(todayStr(),1));
+/* Close the day on every device (owner, 3 November). Space.closedDay (Supabase spaces.closed_day, 0009_closed_day.sql) is the day Cerrar el
+   día was confirmed in that space; null when open. The day is closed while it equals today: midnight opens it again by itself. While closed,
+   Hoy shows what it will show tomorrow (dated tomorrow, a deadline tomorrow, a review day tomorrow; nothing carried), under the line
+   Día cerrado with Reabrir hoy; the segment and the sidebar say Mañana, Ahora hides, and the badge still counts today */
+const isClosed = sp => { sp=sp||space(); return !!sp && sp.closedDay===todayStr(); };
+function setClosedDay(on, how){ const sp=space(); if(!sp) return; const v=on?todayStr():null; if(on?isClosed(sp):!isClosed(sp)) return; // a day of the past is open already
+  sp.closedDay=v; sp.modified=new Date().toISOString(); save(); log('info', on?'Día cerrado':'Día reabierto', {space:sp.name, how}); }
+function closedHoyList(){ const tm=addDays(todayStr(),1); return orderTasks(spaceTasks().filter(x=>isOpen(x)&&(x.date===tm||x.deadline===tm))); }
+const hoyShown = () => isClosed()?closedHoyList():pendingFor('hoy'); // what the Hoy list shows: its count and its hours
+/* Decision 60b: Tareas olvidadas. A pending task with no date, no deadline and not in Ahora that nothing has changed for 30 days or more.
+   The group Sin fecha of Todas offers "Repasar N olvidadas", the walk of the reviews (reviewStart('forgot')). The rows carry no mark */
+const FORGOT_DAYS=30;
+const isForgot = x => !!x && x.status==='pending' && !x.date && !x.deadline && !x.focus && (x.modified||x.created||'')<=new Date(Date.now()-FORGOT_DAYS*864e5).toISOString();
 /* Decision 56b: procrastination. Task.postponed (Supabase tasks.postponed) counts the times an open task went to a later day while it was
    already due (its date today or earlier): the start of a day (rollOver), Aplazar, Cerrar el día, Repasar, a drag, the date pickers.
    Task.carriedSince (Supabase tasks.carried_since) is the first day it was due when it was first counted (the earliest one is kept).
@@ -348,7 +379,7 @@ function doneList(projectId){
 
 /* ---------- UI state ---------- */
 const CAL_VIEWS=['day','week','month'], H0=7*60, H1=21*60, SLOT=30, SH=22; // R12, R19, R20: the calendar views; the hours grid's first and last minute, its slot and the slot's height in px
-const UI = { tab:'tareas', query:'', stack:[], scroll:{}, searchDone:false, select:null, projFilter:null, wide:false, deskView:'hoy', deskDetail:null, weekStart:null, calDay:null, calMonth:null, miniYM:null, addDraft:'', addPaste:null, convertedNotes:{}, deskScroll:{}, deskKey:null,
+const UI = { tab:'tareas', query:'', stack:[], scroll:{}, searchDone:false, select:null, projFilter:null, wide:false, deskView:'hoy', deskDetail:null, weekStart:null, calDay:null, calMonth:null, miniYM:null, addDraft:'', addPaste:null, convertedNotes:{}, deskScroll:{}, deskKey:null, snooze:null,
   dsel:{cur:null, ids:new Set(), anchor:null, mode:false, edit:null, idx:0, order:[], key:null, follow:false} }; // R15, R16: the desktop selection (see deskOrder)
 let deskRedraw=false; // while renderDesktop replaces the markup: a field it takes away is not a field the user left (R15)
 const MODK=/Mac|iPhone|iPad/.test(navigator.platform||navigator.userAgent||'')?'Comando':'Control'; // the key a Mac calls Comando

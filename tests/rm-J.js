@@ -124,7 +124,7 @@ const vis = (page,sel)=>page.evaluate(s=>document.querySelector(s).scrollIntoVie
   await page.click('.closecell'); await page.waitForTimeout(800);
   await page.click('.sheet.on [data-cd=rest]'); await page.waitForTimeout(900);
   r.R8 = await page.evaluate(()=>({n:pendingFor('hoy').length, toast:document.querySelector('#toastText').textContent}));
-  check('R8_rest', r.R8.n===h0.hi && r.R8.toast===(h0.n-h0.hi)+' tareas pasadas a mañana', {r:r.R8, h0});
+  check('R8_rest', r.R8.n===h0.hi && r.R8.toast===(h0.n-h0.hi)+' tareas pasadas a mañana, día cerrado', {r:r.R8, h0}); // the day closed on every device (owner, 3 November)
   await page.click('#toastBtn'); await page.waitForTimeout(800);
   check('R8_undo', await page.evaluate(n=>pendingFor('hoy').length===n, h0.n));
   await ctx.close();

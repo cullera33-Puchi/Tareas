@@ -177,7 +177,7 @@ Cambios acordados con Enric sobre el diseño de abajo. Mandan sobre el texto del
 49. **Dictar en Notas y «Nota de voz» para el audio (aprobado por Enric el 2 de noviembre, opción 3).** La nota de voz dictada hacía lo mismo que dictar con el teclado en Notas. (1) Desaparece el botón de nota de voz dictada en el detalle, en el iPhone y en el escritorio, y en la alta ampliada del escritorio el micrófono dicta en el campo de notas. (2) Las notas de voz existentes se añaden al final de las notas de su tarea, una línea por nota con su fecha y hora («2/11 18:40: texto»), y se marcan como eliminadas; el paso es idempotente (no se añade una línea que ya está), para que dos dispositivos no la dupliquen. Sin cambios en Supabase: la tabla `voice_notes` se queda para los datos antiguos. (3) «Grabar audio» pasa a llamarse «Nota de voz» en todas partes. (4) Cuando llegue M7, la transcripción aparecerá debajo de cada audio. Va justo después de la fecha límite.
 50. **Volver a pendiente más a mano (aprobado por Enric el 2 de noviembre).** Además de la pulsación larga, el clic derecho y el detalle: (1) la hoja «Cambiar Por confirmar» (y su ventana en escritorio) lleva al pie el botón «Volver a pendiente»; (2) en el iPhone, deslizar a la izquierda una tarea por confirmar muestra «Pendiente» en lugar de «Mañana», junto a Eliminar. Ambos con Deshacer, como `unWait`. Hecho en v0.25.0 (`wback` en `waitingSheet`, acción `unwait` en la fila).
 51. **«Revisar hoy» y «Por confirmar más adelante» (aprobado por Enric el 3 de noviembre).** Las tareas por confirmar cuyo día de revisión ha llegado salían mezcladas en Hoy con la marca Revisar, y el bloque de abajo, con el mismo nombre, mostraba otras; resultaba confuso. (1) En Hoy, las que toca revisar van en un grupo propio «Revisar hoy (N)» al principio de la lista, como el grupo de las aplazadas, con «Esperando a» en cada fila. (2) El bloque plegado de abajo pasa a llamarse «Por confirmar más adelante (N)» y su botón «Mostrar las que esperan»; solo lleva las que aún no toca revisar. (3) En Todas, el bloque de abajo muestra todas las por confirmar, con el día de revisión en cada fila. Las que entran por fecha límite (punto 48a) siguen la misma regla: van a «Revisar hoy». Hecho en v0.25.1 (`listHTML`, opción de fila `noReview`, `waitingBlockHTML`, `waitingAll`; prueba `rm-RH`). El contador de Todas deja fuera las por confirmar, como la lista.
-52. **Panel «Ahora» en lugar del resumen del día (aprobado por Enric el 3 de noviembre).** Las cifras del resumen (para hoy, aplazadas, prioritarias) y «Lo primero» son ruido para Enric. Se sustituyen, en el iPhone y en el escritorio, por un panel «Ahora» arriba de Hoy que solo muestra lo que toca ya: (1) los dos próximos recordatorios de hoy que aún no han pasado, con su hora; (2) las tareas con entrega hoy o vencida (punto 48a), hasta tres y «N más»; (3) las tareas marcadas en «Ahora» (punto 39), que dejan de tener bloque propio. Cada fila abre la tarea y su círculo la completa, con Deshacer. Sin cifras ni filtros por cifra; sin tareas que mostrar, el panel no aparece. Se mantienen el contador del segmento Hoy, los grupos «Revisar hoy» y Aplazadas con «Repasar», «Mañana: N» y «Cerrar el día» desde las 19:00 como celda al final de Hoy. En el escritorio desaparece la línea de cifras y la entrada «Ahora» de la barra lateral se conserva. La opción de vista «Mostrar resumen del día» pasa a «Mostrar el panel Ahora». Se construye justo después del punto 49.
+52. **Quitar el resumen del día (decidido por Enric el 3 de noviembre).** Las cifras (para hoy, aplazadas, prioritarias) y «Lo primero» son ruido con su volumen (unas 10 tareas al día): la lista de Hoy ya se ve entera y sus filas muestran hora, entrega y prioridad. Se valoró un panel «Ahora» con recordatorios y entregas y se descartó porque repetiría tareas de la lista. Se quita la tarjeta del resumen en el iPhone y la línea de cifras y «Lo primero» en el escritorio, sin nada en su lugar. Se mantienen el contador del segmento Hoy, el bloque «Ahora» (solo aparece con tareas marcadas), «Revisar hoy», Aplazadas con «Repasar», «Mañana: N» y «Cerrar el día» desde las 19:00 como celda al final de Hoy. Desaparece la opción de vista «Mostrar resumen del día» y los filtros por cifra (`UI.sumFilter`). Después de este punto y del resumen de estado (M4), pausa de unos días para usar la app y depurar antes de añadir funciones.
 
 
 ## 9. Decisiones pendientes de Enric (revisión del 1 de noviembre)
@@ -245,28 +245,30 @@ Salen de una revisión de usabilidad, fluidez y diseño sobre la v0.13.1 en móv
 
 ## 11. Roadmap de mejoras (propuestas del 2 de noviembre)
 
-Orden fijado por Enric el 2 de noviembre (subtareas, punto 46, ya hechas en v0.23.0). Esfuerzo orientativo hasta tener la versión probada y publicada, sin contar las pruebas de Enric en el iPhone; la última columna es el nivel de razonamiento con el que se lanza Opus para construirlo (en alto o más, con revisión independiente al terminar). Las que añaden campos u opciones se diseñan y se acuerdan antes de construir (regla 6).
+Orden fijado por Enric el 2 de noviembre y revisado el 3 de noviembre: tras el resumen de estado, pausa para usar la app y depurar; revisión semanal y responsable pasan detrás, por si sobran (subtareas, punto 46, ya hechas en v0.23.0). Esfuerzo orientativo hasta tener la versión probada y publicada, sin contar las pruebas de Enric en el iPhone; la última columna es el nivel de razonamiento con el que se lanza Opus para construirlo (en alto o más, con revisión independiente al terminar). Las que añaden campos u opciones se diseñan y se acuerdan antes de construir (regla 6).
 
 | Orden | Mejora | Esfuerzo | Opus |
 | --- | --- | --- | --- |
-| 1 | Notas de proyecto (punto 47 de la sección 8) | medio o alto, 4 a 5 h | alto |
-| 2 | M2. Fecha límite aparte de la fecha de trabajo, en rojo al acercarse aunque la tarea se aplace | medio, 3 h | alto |
+| 1 | Notas de proyecto (punto 47 de la sección 8) | hecho en v0.24.0 | alto |
+| 2 | M2. Fecha límite aparte de la fecha de trabajo, en rojo al acercarse aunque la tarea se aplace | hecho en v0.25.0 | alto |
 | 3 | Dictar en Notas y «Nota de voz» para el audio (punto 49 de la sección 8) | bajo o medio, 2 h | medio |
-| 4 | M3. Revisión semanal guiada el viernes: completado, pendiente por proyecto, por confirmar, sin fecha y la semana siguiente | bajo o medio, 2 a 3 h | medio |
-| 5 | Responsable y «Enviar recordatorio» por la hoja de compartir (punto 16) | bajo, 2 h | medio |
-| 6 | M4. Resumen de estado para compartir: texto por proyecto con lo hecho en la semana, en curso, por confirmar y próximos pasos, para Teams, correo o Claude | bajo, 1 a 2 h | medio |
-| 7 | M1. Plantillas de tareas con fechas relativas y pasos (preparar SteerCo, workshop, cierre de mes, go-live) | medio o alto, 4 a 5 h | alto |
-| 8 | M5. Bloqueo con Face ID o Touch ID al abrir la app tras un tiempo sin usarla | medio, 3 h | alto |
-| 9 | M6. Filtros guardados («Prioritarias de OCA esta semana», «Esperando al cliente») | medio, 3 h | medio |
-| 10 | M7. Transcribir los audios grabados en el propio dispositivo, sin coste | alto, 6 a 8 h | muy alto |
-| 11 | Fotos y audios en las notas de proyecto (segunda fase del punto 47) | bajo o medio, 2 h | medio |
-| 12 | «Aplazada desde» en las aplazadas (campo nuevo, parte de R9) | bajo, 1 h | medio |
-| 13 | Siri y Atajo de iOS (decisión pendiente 1; aplazado por Enric el 2 de noviembre) | bajo o medio, 2 a 3 h | alto |
-| 14 | Lista de contactos (nombre, correo, teléfono) para Responsable y «Esperando a» | medio, 3 h | medio |
-| 15 | Duración de los bloques en la vista por horas (campo nuevo, parte de R20) | medio, 3 h | alto |
-| 16 | Fase 2, tareas compartidas entre personas (punto 43, diseño cerrado) | muy alto, 2 a 3 días | máximo |
-| 17 | Outlook de Deloitte (punto 44), sujeto a la política de Deloitte | bajo o medio, 2 a 3 h | medio |
-| 18 | App aparte o evolución para gestión de proyectos con el equipo (ver abajo) | muy alto, semanas | máximo, por fases |
+| 4 | Quitar el resumen del día (punto 52 de la sección 8) | bajo, 1 h | medio |
+| 5 | M4. Resumen de estado para compartir: texto por proyecto con lo hecho en la semana, en curso, por confirmar y próximos pasos, para Teams, correo o Claude | bajo, 1 a 2 h | medio |
+| 6 | Pausa: Enric usa la app unos días y se depuran los fallos y molestias antes de añadir funciones | según uso | medio |
+| 7 | M3. Revisión semanal guiada el viernes: completado, pendiente por proyecto, por confirmar, sin fecha y la semana siguiente | bajo o medio, 2 a 3 h | medio |
+| 8 | Responsable y «Enviar recordatorio» por la hoja de compartir (punto 16) | bajo, 2 h | medio |
+| 9 | M1. Plantillas de tareas con fechas relativas y pasos (preparar SteerCo, workshop, cierre de mes, go-live) | medio o alto, 4 a 5 h | alto |
+| 10 | M5. Bloqueo con Face ID o Touch ID al abrir la app tras un tiempo sin usarla | medio, 3 h | alto |
+| 11 | M6. Filtros guardados («Prioritarias de OCA esta semana», «Esperando al cliente») | medio, 3 h | medio |
+| 12 | M7. Transcribir los audios grabados en el propio dispositivo, sin coste | alto, 6 a 8 h | muy alto |
+| 13 | Fotos y audios en las notas de proyecto (segunda fase del punto 47) | bajo o medio, 2 h | medio |
+| 14 | «Aplazada desde» en las aplazadas (campo nuevo, parte de R9) | bajo, 1 h | medio |
+| 15 | Siri y Atajo de iOS (decisión pendiente 1; aplazado por Enric el 2 de noviembre) | bajo o medio, 2 a 3 h | alto |
+| 16 | Lista de contactos (nombre, correo, teléfono) para Responsable y «Esperando a» | medio, 3 h | medio |
+| 17 | Duración de los bloques en la vista por horas (campo nuevo, parte de R20) | medio, 3 h | alto |
+| 18 | Fase 2, tareas compartidas entre personas (punto 43, diseño cerrado) | muy alto, 2 a 3 días | máximo |
+| 19 | Outlook de Deloitte (punto 44), sujeto a la política de Deloitte | bajo o medio, 2 a 3 h | medio |
+| 20 | App aparte o evolución para gestión de proyectos con el equipo (ver abajo) | muy alto, semanas | máximo, por fases |
 
 M7, condición de Enric: **sin ningún coste**. Se descartan los servicios de pago. Vía propuesta: transcripción en el propio dispositivo con un modelo Whisper que se ejecuta en el navegador (gratis y sin que el audio salga del equipo, lo que además encaja con la política de datos de clientes), primero en el ordenador y en el iPhone si el rendimiento lo permite; la descarga del modelo pesa entre 40 y 250 MB según la calidad. Se diseña con Enric antes de construir.
 

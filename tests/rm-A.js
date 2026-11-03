@@ -174,13 +174,14 @@ const center = async (page, sel) => { await page.$eval(sel, e=>{ const sc=e.clos
   await drag(cdp, page, notes.x-60, notes.y, 20, 0, 6, 16); await page.waitForTimeout(500);
   r.fieldBack = await page.evaluate(()=>UI.stack.map(s=>s.kind).join());
   check('R4_fieldNoBack', r.fieldBack==='project,detail', r.fieldBack);
-  // Mid drag: the detail follows the finger from the middle of the screen
-  await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:150,y:600}]});
-  for(let i=1;i<=6;i++){ await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:150+i*10,y:600}]}); await page.waitForTimeout(30); }
+  // Mid drag: the detail follows the finger from the middle of the screen (on the Prioridad cell: decision 56's Tiempo row put Añadir paso, a field, where y 600 was)
+  const my = (await center(page, '.screen.pushed-screen.detail [data-act=pickPriority]')).y;
+  await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:150,y:my}]});
+  for(let i=1;i<=6;i++){ await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:150+i*10,y:my}]}); await page.waitForTimeout(30); }
   r.midBack = await page.$eval('.screen.pushed-screen.detail', e=>e.style.transform);
   check('R4_detailFollows', /translate3d\((4|5|6)\dpx/.test(r.midBack), r.midBack);
-  await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:240,y:600}]}); await page.waitForTimeout(5);
-  await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:270,y:600}]}); await page.waitForTimeout(5); // 120 px in all: under a third of the width, released fast
+  await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:240,y:my}]}); await page.waitForTimeout(5);
+  await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:270,y:my}]}); await page.waitForTimeout(5); // 120 px in all: under a third of the width, released fast
   await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]}); await page.waitForTimeout(650); /* batch I: v0.14.5 pop takes 520 ms (navLock) */
   r.flickBack = await page.evaluate(()=>UI.stack.map(s=>s.kind).join());
   check('R4_flickBack', r.flickBack==='project', r.flickBack);

@@ -69,7 +69,8 @@ const vis = (page,sel)=>page.evaluate(s=>document.querySelector(s).scrollIntoVie
   await L.touchDrag(page, 5, 400, 250, 0, 10, 16); await page.waitForTimeout(800);
   check('detail_edgeBack', await page.evaluate(()=>UI.stack.length===0));
   await page.click(rowOf(did)+' .row-title'); await page.waitForTimeout(800);
-  await L.touchDrag(page, 150, 600, 70, 0, 2, 10); await page.waitForTimeout(800);
+  const py = await page.$eval('.screen.pushed-screen.detail [data-act=pickPriority]', e=>{ const b=e.getBoundingClientRect(); return Math.round(b.y+b.height/2); }); // decision 56's Tiempo row put Añadir paso, a field, where y 600 was
+  await L.touchDrag(page, 150, py, 70, 0, 2, 10); await page.waitForTimeout(800);
   check('detail_flickBack', await page.evaluate(()=>UI.stack.length===0));
   // Fix: under a sheet the screen beneath the detail is hidden (it bled through the scaled app's edge), and it is back once the sheet closes
   await page.click(rowOf(did)+' .row-title'); await page.waitForTimeout(800);

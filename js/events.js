@@ -122,6 +122,8 @@ function onClick(e){
     case 'pickDate': dateSheet(detailId, act); break; // on the desktop a popover anchored to the control (R17)
     case 'pickReminder': reminderSheet(detailId, act); break;
     case 'pickDeadline': if(detailId) deadlineSheet(detailId, act); break; // decision 48a
+    case 'pickEstimate': if(detailId) estimatePick(detailId, UI.wide?act:act.querySelector('.val')||act); break; // decision 56a
+    case 'suggest': suggestSheet(act); break; // decision 56c: Sugerir, in the head of Ahora
     case 'pickWaiting': if(detailId) waitingMenu(detailId, UI.wide?act:act.querySelector('.val')||act); break; // decision 41
     case 'toggleWaiting': UI.waitOpen=!UI.waitOpen; render(); break;
     case 'pickRepeat': if(detailId) repeatMenu(detailId, UI.wide?act:act.querySelector('.val')||act); break; // decision 38

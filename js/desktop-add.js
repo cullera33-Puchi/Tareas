@@ -45,14 +45,14 @@ function bindTimePick(root, o){ o=o||{}; const box=$('.tpk', root); if(!box) ret
 
 /* ---------- Decision 31: the desktop add bar opens into a composer ----------
    Once something is typed, a panel unfolds under the bar (over the list, so nothing below moves): Notas, and buttons for Fecha, Proyecto,
-   Prioridad, Recordatorio and Dictar (decision 49: the computer's microphone writes into Notas, where the browser can dictate). The words of
+   Prioridad, Tiempo (decision 56a), Recordatorio and Dictar (decision 49: the computer's microphone writes into Notas, where the browser can dictate). The words of
    the title (mañana, #proyecto, !!, a las 9) still count and show on the buttons; a button chosen by hand takes that word out of the title.
    Intro in the title or the notes adds everything (Mayúsculas e Intro is a new line in the notes); then the bar stays open and empty with
    the date and project chosen by hand, for the next one. Esc folds it, asking first when there is something written (decision 28) */
 // AX: the composer's state, set up with UI (the first render reads it)
 function axHasText(){ return !!((UI.addDraft||'').trim()||AX.notes.trim()); }
 // The values chosen by hand over the view's own (deskAddBase); the title's words go over both (quickTask)
-function addxBase(projectId){ const b=deskAddBase(projectId); return {date:AX.date!==undefined?AX.date:b.date, projectId:AX.projectId!==undefined?AX.projectId:b.projectId, priority:AX.priority||b.priority}; }
+function addxBase(projectId){ const b=deskAddBase(projectId); return {date:AX.date!==undefined?AX.date:b.date, projectId:AX.projectId!==undefined?AX.projectId:b.projectId, priority:AX.priority||b.priority, estimate:AX.estimate||null}; }
 function addxTask(text, projectId){ const r=quickTask(text, addxBase(projectId));
   if(!r.q.time&&AX.time){ r.reminder=quickReminder(AX.time, r.date); if(r.reminder&&!r.date) r.date=localDay(r.reminder); r.lateManual=!r.reminder; }
   return r; }
@@ -60,6 +60,7 @@ function axBtnsHTML(r){ const p=r.projectId&&proj(r.projectId), pr=r.priority, b
   return b('date', I.cal, r.date?fmtDate(r.date):'Fecha', !!r.date, '', 'Fecha')+
     b('proj', p?'<span class="pm-dot" style="background:'+p.color+'"></span>':I.folder, p?p.name:'Proyecto', !!p, '', 'Proyecto')+
     b('pri', I.flag, pr==='high'?'Alta':pr==='mid'?'Media':'Prioridad', pr!=='none', pr==='high'?'high':pr==='mid'?'mid':'', 'Prioridad')+
+    b('est', I.est, r.estimate?estLabel(r.estimate):'Tiempo', !!r.estimate, '', 'Tiempo estimado')+ // decision 56a
     b('rem', I.bell, r.reminder?(r.date&&localDay(r.reminder)===r.date?fmtTime(r.reminder):fmtDateTime(r.reminder)):'Recordatorio', !!r.reminder, '', 'Recordatorio')+
     (axSR()?b('voice', I.mic, AX.rec?'Escuchando':'Dictar', !!AX.rec, AX.rec?'rec':'', AX.rec?'Parar el dictado':'Dictar en Notas'):''); } // without a recognizer Notas is written by hand
 function addxPanelHTML(projectId){ const r=addxTask(UI.addDraft||'', projectId);
@@ -72,16 +73,16 @@ function axStrip(kind){ const ab=axBar(); if(!ab) return; const q=parseQuick(ab.
   let v=ab.value; ts.slice().reverse().forEach(t=>{ v=v.slice(0,t.start)+v.slice(t.end); }); v=v.replace(/\s{2,}/g,' ').trim(); ab.value=v; UI.addDraft=v; }
 function axOpen(){ if(AX.open) return; AX.open=true; AX.opened=true; log('info','Alta ampliada abierta'); render(); }
 // Folds the composer (with a short fade and lift) and forgets everything it held
-function axCollapse(){ axStopVoice(); const p=$('#desk .axp'); const done=()=>{ Object.assign(AX, {open:false, notes:'', date:undefined, projectId:undefined, priority:undefined, time:null}); UI.addDraft=''; const ab=axBar(); if(ab) ab.value=''; render(); };
+function axCollapse(){ axStopVoice(); const p=$('#desk .axp'); const done=()=>{ Object.assign(AX, {open:false, notes:'', date:undefined, projectId:undefined, priority:undefined, estimate:undefined, time:null}); UI.addDraft=''; const ab=axBar(); if(ab) ab.value=''; render(); };
   if(p&&p.animate&&!RM.matches){ try{ const a=p.animate([{opacity:1, transform:'none'},{opacity:0, transform:'translate3d(0,-6px,0)'}], {duration:140, easing:'ease-in', fill:'forwards'}); a.onfinish=done; return; }catch(e){} }
   done(); }
 function axEscape(){ if(!axHasText()){ axCollapse(); const ab=axBar(); if(ab) ab.blur(); return; }
   macAlert({title:'La tarea no se ha añadido.', text:'Lo escrito se perderá.', ok:'Descartar tarea', cancel:'Seguir editando', fn:()=>{ log('info','Alta ampliada descartada con texto'); axCollapse(); }}); }
 function axSubmit(projectId){ const ab=axBar(), r=addxTask(ab?ab.value:UI.addDraft||'', projectId); if(!r.title){ axFocus(); return false; }
-  const x=addTask({title:r.title, date:r.date, projectId:r.projectId, priority:r.priority, reminder:r.reminder, notes:AX.notes.replace(/\s+$/,'')});
+  const x=addTask(Object.assign({title:r.title, date:r.date, projectId:r.projectId, priority:r.priority, reminder:r.reminder, notes:AX.notes.replace(/\s+$/,'')}, r.estimate?{estimate:r.estimate}:{}));
   axStopVoice(); log('info','Tarea añadida desde el alta ampliada', {notas:!!x.notes, recordatorio:!!x.reminder});
   // Ready for the next one: the date and project chosen by hand stay, the rest starts again
-  Object.assign(AX, {notes:'', priority:undefined, time:null}); UI.addDraft=''; if(ab) ab.value=''; document.querySelectorAll('#desk .axp textarea').forEach(t=>{ t.value=''; }); // a merge keeps a typed field's value
+  Object.assign(AX, {notes:'', priority:undefined, estimate:undefined, time:null}); UI.addDraft=''; if(ab) ab.value=''; document.querySelectorAll('#desk .axp textarea').forEach(t=>{ t.value=''; }); // a merge keeps a typed field's value
   haptic(6); renderAnimated(); toast('Añadida: '+x.title); axFocus(); if(x.reminder) pushOfferSoon(); return true; }
 // Decision 49: dictation writes into Notas, after what is there. The browser's recognizer where it exists (Chrome, Edge, Safari)
 const axSR = () => window.SpeechRecognition||window.webkitSpeechRecognition||null;
@@ -108,6 +109,8 @@ function axPick(kind, src, projectId){ const r=addxTask((axBar()||{}).value||'',
     popMenu(Object.assign(at, {groups:[[{label:'Ninguno', icon:dot('var(--ink3)'), on:!r.projectId, fn:()=>set(null)}].concat(activeProjects().map(p=>({label:p.name, icon:dot(p.color), on:r.projectId===p.id, fn:()=>set(p.id)})))]})); return; }
   if(kind==='pri'){ const set=v=>{ AX.priority=v; axStrip('pri'); redo(); };
     popMenu(Object.assign(at, {groups:[[['high','Alta',MI.p3,'1'],['mid','Media',MI.p2,'2'],['none','Ninguna',MI.p0,'0']].map(([k,l,ic,key])=>({label:l, icon:ic, key, on:r.priority===k, fn:()=>set(k)}))]})); return; }
+  if(kind==='est'){ const set=v=>{ AX.estimate=v; axStrip('est'); redo(); }; // decision 56a
+    popMenu(Object.assign(at, {groups:[EST_VALUES.map(m=>({label:estLabel(m), icon:MI.est, on:r.estimate===m, fn:()=>set(m)})), r.estimate?[{label:'Quitar', icon:MI.p0, fn:()=>set(null)}]:[]]})); return; }
   if(kind==='date'){ const t=todayStr(), dow=new Date(t+'T00:00:00').getDay(), chips=[[t,'Hoy'],[addDays(t,1),'Mañana']]; if(dow>=1&&dow<=4) chips.push([nextWeekday(5,true),'Este viernes']); chips.push([nextWeekday(1,true),'Próxima semana'],['','Sin fecha']);
     let ym=(r.date||t).slice(0,7);
     popMenu(Object.assign(at, {html:'<div class="chips" style="margin-top:0">'+uniqueBy(chips, c=>c[0]).map(c=>'<button class="chip'+((r.date||'')===c[0]?' on':'')+'" data-d="'+c[0]+'">'+c[1]+'</button>').join('')+'</div><div id="calwrap">'+calendarHTML(ym, r.date)+'</div>', bind:el=>{
@@ -135,15 +138,16 @@ function axBind(d){
     if(!axHasText()&&!AX.rec) axCollapse(); }, 120); }); }
 // A dropped card: a slot sets the date and a reminder at that time; "Todo el día" keeps the date and drops the time; a day or the mini month
 // set the date and take a reminder on the old day along (decision 25, dayPatch); "Sin fecha" clears the date. All with Deshacer
-function dropTask(id, z){ const x=task(id); if(!x) return; const old={date:x.date, carried:x.carried, reminder:x.reminder}; let patch, msg;
+// Decision 56b: a later day counts as a postponing in every case (postPatch; dayPatch does it itself), and Deshacer gives the counters back
+function dropTask(id, z){ const x=task(id); if(!x) return; const old=daySnap(x); let patch, msg;
   if(z.dataset.slot){ const [day,hm]=z.dataset.slot.split('T'); const dt=new Date(day+'T'+hm+':00'), iso=dt.toISOString();
     if(x.date===day&&x.reminder&&new Date(x.reminder).getTime()===dt.getTime()){ render(); return; }
-    patch={date:day, reminder:iso}; msg=(x.date===day?'A las ':'Movida a '+fmtDate(day).toLowerCase()+' a las ')+fmtTime(iso); }
+    patch=Object.assign({date:day, reminder:iso}, postPatch(x, day)); msg=(x.date===day?'A las ':'Movida a '+fmtDate(day).toLowerCase()+' a las ')+fmtTime(iso); }
   else if(z.dataset.allday){ const day=z.dataset.day, timed=remMin(x)!==null; if(x.date===day&&!timed){ render(); return; }
-    patch=timed?{date:day, reminder:null}:dayPatch(x, day); msg=x.date===day?'Sin hora':'Movida a '+fmtDate(day).toLowerCase()+(timed?', sin hora':''); }
+    patch=timed?Object.assign({date:day, reminder:null}, postPatch(x, day)):dayPatch(x, day); msg=x.date===day?'Sin hora':'Movida a '+fmtDate(day).toLowerCase()+(timed?', sin hora':''); }
   else { const day=z.dataset.day||null; if(x.date===day){ render(); return; } patch=dayPatch(x, day); msg=day?'Movida a '+fmtDate(day).toLowerCase():'Sin fecha'; }
   releaseHold(id); updTask(id, patch); haptic(6); renderAnimated(); log('info','Tarea movida en el calendario', {date:patch.date, time:!!patch.reminder});
-  toast(msg, ()=>updTask(id, old)); }
+  toast(msg, ()=>undoDay(old)); }
 function bindDeskEvents(d){
   attBindDrop(d);
   axBind(d); // decision 31: the add bar's composer // decision 29: photos dragged from the computer onto the inspector

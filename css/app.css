@@ -1347,3 +1347,48 @@ body.sdragging,body.sdragging *{cursor:grabbing !important;-webkit-user-select:n
 .wcard .cic.cdl.dl-soon{color:var(--orange);}
 .wcard .cic.cdl.dl-due{color:var(--red);}
 .dlhint{margin-top:10px;}
+/* Decision 56a: Tiempo estimado. Grey on the iPhone row; on the desktop a column of its own, only when some row of the list has one */
+.row-meta .est{color:var(--ink2);}
+.rc-est{width:64px;}
+.app.desktop.has-pane .rc-est{width:54px;}
+.app.desktop .main:not(:has(.row .rc-est:not(:empty))) .rc-est{display:none;}
+/* Decision 56b: a task put off again and again says it in orange where Aplazada goes; the desktop date column widens for it */
+.row-meta .drag{color:var(--orange);font-weight:500;}
+.app.desktop .main:has(.row .rc-date.drag) .rc-date{width:124px;}
+.app.desktop.has-pane .main:has(.row .rc-date.drag) .rc-date{width:96px;}
+.rvdrag{text-align:center;color:var(--orange);font-weight:500;font-size:0.824rem;margin:-6px 0 8px;}
+/* Decision 56c: Sugerir in the head of Ahora, and the sheet (iPhone) or popover (desktop) ¿Qué hago ahora? */
+.ahead .grow{flex:1;}
+.ahead .asug{position:relative;flex:none;color:var(--blue);font-weight:600;font-size:0.765rem;height:28px;padding:0 2px;}
+.ahead .asug::after{content:"";position:absolute;left:-8px;right:-8px;top:-8px;bottom:-8px;} /* 44 pt to the finger */
+.app.desktop .ahead .asug{font-size:11px;height:18px;padding:0;letter-spacing:0;}
+.app.desktop .ahead .asug::after{display:none;}
+.app.desktop .ahead .asug:hover{text-decoration:underline;}
+.sg .sgchips{justify-content:center;margin:0 0 12px;}
+.sgwarn{margin:0 0 10px;padding:9px 12px;border-radius:10px;background:color-mix(in srgb,var(--orange) 14%,transparent);color:var(--ink);font-size:0.824rem;line-height:1.3;}
+.sgempty{text-align:center;color:var(--ink2);font-size:0.882rem;padding:22px 0 18px;}
+.sglist{margin:0;}
+.sgrow{display:flex;align-items:stretch;position:relative;}
+.sgrow + .sgrow::before{content:'';position:absolute;top:0;left:16px;right:0;border-top:.5px solid var(--sep);}
+.sgmain{flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:3px;padding:11px 8px 11px 16px;text-align:left;min-height:56px;justify-content:center;}
+.sgmain:active,.sgopen:active{background:var(--fill);}
+.sgt{font-size:1rem;line-height:1.3;color:var(--ink);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.sgm{display:flex;align-items:center;gap:8px;font-size:0.765rem;color:var(--ink2);max-width:100%;overflow:hidden;white-space:nowrap;}
+.sgm .tag{max-width:45%;flex:none;}
+.sgm .sgwhy{overflow:hidden;text-overflow:ellipsis;}
+.sgopen{flex:none;width:44px;display:flex;align-items:center;justify-content:center;color:var(--ink3);}
+.sgopen svg{width:8px;height:14px;}
+body.desktop .pm-pop .sgtitle{padding:0 0 8px;font-weight:600;font-size:13px;color:var(--ink);border:0;}
+body.desktop .pm.mac .pm-menu.pm-pop:has(.sg){width:340px;}
+body.desktop .sg .sgchips{justify-content:flex-start;margin:0 0 10px;}
+body.desktop .sgwarn{font-size:12px;padding:6px 9px;border-radius:7px;margin-bottom:8px;}
+body.desktop .sgempty{font-size:13px;padding:14px 0 10px;}
+body.desktop .sglist{background:var(--fill);border-radius:8px;overflow:hidden;}
+body.desktop .sgmain{min-height:44px;padding:6px 6px 6px 10px;gap:2px;border-radius:0;}
+body.desktop .sgmain:hover,body.desktop .sgopen:hover{background:var(--dhov);}
+body.desktop .sgt{font-size:13px;}
+body.desktop .sgm{font-size:11px;gap:6px;}
+body.desktop .sgm .tag{font-size:10px;line-height:15px;padding:0 5px;border-radius:4px;}
+body.desktop .sgrow + .sgrow::before{left:10px;}
+body.desktop .sgopen{width:30px;}
+body.desktop .sgopen svg{width:6px;height:11px;}

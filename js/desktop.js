@@ -152,12 +152,12 @@ function dropToProject(ids, pid){ const xs=ids.map(task).filter(x=>x&&(x.project
   toast(bulkN(xs.length)+(xs.length===1?' movida a ':' movidas a ')+(p?p.name:'Sin proyecto'), ()=>batch(()=>prev.forEach(q=>updTask(q.id,{projectId:q.projectId})))); }
 // R16: several rows dropped on a day, Hoy, a half hour or Sin fecha, with the rules of dropTask and one Deshacer
 function dropMany(ids, z){ if(ids.length===1) return dropTask(ids[0], z); const xs=ids.map(task).filter(Boolean); if(!xs.length) return;
-  const prev=xs.map(x=>({id:x.id, date:x.date, carried:x.carried, reminder:x.reminder})); let patch, msg;
-  if(z.dataset.slot){ const [day,hm]=z.dataset.slot.split('T'), iso=new Date(day+'T'+hm+':00').toISOString(); patch=()=>({date:day, reminder:iso}); msg=' movidas a '+fmtDate(day).toLowerCase()+' a las '+fmtTime(iso); }
-  else if(z.dataset.allday){ const day=z.dataset.day; patch=x=>remMin(x)!==null?{date:day, reminder:null}:dayPatch(x, day); msg=' movidas a '+fmtDate(day).toLowerCase(); }
+  const prev=xs.map(daySnap); let patch, msg; // decision 56b: the counters go back with Deshacer too
+  if(z.dataset.slot){ const [day,hm]=z.dataset.slot.split('T'), iso=new Date(day+'T'+hm+':00').toISOString(); patch=x=>Object.assign({date:day, reminder:iso}, postPatch(x, day)); msg=' movidas a '+fmtDate(day).toLowerCase()+' a las '+fmtTime(iso); }
+  else if(z.dataset.allday){ const day=z.dataset.day; patch=x=>remMin(x)!==null?Object.assign({date:day, reminder:null}, postPatch(x, day)):dayPatch(x, day); msg=' movidas a '+fmtDate(day).toLowerCase(); }
   else { const day=z.dataset.day||null; patch=x=>dayPatch(x, day); msg=day?' movidas a '+fmtDate(day).toLowerCase():' sin fecha'; }
   xs.forEach(x=>releaseHold(x.id)); batch(()=>xs.forEach(x=>updTask(x.id, patch(x)))); haptic(6); renderAnimated(); log('info','Tareas arrastradas a una fecha', {n:xs.length, date:z.dataset.day||z.dataset.slot||null});
-  toast(bulkN(xs.length)+msg, ()=>batch(()=>prev.forEach(o=>updTask(o.id,{date:o.date, carried:o.carried, reminder:o.reminder})))); }
+  toast(bulkN(xs.length)+msg, ()=>batch(()=>prev.forEach(undoDay))); }
 function applyWide(){ const w=wideMQ.matches; if(w===UI.wide) return; closeMenu(true); UI.wide=w; document.documentElement.classList.toggle('wide', w); document.body.classList.toggle('desktop', w); app.classList.toggle('desktop', w);
   if(w){ // the pushed iPhone screens map onto the desktop: a project becomes the view and the last detail the pane
     let pr=null; UI.deskDetail=null; UI.stack.forEach(s=>{ if(s.kind==='project') pr=s.id; else if(s.kind==='note'){ const n=noteRec(s.id); if(n){ pr=n.projectId; UI.projTab[pr]='notes'; UI.noteOpen=n.id; } } else UI.deskDetail=s.id; s.el.remove(); }); UI.stack=[]; // decision 47: a note opens in its project's Notas

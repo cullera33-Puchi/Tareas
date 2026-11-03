@@ -54,7 +54,9 @@ function closeDaySheet(){ flushHeld(true); const t=todayStr(), tm=addDays(t,1); 
       closeSheet(); rescheduleMany(k==='all'?mov:rest, tm, 'mañana'); }; }); }
 /* R9 and R8: review tasks one by one. 'carried': the Aplazadas of Hoy (under the project filter, as the list shows them);
    'close': all of Hoy, from Cerrar el día. Each decision applies at once, so the list behind stays current;
-   the balance at the end has one Deshacer for all of them. No field is added: "aplazada desde" was not approved */
+   the balance at the end has one Deshacer for all of them. Decision 56b: a task that keeps being put off says so under its title ("Aplazada
+   4 veces", "Desde el martes 27") and is offered Partir en pasos, which ends the walk there (the rest counts as skipped) and opens the task
+   with Añadir paso ready, inside the same tap so the iPhone keyboard comes up (decision 18) */
 function reviewStart(kind){ flushHeld(true); let xs=kind==='carried'?pendingFor('hoy').filter(carriedOn):pendingFor('hoy');
   if(kind==='carried'&&UI.projFilter!==null) xs=xs.filter(x=> UI.projFilter==='none' ? !x.projectId : x.projectId===UI.projFilter);
   if(!xs.length) return; log('info', kind==='carried'?'Repasar aplazadas':'Cerrar el día una a una', {n:xs.length});
@@ -65,11 +67,13 @@ function reviewStep(ids, i, st){
   const x=task(ids[i]); if(!x||x.status!=='pending'){ reviewStep(ids, i+1, st); return; } // completed or removed meanwhile
   const t=todayStr(); const opts=uniqueBy([['hoy',t,'Hoy'],['man',addDays(t,1),'Mañana'],['vie',nextWeekday(5,true),'Viernes'],['nsem',nextWeekday(1,true),'Próxima semana']], o=>o[1]).concat([['none',null,'Sin fecha']]);
   const p=x.projectId?proj(x.projectId):null; const tally=k=>{ st.tally[k]=(st.tally[k]||0)+1; };
-  const keep=()=>{ if(!st.prev.has(x.id)) st.prev.set(x.id, Object.assign({date:x.date, carried:x.carried, reminder:x.reminder||null, status:x.status, completed:x.completed}, x.focus?{focus:x.focus}:{})); };
+  const keep=()=>{ if(!st.prev.has(x.id)) st.prev.set(x.id, Object.assign({date:x.date, carried:x.carried, reminder:x.reminder||null, status:x.status, completed:x.completed, postponed:x.postponed||null, carriedSince:x.carriedSince||null}, x.focus?{focus:x.focus}:{})); }; // decision 56b: the counters too
   const next=()=>{ haptic(6); render(); reviewStep(ids, i+1, st); };
-  openSheet('<h2>'+(st.kind==='close'?'Cerrar el día':'Repasar aplazadas')+'</h2><div class="hint" style="margin-top:-6px">'+(i+1)+' de '+ids.length+(p?', '+esc(p.name):'')+'</div><div class="plan-title">'+esc(x.title||'Sin título')+'</div>'+
+  const dg=dragText(x);
+  openSheet('<h2>'+(st.kind==='close'?'Cerrar el día':'Repasar aplazadas')+'</h2><div class="hint" style="margin-top:-6px">'+(i+1)+' de '+ids.length+(p?', '+esc(p.name):'')+'</div><div class="plan-title">'+esc(x.title||'Sin título')+'</div>'+(dg?'<div class="rvdrag">'+esc(dg)+'</div>':'')+
     '<div class="chips rvchips">'+opts.map(o=>'<button class="chip" data-rv="'+o[0]+'">'+o[2]+'</button>').join('')+'</div>'+
     '<div class="sheet-actions"><button class="btn" data-x="done">'+I.check+'Completar</button><button class="btn redtext" data-x="del">'+I.trash+'Eliminar</button></div>'+
+    (dg?'<div class="sheet-actions" style="margin-top:10px"><button class="btn" data-x="split">'+I.list+'Partir en pasos</button></div>':'')+
     '<div class="sheet-actions" style="margin-top:10px"><button class="btn" data-x="skip">Saltar</button><button class="btn" data-x="end">Terminar</button></div>', s=>{
     sheetOnClose=()=>{ st.tally.skip=(st.tally.skip||0)+ids.length-i; reviewEnd(st, false); }; // closed with a tap outside or a drag: as Terminar, the balance as a toast
     s.onclick=e=>{ const c=e.target.closest('[data-rv]'); if(c){ const o=opts.find(q=>q[0]===c.dataset.rv); keep(); updTask(x.id, dayPatch(x, o[1], {carried:false})); tally(o[0]); next(); return; } // Hoy confirms the task and clears its Aplazada mark
@@ -78,8 +82,15 @@ function reviewStep(ids, i, st){
       else if(k==='del'){ const go=()=>{ const j=DB.tasks.indexOf(x); if(j>=0){ DB.tasks.splice(j,1); const vn=DB.voiceNotes.filter(v=>v.taskId===x.id); DB.voiceNotes=DB.voiceNotes.filter(v=>v.taskId!==x.id); st.removed.push({x, vn, at:cutAttachments(new Set([x.id])), ss:cutSteps(new Set([x.id]))}); save(); } tally('del'); haptic(10); next(); };
         if(repParse(x.repeat)) askRepeatDelete({n:1, title:x.title}, ()=>{ keep(); skipOccurrence(x.id, true); tally('del'); haptic(10); next(); }, go); else go(); } // decision 38: only this one, or the series
       else if(k==='skip'){ tally('skip'); reviewStep(ids, i+1, st); }
+      else if(k==='split'){ st.tally.skip=(st.tally.skip||0)+ids.length-i-1; sheetOnClose=null; closeSheet(); reviewEnd(st, false); log('info','Partir en pasos desde el repaso'); openStepAdd(x.id); }
       else { st.tally.skip=(st.tally.skip||0)+ids.length-i; sheetOnClose=null; reviewEnd(st, true); } }; });
 }
+// Decision 56b: the task open (the detail on the iPhone, the inspector on the desktop) with the focus in Añadir paso, at once: called inside a tap
+function openStepAdd(id){ if(!task(id)) return; openDetail(id); const scope=UI.wide?$('#desk .pane'):(UI.stack.length?UI.stack[UI.stack.length-1].el:null);
+  const ta=scope&&scope.querySelector('[data-role=stepadd]'); if(!ta) return false;
+  ta.focus({preventScroll:true}); // the detail is still sliding in: a plain focus would scroll the screens around it; its own list scrolls instead
+  const sc=ta.closest('.scroll'); if(sc){ const a=sc.getBoundingClientRect(), b=ta.getBoundingClientRect(); if(b.bottom>a.bottom-24||b.top<a.top) sc.scrollTop+=b.top-a.top-Math.round(a.height/3); }
+  return true; }
 // Deshacer of a review: a task completed in it takes back the next one of its series (decision 38)
 function reviewEnd(st, asSheet){ const T=st.tally, decided=Object.keys(T).some(k=>k!=='skip'&&T[k]);
   const undo=()=>batch(()=>{ st.prev.forEach((o,id)=>{ const x=task(id); if(!x) return; if(x.status==='done'&&o.status!=='done') dropNext(x); updTask(id, o); }); st.removed.forEach(r=>{ if(!task(r.x.id)){ DB.tasks.push(r.x); DB.voiceNotes.push(...r.vn); putAttachments(r.at); putSteps(r.ss); } }); save(); });
@@ -104,6 +115,7 @@ function viewMenu(src){ const top=UI.stack[UI.stack.length-1]; const inProject=U
   popMenu({anchor:src, align:UI.wide?'right':undefined, groups:[
     [{label:'Seleccionar tareas', icon:MI.select, fn:()=>UI.wide?startDeskSelect():startSelect(null)}].concat([{label:DB.settings.doneOpen?'Ocultar completadas':'Mostrar completadas', icon:DB.settings.doneOpen?MI.eyeOff:MI.eye, fn:()=>{ DB.settings.doneOpen=!DB.settings.doneOpen; save(); render(); }}]),
     f==='hoy'||f==='todas'?[{label:'Agrupar por fecha', icon:MI.cal, on:g==='date', fn:()=>setGrouping(k,'date')}, {label:'Agrupar por proyecto', icon:MI.folder, on:g==='project', fn:()=>setGrouping(k,'project')}]:[],
+    f==='hoy'?[{label:'¿Qué hago ahora?', icon:MI.bulb, fn:()=>suggestSheet(src)}]:[], // decision 56c
     statusItems(inProject?(UI.wide?UI.deskView.slice(8):top.id):undefined) ]}); }
 // Roadmap M4: Compartir estado for a real project (pid), Compartir estado de la semana for the space (pid undefined); nothing for Sin proyecto
 const statusItems = pid => pid===undefined ? [{label:UI.wide?'Compartir estado de la semana…':'Compartir estado de la semana', icon:MI.share, fn:()=>statusSheet(null)}]
@@ -125,7 +137,7 @@ function rowMenu(id, src){ const x=task(id); if(!x) return; releaseHold(id);
   { // R10: the row lifts and the menu opens next to it
     const row=src&&src.row||visibleRow(id), b=row&&row.getBoundingClientRect();
     return popMenu({lift:row, x:src&&src.x||(b?b.left+b.width/2:0), y:src&&src.y||0, prio:{cur:x.priority, fn:pr=>setPriority(id,pr)}, groups:[
-      [{label:'Aplazar', icon:MI.postpone, menu:()=>postponeMenu(id)}].concat(x.status!=='done'?[{label:'Fecha límite', icon:MI.flag, menu:()=>deadlineMenu(id)}]:[], [{label:'Mover a proyecto', icon:MI.folder, menu:()=>projectPickMenu(id)}]).concat(DB.spaces.length>1?[{label:'Mover a otro espacio', icon:MI.space, menu:()=>spaceMoveMenu(id)}]:[]), // decision 48a: Fecha límite next to Aplazar
+      [{label:'Aplazar', icon:MI.postpone, menu:()=>postponeMenu(id)}].concat(x.status!=='done'?[{label:'Fecha límite', icon:MI.flag, menu:()=>deadlineMenu(id)}, {label:'Tiempo', icon:MI.est, menu:()=>estimateMenu(id)}]:[], [{label:'Mover a proyecto', icon:MI.folder, menu:()=>projectPickMenu(id)}]).concat(DB.spaces.length>1?[{label:'Mover a otro espacio', icon:MI.space, menu:()=>spaceMoveMenu(id)}]:[]), // decision 48a: Fecha límite next to Aplazar
       [{label:x.status==='done'?'Marcar pendiente':'Completar', icon:x.status==='done'?MI.undo:MI.done, fn:()=>{ leaveRows(id); setTimeout(()=>{ completeTask(id); renderAnimated(); },200); }}]
        .concat(x.status==='pending'?[{label:x.focus?'Quitar de Ahora':'Ahora', icon:x.focus?MI.starOff:MI.star, fn:()=>toggleFocus(id)}]:[]) // decision 39
        .concat(waitItems(x, MI)) // decision 41
@@ -149,7 +161,7 @@ function projectMenu(id, src){ const p=proj(id); if(!p) return; const ps=activeP
 
 // Header used by sheets with text fields: on the iPhone the bottom of a sheet ends up under the keyboard bar
 function sheadHTML(title, cancel, ok){ return '<div class="shead"><button class="hbtn" data-x="cancel">'+cancel+'</button><h2>'+title+'</h2><button class="hbtn ok" data-x="ok">'+ok+'</button></div>'; }
-/* Quick add (R5). The title field and, glued to the keyboard, a bar of 44 pt icons: Fecha, Proyecto, Prioridad and Añadir.
+/* Quick add (R5). The title field and, glued to the keyboard, a bar of 44 pt icons: Fecha, Proyecto, Prioridad, Tiempo (decision 56a) and Añadir.
    Each icon opens a strip of options above the bar without taking the focus from the field, so the keyboard stays up and Enter keeps adding.
    What the title says (R7: date, '#proyecto', '!!', 'a las 9') wins over a pick; a value picked by hand stays for the next task.
    Pasting two or more lines (R6) turns the sheet into a list that Añadir creates in one go. A long press on Añadir adds and opens. */
@@ -161,16 +173,17 @@ function addFromList(){ const hoy=UI.wide?UI.deskView==='hoy':UI.tab==='tareas'&
   if(!hoy||UI.query){ addSheet(null); return; } addSheet(filterProject(), '', {date:todayStr()}); }
 function addSheet(projectId){
   const prefill=arguments[1]||'', preset=arguments[2]||{};
-  const st={date:preset.date||null, projectId:projectId||null, priority:'none', open:null, ym:null, lines:null, added:0, msg:'', warn:false};
+  const st={date:preset.date||null, projectId:projectId||null, priority:'none', estimate:null, open:null, ym:null, lines:null, added:0, msg:'', warn:false};
   // Quick date chips, each a different date: on a Thursday 'Viernes' is tomorrow and on a Sunday 'Próx. semana' is, so they are left out
   const quick=()=>{ const t=todayStr(); return uniqueBy([['hoy',t,'Hoy'],['man',addDays(t,1),'Mañana'],['vie',nextWeekday(5,true),'Viernes'],['nsem',nextWeekday(1,true),'Próx. semana']], q=>q[1]); };
-  const base=()=>({date:st.date, projectId:st.projectId, priority:st.priority});
+  const base=()=>({date:st.date, projectId:st.projectId, priority:st.priority, estimate:st.estimate});
   let inp, cur=quickTask('', base()), lastId=null;
   const strip=()=>{ const k=st.open; if(!k) return ''; const on=(c,v)=>c===v?' on':'';
     if(k==='date'){ if(st.ym) return calendarHTML(st.ym, cur.date); const q=quick();
       return q.map(c=>'<button class="chip'+on(cur.date,c[1])+'" data-c="'+c[0]+'">'+c[2]+'</button>').join('')+'<button class="chip'+(cur.date&&!q.some(c=>c[1]===cur.date)?' on':'')+'" data-c="fecha">'+I.cal+(cur.date&&!q.some(c=>c[1]===cur.date)?fmtDate(cur.date):'Otra fecha')+'</button>'+(cur.date?'<button class="chip" data-c="none">Sin fecha</button>':''); }
     if(k==='proj'){ const ps=activeProjects(); if(!ps.length) return '<button class="chip" disabled>Crea un proyecto en la pestaña Proyectos</button>';
       return '<button class="chip'+(cur.projectId?'':' on')+'" data-p="">Ninguno</button>'+ps.map(p=>'<button class="chip'+on(cur.projectId,p.id)+'" data-p="'+p.id+'"><span class="dot" style="background:'+p.color+'"></span>'+esc(p.name)+'</button>').join(''); }
+    if(k==='est') return EST_VALUES.map(m=>'<button class="chip'+on(cur.estimate,m)+'" data-es="'+m+'">'+I.est+estLabel(m)+'</button>').join('')+(cur.estimate?'<button class="chip" data-es="">Sin tiempo</button>':''); // decision 56a
     return [['high','Alta'],['mid','Media'],['none','Ninguna']].map(c=>'<button class="chip'+on(cur.priority,c[0])+'" data-pr="'+c[0]+'">'+I.flag+c[1]+'</button>').join(''); };
   const tokHTML=(k,label,icon)=>'<span class="tok" data-tok="'+k+'">'+icon+'<span>'+label+'</span><button class="x" data-untok="'+k+'" aria-label="Quitar">×</button></span>';
   const many=()=>(st.lines||[]).concat(inp&&inp.value.trim()?[inp.value.trim()]:[]);
@@ -180,19 +193,20 @@ function addSheet(projectId){
     if(!st.lines){ if(cur.date) t+=tokHTML('date', fmtDate(cur.date), I.cal);
       if(cur.reminder) t+=tokHTML('time', fmtTime(cur.reminder), I.bell);
       if(p) t+=tokHTML('proj', esc(p.name), '<span class="dot" style="background:'+p.color+'"></span>');
-      if(cur.priority!=='none') t+=tokHTML('pri', cur.priority==='high'?'Alta':'Media', I.flag); }
-    else { if(st.date) t+=tokHTML('date', fmtDate(st.date), I.cal); const sp=st.projectId&&proj(st.projectId); if(sp) t+=tokHTML('proj', esc(sp.name), '<span class="dot" style="background:'+sp.color+'"></span>'); if(st.priority!=='none') t+=tokHTML('pri', st.priority==='high'?'Alta':'Media', I.flag); }
+      if(cur.priority!=='none') t+=tokHTML('pri', cur.priority==='high'?'Alta':'Media', I.flag);
+      if(cur.estimate) t+=tokHTML('est', estLabel(cur.estimate), I.est); }
+    else { if(st.date) t+=tokHTML('date', fmtDate(st.date), I.cal); const sp=st.projectId&&proj(st.projectId); if(sp) t+=tokHTML('proj', esc(sp.name), '<span class="dot" style="background:'+sp.color+'"></span>'); if(st.priority!=='none') t+=tokHTML('pri', st.priority==='high'?'Alta':'Media', I.flag); if(st.estimate) t+=tokHTML('est', estLabel(st.estimate), I.est); }
     $('#qtoks',s).innerHTML=t;
     const said=st.lines?{warn:[]}:quickSaid(cur); const hint=$('#addHint',s); hint.textContent=said.warn.length?said.warn.join(' '):st.msg; hint.classList.toggle('warn', !!said.warn.length);
     const pl=$('#qlist',s); if(st.lines){ const all=many(); pl.innerHTML='<div class="plhead"><span>'+all.length+(all.length===1?' tarea':' tareas')+'</span><button data-x="unlist">Cancelar</button></div><div class="plist">'+all.map((l,i)=>{ const r=quickTask(l, base()); return '<div class="pl"><span class="t">'+esc(r.title||l)+'</span><span class="m">'+esc(quickMeta(r))+'</span>'+(i<st.lines.length?'<button class="x" data-rm="'+i+'" aria-label="Quitar">×</button>':'<span style="width:44px"></span>')+'</div>'; }).join('')+'</div>'; } else pl.innerHTML='';
     const sEl=$('#qstrip',s), was=sEl.dataset.k||''; sEl.innerHTML=strip(); sEl.classList.toggle('calon', st.open==='date'&&!!st.ym); sEl.dataset.k=st.open||''; if(st.open&&st.open!==was) chipInView(sEl); // a strip just opened shows its lit option
-    const val={date:st.lines?st.date:cur.date, proj:st.lines?st.projectId:cur.projectId, pri:(st.lines?st.priority:cur.priority)!=='none'};
+    const val={date:st.lines?st.date:cur.date, proj:st.lines?st.projectId:cur.projectId, pri:(st.lines?st.priority:cur.priority)!=='none', est:!!(st.lines?st.estimate:cur.estimate)};
     s.querySelectorAll('.qbtn').forEach(b=>{ b.classList.toggle('set', !!val[b.dataset.k]); b.classList.toggle('open', st.open===b.dataset.k); });
     const n=st.lines?many().length:0; $('.qadd',s).textContent=st.lines?'Crear '+n+(n===1?' tarea':' tareas'):'Añadir'; };
   // Drops what the title says for one kind, so that a pick (or the cross of its token) is what counts
   const dropText=kind=>{ const tk=cur.toks.filter(t=>t.kind===kind); if(!tk.length) return false; let v=inp.value; tk.slice().reverse().forEach(t=>{ v=v.slice(0,t.start)+v.slice(t.end); }); inp.value=v.replace(/\s{2,}/g,' ').replace(/^\s+/,''); return true; };
   openSheet(qinHTML('<input class="titlein" placeholder="Nueva tarea" aria-label="Nueva tarea" autocomplete="off" autocapitalize="sentences" enterkeyhint="done">')+'<div class="qtoks" id="qtoks"></div><div class="qstatus" id="addHint"></div><div id="qlist"></div><div class="qstrip" id="qstrip"></div>'+
-    '<div class="qbar"><button class="qbtn" data-k="date" aria-label="Fecha">'+I.cal+'</button><button class="qbtn" data-k="proj" aria-label="Proyecto">'+I.folder+'</button><button class="qbtn" data-k="pri" aria-label="Prioridad">'+I.flag+'</button><span class="grow"></span><button class="qadd" data-x="ok">Añadir</button></div>', s=>{
+    '<div class="qbar"><button class="qbtn" data-k="date" aria-label="Fecha">'+I.cal+'</button><button class="qbtn" data-k="proj" aria-label="Proyecto">'+I.folder+'</button><button class="qbtn" data-k="pri" aria-label="Prioridad">'+I.flag+'</button><button class="qbtn" data-k="est" aria-label="Tiempo">'+I.est+'</button><span class="grow"></span><button class="qadd" data-x="ok">Añadir</button></div>', s=>{
     sheet.classList.add('addsheet'); inp=$('.titlein',s); inp.focus(); bindQuickScroll(inp);
     inp.addEventListener('input',()=>{ st.msg=''; draw(); });
     // A pasted list (R6): two or more lines become a list; bullets, numbers and check boxes go
@@ -201,7 +215,7 @@ function addSheet(projectId){
     if(prefill){ const ls=pasteLines(prefill); if(ls.length>1) takeLines(ls); else inp.value=ls[0]||''; }
     draw();
     const add=()=>{ const r=quickTask(inp.value, base()); if(!r.title) return false;
-      lastId=addTask({title:r.title, date:r.date, projectId:r.projectId, priority:r.priority, reminder:r.reminder}).id; st.added++; haptic(8); return r.title; };
+      lastId=addTask(Object.assign({title:r.title, date:r.date, projectId:r.projectId, priority:r.priority, reminder:r.reminder}, r.estimate?{estimate:r.estimate}:{})).id; st.added++; haptic(8); return r.title; };
     // The list behind the sheet is drawn once, when the sheet closes (any way it closes), not after every Enter
     sheetOnClose=()=>{ if(st.added) render(); };
     // Decision 28b: a typed title or a pasted list not yet added asks before the sheet goes
@@ -228,7 +242,7 @@ function addSheet(projectId){
     s.onclick=e=>{ const x=e.target.closest('[data-x]');
       if(x){ const k=x.dataset.x; if(k==='ok'){ if(lpDone){ lpDone=false; return; } ok(); } else if(k==='unlist'){ st.lines=null; draw(); inp.focus(); } return; }
       const rm=e.target.closest('[data-rm]'); if(rm){ st.lines.splice(+rm.dataset.rm,1); if(!st.lines.length) st.lines=null; draw(); inp.focus(); return; }
-      const un=e.target.closest('[data-untok]'); if(un){ const k=un.dataset.untok; if(!dropText(k)){ if(k==='date') st.date=null; else if(k==='proj') st.projectId=null; else if(k==='pri') st.priority='none'; } haptic(4); draw(); inp.focus(); return; }
+      const un=e.target.closest('[data-untok]'); if(un){ const k=un.dataset.untok; if(!dropText(k)){ if(k==='date') st.date=null; else if(k==='proj') st.projectId=null; else if(k==='pri') st.priority='none'; else if(k==='est') st.estimate=null; } haptic(4); draw(); inp.focus(); return; }
       const qb=e.target.closest('.qbtn'); if(qb){ st.open=st.open===qb.dataset.k?null:qb.dataset.k; st.ym=null; draw(); inp.focus(); return; }
       const nav=e.target.closest('[data-cal]'); if(nav){ st.ym=shiftMonth(st.ym,+nav.dataset.cal); draw(); inp.focus(); return; }
       const d=e.target.closest('[data-d]'); if(d){ dropText('date'); st.date=d.dataset.d; st.open=null; st.ym=null; haptic(4); draw(); inp.focus(); return; }
@@ -237,13 +251,14 @@ function addSheet(projectId){
         st.open=null; haptic(4); draw(); inp.focus(); return; }
       const pj=e.target.closest('[data-p]'); if(pj){ dropText('proj'); st.projectId=pj.dataset.p||null; st.open=null; haptic(4); draw(); inp.focus(); return; }
       const pr=e.target.closest('[data-pr]'); if(pr){ dropText('pri'); st.priority=pr.dataset.pr; st.open=null; haptic(4); draw(); inp.focus(); return; }
+      const es=e.target.closest('[data-es]'); if(es){ const was=cur.estimate; dropText('est'); st.estimate=es.dataset.es&&+es.dataset.es!==was?+es.dataset.es:null; st.open=null; haptic(4); draw(); inp.focus(); return; } // a second tap on the lit chip clears it
       if(!e.target.closest('input')) inp.focus(); };
   });
 }
 // After a long press that closed what was under the finger, the click the browser may still send is dropped
 function swallowClick(){ const f=e=>{ e.stopPropagation(); e.preventDefault(); off(); }; const off=()=>{ document.removeEventListener('click', f, true); clearTimeout(t); }; document.addEventListener('click', f, true); const t=setTimeout(off, 1000); }
 // R6: several tasks at once (a pasted list, the items of a note). Each line is read as a quick-add title over the shared values.
-function addMany(lines, base, extra){ const ids=[]; batch(()=>{ lines.forEach(l=>{ const r=quickTask(l, base); if(!r.title) return; ids.push(addTask(Object.assign({title:r.title, date:r.date, projectId:r.projectId, priority:r.priority, reminder:r.reminder}, extra||{})).id); }); }); haptic(8); return ids; }
+function addMany(lines, base, extra){ const ids=[]; batch(()=>{ lines.forEach(l=>{ const r=quickTask(l, base); if(!r.title) return; ids.push(addTask(Object.assign({title:r.title, date:r.date, projectId:r.projectId, priority:r.priority, reminder:r.reminder}, r.estimate?{estimate:r.estimate}:{}, extra||{})).id); }); }); haptic(8); return ids; }
 function removeTasks(ids){ const set=new Set(ids); DB.tasks=DB.tasks.filter(x=>!set.has(x.id)); DB.voiceNotes=DB.voiceNotes.filter(v=>!set.has(v.taskId)); cutAttachments(set); cutSteps(set); save(); }
 /* New or edited project */
 function projectSheet(id){
@@ -357,6 +372,7 @@ function shareText(id){ const x=task(id); if(!x) return ''; const p=x.projectId?
   const d = x.date? new Date(x.date+'T00:00:00').toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'}) : 'sin fecha';
   const sp=DB.spaces.find(o=>o.id===x.spaceId)||space(); // the task's own space, not the one on screen
   let t='Tarea: '+x.title+'\nEspacio: '+sp.name+'\nProyecto: '+(p?p.name:'ninguno')+'\nFecha: '+d+'\nPrioridad: '+(x.priority==='high'?'alta':x.priority==='mid'?'media':'ninguna')+'\n';
+  if(x.estimate) t+='Tiempo estimado: '+estLabel(x.estimate).toLowerCase()+'\n'; // decision 56a
   if(x.deadline) t+='Fecha límite: '+new Date(x.deadline+'T00:00:00').toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'})+'\n'; // decision 48a
   if(x.status==='waiting') t+='Estado: por confirmar'+(x.waitingFor?', esperando a '+x.waitingFor:'')+'\n'; // decision 41
   if(repParse(x.repeat)) t+='Se repite: '+repSummary(x.repeat).replace(/^./, c=>c.toLowerCase())+'\n'; // decision 38
@@ -429,9 +445,9 @@ function exportJSON(){ const t=JSON.stringify(exportData(),null,2); if(navigator
 // CSV for Excel in Spanish locales: semicolon separated, UTF-8 with BOM, one row per task.
 // A cell that starts with = + - or @ gets a leading apostrophe: Excel runs it as a formula even when quoted.
 function csvText(){ const q=v=>{ let s=String(v==null?'':v).replace(/"/g,'""').replace(/\r?\n/g,' '); if(/^[=+\-@\t\r]/.test(s)) s="'"+s; return '"'+s+'"'; }; const sp=Object.fromEntries(DB.spaces.map(s=>[s.id,s.name])); const pr={high:'Alta',mid:'Media',none:''};
-  const head=['Espacio','Proyecto','Título','Fecha','Fecha límite','Prioridad','Estado','Completada','Recordatorio','Se repite','Esperando a','Aplazada','Notas','Pasos','Creada']; // decision 49: no Notas de voz column, they are in Notas; decision 38: Se repite, the rule in words; decision 46: Pasos, each with its box
+  const head=['Espacio','Proyecto','Título','Fecha','Fecha límite','Prioridad','Tiempo estimado','Estado','Completada','Recordatorio','Se repite','Esperando a','Aplazada','Notas','Pasos','Creada']; // decision 49: no Notas de voz column, they are in Notas; decision 38: Se repite, the rule in words; decision 46: Pasos, each with its box
   const rows=DB.tasks.slice().sort((a,b)=>(a.spaceId+(a.date||'9999')+a.created)<(b.spaceId+(b.date||'9999')+b.created)?-1:1).map(x=>{ const p=x.projectId?proj(x.projectId):null; const ps=stepsOf(x.id).map(o=>'['+(o.done?'x':' ')+'] '+o.title).join(' | ');
-    return [sp[x.spaceId]||'', p?p.name:'', x.title, x.date||'', x.deadline||'', pr[x.priority]||'', x.status==='done'?'Hecha':x.status==='waiting'?'Por confirmar':'Pendiente', x.completed?localDay(x.completed)+' '+fmtTime(x.completed):'', x.reminder?localDay(x.reminder)+' '+fmtTime(x.reminder):'', repSummary(x.repeat), x.waitingFor||'', x.carried?'Sí':'', x.notes||'', ps, localDay(x.created)].map(q).join(';'); });
+    return [sp[x.spaceId]||'', p?p.name:'', x.title, x.date||'', x.deadline||'', pr[x.priority]||'', x.estimate?estLabel(x.estimate).toLowerCase():'', x.status==='done'?'Hecha':x.status==='waiting'?'Por confirmar':'Pendiente', x.completed?localDay(x.completed)+' '+fmtTime(x.completed):'', x.reminder?localDay(x.reminder)+' '+fmtTime(x.reminder):'', repSummary(x.repeat), x.waitingFor||'', x.carried?'Sí':'', x.notes||'', ps, localDay(x.created)].map(q).join(';'); });
   return '﻿'+head.map(q).join(';')+'\r\n'+rows.join('\r\n')+'\r\n'; }
 async function exportCSV(){
   const name='tareas-'+todayStr()+'.csv'; const blob=new Blob([csvText()],{type:'text/csv;charset=utf-8'});

@@ -70,7 +70,7 @@ async function sqlTests(){
   await db.close();
   db = await pgSetup(); const all = strip(fs.readFileSync(path.join(ROOT, 'supabase/all.sql'), 'utf8'));
   err = null; try { await db.exec(all); await db.exec(all); } catch(e){ err = e.message; }
-  check('sql_all_twice', !err && /0001 a 0007/.test(all.split('\n')[0]) && /migrations\/0007_deadline\.sql/.test(all) && (all.match(/^-- ========== migrations\//mg)||[]).length===fs.readdirSync(path.join(ROOT,'supabase/migrations')).filter(f=>f.endsWith('.sql')).length, err);
+  check('sql_all_twice', !err && /0001 a 00\d\d/.test(all.split('\n')[0]) && /migrations\/0007_deadline\.sql/.test(all) && (all.match(/^-- ========== migrations\//mg)||[]).length===fs.readdirSync(path.join(ROOT,'supabase/migrations')).filter(f=>f.endsWith('.sql')).length, err);
   let rows = []; try { rows = (await db.query(fs.readFileSync(path.join(ROOT, 'supabase/check.sql'), 'utf8'))).rows; } catch(e){ err = e.message; }
   check('sql_check_all_ok', rows.length>=20 && rows.every(x=>x.Estado==='OK') && rows.some(x=>/tasks\.deadline \(0007\)/.test(x.Pieza)), {err, bad:rows.filter(x=>x.Estado!=='OK'), n:rows.length});
   const readme = fs.readFileSync(path.join(ROOT, 'supabase/README.md'), 'utf8');
@@ -249,7 +249,7 @@ async function desktop(browser){
   // The inspector: Fecha límite after Fecha, a popover with the calendar, Deshacer
   await page.click('#desk .main .row[data-id=d4]:not(.first .row) .row-title'); await until(page, ()=>!!document.querySelector('#desk .pane [data-act=pickDeadline]'));
   x = await ev(page, ()=>({pops:[...document.querySelectorAll('#desk .pane .iform .ipop')].map(b=>b.dataset.act).join(), val:document.querySelector('#desk .pane [data-act=pickDeadline] .val').textContent}));
-  check('insp_row', x.pops==='pickProject,pickDate,pickDeadline,pickReminder,pickRepeat' && x.val==='20 nov', x);
+  check('insp_row', /^pickProject,pickDate,pickDeadline,pickReminder,pickRepeat(,pickEstimate)?$/.test(x.pops) && x.val==='20 nov', x); // decision 56 adds Tiempo after Prioridad
   await page.click('#desk .pane [data-act=pickDeadline]'); await until(page, ()=>!!document.querySelector('#pmenu [data-d="2026-11-25"]'));
   await sleep(350); await shot(page, 'd2-inspector-popover');
   await page.click('#pmenu [data-d="2026-11-25"]'); await until(page, ()=>!menuOpen());
@@ -336,8 +336,8 @@ async function syncTests(browser){
     tasks:[ st('s1', {title:'Sin límite'}), st('s2', {title:'Con límite', date:day(1), deadline:day(3)}) ] };
   const fake = new Fake(false); let x;
   const A = await open(browser, {tag:'SA', fake, seed, clock:false}), B = await open(browser, {tag:'SB', fake, seed:Object.assign({}, seed, {tasks:[]}), clock:false, desk:true});
-  x = await ev(A.page, ()=>{ const r1=syncToRow('tasks', task('s1')), r2=syncToRow('tasks', task('s2')); return {k1:Object.keys(r1).join(), d2:r2.deadline, sent:Object.keys(syncSendRow('tasks', r1)).slice(-1)[0]}; });
-  check('sync_signature_unchanged', x.k1==='id,created,space_id,project_id,title,date,reminder,priority,status,notes,carried,completed,modified,deleted' && x.d2===day(3) && x.sent==='deadline', x);
+  x = await ev(A.page, ()=>{ const r1=syncToRow('tasks', task('s1')), r2=syncToRow('tasks', task('s2')); return {k1:Object.keys(r1).join(), d2:r2.deadline, sent:Object.keys(syncSendRow('tasks', r1)).includes('deadline')}; });
+  check('sync_signature_unchanged', x.k1==='id,created,space_id,project_id,title,date,reminder,priority,status,notes,carried,completed,modified,deleted' && x.d2===day(3) && x.sent===true, x); // the cleared columns go as null (later ones, such as 0008's, after it)
   await ev(A.page, ()=>syncSignIn()); check('sync_A_first', await synced(A.page));
   await ev(B.page, ()=>syncSignIn()); check('sync_B_first', await synced(B.page));
   check('sync_server_value', fake.t.tasks.get('s2').deadline===day(3) && fake.t.tasks.get('s1').deadline===null, {s2:fake.t.tasks.get('s2').deadline, s1:fake.t.tasks.get('s1').deadline});

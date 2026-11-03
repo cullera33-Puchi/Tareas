@@ -50,7 +50,7 @@ const realClock = page => page.evaluate(()=>{ if(window.__RD) window.Date=window
   await page.tap(HOY+' .seg button[data-filter=hoy]'); await page.waitForTimeout(300);
   await page.tap(HOY+' .nav .vopts'); await page.waitForTimeout(350);
   r.menuHoy = await sheetItems(page);
-  check('R13_menuHoy', JSON.stringify(r.menuHoy.slice(0,4))===JSON.stringify(['Seleccionar tareas','Mostrar completadas','Agrupar por fecha  ✓','Agrupar por proyecto']) && r.menuHoy[4]==='Compartir estado de la semana' && r.menuHoy.length===5, r.menuHoy); // decision 52: no Mostrar resumen del día; M4: Compartir estado de la semana
+  check('R13_menuHoy', JSON.stringify(r.menuHoy.slice(0,4))===JSON.stringify(['Seleccionar tareas','Mostrar completadas','Agrupar por fecha  ✓','Agrupar por proyecto']) && r.menuHoy[4]==='¿Qué hago ahora?' && r.menuHoy[5]==='Compartir estado de la semana' && r.menuHoy.length===6, r.menuHoy); // decision 56: ¿Qué hago ahora?; decision 52: no Mostrar resumen del día; M4: Compartir estado de la semana
   // Hoy by project
   await clickItem(page, 'Agrupar por proyecto');
   r.hoyByProj = await page.evaluate(()=>{ const sc=document.querySelector('.screen.root[data-root=tareas] .scroll'); return {settings:[DB.settings.hoyGroup, DB.settings.allGroup],
@@ -121,7 +121,7 @@ const realClock = page => page.evaluate(()=>{ if(window.__RD) window.Date=window
   await page.tap(HOY+' [data-act=review]'); await page.waitForTimeout(400); await page.tap('#sheet [data-x=end]'); await page.waitForTimeout(400);
   check('R9_endNothing', await page.evaluate(()=>!document.querySelector('#sheet').classList.contains('on') && pendingFor('hoy').filter(x=>x.carried).length===2));
   // No new data field
-  check('R9_noNewField', await page.evaluate(()=>DB.tasks.every(x=>Object.keys(x).every(k=>['id','title','spaceId','projectId','date','reminder','priority','status','notes','carried','created','modified','completed'].includes(k)))));
+  check('R9_noNewField', await page.evaluate(()=>DB.tasks.every(x=>Object.keys(x).every(k=>['id','title','spaceId','projectId','date','reminder','priority','status','notes','carried','created','modified','completed','postponed','carriedSince'].includes(k)))));
 
   // R8: before 19:00 nothing new; at 19:30 the cell at the end of Hoy (decision 52: the only entry)
   await page.evaluate(()=>{ window.__RD=Date; const RD=Date; const fixed=new RD(); fixed.setHours(12,0,0,0); window.Date=class extends RD{ constructor(...a){ super(...(a.length?a:[fixed.getTime()])); } static now(){ return fixed.getTime(); } }; render(); });
@@ -254,7 +254,7 @@ const realClock = page => page.evaluate(()=>{ if(window.__RD) window.Date=window
   check('D_R13_button', !!r.dMopts, r.dMopts);
   await page.click('#desk .mhead .mopts'); await page.waitForTimeout(350); r.dMenu = await sheetItems(page);
   // Batch G (R16) gives the desktop its own multiple selection, so its view menu now starts with Seleccionar tareas too
-  check('D_R13_menu', r.dMenu[0]==='Seleccionar tareas' && r.dMenu[1]==='Mostrar completadas' && r.dMenu[2]==='Agrupar por fecha  ✓' && r.dMenu[3]==='Agrupar por proyecto' && r.dMenu[4]==='Compartir estado de la semana…' && r.dMenu.length===5, r.dMenu);
+  check('D_R13_menu', r.dMenu[0]==='Seleccionar tareas' && r.dMenu[1]==='Mostrar completadas' && r.dMenu[2]==='Agrupar por fecha  ✓' && r.dMenu[3]==='Agrupar por proyecto' && r.dMenu[4]==='¿Qué hago ahora?' && r.dMenu[5]==='Compartir estado de la semana…' && r.dMenu.length===6, r.dMenu); // decision 56
   await clickItem(page, 'Agrupar por proyecto');
   r.dHoyProj = await page.$$eval('#desk .gsec > .group-title', h=>h.map(x=>x.textContent.trim()));
   check('D_R13_hoyByProject', r.dHoyProj.length===2 && /^FLC/.test(r.dHoyProj[0]), r.dHoyProj);

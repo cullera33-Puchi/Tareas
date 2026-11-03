@@ -27,10 +27,11 @@ const INITIAL_SPACES=['trabajo','personal'];
 // nothing is sent again; but sent as null when cleared (syncSendRow). A database without the column (0004_repeat_focus.sql not run yet)
 // is found on the first upload that names it: from then on, in this session, the column is left out both ways and the value stays on the device.
 // dayN (decision 48a, deadline): the same, for a date (0007_deadline.sql)
+// intN (decision 56, estimate and postponed): the same, for a whole number above zero (0 is none); carried_since is a dayN (0008_estimate_postponed.sql)
 const SYNC_FIELDS={
   spaces:[['name','name','text'],['order','sort_order','int']],
   projects:[['spaceId','space_id','id'],['name','name','text'],['color','color','id'],['order','sort_order','int'],['archived','archived','bool']],
-  tasks:[['spaceId','space_id','id'],['projectId','project_id','id'],['title','title','text'],['date','date','day'],['reminder','reminder','ts'],['priority','priority','pri'],['status','status','status'],['notes','notes','text'],['carried','carried','bool'],['completed','completed','ts'],['reminderSent','reminder_sent','tsOpt'],['repeat','repeat','textN'],['focus','focus','tsN'],['waitingFor','waiting_for','textN'],['deadline','deadline','dayN']],
+  tasks:[['spaceId','space_id','id'],['projectId','project_id','id'],['title','title','text'],['date','date','day'],['reminder','reminder','ts'],['priority','priority','pri'],['status','status','status'],['notes','notes','text'],['carried','carried','bool'],['completed','completed','ts'],['reminderSent','reminder_sent','tsOpt'],['repeat','repeat','textN'],['focus','focus','tsN'],['waitingFor','waiting_for','textN'],['deadline','deadline','dayN'],['estimate','estimate','intN'],['postponed','postponed','intN'],['carriedSince','carried_since','dayN']],
   voice_notes:[['taskId','task_id','id'],['text','text','text']],
   // Decision 29 (0003_attachments.sql): the record of a photo or a recording; its file goes to Storage first (attFlush)
   attachments:[['taskId','task_id','id'],['kind','kind','kind'],['path','path','id'],['mime','mime','id'],['size','size','int'],['width','width','int'],['height','height','int'],['durationMs','duration_ms','int']],
@@ -40,9 +41,9 @@ const SYNC_FIELDS={
   project_notes:[['projectId','project_id','id'],['title','title','text'],['body','body','text'],['pinned','pinned','bool']] };
 const syncTs = v => { if(!v) return null; const d=new Date(v); return isNaN(d) ? null : d.toISOString(); };
 const SYNC_TO={ id:v=>v==null||v===''?null:String(v), text:v=>v==null?'':String(v), int:v=>v==null||v===''||isNaN(+v)?null:Math.round(+v), bool:v=>!!v,
-  day:v=>/^\d{4}-\d{2}-\d{2}$/.test(String(v||''))?v:null, dayN:v=>/^\d{4}-\d{2}-\d{2}$/.test(String(v||''))?String(v).slice(0,10):null, ts:syncTs, tsOpt:syncTs, tsN:syncTs, textN:v=>v==null||v===''?null:String(v), pri:v=>['high','mid','none'].includes(v)?v:'none', status:v=>['pending','done','waiting'].includes(v)?v:'pending', kind:v=>['photo','audio'].includes(v)?v:null };
-const syncNullable = k => k==='textN'||k==='tsN'||k==='dayN';
-// Columns the database turned out not to have (table.column), for this session: 0004_repeat_focus.sql or 0007_deadline.sql not run yet
+  day:v=>/^\d{4}-\d{2}-\d{2}$/.test(String(v||''))?v:null, dayN:v=>/^\d{4}-\d{2}-\d{2}$/.test(String(v||''))?String(v).slice(0,10):null, ts:syncTs, tsOpt:syncTs, tsN:syncTs, intN:v=>{ const n=v==null||v===''?NaN:Math.round(+v); return isFinite(n)&&n>0?n:null; }, textN:v=>v==null||v===''?null:String(v), pri:v=>['high','mid','none'].includes(v)?v:'none', status:v=>['pending','done','waiting'].includes(v)?v:'pending', kind:v=>['photo','audio'].includes(v)?v:null };
+const syncNullable = k => k==='textN'||k==='tsN'||k==='dayN'||k==='intN';
+// Columns the database turned out not to have (table.column), for this session: 0004_repeat_focus.sql, 0007_deadline.sql or 0008_estimate_postponed.sql not run yet
 const SYNC_NOCOL=new Set();
 const syncNoCol = (table, c) => SYNC_NOCOL.has(table+'.'+c);
 // A local record as a row: always the same keys in the same order, so the signature only changes with the content
@@ -227,12 +228,16 @@ function syncColRefused(table, e){ const m=String(e&&(e.message||e.details||e)||
   if(!/PGRST204|42703|column|schema cache/i.test(m)) return null; return SYNC_NULLCOLS(table).find(c=>!syncNoCol(table,c)&&new RegExp('(^|\\W)'+c+'(\\W|$)').test(m))||null; }
 // The status check of 0001 (pending or done) refuses 'waiting' (decision 41) until 0004 widens it: from then on such tasks go up as pending
 const syncWaitRefused = (table, e) => { const m=String(e&&(e.message||e.details||e)||'')+' '+String(e&&e.code||''); return table==='tasks'&&!syncNoCol(table,'status:waiting')&&/23514|check constraint/i.test(m)&&/status/i.test(m); };
-const NOCOL_WHAT={repeat:'La repetición', focus:'Ahora', waiting_for:'Esperando a', deadline:'La fecha límite'}, NOCOL_FILE={deadline:'0007_deadline.sql'}; // the migration that adds each column (0004 unless said)
+const NOCOL_WHAT={repeat:'La repetición', focus:'Ahora', waiting_for:'Esperando a', deadline:'La fecha límite', estimate:'El tiempo estimado y las veces que se ha aplazado'},
+  NOCOL_FILE={deadline:'0007_deadline.sql', estimate:'0008_estimate_postponed.sql', postponed:'0008_estimate_postponed.sql', carried_since:'0008_estimate_postponed.sql'}; // the migration that adds each column (0004 unless said)
 async function syncUpsert(table, rows){ for(;;){ const send=rows.map(r=>{ let o=r; SYNC_NULLCOLS(table).forEach(c=>{ if(syncNoCol(table,c)&&c in o){ if(o===r) o=Object.assign({}, r); delete o[c]; } });
       if(o.status==='waiting'&&syncNoCol(table,'status:waiting')){ if(o===r) o=Object.assign({}, r); o.status='pending'; } return o; });
     try{ return await SY.remote.upsert(table, send); }
     catch(e){ if(syncWaitRefused(table, e)){ SYNC_NOCOL.add(table+'.status:waiting'); log('warn','La base de datos no admite todavía el estado Por confirmar: falta 0004_repeat_focus.sql. Esas tareas se envían como pendientes y siguen por confirmar en este dispositivo'); continue; }
-      const c=syncColRefused(table, e); if(!c) throw e; SYNC_NOCOL.add(table+'.'+c); log('warn','La base de datos no tiene todavía la columna '+table+'.'+c+': falta '+(NOCOL_FILE[c]||'0004_repeat_focus.sql')+'. '+NOCOL_WHAT[c]+' se queda en este dispositivo'); } } }
+      const c=syncColRefused(table, e); if(!c) throw e; SYNC_NOCOL.add(table+'.'+c);
+      // decision 56: the three columns of 0008 come together, so one refused means the three are missing: one line in the log, not three
+      const g=c in NOCOL_FILE&&NOCOL_FILE[c]!==NOCOL_FILE.deadline ? Object.keys(NOCOL_FILE).filter(k=>NOCOL_FILE[k]===NOCOL_FILE[c]) : [c]; g.forEach(k=>SYNC_NOCOL.add(table+'.'+k));
+      log('warn','La base de datos no tiene todavía '+(g.length>1?'las columnas '+listY(g.map(k=>table+'.'+k)):'la columna '+table+'.'+c)+': falta '+(NOCOL_FILE[c]||'0004_repeat_focus.sql')+'. '+NOCOL_WHAT[g[0]]+(g.length>1?' se quedan':' se queda')+' en este dispositivo'); } } }
 async function syncPush(c){ const out={pushed:0, deleted:0, kept:0}; const late={};
   for(const {table} of SYNC_TABLES){
     for(let i=0;i<c.up[table].length;i+=SYNC_CHUNK){ const part=c.up[table].slice(i,i+SYNC_CHUNK);

@@ -22,7 +22,10 @@ with checks(orden, pieza, ok) as (
   union all select 17, 'Pasos: tabla subtasks (0005)', to_regclass('public.subtasks') is not null
   union all select 18, 'Notas de proyecto: tabla project_notes (0006)', to_regclass('public.project_notes') is not null
   union all select 19, 'Fecha límite: columna tasks.deadline (0007)', exists (select 1 from information_schema.columns where table_schema='public' and table_name='tasks' and column_name='deadline')
-  union all select 20, 'Tiempo real: tablas publicadas', (select count(*) from pg_publication_tables where pubname='supabase_realtime' and schemaname='public' and tablename in ('spaces','projects','tasks','voice_notes','attachments','subtasks','project_notes')) = 7
+  union all select 20, 'Tiempo estimado: columna tasks.estimate (0008)', exists (select 1 from information_schema.columns where table_schema='public' and table_name='tasks' and column_name='estimate')
+  union all select 21, 'Aplazamientos: columna tasks.postponed (0008)', exists (select 1 from information_schema.columns where table_schema='public' and table_name='tasks' and column_name='postponed')
+  union all select 22, 'Aplazamientos: columna tasks.carried_since (0008)', exists (select 1 from information_schema.columns where table_schema='public' and table_name='tasks' and column_name='carried_since')
+  union all select 23, 'Tiempo real: tablas publicadas', (select count(*) from pg_publication_tables where pubname='supabase_realtime' and schemaname='public' and tablename in ('spaces','projects','tasks','voice_notes','attachments','subtasks','project_notes')) = 7
 )
 select orden as "N.º", pieza as "Pieza", case when ok then 'OK' else 'FALTA' end as "Estado"
 from checks order by orden;

@@ -72,10 +72,11 @@ function projectMatches(tok){ const k=projKey(tok); if(!k) return []; const ps=a
   const exact=ps.filter(p=>projKey(p.name)===k); if(exact.length===1) return exact;
   return ps.filter(p=>projKey(p.name).startsWith(k) || norm(p.name).split(/[^a-z0-9]+/).some(w=>w&&w.startsWith(k))); }
 /* R7: everything a quick-add title says besides its text. '#pro' anywhere picks a project; at the end, in any order,
-   a date (the parseQuickDate words), a time ('a las 9', 'a las 9:30', 'a las 18h', 'a la 1 de la tarde') and '!!!' or '!!' for the priority.
+   a date (the parseQuickDate words), a time ('a las 9', 'a las 9:30', 'a las 18h', 'a la 1 de la tarde'), '!!!' or '!!' for the priority
+   and (decision 56) the estimated time: '15m', '30m', '1h' or 'medio día' (also '15 min', '30 min', 'medio dia'), case and accents ignored.
    tokens: the recognised ranges of the text, to highlight them and to drop them from the title. */
 function parseQuick(text){
-  const src=String(text||''); const toks=[]; const out={title:'', date:null, projectId:null, priority:null, time:null, ambiguous:null, tokens:toks};
+  const src=String(text||''); const toks=[]; const out={title:'', date:null, projectId:null, priority:null, time:null, estimate:null, ambiguous:null, tokens:toks};
   for(const m of src.matchAll(/(^|\s)#([\p{L}\p{N}_-]+)/gu)){ if(out.projectId) break; const start=m.index+m[1].length, ps=projectMatches(m[2]);
     if(ps.length===1){ out.projectId=ps[0].id; out.ambiguous=null; toks.push({kind:'proj', start, end:start+1+m[2].length}); }
     else if(ps.length>1&&!out.ambiguous) out.ambiguous={tok:'#'+m[2], names:ps.map(p=>p.name)}; }
@@ -86,8 +87,14 @@ function parseQuick(text){
     if(!out.time && (m=work.match(/\s+a\s+las?\s+(\d{1,2})(?:[:.h](\d{2}))?\s*(?:h|hs|horas?)?(?:\s+de\s+la\s+(mañana|tarde|noche))?\s*$/i))){ let h=+m[1]; const mi=m[2]?+m[2]:0; const part=(m[3]||'').toLowerCase();
       if(part&&part!=='mañana'&&h<12) h+=12; if(h<=23&&mi<=59){ out.time={h, m:mi}; take('time', m.index, m.index+m[0].trimEnd().length); more=true; continue; } }
     if(!out.priority && (m=work.match(/\s(!{2,3})\s*$/))){ out.priority=m[1].length===3?'high':'mid'; take('pri', m.index, m.index+1+m[1].length); more=true; continue; }
+    if(!out.estimate && (m=estMatch(work))){ out.estimate=m.min; take('est', m.index, m.index+m.len); more=true; continue; }
     if(!out.date){ const d=quickDateMatch(work); if(d){ out.date=d.date; take('date', d.index, d.index+work.substr(d.index,d.len).trimEnd().length); more=true; } } }
   toks.sort((a,b)=>a.start-b.start); out.title=quickTitle(src, toks); return out; }
+/* Decision 56: the estimate at the end of a title, as its own word. 'medio día' right after 'a', 'al', 'de', 'del', 'hasta', 'desde' or 'para'
+   is part of the sentence ('Comida de medio día', 'Llamar a medio día'), not an estimate */
+function estMatch(work){ const m=work.match(/\s+(15\s?m(?:in)?|30\s?m(?:in)?|1\s?h|medio\s+d[ií]a)\s*$/i); if(!m) return null; const w=norm(m[1]).replace(/\s+/g,'');
+  if(w==='mediodia' && /(?:^|\s)(?:a|al|de|del|hasta|desde|para)$/i.test(work.slice(0, m.index))) return null;
+  return {index:m.index, len:m[0].trimEnd().length, min:w.startsWith('15')?15:w.startsWith('30')?30:w==='1h'?60:240}; }
 function quickTitle(src, toks){ let t='', last=0; toks.forEach(k=>{ t+=src.slice(last,k.start)+' '; last=k.end; }); return (t+src.slice(last)).replace(/\s+/g,' ').trim(); }
 // R7: the reminder for a written time: on the task's date or, with none, today, or tomorrow when that time has passed. null when it would be in the past.
 function quickReminder(time, date){ if(!time) return null; const at=d=>{ const x=new Date(d+'T00:00:00'); x.setHours(time.h, time.m, 0, 0); return x; };
@@ -97,18 +104,19 @@ function quickReminder(time, date){ if(!time) return null; const at=d=>{ const x
 // A time that has already passed on the written day sets no reminder and stays in the title (late).
 function quickTask(text, base){ base=base||{}; const q=parseQuick(text); let toks=q.tokens, reminder=null, late=false; const date=q.date||base.date||null;
   if(q.time){ reminder=quickReminder(q.time, date); if(!reminder){ late=true; toks=toks.filter(t=>t.kind!=='time'); } }
-  return {q, toks, title:late?quickTitle(String(text||''), toks):q.title, date:date||(reminder?localDay(reminder):null), projectId:q.projectId||base.projectId||null, priority:q.priority||base.priority||'none', reminder, late}; }
+  return {q, toks, title:late?quickTitle(String(text||''), toks):q.title, date:date||(reminder?localDay(reminder):null), projectId:q.projectId||base.projectId||null, priority:q.priority||base.priority||'none', estimate:q.estimate||base.estimate||null, reminder, late}; }
 // R7: a short line with what was read in the title, and why something was not taken
 function quickSaid(r){ const q=r.q, out=[], warn=[];
   if(q.date) out.push(fmtDate(q.date));
   if(q.projectId){ const p=proj(q.projectId); if(p) out.push('proyecto '+p.name); }
   if(q.priority) out.push(q.priority==='high'?'prioridad alta':'prioridad media');
   if(r.reminder) out.push('recordatorio '+(!q.date?fmtDate(localDay(r.reminder)).toLowerCase()+' ':'')+'a las '+fmtTime(r.reminder));
+  if(q.estimate) out.push('tiempo '+estLabel(q.estimate).toLowerCase()); // decision 56
   if(q.ambiguous) warn.push(q.ambiguous.tok+' coincide con '+q.ambiguous.names.slice(0,-1).join(', ')+' y '+q.ambiguous.names.slice(-1)+'. No se asigna proyecto.');
   if(r.late) warn.push('Esa hora ya ha pasado. No se pone recordatorio.');
   return {out, warn}; }
 // R6: the values a line of a list will get, in short
-function quickMeta(r){ const m=[]; if(r.date) m.push(fmtDate(r.date)); if(r.reminder) m.push(fmtTime(r.reminder)); const p=r.projectId&&proj(r.projectId); if(p) m.push(p.name); if(r.priority!=='none') m.push(r.priority==='high'?'!!!':'!!'); return m.join(', '); }
+function quickMeta(r){ const m=[]; if(r.date) m.push(fmtDate(r.date)); if(r.reminder) m.push(fmtTime(r.reminder)); const p=r.projectId&&proj(r.projectId); if(p) m.push(p.name); if(r.priority!=='none') m.push(r.priority==='high'?'!!!':'!!'); if(r.estimate) m.push(estLabel(r.estimate)); return m.join(', '); }
 // R7: the field with the recognised parts tinted behind its text
 function qinHTML(input){ return '<div class="qin"><div class="qhl" aria-hidden="true"><span></span></div>'+input+'</div>'; }
 function paintQuick(inp, toks){ const hl=inp.parentNode&&inp.parentNode.querySelector('.qhl span'); if(!hl) return; const v=inp.value; let o='', last=0;
@@ -189,6 +197,7 @@ const I = {
   gearF:'<svg viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><circle cx="13" cy="13" r="4.5" fill="currentColor" stroke="none"/><path d="M13 3v3M13 20v3M3 13h3M20 13h3M6 6l2 2M18 18l2 2M6 20l2-2M18 8l2-2"/></svg>',
   repeat:'<svg class="i-rep" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2.5l3 3-3 3"/><path d="M4 11.5v-2a4 4 0 014-4h12"/><path d="M7 21.5l-3-3 3-3"/><path d="M20 12.5v2a4 4 0 01-4 4H4"/></svg>',
   star:'<svg class="i-star" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 2.8l2.85 5.78 6.38.93-4.62 4.5 1.09 6.35L12 17.36l-5.7 3 1.09-6.35-4.62-4.5 6.38-.93z"/></svg>',
+  est:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h10M7 21h10M8 3v3a4.5 4.5 0 002 3.7L12 11l2-1.3A4.5 4.5 0 0016 6V3M8 21v-3a4.5 4.5 0 012-3.7l2-1.3 2 1.3a4.5 4.5 0 012 3.7v3"/></svg>', // decision 56: Tiempo estimado
   starF:'<svg class="i-star on" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 2.8l2.85 5.78 6.38.93-4.62 4.5 1.09 6.35L12 17.36l-5.7 3 1.09-6.35-4.62-4.5 6.38-.93z"/></svg>',
 };
 
@@ -306,6 +315,26 @@ const waitIn = x => waitDue(x) || (x.status==='waiting' && dlDue(x)); // a waiti
 const carriedOn = x => !!x.carried && !!x.date && x.date<=todayStr(); // Aplazada: by its date, never by a deadline
 function dlLevel(x){ if(!x.deadline||x.status==='done') return ''; const t=todayStr(); return x.deadline<=t?'due':x.deadline<=addDays(t,2)?'soon':''; }
 const dlText = d => { const s=fmtDate(d); return 'Entrega '+s[0].toLowerCase()+s.slice(1); }; // "Entrega hoy", "Entrega jueves", "Entrega 12 nov"
+/* Decision 56a: Tiempo estimado. Task.estimate (Supabase tasks.estimate) is the time the task takes, in minutes; null when not said.
+   Four values of one tap: 15, 30, 60 and 240 (Medio día). The rows say it in grey; Sugerir (56c) reads it */
+const EST_VALUES=[15,30,60,240];
+const estLabel = m => { m=+m; if(!m) return ''; if(m===240) return 'Medio día'; if(m<60) return m+' min'; return Math.floor(m/60)+' h'+(m%60?' '+(m%60)+' min':''); }; // "15 min", "1 h", "Medio día"
+/* Decision 56b: procrastination. Task.postponed (Supabase tasks.postponed) counts the times an open task went to a later day while it was
+   already due (its date today or earlier): the start of a day (rollOver), Aplazar, Cerrar el día, Repasar, a drag, the date pickers.
+   Task.carriedSince (Supabase tasks.carried_since) is the first day it was due when it was first counted (the earliest one is kept).
+   Both stay when it is done (history); a new task, a duplicate and the next one of a series start without them. A task is "arrastrada"
+   with 3 or more or since 7 days or more, while open: its row says "Aplazada 4 veces" or "Desde el martes 27" in orange */
+const DRAG_N=3, DRAG_DAYS=7;
+const isDrag = x => !!x && isOpen(x) && ((+x.postponed||0)>=DRAG_N || (!!x.carriedSince && x.carriedSince<=addDays(todayStr(), -DRAG_DAYS)));
+// "el martes 27" within four weeks, else "el 2 de septiembre" (and the year when it is not this one)
+function sinceWords(d){ const t=todayStr(), x=new Date(d+'T00:00:00'), n=dayNum(t)-dayNum(d);
+  if(n<28) return 'el '+DIAS_L[x.getDay()]+' '+x.getDate(); return 'el '+x.getDate()+' de '+MESES_FULL[x.getMonth()]+(d.slice(0,4)!==t.slice(0,4)?' de '+d.slice(0,4):''); }
+const dragText = x => !isDrag(x) ? '' : (+x.postponed||0)>=DRAG_N ? 'Aplazada '+x.postponed+' veces' : 'Desde '+sinceWords(x.carriedSince);
+// The counters a move of x to date takes (none when it does not count): pending, due (its date today or earlier) and going to a later day.
+// status: the status the same change gives it (a task marked Por confirmar is not postponed)
+function postPatch(x, date, status){ const t=todayStr();
+  if(!x||x.status!=='pending'||(status&&status!=='pending')||!x.date||x.date>t||!date||date<=x.date) return {};
+  return {postponed:(+x.postponed||0)+1, carriedSince:x.carriedSince&&x.carriedSince<x.date?x.carriedSince:x.date}; }
 // The block Por confirmar: the waiting tasks of the space (of a project, or under the project filter) whose review day has not come
 function waitingList(projectId){ let list=spaceTasks().filter(x=>x.status==='waiting'&&!waitIn(x));
   if(projectId!==undefined) list=list.filter(x=> projectId===null ? !x.projectId : x.projectId===projectId);
@@ -324,7 +353,7 @@ const UI = { tab:'tareas', query:'', stack:[], scroll:{}, searchDone:false, sele
 let deskRedraw=false; // while renderDesktop replaces the markup: a field it takes away is not a field the user left (R15)
 const MODK=/Mac|iPhone|iPad/.test(navigator.platform||navigator.userAgent||'')?'Comando':'Control'; // the key a Mac calls Comando
 const bulkN = n => n+(n===1?' tarea':' tareas');
-const AX={open:false, notes:'', rec:null, date:undefined, projectId:undefined, priority:undefined, time:null, opened:false}; // decision 31: the desktop add bar's composer (axOpen)
+const AX={open:false, notes:'', rec:null, date:undefined, projectId:undefined, priority:undefined, estimate:undefined, time:null, opened:false}; // decision 31: the desktop add bar's composer (axOpen)
 
 /* ---------- Toast with undo ---------- */
 let toastTimer=null, undoFn=null, toastLbl=null; // toastLbl: the button is not Deshacer (Actualizar, Completar tarea): Comando Z and shaking leave it alone
@@ -413,7 +442,7 @@ function spawnNext(x){ const r=repParse(x.repeat); if(!r) return null;
   const t=todayStr(), date=repNext(r, x.date&&x.date>t?x.date:t); if(!date) return null;
   let reminder=null; if(x.reminder){ const a=new Date(x.reminder), d=new Date(date+'T00:00:00'); d.setHours(a.getHours(), a.getMinutes(), 0, 0); reminder=d.toISOString(); }
   const dl=dlShift(x, date); // decision 48a: its deadline as far from its date as the completed one's; none when that one had no date
-  const n=addTask(Object.assign({title:x.title, spaceId:x.spaceId, projectId:x.projectId, priority:x.priority, notes:x.notes||'', date, reminder, repeat:x.repeat}, dl?{deadline:dl}:{}));
+  const n=addTask(Object.assign({title:x.title, spaceId:x.spaceId, projectId:x.projectId, priority:x.priority, notes:x.notes||'', date, reminder, repeat:x.repeat}, dl?{deadline:dl}:{}, x.estimate?{estimate:x.estimate}:{})); // decision 56: the estimate too, never the counters
   copySteps(x.id, n.id); // decision 46: its steps, unchecked
   log('info','Siguiente tarea de la serie', {date}); return n; }
 // Reopening a completed task of a series (Deshacer, or marking it pending again) takes back the next one it created, while nobody has touched it
@@ -423,7 +452,7 @@ function dropNext(x){ const s=repSeries(x.repeat); if(!s||!x.completed) return [
   return out; }
 // "Eliminar solo esta": the task moves to the next date of its series, with Deshacer (it also leaves Ahora). quiet: the caller gives the feedback
 function skipOccurrence(id, quiet){ const x=task(id); if(!x) return null; const r=repParse(x.repeat); if(!r) return null; const t=todayStr(), d=repNext(r, x.date&&x.date>t?x.date:t); if(!d) return null;
-  const old=Object.assign(daySnap(x), {focus:x.focus||null, deadline:x.deadline||null}), dl=dlShift(x, d); releaseHold(id); updTask(id, dayPatch(x, d, Object.assign({carried:false, focus:null}, dl?{deadline:dl}:{}))); log('info','Eliminada solo esta de una serie', {to:d}); // decision 48a: the deadline goes along, as for the next one
+  const old=Object.assign(daySnap(x), {focus:x.focus||null, deadline:x.deadline||null}), dl=dlShift(x, d); releaseHold(id); updTask(id, dayPatch(x, d, Object.assign({carried:false, focus:null}, dl?{deadline:dl}:{}), true)); log('info','Eliminada solo esta de una serie', {to:d}); // decision 48a: the deadline goes along, as for the next one
   const undo=()=>updTask(id, Object.assign({date:old.date, carried:old.carried, reminder:old.reminder, focus:old.focus}, dl?{deadline:old.deadline}:{}));
   if(!quiet){ haptic(14); toast('Eliminada solo esta, la siguiente '+dayWords(d), undo); } return undo; }
 /* Two devices that complete the same task of a series while offline each create its next one. When their data meets (a sync, or the
@@ -480,7 +509,7 @@ function removeFromAhora(ids){ const xs=ids.map(task).filter(x=>x&&x.focus); if(
 const waitSnap = x => ({status:x.status, waitingFor:x.waitingFor||null, date:x.date, carried:x.carried, reminder:x.reminder||null, focus:x.focus||null});
 function waitUndo(id, o){ const x=task(id); if(!x) return; const p={status:o.status, waitingFor:o.waitingFor, date:o.date, carried:o.carried, reminder:o.reminder}; if(o.focus||x.focus) p.focus=o.focus; updTask(id, p); }
 function setWaiting(id, who, date){ const x=task(id); if(!x||x.status==='done') return; const old=waitSnap(x), was=x.status==='waiting';
-  const p=Object.assign(date!==undefined&&date!==x.date ? dayPatch(x, date) : {}, {status:'waiting', waitingFor:String(who||'').trim()||null, carried:false}); if(x.focus) p.focus=null;
+  const p=Object.assign(date!==undefined&&date!==x.date ? dayPatch(x, date, {status:'waiting'}) : {}, {status:'waiting', waitingFor:String(who||'').trim()||null, carried:false}); if(x.focus) p.focus=null;
   releaseHold(id); updTask(id, p); haptic(8); log('info', was?'Por confirmar cambiada':'Por confirmar', {date:x.date});
   const when=x.date&&x.date>todayStr()?', revisar '+dayWords(x.date):x.date?', revisar hoy':'';
   toast('Por confirmar'+(x.waitingFor?', esperando a '+x.waitingFor:'')+when, ()=>waitUndo(id, old)); }
@@ -503,18 +532,22 @@ function updTask(id, patch){ const x=task(id); if(!x) return; if('date' in patch
 /* Decision 25: a task that changes day through rollOver, Aplazar, Pasar lo pendiente a mañana, the reviews, planning, the desktop quick dates
    or a calendar drag takes a reminder set on its old day to the new day, at the same time. If that time has already passed (yesterday's
    tasks rolled over to today), the reminder stays but is marked as sent, so it never notifies. The one helper every one of those paths uses;
-   'extra' joins the patch (carried, status). The Fecha and Recordatorio sheets are manual edits and do not use it */
+   'extra' joins the patch (carried, status). The Fecha and Recordatorio sheets are manual edits and do not use it.
+   Decision 56b: it counts the move too (postPatch), unless 'still' (Eliminar solo esta: the next date of a series is no postponing) */
 const sentStamp = iso => iso && Date.parse(iso)<=Date.now() ? new Date().toISOString() : null;
-function dayPatch(x, date, extra){ const p=Object.assign({date}, extra||{});
+function dayPatch(x, date, extra, still){ const p=Object.assign({date}, extra||{}); if(!still) Object.assign(p, postPatch(x, date, p.status));
   if(x && x.reminder && x.date && date && date!==x.date && localDay(x.reminder)===x.date){ const r=new Date(x.reminder), d=new Date(date+'T00:00:00');
     d.setHours(r.getHours(), r.getMinutes(), r.getSeconds(), r.getMilliseconds()); p.reminder=d.toISOString(); p.reminderSent=sentStamp(p.reminder); }
   return p; }
-// What Deshacer needs to put a task back on its day: the date, the Aplazada mark and the reminder (updTask works out reminderSent again)
-const daySnap = x => ({id:x.id, date:x.date, carried:x.carried, reminder:x.reminder||null});
-const undoDay = o => updTask(o.id, {date:o.date, carried:o.carried, reminder:o.reminder});
+// What Deshacer needs to put a task back on its day: the date, the Aplazada mark, the reminder (updTask works out reminderSent again)
+// and the counters of decision 56b
+const daySnap = x => ({id:x.id, date:x.date, carried:x.carried, reminder:x.reminder||null, postponed:x.postponed||null, carriedSince:x.carriedSince||null});
+const undoDay = o => updTask(o.id, {date:o.date, carried:o.carried, reminder:o.reminder, postponed:o.postponed||null, carriedSince:o.carriedSince||null});
 /* Roll over: pending tasks dated before today move to today and are flagged as carried.
    Runs at start and whenever the app comes back to the foreground (the day may have changed). */
 // It leaves 'modified' alone: every device repeats it, so it must not beat a real edit in an import ('newer wins').
+// Decision 56b: it counts the move (dayPatch), also without touching 'modified': the new signature goes up with the same time, which the
+// server accepts (equal times win, 0001_init.sql), as the carried mark and the new date always did; every device counts the same move once
 // Decision 39: Ahora empties with the day; a task put there before today goes back to its usual place (focus cleared, modified untouched)
 // Decision 38: a carried task of a series stays one task: no copies for the days it missed
 function rollOver(){ const t=todayStr(); let n=0, f=0; if(DB.settings.summaryDay!==t){ DB.settings.summaryDay=t; save(); } /* the day this device last rolled over (checkDay); the name is older than decision 52 */ DB.tasks.forEach(x=>{ if(x.status==='pending'&&x.date&&x.date<t){ Object.assign(x, dayPatch(x, t, {carried:true})); n++; } if(x.focus&&localDay(x.focus)<t){ x.focus=null; f++; } });

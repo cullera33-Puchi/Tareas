@@ -64,7 +64,7 @@ const paste = (page, sel, text) => page.$eval(sel, (el,t)=>{ const dt=new DataTr
   r.sheet = await page.evaluate(()=>{ const s=document.querySelector('#sheet'); const bs=[...s.querySelectorAll('.qbtn')].map(b=>{ const x=b.getBoundingClientRect(); return [b.dataset.k, Math.round(x.width), Math.round(x.height)]; });
     return { on:s.classList.contains('on'), add:s.classList.contains('addsheet'), focused:document.activeElement===s.querySelector('.titlein'), bs, addBtn:(s.querySelector('.qadd')||{}).textContent,
       noHelp:!/Escribe|Enter añade/.test(s.textContent), noCancel:![...s.querySelectorAll('button')].some(b=>/Cancelar|Añadir y abrir/.test(b.textContent)), stripHidden:getComputedStyle(s.querySelector('#qstrip')).display==='none' }; });
-  check('R5_sheet', r.sheet.on && r.sheet.add && r.sheet.focused && r.sheet.bs.map(b=>b[0]).join()==='date,proj,pri' && r.sheet.bs.every(b=>b[1]>=44&&b[2]>=44) && r.sheet.addBtn==='Añadir' && r.sheet.noHelp && r.sheet.noCancel && r.sheet.stripHidden, r.sheet);
+  check('R5_sheet', r.sheet.on && r.sheet.add && r.sheet.focused && r.sheet.bs.map(b=>b[0]).join()==='date,proj,pri,est' && /* decision 56: Tiempo */ r.sheet.bs.every(b=>b[1]>=44&&b[2]>=44) && r.sheet.addBtn==='Añadir' && r.sheet.noHelp && r.sheet.noCancel && r.sheet.stripHidden, r.sheet);
   // The bar is the last thing in the sheet, at its bottom (on the keyboard when there is one)
   r.barBottom = await page.evaluate(()=>{ const s=document.querySelector('#sheet').getBoundingClientRect(), b=document.querySelector('.qbar').getBoundingClientRect(); return Math.round(s.bottom-b.bottom); });
   check('R5_barAtBottom', r.barBottom<=60, r.barBottom);

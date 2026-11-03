@@ -553,7 +553,8 @@ body.pdragging,body.pdragging *{cursor:grabbing !important;user-select:none;-web
 .app.desktop .side .it .dot{width:9px;height:9px;margin:0 3.5px;}
 .app.desktop .side .it .n{font-size:11px;font-variant-numeric:tabular-nums;}
 /* The column head: title, project filter, search and view options, as wide as the list under it */
-.app.desktop .main .mhead{gap:8px;padding:12px 24px 8px;max-width:948px;min-height:52px;}
+.app.desktop .main .mhead{gap:8px;padding:12px 24px 8px;min-height:52px;}
+.app.desktop .main:has(.inner.settings) .mhead,.app.desktop .main:has(.notes-inner) .mhead{max-width:948px;} /* decision 58: the lists take the whole column; Ajustes and Notas keep their width */
 .app.desktop .main .mhead.wide-head{max-width:none;}
 .app.desktop .main .mhead h1{font-size:20px;letter-spacing:-.2px;}
 .app.desktop .main .mhead .searchbar{width:auto;flex:none;gap:8px;}
@@ -572,7 +573,8 @@ body.pdragging,body.pdragging *{cursor:grabbing !important;user-select:none;-web
 .pfdrop svg{width:9px;height:9px;flex:none;color:var(--ink2);}
 .pfdrop.on{background:var(--qhl);border-color:transparent;box-shadow:none;}
 .app.desktop .main .mbody{padding:0 24px 40px;}
-.app.desktop .main .inner{max-width:900px;}
+.app.desktop .main .inner{max-width:none;}
+.app.desktop .main .inner.settings{max-width:900px;}
 .app.desktop .main .inner.week-inner{max-width:none;}
 .app.desktop .addbar{height:34px;gap:8px;padding:0 10px;margin:2px 0 10px;border-radius:8px;background:var(--dmain);border:.5px solid var(--dline);box-shadow:0 .5px 1.5px rgba(0,0,0,.06);}
 .app.desktop .addbar:focus-within{border-color:var(--blue);box-shadow:0 0 0 3px var(--qhl);}
@@ -590,12 +592,13 @@ body.pdragging,body.pdragging *{cursor:grabbing !important;user-select:none;-web
 .app.desktop .row-text{display:flex;align-items:center;gap:8px;}
 .app.desktop .row-title{display:block;flex:0 1 auto;min-width:0;font-size:14px;white-space:nowrap;text-overflow:ellipsis;}
 .app.desktop .row-text{flex:1 1 auto;min-width:0;}
-.app.desktop .pcol{flex:none;width:132px;display:flex;align-items:center;min-width:0;}
-.app.desktop.has-pane .pcol{width:100px;}
+.app.desktop .pcol{flex:none;width:var(--col-proj,132px);display:flex;align-items:center;min-width:0;}
+.app.desktop.has-pane .pcol{width:var(--col-proj,100px);}
 /* With the inspector open the list is narrow: the date column tightens and a reminder shows as its bell only (the time is in the tooltip and the inspector) */
-.app.desktop.has-pane .rc-date{width:70px;}
-.app.desktop.has-pane .rc-rem{width:18px;font-size:0;}
-.app.desktop.has-pane .rc-rem svg{margin:0;}
+.app.desktop.has-pane .rc-date{width:var(--col-date,70px);}
+.app.desktop.has-pane .rc-rem{width:var(--col-rem,18px);}
+.app.desktop.has-pane .desk:not(.colw-rem) .rc-rem{font-size:0;}
+.app.desktop.has-pane .desk:not(.colw-rem) .rc-rem svg{margin:0;}
 .app.desktop .pcol .tag{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;line-height:16px;padding:0 6px;border-radius:5px;margin:0;}
 /* Date, reminder and notes columns only take room when some row of the list uses them */
 .app.desktop .main:not(:has(.row .rc-date:not(:empty))) .rc-date{display:none;}
@@ -603,8 +606,8 @@ body.pdragging,body.pdragging *{cursor:grabbing !important;user-select:none;-web
 .app.desktop .main:not(:has(.row .inds:not(:empty))) .inds{display:none;}
 .app.desktop .row-meta{flex:none;display:flex;margin:0;font-size:12px;font-variant-numeric:tabular-nums;}
 .rc{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right;}
-.rc-date{width:84px;}
-.rc-rem{width:100px;}
+.rc-date{width:var(--col-date,84px);}
+.rc-rem{width:var(--col-rem,100px);}
 .rc-rem svg{width:11px;height:11px;margin-right:3px;vertical-align:-1px;}
 .app.desktop .inds{width:auto;min-width:34px;justify-content:flex-end;gap:4px;} /* up to three icons: notes, voice, paperclip (decision 29); right-aligned, so the columns after them stay put */
 .app.desktop .inds svg{width:12px;height:12px;}
@@ -1339,8 +1342,8 @@ body.sdragging,body.sdragging *{cursor:grabbing !important;-webkit-user-select:n
 .row-meta .dl{color:var(--ink2);}
 .dl-soon,.row-meta .dl.dl-soon,.cell .val.dl-soon{color:var(--orange);font-weight:500;}
 .dl-due,.row-meta .dl.dl-due,.cell .val.dl-due{color:var(--red);font-weight:500;}
-.rc-dl{width:108px;}
-.app.desktop.has-pane .rc-dl{width:100px;}
+.rc-dl{width:var(--col-dl,108px);}
+.app.desktop.has-pane .rc-dl{width:var(--col-dl,100px);}
 .app.desktop .main:not(:has(.row .rc-dl:not(:empty))) .rc-dl{display:none;}
 .app.desktop .row.done .rc-dl{color:inherit;font-weight:400;}
 .wcard .cic.cdl svg{width:11px;height:11px;}
@@ -1349,13 +1352,13 @@ body.sdragging,body.sdragging *{cursor:grabbing !important;-webkit-user-select:n
 .dlhint{margin-top:10px;}
 /* Decision 56a: Tiempo estimado. Grey on the iPhone row; on the desktop a column of its own, only when some row of the list has one */
 .row-meta .est{color:var(--ink2);}
-.rc-est{width:64px;}
-.app.desktop.has-pane .rc-est{width:54px;}
+.rc-est{width:var(--col-est,64px);}
+.app.desktop.has-pane .rc-est{width:var(--col-est,54px);}
 .app.desktop .main:not(:has(.row .rc-est:not(:empty))) .rc-est{display:none;}
 /* Decision 56b: a task put off again and again says it in orange where Aplazada goes; the desktop date column widens for it */
 .row-meta .drag{color:var(--orange);font-weight:500;}
-.app.desktop .main:has(.row .rc-date.drag) .rc-date{width:124px;}
-.app.desktop.has-pane .main:has(.row .rc-date.drag) .rc-date{width:96px;}
+.app.desktop .main:has(.row .rc-date.drag) .rc-date{width:var(--col-date,124px);}
+.app.desktop.has-pane .main:has(.row .rc-date.drag) .rc-date{width:var(--col-date,96px);}
 .rvdrag{text-align:center;color:var(--orange);font-weight:500;font-size:0.824rem;margin:-6px 0 8px;}
 /* Decision 56c: Sugerir in the head of Ahora, and the sheet (iPhone) or popover (desktop) ¿Qué hago ahora? */
 .ahead .grow{flex:1;}
@@ -1392,3 +1395,26 @@ body.desktop .sgm .tag{font-size:10px;line-height:15px;padding:0 5px;border-radi
 body.desktop .sgrow + .sgrow::before{left:10px;}
 body.desktop .sgopen{width:30px;}
 body.desktop .sgopen svg{width:6px;height:11px;}
+/* ---------- Decision 58: the column header of a desktop list, a thin Mac table header with the same cells (and widths) as the rows.
+   A right-hand column shows only when some row of the list uses it (the :has rules above); Proyecto only when the rows have the column.
+   Each boundary has a 6 px handle (.colgrip); the line shows on hover and while dragging ---------- */
+.colhead{display:none;}
+.app.desktop .colhead{display:flex;align-items:center;gap:10px;height:22px;overflow:hidden;padding:0 8px 0 12px;margin:0 0 2px;border-bottom:.5px solid var(--dline);font-size:11px;color:var(--ink2);cursor:default;-webkit-user-select:none;user-select:none;}
+.app.desktop .main:not(:has(.mbody .row)) .colhead{display:none;}
+.app.desktop .colhead .ch-check{flex:none;width:16px;}
+.app.desktop .main:has(.row .selbox) .colhead .rowmore{display:none;}
+.app.desktop .colhead .rowmore{opacity:1;}
+.app.desktop .main:not(:has(.row .pcol)) .colhead .pcol{display:none;}
+.app.desktop .colhead .pcol,.app.desktop .colhead .rc{position:relative;overflow:visible;}
+.app.desktop .colhead .row-meta{font-size:11px;overflow:visible;}
+.app.desktop .colhead .chl{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.app.desktop .colhead .rc{display:flex;justify-content:flex-end;}
+.app.desktop .colhead .rc-rem svg{display:none;}
+.app.desktop.has-pane .desk:not(.colw-rem) .colhead .rc-rem svg{display:block;width:11px;height:11px;}
+.colgrip{position:absolute;top:-3px;bottom:-3px;width:6px;cursor:col-resize;z-index:1;}
+.pcol > .colgrip{right:-8px;}
+.rc > .colgrip{left:-3px;}
+.colgrip::after{content:"";position:absolute;left:2.5px;top:4px;bottom:4px;width:1px;background:var(--ink3);opacity:0;transition:opacity .15s;}
+.colgrip:hover::after,.colgrip.on::after{opacity:1;}
+/* A narrow column (1000 px with the inspector open) clips the right-hand columns of a row instead of scrolling the list sideways */
+.app.desktop .main .mbody .row-content{overflow:hidden;}

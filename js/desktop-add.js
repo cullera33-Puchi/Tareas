@@ -149,7 +149,7 @@ function dropTask(id, z){ const x=task(id); if(!x) return; const old=daySnap(x);
   releaseHold(id); updTask(id, patch); haptic(6); renderAnimated(); log('info','Tarea movida en el calendario', {date:patch.date, time:!!patch.reminder});
   toast(msg, ()=>undoDay(old)); }
 function bindDeskEvents(d){
-  attBindDrop(d);
+  attBindDrop(d); bindColResize(d); // decision 58
   axBind(d); // decision 31: the add bar's composer // decision 29: photos dragged from the computer onto the inspector
   // Right click opens the row menu, and on a sidebar project the project menu (the iPhone long press)
   // R17: each one opens at the pointer, as a Mac context menu; text fields keep the browser's own

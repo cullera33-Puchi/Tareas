@@ -40,7 +40,7 @@ function renderDesktop(again){
   const rowF=ae&&d.contains(ae)&&ae.classList.contains('row'), paneWas=UI.deskDetail; // R15: a focused row gives the focus to the selected row of the new markup
   const pop = isCalView(UI.deskView); // R17: in Semana the detail is a popover next to its card, so the seven columns keep their width
   const pane = deskPaneHTML();
-  d.style.setProperty('--panew', paneWidth(DB.settings.paneWidth)+'px');
+  d.style.setProperty('--panew', paneWidth(DB.settings.paneWidth)+'px'); applyColWidths(d); // decision 58
   const sideHTML=deskSide(), mainHTML=deskMain();
   const key=UI.deskView+'|'+DB.settings.activeSpace; // read after deskMain, which may fall back to another view
   const keep={}; d.querySelectorAll('[data-keep]').forEach(e=>{ keep[e.dataset.keep]=e.scrollTop; }); // the calendar's own scroll boxes (columns, tray, hours)

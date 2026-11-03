@@ -200,16 +200,44 @@ function pfDropHTML(){ if(UI.query||!activeProjects().length) return ''; const f
   return '<button class="pfdrop'+(f!==null?' on':'')+'" data-act="projFilterMenu" aria-haspopup="menu" title="Filtrar por proyecto">'+(f!==null?'<span class="dot" style="background:'+(p?p.color:'var(--ink3)')+'"></span>':'')+'<span class="l"><i>Proyecto:</i> '+esc(f===null?'Todos':p?p.name:'Sin proyecto')+'</span>'+I.chevD+'</button>'; }
 function projFilterMenu(src){ const dot=c=>'<span class="pm-dot" style="background:'+c+'"></span>', set=v=>{ UI.projFilter=v; render(); };
   popMenu({anchor:src, align:'right', groups:[[{label:'Todos', on:UI.projFilter===null, fn:()=>set(null)}], activeProjects().map(p=>({label:p.name, icon:dot(p.color), on:UI.projFilter===p.id, fn:()=>set(p.id)})), [{label:'Sin proyecto', icon:dot('var(--ink3)'), on:UI.projFilter==='none', fn:()=>set('none')}]]}); }
+/* Decision 58: the column header above a desktop list (Proyecto, Tarea and the right-hand columns some row of the list uses, by the same
+   :has rules as the rows) and its resize handles. The widths are CSS custom properties on #desk (--col-proj, --col-date, --col-dl,
+   --col-rem, --col-est): rows and header read them, so a drag moves both with no redraw. A column the user never resized has no property
+   and takes its default from the stylesheet, which differs with the inspector open (the narrower widths of point 22); a resized one keeps
+   its width in both states. Kept in DB.settings.colWidths, a device setting that is not synced */
+const COL_LIMITS={proj:[60,300], date:[60,200], dl:[70,200], rem:[60,200], est:[44,140]};
+// The saved widths, with anything unknown or out of range dropped (an old or hand-edited setting)
+function colWidths(){ const c=DB.settings.colWidths; if(!c||typeof c!=='object'||Array.isArray(c)){ if(c!==undefined) delete DB.settings.colWidths; return {}; }
+  Object.keys(c).forEach(k=>{ const l=COL_LIMITS[k], w=c[k]; if(!l||typeof w!=='number'||!isFinite(w)||w<l[0]||w>l[1]) delete c[k]; else c[k]=Math.round(w); }); return c; }
+function applyColWidths(d){ const c=colWidths(); Object.keys(COL_LIMITS).forEach(k=>{ if(c[k]) d.style.setProperty('--col-'+k, c[k]+'px'); else d.style.removeProperty('--col-'+k); });
+  d.classList.toggle('colw-rem', !!c.rem); } // a resized reminder column shows its time with the inspector open too
+function colHeadHTML(){ const g=k=>'<i class="colgrip" data-col="'+k+'" title="Arrastra para cambiar el ancho. Doble clic: ancho inicial"></i>', c=(k,l)=>'<span class="rc rc-'+k+'">'+g(k)+(k==='rem'?I.bell:'')+'<span class="chl">'+l+'</span></span>';
+  return '<div class="colhead" aria-hidden="true"><span class="ch-check"></span><span class="pcol"><span class="chl">Proyecto</span>'+g('proj')+'</span><span class="row-text"><span class="chl">Tarea</span></span><span class="inds"></span><span class="rsteps"></span><span class="row-meta">'+c('date','Fecha')+c('dl','Entrega')+c('rem','Recordatorio')+c('est','Tiempo')+'</span><span class="pri"></span><span class="rowmore"></span></div>'; }
+/* A handle drags the width of its column: Proyecto's sits on its right edge (the title takes the rest); a right-hand column's on its left
+   edge, so dragging left widens it. Limits in COL_LIMITS; the width is written once per frame and saved on the drop; a double click resets */
+function bindColResize(d){
+  d.addEventListener('pointerdown', e=>{ const g=e.target.closest('.colgrip'); if(!g||e.button!==0) return; e.preventDefault(); e.stopPropagation();
+    const k=g.dataset.col, l=COL_LIMITS[k], cell=g.parentElement, x0=e.clientX, w0=cell.getBoundingClientRect().width, dir=k==='proj'?1:-1; let w=null, raf=0;
+    try{ g.setPointerCapture(e.pointerId); }catch(err){} document.body.classList.add('resizing'); g.classList.add('on');
+    const put=()=>{ raf=0; if(w==null) return; d.style.setProperty('--col-'+k, w+'px'); if(k==='rem') d.classList.add('colw-rem'); };
+    const mv=ev=>{ w=Math.round(Math.max(l[0], Math.min(l[1], w0+dir*(ev.clientX-x0)))); if(!raf) raf=requestAnimationFrame(put); };
+    const up=()=>{ g.removeEventListener('pointermove', mv); g.removeEventListener('pointerup', up); g.removeEventListener('pointercancel', up); if(raf){ cancelAnimationFrame(raf); put(); }
+      document.body.classList.remove('resizing'); g.classList.remove('on');
+      if(w!=null&&w!==(colWidths()[k]||null)){ DB.settings.colWidths=Object.assign(colWidths(), {[k]:w}); save(); log('info','Ancho de columna', {col:k, w}); } };
+    g.addEventListener('pointermove', mv); g.addEventListener('pointerup', up); g.addEventListener('pointercancel', up); });
+  d.addEventListener('dblclick', e=>{ const g=e.target.closest('.colgrip'); if(!g) return; e.preventDefault(); const c=colWidths(); if(!(g.dataset.col in c)) return;
+    delete c[g.dataset.col]; DB.settings.colWidths=c; save(); applyColWidths(d); });
+  d.addEventListener('click', e=>{ if(e.target.closest('.colhead')) e.stopPropagation(); }, true); } // the header is not a row: a click on it does nothing
 function deskMain(){
   const v=UI.deskView; let title='', body='', search=true, pf=false, seg='', notes=false;
   if(v==='hoy'||v==='todas'){ const f=v; title=f==='hoy'?'Hoy':'Todas'; pf=true;
-    body = addBarHTML(null)+(UI.query?'':ahoraHTML())+
+    body = addBarHTML(null)+colHeadHTML()+(UI.query?'':ahoraHTML())+
       listHTML(UI.query?'todas':f); }
-  else if(v==='ahora'){ title='Ahora'; body=ahoraViewHTML(); } // decision 39
-  else if(v==='waiting'){ title='Por confirmar'; body=waitingViewHTML(); } // decision 41
+  else if(v==='ahora'){ title='Ahora'; body=colHeadHTML()+ahoraViewHTML(); } // decision 39
+  else if(v==='waiting'){ title='Por confirmar'; body=colHeadHTML()+waitingViewHTML(); } // decision 41
   else if(isCalView(v)){ title={day:'Día',week:'Semana',month:'Mes'}[v]; pf=true; body=weekHTML(); } // the project filter applies here too, so it stays visible and clearable
   else if(v.startsWith('project:')){ const id=v.slice(8); const p=id==='none'?null:proj(id); if(id!=='none'&&(!p||p.archived||p.spaceId!==space().id)){ UI.deskView=DB.settings.filter||'hoy'; return deskMain(); } /* gone, archived or in another space */ title=p?p.name:'Sin proyecto';
-    if(p){ seg=projSegHTML(p); notes=projTab(p.id)==='notes'; } body=notes?deskNotesHTML(p):addBarHTML(p?p.id:null)+listHTML('todas', p?p.id:null); } // decision 47: Tareas or Notas
+    if(p){ seg=projSegHTML(p); notes=projTab(p.id)==='notes'; } body=notes?deskNotesHTML(p):addBarHTML(p?p.id:null)+colHeadHTML()+listHTML('todas', p?p.id:null); } // decision 47: Tareas or Notas
   else if(v==='settings'){ title='Ajustes'; search=false; const h=viewAjustes(); body=h.slice(h.indexOf('<div class="scroll">')); }
   const cal=isCalView(v);
   return '<main class="main'+(v==='hoy'?' with-agenda':'')+'"><div class="mhead'+(cal?' wide-head':'')+'"><h1>'+esc(title)+'</h1>'+seg+(pf?'<span class="pfslot">'+pfDropHTML()+'</span>':'')+(search?'<div class="searchbar"><div class="search">'+I.search+'<input type="search" placeholder="Buscar" value="'+esc(UI.query)+'" data-role="search" autocomplete="off"></div>'+(UI.query?'<button class="cancel" data-act="clearSearch">Cancelar</button>':'')+'</div>':'')+(v==='hoy'||v==='todas'||(v.startsWith('project:')&&!notes)?'<button class="mopts" data-act="viewMenu" aria-label="Opciones de vista" title="Opciones de vista">'+I.more+'</button>':'')+'</div><div class="mbody'+(cal?' calbody':notes?' notesbody':'')+'"><div class="inner'+(cal?' week-inner':v==='settings'?' settings':notes?' notes-inner':'')+'">'+body+'</div></div>'+(v==='hoy'?agendaHTML():'')+'</main>';

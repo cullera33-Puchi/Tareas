@@ -1,5 +1,9 @@
 # Registro de cambios
 
+## v0.28.1. «Hoy» como día de revisión en «Por confirmar» (3 de noviembre de 2026)
+
+- Al pasar una tarea a «Por confirmar», los días de revisión empiezan por «Hoy»: la tarea queda esperando a la persona, pero se mantiene en «Revisar hoy», arriba de la lista, para cerrarla en el día. Una tarea de hoy sigue proponiendo «Mañana» por defecto.
+
 ## v0.28.0. Tiempo estimado, tareas arrastradas y «¿Qué hago ahora?» (3 de noviembre de 2026)
 
 - Tiempo estimado por tarea: 15 min, 30 min, 1 h o medio día, desde el detalle, la pulsación larga, el clic derecho y el alta, o escribiendo «15m», «30m», «1h» o «medio día» al final del título. Se ve en gris en la fila y va en compartir y CSV.

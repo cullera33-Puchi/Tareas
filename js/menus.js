@@ -324,10 +324,10 @@ function waitItems(x, icons, src){ const id=x.id;
   if(x.status==='waiting') return [{label:'Volver a pendiente', icon:icons&&icons.unwait, fn:()=>{ unWait(id); renderAnimated(); }}, {label:UI.wide?'Cambiar Por confirmar…':'Cambiar Por confirmar', icon:icons&&icons.wait, fn:()=>waitingSheet(id, src)}];
   return []; }
 // The review days: Mañana, En 3 días, Próxima semana and Sin fecha; the one the task already has is chosen, else none (its date stays)
-function waitDays(){ const t=todayStr(); return uniqueBy([['man',addDays(t,1),'Mañana'],['3d',addDays(t,3),'En 3 días'],['nsem',nextWeekday(1,true),'Próxima semana']], o=>o[1]).concat([['none',null,'Sin fecha']]); }
-function waitingSheet(id, src){ const x=task(id); if(!x||x.status==='done') return; const days=waitDays(); let sel=(days.find(o=>o[1]===(x.date||null))||[])[0]||(x.status==='waiting'?null:x.date&&x.date>todayStr()?null:'man');
+function waitDays(){ const t=todayStr(); return uniqueBy([['hoy',t,'Hoy'],['man',addDays(t,1),'Mañana'],['3d',addDays(t,3),'En 3 días'],['nsem',nextWeekday(1,true),'Próxima semana']], o=>o[1]).concat([['none',null,'Sin fecha']]); }
+function waitingSheet(id, src){ const x=task(id); if(!x||x.status==='done') return; const days=waitDays(); let sel=(days.find(o=>o[1]===(x.date||null)&&(o[0]!=='hoy'||x.status==='waiting'))||[])[0]||(x.status==='waiting'?null:x.date&&x.date>todayStr()?null:'man');
   const chips=()=>days.map(o=>'<button class="chip'+(sel===o[0]?' on':'')+'" data-wd="'+o[0]+'">'+o[2]+'</button>').join('');
-  const line=()=>{ const d=sel?days.find(o=>o[0]===sel)[1]:x.date; return d?'Vuelve a Hoy '+dayWords(d)+', en Revisar hoy.':'Sin día de revisión: queda en Por confirmar.'; };
+  const line=()=>{ const d=sel?days.find(o=>o[0]===sel)[1]:x.date; return d?(d<=todayStr()?'Se queda hoy en Revisar hoy, arriba de la lista.':'Vuelve a Hoy '+dayWords(d)+', en Revisar hoy.'):'Sin día de revisión: queda en Por confirmar.'; };
   const field='<input type="text" class="wfor" data-role="waitfor" placeholder="Nombre o motivo (opcional)" value="'+esc(x.waitingFor||'')+'" autocomplete="off" enterkeyhint="done"'+(UI.wide?' autofocus':'')+'>';
   const back=x.status==='waiting'?'<button class="wback" data-x="unwait">Volver a pendiente</button>':''; // decision 50
   const body='<div class="wsheet"><label class="wlbl">Esperando a</label>'+field+'<div class="wlbl">Revisar</div><div class="chips wchips">'+chips()+'</div><div class="hint wline">'+line()+'</div>';

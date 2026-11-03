@@ -42,6 +42,18 @@ const SEED = JSON.stringify({spaces:[{id:'s1',name:'Trabajo',order:0,created:T0,
     }, T0);
     check('refetch_gets_focus', x.one.focus==='2026-11-03T01:15:00.000Z' && x.one.t2===null && x.one.pulls.includes('tasks:all') && x.one.up.length===0 && x.one.fields && x.one.log===1, x.one);
     check('second_run_uses_cursor', x.two.pulls.includes('tasks:cursor') && !x.two.pulls.includes('tasks:all') && x.two.up.length===0, x.two);
+    // v0.28.0: a copy with the same modified never lowers the count (a device closed for days counts once from its old copy)
+    const y = await page.evaluate(async()=>{
+      const t1=task('t1'); const sig=syncSig(syncToRow('tasks', t1));
+      const st=JSON.parse(localStorage.getItem('tareas-sync')); st.known.tasks.t1=sig; st.cursor.tasks='2026-11-03T08:10:00.000Z'; localStorage.setItem('tareas-sync', JSON.stringify(st));
+      updTaskQuiet: { const x=task('t1'); x.postponed=1; x.carriedSince='2026-11-02'; save(); } // this device's rollOver: count changed, modified kept
+      const sent=[]; const row=Object.assign(syncToRow('tasks', task('t1')), {id:'t1', owner_id:'u1', server_ts:'2026-11-03T08:11:00.000Z', postponed:3, carried_since:'2026-10-30'});
+      SY.remote.pull=async(table, after)=>table==='tasks'?[row]:[]; SY.remote.upsert=async(table, rows)=>{ sent.push(...rows.filter(r=>r.id==='t1').map(r=>r.postponed+'|'+r.carried_since)); return rows.map(r=>Object.assign({}, r, {server_ts:new Date().toISOString()})); };
+      await syncRun('prueba');
+      const t=task('t1'); return {p:t.postponed, c:t.carriedSince, sent, est:[parseQuick('Comprar cable 15 m').estimate||null, parseQuick('Llamar a Luis 15m').estimate||null, parseQuick('Revisar 30 min').estimate||null]};
+    });
+    check('count_never_goes_down', y.p===3 && y.c==='2026-10-30', y);
+    check('estimate_not_metres', y.est[0]===null && y.est[1]===15 && y.est[2]===30, y.est);
     await ctx.close();
   }catch(e){ fails.push('exception'); errors.push(String(e&&e.stack||e)); }
   console.log(JSON.stringify({r, fails, errors}, null, 1));

@@ -92,7 +92,7 @@ function parseQuick(text){
   toks.sort((a,b)=>a.start-b.start); out.title=quickTitle(src, toks); return out; }
 /* Decision 56: the estimate at the end of a title, as its own word. 'medio día' right after 'a', 'al', 'de', 'del', 'hasta', 'desde' or 'para'
    is part of the sentence ('Comida de medio día', 'Llamar a medio día'), not an estimate */
-function estMatch(work){ const m=work.match(/\s+(15\s?m(?:in)?|30\s?m(?:in)?|1\s?h|medio\s+d[ií]a)\s*$/i); if(!m) return null; const w=norm(m[1]).replace(/\s+/g,'');
+function estMatch(work){ const m=work.match(/\s+(15(?:m|\s?min)|30(?:m|\s?min)|1\s?h|medio\s+d[ií]a)\s*$/i); if(!m) return null; const w=norm(m[1]).replace(/\s+/g,'');
   if(w==='mediodia' && /(?:^|\s)(?:a|al|de|del|hasta|desde|para)$/i.test(work.slice(0, m.index))) return null;
   return {index:m.index, len:m[0].trimEnd().length, min:w.startsWith('15')?15:w.startsWith('30')?30:w==='1h'?60:240}; }
 function quickTitle(src, toks){ let t='', last=0; toks.forEach(k=>{ t+=src.slice(last,k.start)+' '; last=k.end; }); return (t+src.slice(last)).replace(/\s+/g,' ').trim(); }

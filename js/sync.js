@@ -180,13 +180,16 @@ function syncMerge(W, st, table, rows, stats){
     const takeRemote = !(known[id]==='x' && !remote) && (rm>lm || (rm===lm && !dirty));
     if(dirty && known[id]!=='x') stats.conflicts.push({table, id, won:takeRemote?'servidor':'local'});
     known[id]=rsig; // what the server holds now: a local copy that stays different goes up afterwards
-    if(!takeRemote) return;
+    // Decision 56: rollOver counts without touching modified, so two copies with the same time can each hold part of the count (a device
+    // closed for days counts once from its old copy). With equal times the count never goes down: the higher count and the earlier first day win
+    const tally=table==='tasks'&&remote&&rm===lm ? {postponed:Math.max(+local.postponed||0, +remote.postponed||0)||null, carriedSince:[local.carriedSince, remote.carriedSince].filter(Boolean).sort()[0]||null} : null;
+    if(!takeRemote){ if(tally&&(tally.postponed!==(local.postponed||null)||tally.carriedSince!==(local.carriedSince||null))){ Object.assign(W[list][i], tally); stats.updated++; } return; } // counted as a change, so the merged copy is kept
     if(!remote){ W[list][i]=null; removed=true; stats.removed++;
       if(table==='tasks'){ W.voiceNotes.forEach((v,j)=>{ if(v&&v.taskId===id){ W.voiceNotes[j]=null; } }); W.attachments.forEach((a,j)=>{ if(a&&a.taskId===id){ W.attachments[j]=null; } }); W.subtasks.forEach((s,j)=>{ if(s&&s.taskId===id){ W.subtasks[j]=null; } }); }
       if(table==='projects') W.projectNotes.forEach((n,j)=>{ if(n&&n.projectId===id){ W.projectNotes[j]=null; } }); return; } // a task deleted elsewhere takes its notes, attachments and steps; a project its notes (decision 47)
     const keep={}; Object.keys(local).forEach(k=>{ if(!(k in lrow) && !SYNC_FIELDS[table].some(f=>f[0]===k)) keep[k]=local[k]; }); // fields this model does not sync stay
     SYNC_FIELDS[table].forEach(([f,c,k])=>{ if(syncNullable(k)&&!(c in row)&&local[f]!=null) keep[f]=local[f]; }); // and a column the server lacks keeps the device's value
-    W[list][i]=Object.assign(keep, remote); stats.updated++;
+    W[list][i]=Object.assign(keep, remote, tally||{}); stats.updated++;
     if(table==='tasks'&&syncNoCol(table,'status:waiting')&&local.status==='waiting'&&remote.status==='pending'){ W[list][i].status='waiting'; if(local.waitingFor&&!W[list][i].waitingFor) W[list][i].waitingFor=local.waitingFor; } }); // so does a status it cannot hold (decision 41)
   if(removed) SYNC_TABLES.forEach(({list:l})=>{ W[l]=W[l].filter(Boolean); });
 }

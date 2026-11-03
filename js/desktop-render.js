@@ -36,7 +36,7 @@ function renderDesktop(again){
   // Each view keeps its own scroll (per space), like the iPhone tabs; a view seen for the first time opens at the top
   const body=d.querySelector('.mbody'); if(body&&UI.deskKey) UI.deskScroll[UI.deskKey]=body.scrollTop; const side=d.querySelector('.side'); const sst=side?side.scrollTop:0;
   // The add bar or the search keep focus and caret across the rebuild (a click elsewhere has already taken the focus)
-  const ae=document.activeElement, fr=ae&&d.contains(ae)&&/^(addbar|search|rowedit|addnotes|ntitle|nbody)$/.test(ae.dataset.role||'') ? {role:ae.dataset.role, a:ae.selectionStart, b:ae.selectionEnd} : null;
+  const ae=document.activeElement, fr=ae&&d.contains(ae)&&/^(addbar|search|rowedit|addnotes|ntitle|nbody|pitnew|pittitle|pitbody)$/.test(ae.dataset.role||'') ? {role:ae.dataset.role, a:ae.selectionStart, b:ae.selectionEnd} : null;
   const rowF=ae&&d.contains(ae)&&ae.classList.contains('row'), paneWas=UI.deskDetail; // R15: a focused row gives the focus to the selected row of the new markup
   const pop = isCalView(UI.deskView); // R17: in Semana the detail is a popover next to its card, so the seven columns keep their width
   const pane = deskPaneHTML();
@@ -61,6 +61,7 @@ function renderDesktop(again){
   d.querySelectorAll('[data-keep]').forEach(e=>{ const k=e.dataset.keep; if(k in keep) e.scrollTop=keep[k]; else if(k==='hours') scrollHours(e); });
   const b2=d.querySelector('.mbody'); if(b2) b2.scrollTop=UI.deskScroll[key]||0; UI.deskKey=key;
   const s2=d.querySelector('.side'); if(s2) s2.scrollTop=sst;
+  pitFit(); // decision 59: the post-its that fit the column's height
   ariaList(d); if(syncSel(paneWas)&&!again) return renderDesktop(true); paintSel(); // R15, R16: a selected row that left the list hands over to its neighbour
   if(fr){ const n=$('#desk [data-role='+fr.role+']'); if(n){ n.focus({preventScroll:true}); try{ n.setSelectionRange(fr.a, fr.b); }catch(e){} } }
   else if(UI.dsel.edit){ const n=$('#desk [data-role=rowedit]'); if(n){ n.focus({preventScroll:true}); if(UI.dsel.edit.fresh){ n.select(); UI.dsel.edit.fresh=false; } } }
@@ -94,7 +95,7 @@ function deskResultsNow(d){ const main=d.querySelector(':scope > .main'), ob=mai
     oi.replaceWith(ni); const sb=bar.querySelector('.search'); [...bar.children].forEach(c=>{ if(c!==sb) c.remove(); }); [...nbar.children].forEach(c=>{ if(!c.querySelector('[data-role=search]')) bar.appendChild(c); });
     const os=main.querySelector('.mhead .pfslot'), ns=t.querySelector('.mhead .pfslot'); if(os&&ns) os.replaceWith(ns); }
   rowStash=stash; armRows(ob);
-  bindAddBar(d); if(deskNotesOn()) bindNotesDesk(d); if(isCalView(UI.deskView)&&UI.deskDetail) placeWeekPop(d); ariaList(d); syncSel(UI.deskDetail); paintSel(); return true; }
+  bindAddBar(d); if(deskNotesOn()) bindNotesDesk(d); pitFit(); if(isCalView(UI.deskView)&&UI.deskDetail) placeWeekPop(d); ariaList(d); syncSel(UI.deskDetail); paintSel(); return true; }
 function bindAddBar(d){
   const ab=$('[data-role=addbar]',d); if(!ab) return; const base=()=>deskAddBase(ab.dataset.project);
   const refocus=()=>{ const n=$('#desk [data-role=addbar]'); if(n){ n.focus(); const l=n.value.length; n.setSelectionRange(l,l); } };

@@ -4,7 +4,7 @@
    listeners run at load; the start itself (first screen, timers, sync, service worker) is in boot.js, the last file. */
 /* ---------- Desktop layout ---------- */
 function mondayOf(d){ const x=new Date(d+'T00:00:00'); return addDays(d, -((x.getDay()+6)%7)); }
-function setDeskView(v){ if(v==='project:none') v='project:none'; if(UI.noteOpen&&v!==UI.deskView&&v!=='project:'+((noteRec(UI.noteOpen)||{}).projectId)) noteLeft(UI.noteOpen); UI.deskView=v; UI.deskDetail=null; UI.dsel.ids.clear(); UI.dsel.mode=false; UI.dsel.edit=null; UI.query=''; UI.searchDone=false; if(v==='hoy'||v==='todas'){ DB.settings.filter=v; save(); } render(); } // another list starts with nothing selected (R16)
+function setDeskView(v){ if(v==='project:none') v='project:none'; if(UI.pitOpen) pitCollapse(true); /* decision 59 */ if(UI.noteOpen&&v!==UI.deskView&&v!=='project:'+((noteRec(UI.noteOpen)||{}).projectId)) noteLeft(UI.noteOpen); UI.deskView=v; UI.deskDetail=null; UI.dsel.ids.clear(); UI.dsel.mode=false; UI.dsel.edit=null; UI.query=''; UI.searchDone=false; if(v==='hoy'||v==='todas'){ DB.settings.filter=v; save(); } render(); } // another list starts with nothing selected (R16)
 /* ---------- R15, R16: the desktop lists' selected row, keyboard and multiple selection ----------
    UI.dsel.cur is the selected row, apart from the hover (the inspector, when open, shows it); arrows or J and K move it and the inspector
    follows, as in Mail. ids is the multiple selection (Comando clic, Mayúsculas clic, Comando A, Mayúsculas y flechas): it counts from two
@@ -229,7 +229,7 @@ function bindColResize(d){
     delete c[g.dataset.col]; DB.settings.colWidths=c; save(); applyColWidths(d); });
   d.addEventListener('click', e=>{ if(e.target.closest('.colhead')) e.stopPropagation(); }, true); } // the header is not a row: a click on it does nothing
 function deskMain(){
-  const v=UI.deskView; let title='', body='', search=true, pf=false, seg='', notes=false;
+  const v=UI.deskView; let title='', body='', search=true, pf=false, seg='', notes=false, pit=null;
   if(v==='hoy'||v==='todas'){ const f=v; title=f==='hoy'?'Hoy':'Todas'; pf=true;
     body = addBarHTML(null)+colHeadHTML()+(UI.query?'':ahoraHTML())+
       listHTML(UI.query?'todas':f); }
@@ -237,8 +237,10 @@ function deskMain(){
   else if(v==='waiting'){ title='Por confirmar'; body=colHeadHTML()+waitingViewHTML(); } // decision 41
   else if(isCalView(v)){ title={day:'Día',week:'Semana',month:'Mes'}[v]; pf=true; body=weekHTML(); } // the project filter applies here too, so it stays visible and clearable
   else if(v.startsWith('project:')){ const id=v.slice(8); const p=id==='none'?null:proj(id); if(id!=='none'&&(!p||p.archived||p.spaceId!==space().id)){ UI.deskView=DB.settings.filter||'hoy'; return deskMain(); } /* gone, archived or in another space */ title=p?p.name:'Sin proyecto';
-    if(p){ seg=projSegHTML(p); notes=projTab(p.id)==='notes'; } body=notes?deskNotesHTML(p):addBarHTML(p?p.id:null)+colHeadHTML()+listHTML('todas', p?p.id:null); } // decision 47: Tareas or Notas
+    if(p){ seg=projSegHTML(p); notes=projTab(p.id)==='notes'; } body=notes?deskNotesHTML(p):addBarHTML(p?p.id:null)+colHeadHTML()+listHTML('todas', p?p.id:null); // decision 47: Tareas or Notas
+    if(p&&!notes) pit=p; } // decision 59: the post-it column beside the tasks (the stylesheet shows it from 1300 px, without the inspector)
   else if(v==='settings'){ title='Ajustes'; search=false; const h=viewAjustes(); body=h.slice(h.indexOf('<div class="scroll">')); }
   const cal=isCalView(v);
-  return '<main class="main'+(v==='hoy'?' with-agenda':'')+'"><div class="mhead'+(cal?' wide-head':'')+'"><h1>'+esc(title)+'</h1>'+seg+(pf?'<span class="pfslot">'+pfDropHTML()+'</span>':'')+(search?'<div class="searchbar"><div class="search">'+I.search+'<input type="search" placeholder="Buscar" value="'+esc(UI.query)+'" data-role="search" autocomplete="off"></div>'+(UI.query?'<button class="cancel" data-act="clearSearch">Cancelar</button>':'')+'</div>':'')+(v==='hoy'||v==='todas'||(v.startsWith('project:')&&!notes)?'<button class="mopts" data-act="viewMenu" aria-label="Opciones de vista" title="Opciones de vista">'+I.more+'</button>':'')+'</div><div class="mbody'+(cal?' calbody':notes?' notesbody':'')+'"><div class="inner'+(cal?' week-inner':v==='settings'?' settings':notes?' notes-inner':'')+'">'+body+'</div></div>'+(v==='hoy'?agendaHTML():'')+'</main>';
+  const pitOn=pit&&!pitFolded();
+  return '<main class="main'+(v==='hoy'?' with-agenda':'')+(pitOn?' with-pit':'')+'"><div class="mhead'+(cal?' wide-head':'')+'"><h1>'+esc(title)+'</h1>'+seg+(pf?'<span class="pfslot">'+pfDropHTML()+'</span>':'')+(search?'<div class="searchbar"><div class="search">'+I.search+'<input type="search" placeholder="Buscar" value="'+esc(UI.query)+'" data-role="search" autocomplete="off"></div>'+(UI.query?'<button class="cancel" data-act="clearSearch">Cancelar</button>':'')+'</div>':'')+(pit?pitOpenBtnHTML(pit):'')+(v==='hoy'||v==='todas'||(v.startsWith('project:')&&!notes)?'<button class="mopts" data-act="viewMenu" aria-label="Opciones de vista" title="Opciones de vista">'+I.more+'</button>':'')+'</div><div class="mbody'+(cal?' calbody':notes?' notesbody':'')+'"><div class="inner'+(cal?' week-inner':v==='settings'?' settings':notes?' notes-inner':'')+'">'+body+'</div></div>'+(v==='hoy'?agendaHTML():'')+(pitOn?pitColHTML(pit):'')+'</main>';
 }

@@ -1418,3 +1418,60 @@ body.desktop .sgopen svg{width:6px;height:11px;}
 .colgrip:hover::after,.colgrip.on::after{opacity:1;}
 /* A narrow column (1000 px with the inspector open) clips the right-hand columns of a row instead of scrolling the list sideways */
 .app.desktop .main .mbody .row-content{overflow:hidden;}
+/* Decision 59: the notes of a project as post-its in a column beside its tasks: from 1300 px and without the inspector (as the agenda of
+   Hoy), desktop only. Cards tinted with the project's colour over the content's background (a stronger mix in the dark theme), the text
+   in the usual ink; a closed card shows its title, date and first lines, which fade when cut */
+.pitcol,.pitshow{display:none;}
+@media (min-width:1300px){
+  .app.desktop:not(.has-pane) .main.with-pit{display:grid;grid-template-columns:minmax(0,1fr) 300px;grid-template-rows:auto minmax(0,1fr);}
+  .app.desktop:not(.has-pane) .main.with-pit .mhead{grid-column:1;grid-row:1;}
+  .app.desktop:not(.has-pane) .main.with-pit .mbody{grid-column:1;grid-row:2;}
+  .app.desktop:not(.has-pane) .pitcol{grid-column:2;grid-row:1 / 3;display:flex;flex-direction:column;min-height:0;padding:12px 16px 14px 0;}
+  .app.desktop:not(.has-pane) .pitshow{display:flex;}
+}
+.pitshow{flex:none;align-items:center;gap:5px;height:28px;padding:0 9px;border-radius:6px;font-size:13px;color:var(--ink2);}
+.pitshow:hover{background:var(--dhov);color:var(--ink);}
+.pitshow svg{width:15px;height:15px;}
+.pithead{flex:none;display:flex;align-items:center;gap:6px;height:28px;margin:0 0 8px;}
+.pithead b{font-size:15px;font-weight:600;}
+.pithead .n{font-size:13px;color:var(--ink2);font-variant-numeric:tabular-nums;}
+.pithead .grow{flex:1;}
+.pitb{width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;color:var(--ink2);}
+.pitb:hover{background:var(--dhov);color:var(--ink);}
+.pitb svg{width:15px;height:15px;}
+.pitnew{flex:none;margin:0 0 10px;border-radius:10px;background:var(--dmain);border:.5px solid var(--dline);box-shadow:0 .5px 1.5px rgba(0,0,0,.08);padding:8px 10px;}
+.pitnew:focus-within{border-color:var(--blue);box-shadow:0 0 0 3px var(--qhl);}
+.pitnew textarea{display:block;width:100%;background:none;border:0;outline:0;resize:none;padding:0;font-size:13px;line-height:1.4;max-height:180px;overflow-y:auto;color:var(--ink);}
+.pitnew textarea::placeholder,.pitcard textarea::placeholder{color:var(--ink3);}
+.pitlist{flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;gap:8px;}
+.pithint{font-size:12px;color:var(--ink2);line-height:1.4;padding:2px 4px;}
+.pitcard{--pc:var(--ink3);flex:none;position:relative;text-align:left;border-radius:10px;padding:9px 11px 10px;cursor:pointer;color:var(--ink);
+  background:color-mix(in srgb, var(--pc) 13%, var(--dmain));border:.5px solid color-mix(in srgb, var(--pc) 32%, transparent);box-shadow:0 .5px 1.5px rgba(0,0,0,.08);}
+.pitcard:hover{background:color-mix(in srgb, var(--pc) 18%, var(--dmain));}
+.pitcard:focus-visible{outline:2px solid var(--blue);outline-offset:1px;}
+.pitcard.pit-hide{display:none;}
+.pit-t{display:flex;align-items:center;gap:5px;min-width:0;font-size:13px;font-weight:600;line-height:1.3;}
+.pit-t .npin svg{width:12px;height:12px;}
+.pit-tt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;}
+.pit-d{font-size:11px;color:var(--ink2);margin-top:1px;}
+.pitv{margin-top:5px;font-size:12.5px;line-height:1.4;max-height:calc(4 * 1.4em);overflow:hidden;white-space:pre-wrap;overflow-wrap:anywhere;}
+.pitcard.clip .pitv{-webkit-mask-image:linear-gradient(to bottom, #000 62%, transparent);mask-image:linear-gradient(to bottom, #000 62%, transparent);}
+.pitv a{color:var(--blue);text-decoration:none;}
+.pitv .nl{min-height:1.4em;padding-left:calc(var(--ind,0) * 14px);}
+.pitv .nl.li,.pitv .nl.ck{gap:6px;}
+.pitv .nl .nb{width:10px;height:1.4em;}
+.pitv .nl .nb::before{width:4px;height:4px;}
+.pitv .ncheck{width:14px;height:14px;margin-top:calc((1.4em - 14px) / 2);border-width:1.2px;}
+.pitv .ncheck::before{inset:-6px;}
+.pitv .ncheck svg{width:9px;height:9px;}
+.pitcard.open{cursor:auto;box-shadow:0 0 0 2px color-mix(in srgb, var(--pc) 55%, transparent),0 2px 8px rgba(0,0,0,.1);}
+.pitcard.open:hover{background:color-mix(in srgb, var(--pc) 13%, var(--dmain));}
+.pitcard textarea{display:block;width:100%;background:none;border:0;outline:0;resize:none;padding:0;color:var(--ink);}
+.pitcard .pit-ti{font-size:13px;font-weight:600;line-height:1.3;overflow:hidden;}
+.pitcard .pit-bo{margin-top:6px;font-size:13px;line-height:1.4;min-height:60px;max-height:50vh;overflow-y:auto;}
+.pitall{flex:none;align-self:flex-start;font-size:13px;color:var(--blue);padding:2px 4px;border-radius:5px;}
+.pitall:hover{text-decoration:underline;}
+.pitall[hidden]{display:none;}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .pitcard{background:color-mix(in srgb, var(--pc) 22%, var(--dmain));} :root:not([data-theme="light"]) .pitcard:hover,:root:not([data-theme="light"]) .pitcard.open:hover{background:color-mix(in srgb, var(--pc) 27%, var(--dmain));} }
+:root[data-theme="dark"] .pitcard{background:color-mix(in srgb, var(--pc) 22%, var(--dmain));}
+:root[data-theme="dark"] .pitcard:hover,:root[data-theme="dark"] .pitcard.open:hover{background:color-mix(in srgb, var(--pc) 27%, var(--dmain));}

@@ -227,7 +227,7 @@ function noteTasksDesk(id){ const n=noteRec(id); if(!n) return; const sel=noteSe
 // The note a tap acts on: the drawn note it is inside, the desktop's open note, or the note of the iPhone screen tapped
 function noteIdOf(e){ const ed=e.target.closest('[data-note]'); if(ed) return ed.dataset.note; if(UI.wide) return UI.noteOpen; const s=UI.stack.find(x=>x.el===e.currentTarget); return s&&s.kind==='note'?s.id:null; }
 // Called by onClick first: true when the tap was the notes'
-function noteClick(e){ const t=e.target;
+function noteClick(e){ const t=e.target; if(pitClick(e)) return true; // decision 59: the post-it column
   const ps=t.closest('[data-pseg]'); if(ps){ setProjTab(ps.dataset.pid, ps.dataset.pseg); return true; }
   const na=t.closest('[data-nact]'); if(na){ const el=na.closest('[data-pn]'); if(el){ closeVn(el); deleteNote(el.dataset.pn); } return true; }
   const ck=t.closest('[data-nck]'); if(ck){ const ed=ck.closest('[data-note]'); if(ed) toggleNoteCheck(ed.dataset.note, +ck.dataset.nck); return true; }
@@ -258,3 +258,97 @@ document.addEventListener('keydown', e=>{ if(!UI.wide||!deskNotesOn()) return; i
   if(k==='ArrowDown'||k==='ArrowUp'||k==='j'||k==='k'){ stop(); noteStep(k==='ArrowDown'||k==='j'?1:-1); return; }
   if(k==='Enter'){ if(t.closest&&t.closest('button,a,[role=button]')) return; const ed=document.querySelector('#desk .ned .nedit'); if(ed){ stop(); noteEditAt(ed, null); } return; }
   if((k==='Delete'||k==='Backspace')&&UI.noteOpen){ stop(); const id=UI.noteOpen, n=noteRec(id); confirmSheet('Eliminar nota', '"'+((n&&n.title)||'Nota sin título')+'" se eliminará. Podrás deshacerlo durante unos segundos.', ()=>deleteNote(id)); } });
+
+/* ---------- Decision 59: the notes of a project as post-its, in a column beside its tasks (desktop only) ----------
+   On a project's Tareas, with the window at least 1300 px wide and the inspector closed (the stylesheet decides, as for the agenda of Hoy),
+   a column Notas on the right: a card to write a new note (Intro keeps it, the first line is its title; Mayúsculas e Intro, a new line; Esc
+   empties it), then the notes as post-its in the project's colour, pinned first and then the newest, as many as the height allows and «Ver
+   todas (N)» for the rest (pitFit, again on each drawing and on a resize). A click on a card opens it in place as an editor (the same saving
+   as Notas, saveNoteEdit); a click elsewhere or Esc closes it. Its boxes tick with one click while it is closed; a right click opens the note's
+   menu. A button folds the column (DB.settings.pitFold, a device setting), and «Notas (N)» in the column head unfolds it. No new data */
+UI.pitOpen=null; UI.pitDraft='';
+const PIT_I='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M14.5 4.5v15"/></svg>';
+const pitFolded = () => !!DB.settings.pitFold;
+// The project whose Tareas can show the column (Sin proyecto has no notes)
+function pitProject(){ if(!UI.wide) return null; const v=UI.deskView||''; if(!v.startsWith('project:')) return null; const id=v.slice(8); if(id==='none') return null; const p=proj(id); return p&&!p.archived&&projTab(id)!=='notes'?p:null; }
+// The button that unfolds it, in the column head; shown by the stylesheet only where the column would be
+function pitOpenBtnHTML(p){ if(!pitFolded()) return ''; const k=DB.projectNotes.filter(n=>n&&n.projectId===p.id).length;
+  return '<button class="pitshow" data-act="pitUnfold" title="Mostrar las notas del proyecto">'+PIT_I+'<span>Notas ('+k+')</span></button>'; }
+// A card's title (the first line of the text when the note has none) and its text without that line
+function pitCardHTML(n, color){ const t=String(n.title||'').trim(), st=' style="--pc:'+esc(color)+'"';
+  if(UI.pitOpen===n.id) return '<div class="pitcard open" data-pit="'+esc(n.id)+'"'+st+'><textarea class="pit-ti" data-role="pittitle" rows="1" placeholder="Título" autocomplete="off" aria-label="Título de la nota">'+esc(n.title||'')+'</textarea>'+
+    '<div class="pit-d">'+esc(noteMeta(n))+'</div><textarea class="pit-bo" data-role="pitbody" rows="3" placeholder="Escribe aquí" autocomplete="off" aria-label="Texto de la nota">'+esc(n.body||'')+'</textarea></div>';
+  let title=t, body=String(n.body||'');
+  if(!title){ const ls=body.split('\n'), k=ls.findIndex(l=>l.trim()); if(k>=0){ title=ls[k].replace(LIST_MARK,'').trim(); ls[k]=''; body=ls.join('\n'); } }
+  let bh=body.trim()?noteBodyHTML(body).replace(/^(?:<div class="nl blank" data-ln="\d+"><\/div>)+/, ''):''; // the line that became the title, and blank ones before it, are not drawn
+  return '<div class="pitcard" data-pit="'+esc(n.id)+'"'+st+' tabindex="0" aria-label="'+esc(title||'Nueva nota')+'">'+
+    '<div class="pit-t">'+(n.pinned?'<span class="npin" title="Fijada" aria-label="Fijada">'+PIN_F+'</span>':'')+'<span class="pit-tt">'+esc(title||'Nueva nota')+'</span></div>'+
+    '<div class="pit-d">'+esc(noteWhen(noteTime(n)))+'</div>'+(bh?'<div class="pitv">'+bh+'</div>':'')+'</div>'; }
+function pitColHTML(p){ if(pitFolded()) return ''; const ns=notesOf(p.id);
+  if(UI.pitOpen&&!ns.some(n=>n.id===UI.pitOpen)) UI.pitOpen=null; // a note of another project, or gone
+  return '<aside class="pitcol" data-pid="'+esc(p.id)+'" aria-label="Notas de '+esc(p.name)+'"><div class="pithead"><b>Notas</b><span class="n">'+ns.length+'</span><span class="grow"></span>'+
+    '<button class="pitb" data-act="pitAdd" title="Nueva nota" aria-label="Nueva nota">'+I.plus+'</button><button class="pitb" data-act="pitFold" title="Ocultar las notas" aria-label="Ocultar las notas">'+PIT_I+'</button></div>'+
+    '<div class="pitnew"><textarea data-role="pitnew" rows="1" placeholder="Escribe una nota…" autocomplete="off" aria-label="Nueva nota">'+esc(UI.pitDraft||'')+'</textarea></div>'+
+    '<div class="pitlist">'+ns.map(n=>pitCardHTML(n, p.color)).join('')+(ns.length?'':'<div class="pithint">Intro guarda la nota y la primera línea es su título. Mayúsculas e Intro, otra línea.</div>')+
+    '<button class="pitall" data-act="pitAll" hidden>Ver todas ('+ns.length+')</button></div></aside>'; }
+// A text area as tall as its text (the note's text up to a limit, then it scrolls)
+function pitGrow(ta){ if(!ta||!ta.isConnected) return; ta.style.height='auto'; const h=ta.scrollHeight; if(h) ta.style.height=h+'px'; }
+// The cards that fit the column's height; the rest wait behind «Ver todas (N)». The open card always shows. Called after each drawing
+function pitFit(){ const col=document.querySelector('#desk .pitcol'); if(!col||!col.offsetParent) return; const list=col.querySelector('.pitlist'), all=col.querySelector('.pitall'); if(!list||!all) return;
+  col.querySelectorAll('textarea').forEach(pitGrow);
+  const cards=[...list.querySelectorAll('.pitcard')]; cards.forEach(c=>c.classList.remove('pit-hide')); all.hidden=true;
+  cards.forEach(c=>{ const v=c.querySelector('.pitv'), l=v&&v.lastElementChild; c.classList.toggle('clip', !!l&&l.getBoundingClientRect().bottom>v.getBoundingClientRect().bottom+1); }); // a text longer than the card fades out (the boxes' wider click area does not count)
+  if(list.scrollHeight<=list.clientHeight+1) return;
+  all.hidden=false; const top=list.getBoundingClientRect().top, lim=list.clientHeight-all.offsetHeight-8, bot=cards.map(c=>c.getBoundingClientRect().bottom-top); let cut=false;
+  cards.forEach((c,i)=>{ if(c.classList.contains('open')) return; if(cut||bot[i]>lim){ cut=true; c.classList.add('pit-hide'); } }); }
+let pitFitRaf=0; addEventListener('resize', ()=>{ if(!UI.wide) return; cancelAnimationFrame(pitFitRaf); pitFitRaf=requestAnimationFrame(pitFit); });
+// The quick card: the first line is the title, the rest the text. One Deshacer takes it back
+function pitAdd(pid, text){ const ls=String(text||'').replace(/\r/g,'').split('\n'), k=ls.findIndex(l=>l.trim()); if(k<0||!proj(pid)) return null;
+  const title=ls[k].trim(), rest=ls.slice(k+1); while(rest.length&&!rest[0].trim()) rest.shift(); while(rest.length&&!rest[rest.length-1].trim()) rest.pop();
+  const t=new Date().toISOString(), n={id:uid(), projectId:pid, title, body:rest.join('\n'), pinned:false, created:t, modified:t};
+  flushEdits(); DB.projectNotes.push(n); save(); haptic(8); log('info','Nota de proyecto creada desde la columna'); UI.pitDraft=''; render();
+  toast('Nota creada', ()=>{ DB.projectNotes=DB.projectNotes.filter(x=>x.id!==n.id); if(UI.pitOpen===n.id) UI.pitOpen=null; save(); });
+  return n; }
+// A card opens in place, with the caret at the end of its text; closing it draws it again (a note of this device left empty goes, as in Notas)
+function pitExpand(id){ if(UI.pitOpen===id) return; flushEdits(); if(UI.pitOpen) pitCollapse(true); if(!noteRec(id)) return; UI.pitOpen=id; render();
+  const ta=document.querySelector('#desk .pitcard.open [data-role=pitbody]'); if(ta){ ta.focus({preventScroll:true}); const l=ta.value.length; try{ ta.setSelectionRange(l,l); }catch(e){} } }
+function pitCollapse(quiet){ const id=UI.pitOpen; if(!id) return; UI.pitOpen=null; flushEdits(); noteLeft(id); if(!quiet) render(); }
+function pitFocusNew(){ const ta=document.querySelector('#desk .pitcol [data-role=pitnew]'); if(ta) ta.focus(); }
+// Called first by noteClick: true when the click was the column's (or the button that unfolds it)
+function pitClick(e){ const t=e.target;
+  if(t.closest('[data-act=pitUnfold]')){ DB.settings.pitFold=false; save(); log('info','Columna de notas visible'); render(); return true; }
+  const col=t.closest('.pitcol'); if(!col) return false; const pid=col.dataset.pid;
+  const act=t.closest('[data-act]'), a=act&&act.dataset.act;
+  if(a==='pitFold'){ pitCollapse(true); DB.settings.pitFold=true; save(); log('info','Columna de notas oculta'); render(); return true; }
+  if(a==='pitAdd'){ pitCollapse(); pitFocusNew(); return true; }
+  if(a==='pitAll'){ pitCollapse(true); setProjTab(pid, 'notes'); return true; }
+  const card=t.closest('.pitcard[data-pit]'); if(!card) return true;
+  if(card.classList.contains('open')) return true; // the editor's own fields
+  if(t.closest('a')) return true; // a link opens
+  const ck=t.closest('[data-nck]'); if(ck){ toggleNoteCheck(card.dataset.pit, +ck.dataset.nck); render(); return true; }
+  pitExpand(card.dataset.pit); return true; }
+// A click anywhere else on the desktop closes the open card first; the click then does what it does
+document.addEventListener('click', e=>{ if(!UI.wide||!UI.pitOpen) return; const t=e.target; if(!t.closest||!t.closest('#desk')||t.closest('.pitcard.open')) return; pitCollapse(); }, true);
+// Typing in the column: the new card keeps its draft through a redraw; an open card saves as Notas does
+document.addEventListener('input', e=>{ const t=e.target, role=t.dataset&&t.dataset.role; if(!role||!/^pit(new|title|body)$/.test(role)) return;
+  if(role==='pitnew'){ UI.pitDraft=t.value; pitGrow(t); return; }
+  const c=t.closest('.pitcard[data-pit]'), n=c&&noteRec(c.dataset.pit); if(!n) return;
+  if(role==='pittitle'){ const v=t.value.replace(/\n/g,' '); if(v!==t.value) t.value=v; saveNoteEdit(n, {title:v}); pitGrow(t); }
+  else { saveNoteEdit(n, {body:t.value}); pitGrow(t); }
+  const d=c.querySelector('.pit-d'); if(d) d.textContent=noteMeta(n); pitFit(); });
+/* Keys in the column, ahead of the desktop's own (capture): Intro keeps the new note and Esc empties it; in an open card Intro on the title
+   goes on to the text, the list lines go on as in Notas and Esc closes it; Intro on a card opens it. Nothing typed here reaches the list's keys */
+document.addEventListener('keydown', e=>{ if(!UI.wide) return; const t=e.target; if(!t.closest||!t.closest('#desk .pitcol')) return; const role=t.dataset&&t.dataset.role, k=e.key;
+  if(sheet.classList.contains('on')||asheet.classList.contains('on')||menuOpen()) return;
+  const stop=()=>{ e.preventDefault(); e.stopImmediatePropagation(); };
+  if(role==='pitnew'){ if(e.isComposing) return;
+    if(k==='Enter'&&!e.shiftKey&&!e.altKey&&!e.metaKey&&!e.ctrlKey){ stop(); const col=t.closest('.pitcol'); if(!t.value.trim()) return; t.value=''; pitGrow(t); pitAdd(col.dataset.pid, UI.pitDraft); const n=$('#desk [data-role=pitnew]'); if(n) n.focus(); return; }
+    if(k==='Escape'){ stop(); t.value=''; UI.pitDraft=''; pitGrow(t); t.blur(); } return; }
+  if(role==='pittitle'||role==='pitbody'){ if(e.isComposing) return;
+    if(k==='Escape'){ stop(); pitCollapse(); return; }
+    if(role==='pittitle'&&k==='Enter'){ stop(); const b=t.closest('.pitcard').querySelector('[data-role=pitbody]'); if(b){ b.focus(); try{ b.setSelectionRange(0,0); }catch(err){} } return; }
+    if(role==='pitbody') noteEnter(e, t);
+    e.stopImmediatePropagation(); return; }
+  if(t.classList.contains('pitcard')&&(k==='Enter'||k===' ')){ stop(); pitExpand(t.dataset.pit); return; }
+  if(k==='Escape') return; // the desktop's Esc (a selection, a search)
+  if(!e.metaKey&&!e.ctrlKey) e.stopImmediatePropagation(); }, true); // a focused card or button of the column is not the list

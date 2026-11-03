@@ -47,10 +47,10 @@ const rowSel = id => '#desk .main .group .row[data-id="'+id+'"]';
     return {date:xs('.rc-date'), rem:xs('.rc-rem'), pri:xs('.pri'), hoyDates:rows.map(x=>x.querySelector('.rc-date')).filter(e=>!e.classList.contains('drag')).map(e=>e.textContent).filter(Boolean)}; }); // decision 56b: «Aplazada N veces» and «Desde…» are not a date
   check('R11_columnsAligned', r.cols.date.length===1 && r.cols.rem.length===1 && r.cols.pri.length===1, r.cols);
   check('R3_deskHoySaysNoDate', r.cols.hoyDates.length===0, r.cols.hoyDates); // Hoy: no "Hoy"; Aplazadas: no "Aplazada"
-  // The list grows to about 900 px and the head (search, view options) ends where the list ends
+  // The list takes the whole column (decision 58) and the head (search, view options) ends where the list ends
   r.width = await page.evaluate(()=>{ const i=document.querySelector('#desk .main .inner').getBoundingClientRect(), m=document.querySelector('#desk .mhead .mopts').getBoundingClientRect(), s=document.querySelector('#desk .mhead .search').getBoundingClientRect(), h=document.querySelector('#desk .mhead h1').getBoundingClientRect();
     return {inner:Math.round(i.width), right:Math.round(i.right), mopts:Math.round(m.right), searchTop:Math.round(s.top), h1Top:Math.round(h.top)}; });
-  check('R11_listWidth', r.width.inner===900, r.width);
+  check('R11_listWidth', r.width.inner===1012, r.width); // decision 58: the list takes the whole column (1280 - 220 - 2 x 24), no 900 px cap
   check('R11_searchInHead', Math.abs(r.width.right-r.width.mopts)<=1, r.width);
   // Materials: white content, translucent grey sidebar
   r.mat = await page.evaluate(()=>({main:getComputedStyle(document.querySelector('#desk')).backgroundColor, side:getComputedStyle(document.querySelector('#desk .side')).backgroundColor, row:getComputedStyle(document.querySelector('#desk .main .row:not(.first .row) .row-content')).backgroundColor})); // v0.16.3: "Lo primero" rows sit on a tinted block, so the check reads a list row

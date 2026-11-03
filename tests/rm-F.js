@@ -221,7 +221,7 @@ const clickItem = (page, label) => page.evaluate(l=>{ const b=[...document.query
   check('R19_miniPastRefused', await page.evaluate(()=>task('tC').date==='2026-11-05') && await toastText(page)==='No se puede mover a un día pasado');
   // In Hoy the mini month is there too; at 1280 px there is no agenda
   await page.click('#desk [data-view=hoy]'); await page.waitForTimeout(300);
-  check('R20_noAgendaAt1280', await page.evaluate(()=>!!document.querySelector('#desk .side .minical') && getComputedStyle(document.querySelector('#desk .hagenda')).display==='none' && Math.round(document.querySelector('#desk .main .inner').getBoundingClientRect().width)===900));
+  check('R20_noAgendaAt1280', await page.evaluate(()=>!!document.querySelector('#desk .side .minical') && getComputedStyle(document.querySelector('#desk .hagenda')).display==='none' && Math.round(document.querySelector('#desk .main .inner').getBoundingClientRect().width)===1012)); // decision 58: the whole column, no 900 px cap
   check('noErrorsLight', errors.length===0, errors.slice());
   await ctx.close();
 

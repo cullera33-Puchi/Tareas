@@ -1,5 +1,12 @@
 # Registro de cambios
 
+## v0.26.1. Sin resumen del día (3 de noviembre de 2026)
+
+- Desaparece el resumen del día en el iPhone y en el ordenador: las cifras (para hoy, aplazadas, prioritarias), sus filtros y «Lo primero». La lista de Hoy empieza directamente.
+- Se mantienen el número del segmento Hoy, el bloque «Ahora» cuando hay tareas marcadas, «Revisar hoy», Aplazadas con «Repasar», «Mañana: N» y, desde las 19:00, la celda «Cerrar el día» al final de Hoy.
+- Con todo lo de hoy hecho, Hoy muestra «Todo hecho por hoy» con las tareas completadas.
+- Prueba nueva `rm-NS`.
+
 ## v0.26.0. Dictar en Notas y «Nota de voz» para el audio (3 de noviembre de 2026)
 
 - Desaparece la nota de voz dictada: se dicta con el micrófono del teclado directamente en Notas. En el ordenador, el micrófono de la alta ampliada («Dictar») escribe en el campo de notas.

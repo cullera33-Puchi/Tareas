@@ -179,6 +179,7 @@ Cambios acordados con Enric sobre el diseño de abajo. Mandan sobre el texto del
 51. **«Revisar hoy» y «Por confirmar más adelante» (aprobado por Enric el 3 de noviembre).** Las tareas por confirmar cuyo día de revisión ha llegado salían mezcladas en Hoy con la marca Revisar, y el bloque de abajo, con el mismo nombre, mostraba otras; resultaba confuso. (1) En Hoy, las que toca revisar van en un grupo propio «Revisar hoy (N)» al principio de la lista, como el grupo de las aplazadas, con «Esperando a» en cada fila. (2) El bloque plegado de abajo pasa a llamarse «Por confirmar más adelante (N)» y su botón «Mostrar las que esperan»; solo lleva las que aún no toca revisar. (3) En Todas, el bloque de abajo muestra todas las por confirmar, con el día de revisión en cada fila. Las que entran por fecha límite (punto 48a) siguen la misma regla: van a «Revisar hoy». Hecho en v0.25.1 (`listHTML`, opción de fila `noReview`, `waitingBlockHTML`, `waitingAll`; prueba `rm-RH`). El contador de Todas deja fuera las por confirmar, como la lista.
 52. **Quitar el resumen del día (decidido por Enric el 3 de noviembre).** Las cifras (para hoy, aplazadas, prioritarias) y «Lo primero» son ruido con su volumen (unas 10 tareas al día): la lista de Hoy ya se ve entera y sus filas muestran hora, entrega y prioridad. Se valoró un panel «Ahora» con recordatorios y entregas y se descartó porque repetiría tareas de la lista. Se quita la tarjeta del resumen en el iPhone y la línea de cifras y «Lo primero» en el escritorio, sin nada en su lugar. Se mantienen el contador del segmento Hoy, el bloque «Ahora» (solo aparece con tareas marcadas), «Revisar hoy», Aplazadas con «Repasar», «Mañana: N» y «Cerrar el día» desde las 19:00 como celda al final de Hoy. Desaparece la opción de vista «Mostrar resumen del día» y los filtros por cifra (`UI.sumFilter`). Después de este punto y del resumen de estado (M4), pausa de unos días para usar la app y depurar antes de añadir funciones. Hecho en v0.26.1: fuera `summaryHTML`, `summaryState`, `UI.sumFilter`, `toggleSummary` y la línea de cifras del escritorio; «Todo hecho por hoy» pasa a ser el estado vacío de Hoy; `settings.summaryDay` se queda como marca del día de `rollOver`; prueba `rm-NS`.
 53. **Tiempo estimado e indicador de procrastinación (ideas de Enric del 3 de noviembre, para justo después de la pausa; diseño sin cerrar).** (a) Tiempo estimado por tarea: ayuda a priorizar y a sacar rápido las fáciles. Necesita un campo nuevo en Tarea (duración estimada); a decidir los valores (por ejemplo 5, 15, 30 minutos, 1 hora, más), cómo se ve en la fila y si hay filtro o grupo de «rápidas». Puede servir también para la duración de los bloques de la vista por horas. (b) Indicador de procrastinación: señalar las tareas que dan pereza y se van apartando. Necesita guardar cuántas veces o desde cuándo se aplaza (absorbe «Aplazada desde» de R9); a decidir el umbral, cómo se marca en la fila y qué propone el repaso de aplazadas (partirla en pasos, ponerla en Ahora, delegarla o eliminarla). Ambas cambian el modelo de datos y se acuerdan antes de construir (regla 6).
+54. **Sugerir próximas tareas (idea de Enric del 3 de noviembre; diseño sin cerrar).** Que la app proponga qué hacer después, por ejemplo las rápidas. Propuesta inicial, para no añadir ruido: solo bajo demanda (un botón «¿Qué hago ahora?» en Hoy o en el bloque «Ahora», nunca un panel fijo); se elige el hueco disponible (15 minutos, 30, 1 hora o más) y propone hasta tres tareas que caben, por este orden: entrega hoy o vencida, prioridad alta, las que más se arrastran (punto 53b) y las rápidas (punto 53a); avisa si hay un recordatorio antes de que acabe el hueco. Un toque pasa la sugerida a «Ahora». Reglas en el propio dispositivo, sin coste ni servicios externos. Depende de los dos campos del punto 53 y se diseña con ellos.
 
 
 ## 9. Decisiones pendientes de Enric (revisión del 1 de noviembre)
@@ -258,19 +259,20 @@ Orden fijado por Enric el 2 de noviembre y revisado el 3 de noviembre: tras el r
 | 6 | Pausa: Enric usa la app unos días y se depuran los fallos y molestias antes de añadir funciones | según uso | medio |
 | 7 | Tiempo estimado por tarea (punto 53 de la sección 8): ver lo que es rápido para priorizar y despachar las fáciles | bajo o medio, 2 a 3 h | medio |
 | 8 | Indicador de procrastinación (punto 53 de la sección 8): señalar las tareas que se van apartando día tras día; incluye «Aplazada desde» | bajo o medio, 2 a 3 h | medio |
-| 9 | M3. Revisión semanal guiada el viernes: completado, pendiente por proyecto, por confirmar, sin fecha y la semana siguiente | bajo o medio, 2 a 3 h | medio |
-| 10 | Responsable y «Enviar recordatorio» por la hoja de compartir (punto 16) | bajo, 2 h | medio |
-| 11 | M1. Plantillas de tareas con fechas relativas y pasos (preparar SteerCo, workshop, cierre de mes, go-live) | medio o alto, 4 a 5 h | alto |
-| 12 | M5. Bloqueo con Face ID o Touch ID al abrir la app tras un tiempo sin usarla | medio, 3 h | alto |
-| 13 | M6. Filtros guardados («Prioritarias de OCA esta semana», «Esperando al cliente») | medio, 3 h | medio |
-| 14 | M7. Transcribir los audios grabados en el propio dispositivo, sin coste | alto, 6 a 8 h | muy alto |
-| 15 | Fotos y audios en las notas de proyecto (segunda fase del punto 47) | bajo o medio, 2 h | medio |
-| 16 | Siri y Atajo de iOS (decisión pendiente 1; aplazado por Enric el 2 de noviembre) | bajo o medio, 2 a 3 h | alto |
-| 17 | Lista de contactos (nombre, correo, teléfono) para Responsable y «Esperando a» | medio, 3 h | medio |
-| 18 | Duración de los bloques en la vista por horas (campo nuevo, parte de R20) | medio, 3 h | alto |
-| 19 | Fase 2, tareas compartidas entre personas (punto 43, diseño cerrado) | muy alto, 2 a 3 días | máximo |
-| 20 | Outlook de Deloitte (punto 44), sujeto a la política de Deloitte | bajo o medio, 2 a 3 h | medio |
-| 21 | App aparte o evolución para gestión de proyectos con el equipo (ver abajo) | muy alto, semanas | máximo, por fases |
+| 9 | Sugerir próximas tareas (punto 54 de la sección 8): bajo demanda, según el tiempo libre, con las rápidas, las que vencen y las que se arrastran | medio, 3 h | alto |
+| 10 | M3. Revisión semanal guiada el viernes: completado, pendiente por proyecto, por confirmar, sin fecha y la semana siguiente | bajo o medio, 2 a 3 h | medio |
+| 11 | Responsable y «Enviar recordatorio» por la hoja de compartir (punto 16) | bajo, 2 h | medio |
+| 12 | M1. Plantillas de tareas con fechas relativas y pasos (preparar SteerCo, workshop, cierre de mes, go-live) | medio o alto, 4 a 5 h | alto |
+| 13 | M5. Bloqueo con Face ID o Touch ID al abrir la app tras un tiempo sin usarla | medio, 3 h | alto |
+| 14 | M6. Filtros guardados («Prioritarias de OCA esta semana», «Esperando al cliente») | medio, 3 h | medio |
+| 15 | M7. Transcribir los audios grabados en el propio dispositivo, sin coste | alto, 6 a 8 h | muy alto |
+| 16 | Fotos y audios en las notas de proyecto (segunda fase del punto 47) | bajo o medio, 2 h | medio |
+| 17 | Siri y Atajo de iOS (decisión pendiente 1; aplazado por Enric el 2 de noviembre) | bajo o medio, 2 a 3 h | alto |
+| 18 | Lista de contactos (nombre, correo, teléfono) para Responsable y «Esperando a» | medio, 3 h | medio |
+| 19 | Duración de los bloques en la vista por horas (campo nuevo, parte de R20) | medio, 3 h | alto |
+| 20 | Fase 2, tareas compartidas entre personas (punto 43, diseño cerrado) | muy alto, 2 a 3 días | máximo |
+| 21 | Outlook de Deloitte (punto 44), sujeto a la política de Deloitte | bajo o medio, 2 a 3 h | medio |
+| 22 | App aparte o evolución para gestión de proyectos con el equipo (ver abajo) | muy alto, semanas | máximo, por fases |
 
 M7, condición de Enric: **sin ningún coste**. Se descartan los servicios de pago. Vía propuesta: transcripción en el propio dispositivo con un modelo Whisper que se ejecuta en el navegador (gratis y sin que el audio salga del equipo, lo que además encaja con la política de datos de clientes), primero en el ordenador y en el iPhone si el rendimiento lo permite; la descarga del modelo pesa entre 40 y 250 MB según la calidad. Se diseña con Enric antes de construir.
 

@@ -151,31 +151,10 @@ body.desktop .toast{left:auto;right:28px;bottom:28px;width:360px;}
 
 .scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:0 max(16px,env(safe-area-inset-right,0px)) 120px max(16px,env(safe-area-inset-left,0px));}
 
-/* Day summary */
-.summary{background:var(--card);border-radius:12px;padding:12px 16px 12px;margin:8px 0 12px;}
-.summary-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
-.summary-head h3{margin:0;font-size:0.882rem;font-weight:600;color:var(--ink2);}
-.summary-head button{color:var(--ink3);width:44px;height:44px;margin:-8px -12px -8px 0;display:flex;align-items:center;justify-content:center;} /* 44 pt to the finger (R2), drawn as before: the negative margin keeps the head's height */
-.summary-head svg{width:14px;height:14px;transition:transform .25s;}
-.summary.collapsed .summary-head svg{transform:rotate(-90deg);}
-.summary.collapsed .summary-body{display:none;}
-.summary.collapsed{padding-bottom:12px;}
-.summary.collapsed .summary-head{margin-bottom:0;}
-.nums{display:flex;gap:8px;}
+/* Rows repeated in a card (Ahora, decision 39) */
 .first{margin-top:10px;}
-.num{flex:1;border-radius:10px;padding:6px 4px;text-align:center;}
-.num b{display:block;font-size:1.647rem;font-weight:700;line-height:1.1;letter-spacing:-.6px;}
-.num span{font-size:0.706rem;color:var(--ink2);}
-.num.red b{color:var(--red);}
-.num.on{background:var(--fill);}
-.num:active{opacity:.7;}
-.num.orange b{color:var(--orange);}
-.first h4{margin:6px 0 2px;font-size:0.765rem;color:var(--ink2);font-weight:500;}
 .first .row{margin:0;}
 .first .row-content{padding-left:0;}
-.first .empty-line{color:var(--ink3);font-size:0.882rem;padding:8px 0 10px;}
-.first .soon{display:flex;align-items:center;gap:8px;font-size:0.824rem;color:var(--ink2);padding:8px 0 6px;border-top:.5px solid var(--sep);}
-.first .soon svg{width:15px;height:15px;color:var(--orange);}
 
 /* Search and segment */
 .searchbar{display:flex;align-items:center;gap:10px;margin:4px 0 10px;}
@@ -243,7 +222,7 @@ body.desktop .toast{left:auto;right:28px;bottom:28px;width:360px;}
 /* R2: the circle is drawn at 22 pt but takes the finger over 44 by 44 pt (Apple's minimum); a tap there completes instead of opening the detail */
 .check::after,.selbox::after{content:"";position:absolute;left:50%;top:50%;width:44px;height:44px;margin:-22px 0 0 -22px;}
 .wcard .check::after{display:none;} /* desktop week cards: mouse only, and the area would cover the title */
-.first .row{overflow:visible;} /* "Lo primero" rows have no swipe background to clip, and their circle's area reaches into the card's padding */
+.first .row{overflow:visible;} /* Ahora rows have no swipe background to clip, and their circle's area reaches into the card's padding */
 /* R1: a row just marked stays where it is, dimmed, until the marks settle (flushHeld) */
 .row.held .row-text,.row.held .inds,.row.held .pri{opacity:.4;transition:opacity .2s;}
 .check:active{transform:scale(.88);}
@@ -312,10 +291,7 @@ body.desktop .toast{left:auto;right:28px;bottom:28px;width:360px;}
 .pchips .chip .dot{width:8px;height:8px;border-radius:50%;}
 .pchips .chip.on{color:#fff;}
 .plan-title{font-size:1.06rem;font-weight:600;text-align:center;margin:2px 0 10px;line-height:1.3;}
-.closeday{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:10px;padding:10px 0 2px;border-top:.5px solid var(--sep);color:var(--blue);font-weight:600;font-size:0.882rem;}
-.closeday svg{width:16px;height:16px;}
-/* R8: Cerrar el día in the folded summary, at the end of Hoy and its sheet */
-.summary-head .sumclose{width:auto;height:44px;margin:-8px 10px -8px auto;color:var(--blue);font-size:0.824rem;font-weight:600;}
+/* R8: Cerrar el día at the end of Hoy and its sheet */
 .cell.closecell svg{width:20px;height:20px;flex:none;}
 .cdnums{display:flex;gap:8px;margin:0 0 4px;}
 .cdnums div{flex:1;text-align:center;background:var(--bg);border-radius:10px;padding:8px 4px;}
@@ -343,8 +319,6 @@ body.desktop .toast{left:auto;right:28px;bottom:28px;width:360px;}
 .app.selecting .selbar{display:flex;z-index:9;} /* above pushed screens (8): selecting inside a project; still under sheets and toast */
 .preview{display:flex;align-items:center;justify-content:space-between;width:100%;padding:4px 20px 16px;color:var(--ink2);font-size:0.882rem;}
 .preview svg{width:8px;height:14px;color:var(--ink3);}
-.alldone{display:flex;align-items:center;gap:8px;margin-top:10px;padding-top:10px;border-top:.5px solid var(--sep);color:var(--green);font-weight:600;font-size:0.882rem;}
-.alldone svg{width:16px;height:16px;}
 .tips p{margin:0 0 10px;font-size:0.882rem;line-height:1.4;}
 .tips b{font-weight:600;}
 
@@ -606,33 +580,6 @@ body.pdragging,body.pdragging *{cursor:grabbing !important;user-select:none;-web
 .app.desktop .addbar input,.app.desktop .addbar .qhl{font-size:14px;}
 .app.desktop .addbar .kbd{font-size:11px;}
 .app.desktop .addhint{margin:-6px 4px 10px;font-size:12px;}
-/* The day summary as one line: the figures filter the list; "Lo primero" folds under it (the summary's own fold) */
-.app.desktop .summary{background:none;border-radius:0;padding:0;margin:0 0 8px;}
-.app.desktop .summary.collapsed{padding:0;}
-.app.desktop .dsum .summary-head{margin:0;gap:4px;min-height:28px;justify-content:flex-start;}
-.app.desktop .dsum .summary-head button{width:auto;height:26px;margin:0;color:var(--ink2);}
-.app.desktop .dsum .summary-head svg,.app.desktop .summary.collapsed .summary-head svg{transform:none;}
-.dsum .num{flex:none;display:flex;align-items:center;gap:5px;padding:0 10px;border-radius:13px;font-size:13px;text-align:left;}
-.dsum .num b{display:inline;font-size:14px;font-weight:600;letter-spacing:0;line-height:1;color:var(--ink);font-variant-numeric:tabular-nums;}
-.dsum .num span{font-size:13px;color:var(--ink2);}
-.dsum .num:hover{background:var(--dhov);}
-.dsum .num.on,.dsum .num.on:hover{background:var(--fill);}
-.dsum .soonl{flex:1;min-width:0;display:flex;align-items:center;gap:5px;padding:0 8px;font-size:12px;color:var(--ink2);white-space:nowrap;overflow:hidden;}
-.dsum .soonl span{overflow:hidden;text-overflow:ellipsis;}
-.dsum .soonl svg{width:13px;height:13px;flex:none;color:var(--orange);}
-.dsum .soonl.ok svg{color:var(--green);}
-.app.desktop .dsum .summary-head .sumclose{color:var(--blue);font-size:13px;font-weight:500;padding:0 8px;border-radius:6px;}
-.app.desktop .dsum .summary-head .sumfold{display:flex;align-items:center;gap:5px;padding:0 8px;border-radius:6px;font-size:13px;}
-.app.desktop .dsum .summary-head .sumclose:hover,.app.desktop .dsum .summary-head .sumfold:hover{background:var(--dhov);}
-.dsum .sumfold svg{width:9px;height:9px;transition:transform .2s;}
-.app.desktop .summary.collapsed .sumfold svg{transform:rotate(-90deg);}
-.app.desktop .dsum .first{margin:6px 0 10px;padding:2px 0 4px;background:var(--fill);border-radius:8px;}
-.app.desktop .dsum .first .row,.app.desktop .dsum .first .row-content{background:transparent;}
-.app.desktop .dsum .first .row + .row .row-content::before{display:none;}
-.dsum .firsthead{font-size:11px;font-weight:600;color:var(--ink2);padding:6px 12px 2px;letter-spacing:.2px;}
-.firsthead{display:none;}
-.app.desktop .firsthead{display:block;}
-.app.desktop .dsum .first .row-content{padding:0 8px 0 12px;min-height:32px;}
 /* Rows: one line; the circle keeps a 32 px click area */
 .app.desktop .row-content{gap:10px;padding:0 8px 0 12px;min-height:32px;}
 .app.desktop .row-content:hover{background:var(--dhov);}
@@ -1153,7 +1100,7 @@ body.resizing,body.resizing *{cursor:col-resize !important;-webkit-user-select:n
 .app.desktop .gsec.over,.app.desktop .main [data-gday].over{background:color-mix(in srgb,var(--blue) 8%,transparent);border-radius:8px;}
 .app.desktop .gsec.over > .group-title,.app.desktop .main .group-title[data-gday].over{color:var(--blue);background:color-mix(in srgb,var(--blue) 10%,var(--dmain));}
 .app.desktop .gsec.over > .group-title .gl,.app.desktop .main .group-title[data-gday].over .gl{color:var(--blue);}
-/* Decision 39: Ahora. iPhone: a card at the top of Hoy, above the summary, with compact rows; the star is the system orange */
+/* Decision 39: Ahora. iPhone: a card at the top of Hoy, above the search, with compact rows; the star is the system orange */
 .ahora{background:var(--card);border-radius:12px;padding:10px 16px 4px;margin:8px 0 12px;}
 .ahead{display:flex;align-items:center;gap:6px;font-size:0.882rem;font-weight:600;color:var(--ink);}
 .ahead svg{width:15px;height:15px;color:var(--orange);flex:none;}

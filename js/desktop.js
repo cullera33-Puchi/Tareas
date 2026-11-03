@@ -4,7 +4,7 @@
    listeners run at load; the start itself (first screen, timers, sync, service worker) is in boot.js, the last file. */
 /* ---------- Desktop layout ---------- */
 function mondayOf(d){ const x=new Date(d+'T00:00:00'); return addDays(d, -((x.getDay()+6)%7)); }
-function setDeskView(v){ if(v==='project:none') v='project:none'; if(UI.noteOpen&&v!==UI.deskView&&v!=='project:'+((noteRec(UI.noteOpen)||{}).projectId)) noteLeft(UI.noteOpen); UI.deskView=v; UI.deskDetail=null; UI.dsel.ids.clear(); UI.dsel.mode=false; UI.dsel.edit=null; UI.query=''; UI.searchDone=false; UI.sumFilter=null; if(v==='hoy'||v==='todas'){ DB.settings.filter=v; save(); } render(); } // another list starts with nothing selected (R16)
+function setDeskView(v){ if(v==='project:none') v='project:none'; if(UI.noteOpen&&v!==UI.deskView&&v!=='project:'+((noteRec(UI.noteOpen)||{}).projectId)) noteLeft(UI.noteOpen); UI.deskView=v; UI.deskDetail=null; UI.dsel.ids.clear(); UI.dsel.mode=false; UI.dsel.edit=null; UI.query=''; UI.searchDone=false; if(v==='hoy'||v==='todas'){ DB.settings.filter=v; save(); } render(); } // another list starts with nothing selected (R16)
 /* ---------- R15, R16: the desktop lists' selected row, keyboard and multiple selection ----------
    UI.dsel.cur is the selected row, apart from the hover (the inspector, when open, shows it); arrows or J and K move it and the inspector
    follows, as in Mail. ids is the multiple selection (Comando clic, Mayúsculas clic, Comando A, Mayúsculas y flechas): it counts from two
@@ -13,7 +13,7 @@ function setDeskView(v){ if(v==='project:none') v='project:none'; if(UI.noteOpen
    The iPhone keeps its own selection mode (UI.select) */
 function deskMulti(){ return UI.wide && (UI.dsel.mode || UI.dsel.ids.size>1); }
 function deskListView(){ const v=UI.deskView; return v==='hoy'||v==='todas'||v==='ahora'||v==='waiting'||(v.startsWith('project:')&&!deskNotesOn()); } // decision 47: a project's Notas is not a list of tasks // decisions 39 and 41: Ahora and Por confirmar are lists too
-// The rows of the visible list in order, with the placeholders of a long one; "Lo primero" repeats rows and is left out
+// The rows of the visible list in order, with the placeholders of a long one; Ahora repeats rows and is left out
 function deskOrder(){ return [...document.querySelectorAll('#desk .main .mbody .row[data-id], #desk .main .mbody .rph[data-id]')].filter(r=>!r.closest('.first')).map(r=>r.dataset.id); }
 function deskRow(id){ return id?document.querySelector('#desk .main .mbody .row[data-id="'+CSS.escape(id)+'"]:not(.first .row)'):null; }
 // The selection changed without the rows' markup: classes, ARIA and the one row the Tab key reaches.
@@ -203,7 +203,7 @@ function projFilterMenu(src){ const dot=c=>'<span class="pm-dot" style="backgrou
 function deskMain(){
   const v=UI.deskView; let title='', body='', search=true, pf=false, seg='', notes=false;
   if(v==='hoy'||v==='todas'){ const f=v; title=f==='hoy'?'Hoy':'Todas'; pf=true;
-    body = addBarHTML(null)+(UI.query?'':ahoraHTML())+(f==='hoy'&&!UI.query?summaryHTML():'')+
+    body = addBarHTML(null)+(UI.query?'':ahoraHTML())+
       listHTML(UI.query?'todas':f); }
   else if(v==='ahora'){ title='Ahora'; body=ahoraViewHTML(); } // decision 39
   else if(v==='waiting'){ title='Por confirmar'; body=waitingViewHTML(); } // decision 41

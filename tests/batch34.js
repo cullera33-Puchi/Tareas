@@ -10,9 +10,9 @@ const srv = http.createServer((req,res)=>{ let p = decodeURIComponent(req.url.sp
   const ctx = await browser.newContext({ viewport:{width:390,height:844}, deviceScaleFactor:2, isMobile:true, hasTouch:true });
   const page = await ctx.newPage(); await page.addInitScript(()=>{ if(!localStorage.getItem('tareas-v1')) localStorage.setItem('tareas-v1', JSON.stringify({spaces:[{id:'trabajo',name:'Trabajo',order:0},{id:'personal',name:'Personal',order:1}],projects:[],tasks:[],voiceNotes:[],settings:{tipsSeen:true}})); }); const errors=[]; page.on('pageerror', e=>errors.push(e.message)); page.on('console', m=>{ if(m.type()==='error') errors.push(m.text()); });
   await page.goto('http://localhost:8779/'); await page.waitForTimeout(400); const r={}; const T='.screen.root[data-root=tareas] ';
-  // Few tasks: summary open, two blocks when carried + today
+  // Few tasks: two blocks when carried + today; decision 52: no day summary
   await page.evaluate(()=>{ const p=addProject('Comité','#FF9500'); addTask({title:'De ayer',date:addDays(todayStr(),-1),projectId:p.id}); addTask({title:'Hoy normal',date:todayStr()}); rollOver(); render(); }); await page.waitForTimeout(200);
-  r.summaryOpen = !(await page.$eval(T+'.summary', e=>e.classList.contains('collapsed')));
+  r.noSummary = await page.evaluate(T=>!document.querySelector(T+'.summary')&&!document.querySelector(T+'[data-sum]'), T); if(!r.noSummary) errors.push('day summary still drawn');
   r.hoyGroups = await page.$$eval(T+'.group-title', g=>g.map(x=>x.textContent));
   r.tag = await page.$eval(T+'.tag', e=>({text:e.textContent, bg:getComputedStyle(e).backgroundColor, color:getComputedStyle(e).color}));
   // Accent-insensitive search incl. project name
@@ -25,10 +25,10 @@ const srv = http.createServer((req,res)=>{ let p = decodeURIComponent(req.url.sp
   // G4a (F100): an option whose date is already offered is left out, so on a Sunday "Próxima semana" (Monday) is gone and "Mañana" is that same date; pick by text, not by position
   await page.evaluate(()=>{ const its=[...document.querySelectorAll('#pmenu .pm-it')]; (its.find(b=>b.textContent.startsWith('Próxima semana'))||its.find(b=>b.textContent.trim()==='Mañana'&&addDays(todayStr(),1)===nextWeekday(1,true))).click(); }); await page.waitForTimeout(600);   // "Próxima semana"
   r.postponed = await page.evaluate(()=>({date:DB.tasks[0].date===nextWeekday(1,true)?'next monday':DB.tasks[0].date, toast:document.querySelector('#toastText').textContent}));
-  // Many tasks: summary auto-collapsed; toggle makes it explicit
+  // Many tasks: decision 52, still no summary (it used to fold itself over 20) and every task listed
   await page.evaluate(()=>{ for(let i=0;i<25;i++) addTask({title:'T'+i,date:todayStr()}); render(); }); await page.waitForTimeout(200);
-  r.autoCollapsed = await page.$eval(T+'.summary', e=>e.classList.contains('collapsed'));
-  await page.click(T+'[data-act=toggleSummary]'); await page.waitForTimeout(200); r.afterToggle = await page.evaluate(()=>DB.settings.summaryState);
+  r.manyNoSummary = await page.evaluate(T=>({summary:!!document.querySelector(T+'.summary,'+T+'[data-act=toggleSummary]'), rows:document.querySelectorAll(T+'.group .row[data-id]').length, hoy:pendingFor('hoy').length}), T);
+  if(r.manyNoSummary.summary || r.manyNoSummary.rows!==r.manyNoSummary.hoy) errors.push('many tasks: '+JSON.stringify(r.manyNoSummary));
   // Quick-add chips
   await page.click('.fab'); await page.waitForTimeout(250); /* R5: the date chips are in the strip of the date icon */ await page.click('#sheet .qbtn[data-k=date]'); r.chips = await page.$$eval('#sheet .chip', c=>c.map(x=>x.textContent)); const vk = await page.$('#sheet [data-c=vie]') ? 'vie' : 'man'; /* G4a (F54): on a Thursday 'Viernes' is tomorrow and only 'Mañana' is shown */ await page.click('#sheet [data-c='+vk+']'); r.vieDate = await page.evaluate(k=>{ /* R5: a pick closes the strip; the choice shows as the date token and the lit icon */ const t=document.querySelector('#sheet .tok[data-tok=date]'); return !!t && document.querySelector('#sheet .qbtn[data-k=date]').classList.contains('set') && t.textContent.replace('×','')===(k==='vie'?'Viernes':'Mañana'); }, vk); await page.evaluate(()=>closeSheet()); await page.waitForTimeout(400);
   // Detail structure

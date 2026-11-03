@@ -75,11 +75,9 @@ const center = async (page, sel) => { await page.$eval(sel, e=>{ const sc=e.clos
   r.checkHit = await page.evaluate(({x,y})=>[[-20,0],[20,0],[0,-20],[0,20],[-18,-18]].map(([dx,dy])=>{ const e=document.elementFromPoint(x+dx,y+dy); return !!e&&!!e.closest('.check'); }), ck);
   check('R2_checkDrawn22', Math.round(ck.w)===22, ck);
   check('R2_checkHit44', r.checkHit.every(Boolean), r.checkHit);
-  const fc = await center(page, HOY+' .first .row .check');
-  r.firstHit = await page.evaluate(({x,y})=>[[-20,0],[20,0],[0,-20],[0,20]].map(([dx,dy])=>{ const e=document.elementFromPoint(x+dx,y+dy); return !!e&&!!e.closest('.check'); }), fc);
-  check('R2_firstHit44', r.firstHit.every(Boolean), r.firstHit);
-  r.fold = await page.$eval(HOY+' .summary-head button', b=>{ const q=b.getBoundingClientRect(); return {w:q.width,h:q.height}; });
-  check('R2_fold44', r.fold.w>=44&&r.fold.h>=44, r.fold);
+  // Decision 52: the day summary is gone, with "Lo primero" and its fold button (their 44 pt areas went with them)
+  r.noSummary = await page.evaluate(H=>({summary:!!document.querySelector(H+' .summary'), first:[...document.querySelectorAll(H+' .first')].filter(e=>!e.closest('.ahora')).length, fold:!!document.querySelector(H+' [data-act=toggleSummary]')}), HOY);
+  check('R2_noSummary', !r.noSummary.summary && !r.noSummary.first && !r.noSummary.fold, r.noSummary);
 
   // R1: a tap 18 pt off the circle (inside its 44 pt) marks the row; it stays, dimmed; the data waits
   await page.touchscreen.tap(ck.x+18, ck.y); await page.waitForTimeout(300);

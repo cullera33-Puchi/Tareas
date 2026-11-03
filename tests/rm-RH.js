@@ -44,16 +44,16 @@ async function open(browser, o){
 const ev = (page, fn, arg) => page.evaluate(fn, arg);
 const until = async (page, fn, arg, ms=8000)=>{ const t0=Date.now(); for(;;){ let v=false; try{ v=await page.evaluate(fn, arg); }catch(e){} if(v) return true; if(Date.now()-t0>ms) return false; await sleep(80); } };
 const calm = page => until(page, ()=>!app.classList.contains('navigating') && !HELD.size && !document.querySelector('.row.leaving, .flip, .enter') && !touchDrag);
-// The list as the eye reads it: each group title with the ids of the rows under it, until the next title ("Lo primero" and Ahora left out)
+// The list as the eye reads it: each group title with the ids of the rows under it, until the next title (Ahora left out)
 const groups = (page, root) => ev(page, root=>{ const out=[]; let cur=null;
-  document.querySelectorAll(root+' .group-title, '+root+' .group').forEach(e=>{ if(e.closest('.first,.ahora,.summary')) return;
+  document.querySelectorAll(root+' .group-title, '+root+' .group').forEach(e=>{ if(e.closest('.first,.ahora')) return;
     if(e.classList.contains('group-title')){ const gl=e.querySelector('.gl'); cur={t:[...(gl||e).childNodes].filter(n=>n.nodeType===3).map(n=>n.textContent).join('').trim(), n:(e.querySelector('.gn')||{}).textContent||'', x:(e.querySelector('.gx')||{}).textContent||'', ids:[]}; out.push(cur); }
     else { const ids=[...e.querySelectorAll('.row')].map(r=>r.dataset.id); if(!cur){ cur={t:'', ids:[]}; out.push(cur); } cur.ids.push(...ids); } });
   return out; }, root);
 const rowMeta = (page, root, id) => ev(page, ([root,id])=>{ const r=document.querySelector(root+' .row[data-id="'+id+'"]'); if(!r) return null;
   return UI.wide ? {date:r.querySelector('.rc-date').textContent, tag:(r.querySelector('.wtag')||{}).textContent||'', half:r.querySelector('.check').classList.contains('waiting')}
     : {meta:(r.querySelector('.row-meta')||{}).textContent||'', half:r.querySelector('.check').classList.contains('waiting'), swipe:(r.querySelector('.row-bg.right button')||{}).textContent||''}; }, [root,id]);
-const dupIds = (page, root) => ev(page, root=>{ const ids=[...document.querySelectorAll(root+' .row[data-id]')].filter(r=>!r.closest('.first,.ahora,.summary')).map(r=>r.dataset.id); return ids.filter((x,i)=>ids.indexOf(x)!==i); }, root);
+const dupIds = (page, root) => ev(page, root=>{ const ids=[...document.querySelectorAll(root+' .row[data-id]')].filter(r=>!r.closest('.first,.ahora')).map(r=>r.dataset.id); return ids.filter((x,i)=>ids.indexOf(x)!==i); }, root);
 const L = '.screen.root .scroll';
 
 /* ======================= 1. iPhone ======================= */
@@ -65,8 +65,8 @@ async function iphone(browser, h, theme){
     && g[3].t==='Por confirmar más adelante' && g[3].n==='2' && g[3].x==='Mostrar las que esperan' && !g[3].ids.length, g);
   x = {w1:await rowMeta(page, L, 'w1'), w4:await rowMeta(page, L, 'w4')};
   check(tag+'_review_rows', x.w1.meta==='FLCEsperando a Ramiro' && x.w4.meta==='OCAEntrega hoyEsperando a Legal' && !/Revisar/.test(x.w4.meta) && x.w1.half && x.w1.swipe==='Pendiente', x);
-  x = await ev(page, ()=>({nums:[...document.querySelectorAll('.screen.root .summary .num b')].map(b=>b.textContent), hoy:pendingFor('hoy').map(x=>x.id).sort().join()}));
-  check(tag+'_para_hoy', x.nums[0]==='4' && x.hoy==='c1,n1,w1,w4', x);
+  x = await ev(page, ()=>({summary:!!document.querySelector('.screen.root .summary'), seg:(document.querySelector('.screen.root .seg [data-filter=hoy] .n')||{}).textContent, hoy:pendingFor('hoy').map(x=>x.id).sort().join()}));
+  check(tag+'_para_hoy', !x.summary && x.seg==='4' && x.hoy==='c1,n1,w1,w4', x); // decision 52: the segment counts them, no summary figure
   if(h===0 && theme!=='dark') await shot(page, 'm-hoy-0010');
   // Unfold: only the two waiting tasks not in Hoy, each with its review day
   await page.tap(L+' .wblock [data-act=toggleWaiting]'); await calm(page);
@@ -83,10 +83,7 @@ async function iphone(browser, h, theme){
   check(tag+'_by_project', g[0].t==='Revisar hoy' && g[0].ids.join()==='w1,w4' && g[1].t==='FLC' && g[1].ids.join()===['n1','c1'].filter(i=>g[1].ids.includes(i)).join() && g[1].ids.length===2 && !g.slice(1).some(o=>o.t!=='Por confirmar más adelante'&&(o.ids.includes('w1')||o.ids.includes('w4'))) && !(await dupIds(page, L)).length, g);
   if(!theme) await shot(page, 'm-hoy-by-project');
   await ev(page, ()=>{ DB.settings.hoyGroup='date'; save(); render(); }); await calm(page);
-  // The summary filter high: only n1, no Revisar hoy group
-  await ev(page, ()=>{ UI.sumFilter='high'; render(); }); await calm(page); g = await groups(page, L);
-  check(tag+'_sum_high', !g.some(o=>o.t==='Revisar hoy') && g[0].ids.join()==='n1', g);
-  await ev(page, ()=>{ UI.sumFilter=null; UI.waitOpen=false; render(); }); await calm(page);
+  await ev(page, ()=>{ UI.waitOpen=false; render(); }); await calm(page); // decision 52: no summary filter left to try
   // Todas: no waiting task in the day groups; the foot block has them all, those of today first, with Revisar hoy or their day
   await page.tap('.screen.root [data-filter=todas]'); await calm(page);
   g = await groups(page, L); const fb=g.find(o=>o.t==='Por confirmar');

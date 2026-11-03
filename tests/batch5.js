@@ -11,10 +11,10 @@ const srv = http.createServer((req,res)=>{ let p = decodeURIComponent(req.url.sp
   const page = await ctx.newPage(); await page.addInitScript(()=>{ if(!localStorage.getItem('tareas-v1')) localStorage.setItem('tareas-v1', JSON.stringify({spaces:[{id:'trabajo',name:'Trabajo',order:0},{id:'personal',name:'Personal',order:1}],projects:[],tasks:[],voiceNotes:[],settings:{tipsSeen:true}})); }); const errors=[]; page.on('pageerror', e=>errors.push(e.message)); page.on('console', m=>{ if(m.type()==='error') errors.push(m.text()); });
   await page.goto('http://localhost:8781/'); await page.waitForTimeout(400); const r={}; const T='.screen.root[data-root=tareas] ';
   r.hapSwitch = await page.$eval('#hap', e=>e.getAttribute('switch')!==null);
-  r.summaryFirst = await page.evaluate(()=>UI.summaryFirst+' '+(DB.settings.summaryDay===todayStr()));
+  r.rolledToday = await page.evaluate(()=>DB.settings.summaryDay===todayStr()); if(!r.rolledToday) errors.push('day marker not set'); // the day this device last rolled over
   await page.evaluate(()=>{ const p=addProject('FLC','#FF9500'); addTask({title:'Con enlace',date:addDays(todayStr(),3),projectId:p.id,notes:'Reunión en https://teams.microsoft.com/l/meetup-join/abc y llamar al +34 600 123 456'}); addTask({title:'Hoy simple',date:todayStr()}); for(let i=0;i<22;i++) addTask({title:'T'+i,date:todayStr()}); render(); });
   await page.waitForTimeout(200);
-  r.summaryOpenFirstTime = !(await page.$eval(T+'.summary', e=>e.classList.contains('collapsed')));
+  r.noSummary = await page.evaluate(T=>!document.querySelector(T+'.summary'), T); if(!r.noSummary) errors.push('day summary still drawn'); // decision 52
   await page.click(T+'[data-filter=todas]'); await page.waitForTimeout(200);
   r.weekday = await page.$eval(T+'.row[data-id] .row-meta', e=>e.textContent);
   r.indicator = await page.$eval(T+'.row[data-id] .row-content > .inds svg', e=>!!e); // R3 moved the indicators out of the meta line, to the right

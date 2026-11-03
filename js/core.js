@@ -197,7 +197,7 @@ const KEY = 'tareas-v1';
 let DB = null;
 function blank(){
   const t=new Date().toISOString();
-  return { spaces:[{id:'trabajo',name:'Trabajo',order:0,created:t},{id:'personal',name:'Personal',order:1,created:t}], projects:[], tasks:[], voiceNotes:[], attachments:[], subtasks:[], projectNotes:[], settings:{activeSpace:'trabajo', summaryState:'auto', filter:'hoy', doneOpen:false, theme:'auto', tipsSeen:false, shakeUndo:false, allGroup:'date', hoyGroup:'date'} };
+  return { spaces:[{id:'trabajo',name:'Trabajo',order:0,created:t},{id:'personal',name:'Personal',order:1,created:t}], projects:[], tasks:[], voiceNotes:[], attachments:[], subtasks:[], projectNotes:[], settings:{activeSpace:'trabajo', filter:'hoy', doneOpen:false, theme:'auto', tipsSeen:false, shakeUndo:false, allGroup:'date', hoyGroup:'date'} };
 }
 let lastRaw = null; // the stored text this window last read or wrote; another window may have changed it since
 function load(){
@@ -214,9 +214,8 @@ function load(){
   if(!Array.isArray(d.spaces) || !d.spaces.length){ d.spaces=b.spaces; log('warn','Datos guardados sin espacios: se crean Trabajo y Personal'); }
   lists.forEach(k=>{ if(!Array.isArray(d[k])) d[k]=b[k]; });
   const s=(d.settings&&typeof d.settings==='object')?d.settings:{};
-  // Before v0.7 the summary kept a boolean summaryCollapsed; carry it over to summaryState
-  if(s.summaryState===undefined && 'summaryCollapsed' in s) s.summaryState=s.summaryCollapsed?'closed':'auto';
-  delete s.summaryCollapsed;
+  // Decision 52: the day summary is gone; its fold settings (summaryState, and summaryCollapsed before v0.7) are dropped
+  delete s.summaryState; delete s.summaryCollapsed;
   return Object.assign(b, d, {settings:Object.assign(b.settings, s)});
 }
 let saveFailed = false; // the last save did not reach localStorage
@@ -278,7 +277,7 @@ function orderTasks(list){
 function queryMatcher(query){ const q=norm(query); const vn=new Set(DB.voiceNotes.filter(v=>norm(v.text).includes(q)).map(v=>v.taskId)), sv=new Set(DB.subtasks.filter(s=>s&&norm(s.title).includes(q)).map(s=>s.taskId)); // decision 46: the steps' titles too
   return x => norm(x.title).includes(q) || norm(x.notes).includes(q) || (x.waitingFor && norm(x.waitingFor).includes(q)) || (x.projectId && norm((proj(x.projectId)||{}).name).includes(q)) || vn.has(x.id) || sv.has(x.id); }
 function matchesQuery(x, query){ return queryMatcher(query)(x); }
-// R18: while one screen is drawn (drawing) each pending list is worked out once: the summary, the counts and the list ask for the same ones,
+// R18: while one screen is drawn (drawing) each pending list is worked out once: the counts, the list and the close of the day ask for the same ones,
 // and nothing changes the data in between. Callers only read the lists
 let PF=null;
 function drawing(fn){ if(PF) return fn(); PF=new Map(); try{ return fn(); } finally{ PF=null; } }
@@ -320,7 +319,7 @@ function doneList(projectId){
 
 /* ---------- UI state ---------- */
 const CAL_VIEWS=['day','week','month'], H0=7*60, H1=21*60, SLOT=30, SH=22; // R12, R19, R20: the calendar views; the hours grid's first and last minute, its slot and the slot's height in px
-const UI = { tab:'tareas', query:'', stack:[], scroll:{}, sumFilter:null, summaryFirst:false, searchDone:false, select:null, projFilter:null, wide:false, deskView:'hoy', deskDetail:null, weekStart:null, calDay:null, calMonth:null, miniYM:null, addDraft:'', addPaste:null, convertedNotes:{}, deskScroll:{}, deskKey:null,
+const UI = { tab:'tareas', query:'', stack:[], scroll:{}, searchDone:false, select:null, projFilter:null, wide:false, deskView:'hoy', deskDetail:null, weekStart:null, calDay:null, calMonth:null, miniYM:null, addDraft:'', addPaste:null, convertedNotes:{}, deskScroll:{}, deskKey:null,
   dsel:{cur:null, ids:new Set(), anchor:null, mode:false, edit:null, idx:0, order:[], key:null, follow:false} }; // R15, R16: the desktop selection (see deskOrder)
 let deskRedraw=false; // while renderDesktop replaces the markup: a field it takes away is not a field the user left (R15)
 const MODK=/Mac|iPhone|iPad/.test(navigator.platform||navigator.userAgent||'')?'Comando':'Control'; // the key a Mac calls Comando
@@ -518,7 +517,7 @@ const undoDay = o => updTask(o.id, {date:o.date, carried:o.carried, reminder:o.r
 // It leaves 'modified' alone: every device repeats it, so it must not beat a real edit in an import ('newer wins').
 // Decision 39: Ahora empties with the day; a task put there before today goes back to its usual place (focus cleared, modified untouched)
 // Decision 38: a carried task of a series stays one task: no copies for the days it missed
-function rollOver(){ const t=todayStr(); let n=0, f=0; if(DB.settings.summaryDay!==t){ DB.settings.summaryDay=t; UI.summaryFirst=true; save(); } DB.tasks.forEach(x=>{ if(x.status==='pending'&&x.date&&x.date<t){ Object.assign(x, dayPatch(x, t, {carried:true})); n++; } if(x.focus&&localDay(x.focus)<t){ x.focus=null; f++; } });
+function rollOver(){ const t=todayStr(); let n=0, f=0; if(DB.settings.summaryDay!==t){ DB.settings.summaryDay=t; save(); } /* the day this device last rolled over (checkDay); the name is older than decision 52 */ DB.tasks.forEach(x=>{ if(x.status==='pending'&&x.date&&x.date<t){ Object.assign(x, dayPatch(x, t, {carried:true})); n++; } if(x.focus&&localDay(x.focus)<t){ x.focus=null; f++; } });
   if(f) log('info','Ahora vaciada con el cambio de día', {n:f}); const dd=dedupeSeries(DB); if(n||f||dd) save(); return n; } // decision 38: duplicates of a series, at the start too
 /* The data side of completing or reopening, with no feedback. Completing takes the task out of Ahora (decision 39) and, in a series,
    creates the next one (decision 38), which it returns; reopening takes that next one back */

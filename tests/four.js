@@ -20,7 +20,7 @@ const srv = http.createServer((req,res)=>{ let p = decodeURIComponent(req.url.sp
   await page.click(T+'.pchips [data-pf=none]'); await page.waitForTimeout(200); r.unfiltered = await page.$$eval(T+'.group .row', t=>t.length);
   // 2. Close the day (force the clock past 18:00)
   await page.evaluate(()=>{ const RD=Date; const fixed=new RD(); fixed.setHours(19,0,0,0); window.Date=class extends RD{ constructor(...a){ super(...(a.length?a:[fixed.getTime()])); } static now(){ return fixed.getTime(); } }; render(); }); await page.waitForTimeout(200);
-  r.closeDayBtn = await page.$eval(T+'.closeday', e=>e.textContent).catch(()=>null);
+  r.closeDayBtn = await page.$eval(T+'.closecell', e=>e.textContent).catch(()=>null); if(!r.closeDayBtn) errors.push('no Cerrar el día cell at 19:00'); // decision 52: the cell at the end of Hoy
   // Updated by batch C (R8): Cerrar el día opens a sheet with the day's balance and its actions as cells
   await page.click(T+'[data-act=closeDay]'); await page.waitForTimeout(350); r.closeDayOpts = await page.$$eval('#sheet [data-cd]', b=>b.map(x=>x.textContent.trim()));
   await page.click('#sheet [data-cd=rest]'); await page.waitForTimeout(500);

@@ -4,7 +4,7 @@
    listeners run at load; the start itself (first screen, timers, sync, service worker) is in boot.js, the last file. */
 // The start, in the order it had at the end of the single script: the first screen and what follows it need every other file
 (function(){ let st='?'; try{ st=(navigator.standalone===true||matchMedia('(display-mode: standalone)').matches)?'instalada':'navegador'; }catch(e){} log('info','Inicio v'+APP_VERSION+' ('+st+')', {spaces:DB.spaces.length, projects:DB.projects.length, tasks:DB.tasks.length}); })();
-DB.settings.filter='hoy'; UI.sumFilter=null; // the app always opens on Hoy; the filter is kept only while it runs
+DB.settings.filter='hoy'; // the app always opens on Hoy; the filter is kept only while it runs
 // Voice notes saved without a task (an old desktop pane bug) never show anywhere: drop them
 { const n=DB.voiceNotes.length; DB.voiceNotes=DB.voiceNotes.filter(v=>v.taskId&&task(v.taskId)); if(DB.voiceNotes.length!==n){ save(); log('info','Notas de voz sin tarea eliminadas: '+(n-DB.voiceNotes.length)); } }
 if(foldVoiceNotes(DB)) save(); // decision 49: dictated voice notes go into their task's Notas, before the first screen

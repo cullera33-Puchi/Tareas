@@ -92,7 +92,6 @@ function reviewEnd(st, asSheet){ const T=st.tally, decided=Object.keys(T).some(k
     '<div class="hint cdfoot">'+tomorrowLine()+'</div><div class="sheet-actions"><button class="btn" data-x="undo">Deshacer</button><button class="btn primary" data-x="ok">Listo</button></div>', s=>{
     s.onclick=e=>{ const b=e.target.closest('[data-x]'); if(!b) return; closeSheet(); if(b.dataset.x==='undo'){ undo(); renderAnimated(); toast(st.kind==='close'?'Cierre deshecho':'Repaso deshecho'); } }; }); }
 /* R13: the view options, from the three dots of the Tareas bar (and of a project) on the iPhone and of the column head on the desktop */
-function toggleSummary(){ const fold=!summaryCollapsed(pendingFor('hoy').length); DB.settings.summaryState = fold?'closed':'open'; if(fold) UI.sumFilter=null; UI.summaryFirst=false; save(); render(); } // a folded summary hides its figures, so their filter goes too
 function setGrouping(key, g){ if(DB.settings[key]===g) return; DB.settings[key]=g; save(); haptic(4); renderAnimated(); }
 function spaceMenu(src){ const pickSpace=s=>{ DB.settings.activeSpace=s.id; save(); resetListState();
     if(UI.wide){ UI.deskDetail=null; if(UI.deskView.startsWith('project:')&&UI.deskView!=='project:none') UI.deskView=DB.settings.filter||'hoy'; } // the other space's project and task never stay on screen
@@ -104,8 +103,7 @@ function viewMenu(src){ const top=UI.stack[UI.stack.length-1]; const inProject=U
   // R10 and R17: an anchored menu, the grouping as a checked pair. On the desktop Seleccionar tareas starts its own selection (R16)
   popMenu({anchor:src, align:UI.wide?'right':undefined, groups:[
     [{label:'Seleccionar tareas', icon:MI.select, fn:()=>UI.wide?startDeskSelect():startSelect(null)}].concat([{label:DB.settings.doneOpen?'Ocultar completadas':'Mostrar completadas', icon:DB.settings.doneOpen?MI.eyeOff:MI.eye, fn:()=>{ DB.settings.doneOpen=!DB.settings.doneOpen; save(); render(); }}]),
-    f==='hoy'||f==='todas'?[{label:'Agrupar por fecha', icon:MI.cal, on:g==='date', fn:()=>setGrouping(k,'date')}, {label:'Agrupar por proyecto', icon:MI.folder, on:g==='project', fn:()=>setGrouping(k,'project')}]:[],
-    f==='hoy'?[{label:summaryCollapsed(pendingFor('hoy').length)?'Mostrar resumen del día':'Plegar resumen del día', icon:MI.summary, fn:toggleSummary}]:[] ]}); }
+    f==='hoy'||f==='todas'?[{label:'Agrupar por fecha', icon:MI.cal, on:g==='date', fn:()=>setGrouping(k,'date')}, {label:'Agrupar por proyecto', icon:MI.folder, on:g==='project', fn:()=>setGrouping(k,'project')}]:[] ]}); }
 /* R14: a day header of Todas. A long press (iPhone) or a right click (desktop, at the pointer: pt) offers to move its tasks to another day */
 function dayHeadMenu(head, pt){ const sec=head.closest('.gsec'), day=head.dataset.dayHead; if(!sec||UI.select) return;
   const xs=[...sec.querySelectorAll('.group [data-id]')].map(r=>task(r.dataset.id)).filter(x=>x&&x.status==='pending'); if(!xs.length) return;

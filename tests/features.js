@@ -31,15 +31,11 @@ const srv = http.createServer((req,res)=>{ let p = decodeURIComponent(req.url.sp
   r.groups = await page.$$eval(T+'.group-title', g=>g.map(x=>x.textContent));
   r.segCounts = await page.$$eval(T+'.seg .n', n=>n.map(x=>x.textContent));
   await page.screenshot({path:'18-todas-grouped.png'});
-  // Summary filter
+  // Decision 52: no summary figures to filter Hoy; every task of today is listed
   await page.click(T+'[data-filter=hoy]'); await page.waitForTimeout(200);
   await page.evaluate(()=>{ addTask({title:'Urgente hoy',date:todayStr(),priority:'high'}); addTask({title:'Normal hoy',date:todayStr()}); render(); }); await page.waitForTimeout(200);
-  await page.click(T+'[data-sum=high]'); await page.waitForTimeout(200);
-  r.sumHigh = await page.$$eval(T+'.group .row .row-title', t=>t.map(x=>x.textContent));
-  await page.click(T+'[data-sum=carried]'); await page.waitForTimeout(200);
-  r.sumCarriedEmpty = await page.$eval(T+'.empty b', e=>e.textContent).catch(()=>null);
-  await page.click(T+'[data-sum=all]'); await page.waitForTimeout(200);
-  r.sumAll = await page.$$eval(T+'.group .row', x=>x.length);
+  r.noFigures = await page.evaluate(T=>!document.querySelector(T+'[data-sum],'+T+'.summary'), T); if(!r.noFigures) errors.push('summary figures still drawn');
+  r.hoyAll = await page.$$eval(T+'.group .row .row-title', t=>t.map(x=>x.textContent)); if(!(r.hoyAll.includes('Urgente hoy')&&r.hoyAll.includes('Normal hoy'))) errors.push('Hoy rows: '+r.hoyAll);
   // Priority marks and two-line title
   r.priMark = await page.$eval(T+'.pri.high', e=>e.textContent);
   // Search with cancel and count

@@ -93,15 +93,15 @@ async function timeIt(page, label, setup, act, fullAct){
   check('M_initial', await page.evaluate(()=>sameRoot()) === true, await page.evaluate(()=>sameRoot()));
   check('M_rowsTagged', await page.evaluate(()=>[...document.querySelectorAll('.screen.root:not(.hidden-tab) .row')].every(x=>typeof x._h==='string')));
 
-  // Priority: one row (and "Lo primero" when it becomes high) is drawn again, the rest stay; the summary counts follow
+  // Priority: one row is drawn again, the rest stay (decision 52: no summary or "Lo primero" to follow); the segment is kept
   let id = await pick(page, 4);
-  await page.evaluate(()=>mark('.screen.root .row, .screen.root .summary, .screen.root .seg, .screen.root [data-role=search]'));
+  await page.evaluate(()=>mark('.screen.root .row, .screen.root .seg, .screen.root [data-role=search]'));
   await page.evaluate(id=>setPriority(id, task(id).priority==='high'?'none':'high'), id); await settle(page);
   r.priFresh = await page.evaluate(()=>fresh(rowSel));
   check('M_priority_same', await page.evaluate(()=>sameRoot()) === true, await page.evaluate(()=>sameRoot()));
-  check('M_priority_fewRows', r.priFresh.length>=1 && r.priFresh.length<=2 && r.priFresh.every(x=>x===id), r.priFresh);
-  r.priSum = await page.evaluate(()=>({shown:+document.querySelector('.screen.root:not(.hidden-tab) .summary [data-sum=high] b').textContent, real:pendingFor('hoy').filter(x=>x.priority==='high').length, kept:!!document.querySelector('.screen.root:not(.hidden-tab) .summary').__m}));
-  check('M_priority_counter', r.priSum.shown===r.priSum.real && r.priSum.kept, r.priSum);
+  check('M_priority_fewRows', r.priFresh.length===1 && r.priFresh.every(x=>x===id), r.priFresh);
+  r.priSum = await page.evaluate(()=>({summary:!!document.querySelector('.screen.root:not(.hidden-tab) .summary'), shown:+document.querySelector('.screen.root:not(.hidden-tab) .seg [data-filter=hoy] .n').textContent, real:pendingFor('hoy').length, kept:!!document.querySelector('.screen.root:not(.hidden-tab) .seg').__m}));
+  check('M_priority_counter', !r.priSum.summary && r.priSum.shown===r.priSum.real && r.priSum.kept, r.priSum);
   await page.click('#toastBtn'); await settle(page);
   check('M_priority_undo', await page.evaluate(()=>sameRoot()) === true, await page.evaluate(()=>sameRoot()));
 
@@ -136,12 +136,11 @@ async function timeIt(page, label, setup, act, fullAct){
   await page.evaluate(id=>{ const row=document.querySelector('.screen.root:not(.hidden-tab) .scroll .group .row[data-id="'+id+'"]'); row.classList.add('swiping','dir-l'); row.dataset.open='1'; row.querySelector('.row-content').style.transform='translate3d(-160px,0,0)'; render(); }, id);
   check('M_dirtyRowRedrawn', await page.evaluate(()=>sameRoot()) === true, await page.evaluate(()=>sameRoot()));
 
-  // Views and filters: Todas by date, by project, the summary figures, a project chip, completed shown, the summary folded
+  // Views and filters: Todas by date, by project, a project chip, completed shown
   for(const [name, src] of [['todas', "DB.settings.filter='todas'; render()"], ['todasProject', "DB.settings.allGroup='project'; render()"], ['todasDate', "DB.settings.allGroup='date'; render()"],
     ['hoy', "DB.settings.filter='hoy'; render()"], ['hoyProject', "DB.settings.hoyGroup='project'; render()"], ['hoyPlain', "DB.settings.hoyGroup=null; render()"],
-    ['sumHigh', "UI.sumFilter='high'; render()"], ['sumCarried', "UI.sumFilter='carried'; render()"], ['sumOff', "UI.sumFilter=null; render()"],
     ['chip', "UI.projFilter=activeProjects()[1].id; render()"], ['chipNone', "UI.projFilter='none'; render()"], ['chipOff', "UI.projFilter=null; render()"],
-    ['doneOpen', "DB.settings.doneOpen=true; render()"], ['doneClosed', "DB.settings.doneOpen=false; render()"], ['fold', "toggleSummary()"], ['unfold', "toggleSummary()"],
+    ['doneOpen', "DB.settings.doneOpen=true; render()"], ['doneClosed', "DB.settings.doneOpen=false; render()"],
     ['select', "startSelect(null)"], ['selectEnd', "endSelect()"]]){
     try{ await page.evaluate(new Function(src)); }catch(e){ check('M_view_'+name+'_ran', false, e.message); continue; }
     await settle(page); const s = await page.evaluate(()=>sameRoot()); check('M_view_'+name, s===true, s); }
@@ -164,17 +163,17 @@ async function timeIt(page, label, setup, act, fullAct){
   r.s3 = await page.evaluate(()=>({rows:document.querySelectorAll('.screen.root:not(.hidden-tab) .scroll .row[data-id]').length, titles:[...document.querySelectorAll('.screen.root:not(.hidden-tab) .scroll .row-title')].every(t=>/comité/.test(t.textContent))}));
   check('M_search_accents', r.s3.rows>0 && r.s3.titles, r.s3);
   await page.click('.screen.root:not(.hidden-tab) .searchbar .cancel'); await page.waitForTimeout(300);
-  r.s4 = await page.evaluate(()=>{ const s=document.querySelector('.screen.root:not(.hidden-tab) [data-role=search]'); return {q:UI.query, value:s.value, focus:document.activeElement===s, summary:!!document.querySelector('.screen.root:not(.hidden-tab) .summary'), cancel:!!document.querySelector('.screen.root:not(.hidden-tab) .searchbar .cancel')}; });
-  check('M_search_cancel', r.s4.q==='' && r.s4.value==='' && !r.s4.focus && r.s4.summary && !r.s4.cancel, r.s4);
+  r.s4 = await page.evaluate(()=>{ const s=document.querySelector('.screen.root:not(.hidden-tab) [data-role=search]'); return {q:UI.query, value:s.value, focus:document.activeElement===s, summary:!!document.querySelector('.screen.root:not(.hidden-tab) .summary'), seg:!!document.querySelector('.screen.root:not(.hidden-tab) .seg'), cancel:!!document.querySelector('.screen.root:not(.hidden-tab) .searchbar .cancel')}; });
+  check('M_search_cancel', r.s4.q==='' && r.s4.value==='' && !r.s4.focus && !r.s4.summary && r.s4.seg && !r.s4.cancel, r.s4);
   check('M_search_cancel_same', await page.evaluate(()=>sameRoot()) === true, await page.evaluate(()=>sameRoot()));
 
   // Pushed screens: a detail draws only itself, going back draws nothing when nothing changed
   id = await pick(page, 2);
-  await page.evaluate(()=>mark('.screen.root .row, .screen.root .summary'));
+  await page.evaluate(()=>mark('.screen.root .row, .screen.root .seg'));
   await page.evaluate(id=>openDetail(id), id); await page.waitForTimeout(450);
   await page.evaluate(()=>pop()); await page.waitForTimeout(500);
-  r.nav = await page.evaluate(()=>({fresh:fresh(rowSel).length, summary:!!document.querySelector('.screen.root:not(.hidden-tab) .summary').__m}));
-  check('M_detail_noRootRepaint', r.nav.fresh===0 && r.nav.summary, r.nav);
+  r.nav = await page.evaluate(()=>({fresh:fresh(rowSel).length, seg:!!document.querySelector('.screen.root:not(.hidden-tab) .seg').__m}));
+  check('M_detail_noRootRepaint', r.nav.fresh===0 && r.nav.seg, r.nav);
   // A change in the detail: the list behind follows, with the other rows kept
   await page.evaluate(id=>openDetail(id), id); await page.waitForTimeout(450);
   await page.evaluate(id=>setPriority(id, task(id).priority==='mid'?'none':'mid'), id); await page.waitForTimeout(500);

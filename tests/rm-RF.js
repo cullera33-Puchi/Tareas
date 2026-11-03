@@ -4,9 +4,9 @@ require('./lib/out.js'); // outputs (screenshots, downloads) go to tests/out
 //     the two columns, the write trigger still "newest modified wins" with them, the rules by owner.
 //  2. The rule engine in the page: parse, dates of the series (weeks every 2, months, the k-th and last weekday, 31 and 29 February), words.
 //  3. iPhone, clock at Wednesday 4 November 2026 10:00: Repetir in the detail (anchored menu, Personalizada sheet), an undated task dated by
-//     its rule, completing with the circle (R1 hold), the row menu, Lo primero and in bulk, each with Deshacer taking the next one back,
+//     its rule, completing with the circle (R1 hold), the row menu, the Ahora block and in bulk, each with Deshacer taking the next one back,
 //     "Eliminar solo esta" and "Eliminar la serie" (also in bulk), rollOver with no copies, the row indicator, share text and CSV.
-//     Ahora: from the long-press menu, the block above the summary in order, compact rows, the sixth refused, the star of the detail,
+//     Ahora: from the long-press menu, the block above the search in order, compact rows, the sixth refused, the star of the detail,
 //     completing and deleting take tasks out, a new day empties it, the star in the list rows.
 //  4. Desktop: the inspector's Repetir (Mac menu and popover), the key A, the context menu, drags onto the sidebar entry and onto the block,
 //     the Ahora view with the keys, the three-button alert on Supr, C on a repeating task, the calendar card's icon.
@@ -186,11 +186,12 @@ async function iphone(browser){
   await ev(page, ()=>rowMenu('r1')); await sleep(600); await menuItem(page, 'Completar').tap(); await sleep(700);
   s = await series(page, 'r1'); check('menu_complete', s.length===2 && s.filter(o=>o.status==='pending').length===1, s);
   await page.tap('#toastBtn'); await sleep(500); s = await series(page, 'r1'); check('menu_complete_undo', s.length===1 && s[0].status==='pending', s);
-  // From Lo primero (r1 is today's high priority)
-  await ev(page, ()=>{ DB.settings.summaryState='open'; save(); render(); }); await sleep(300);
-  await page.tap(L+' .summary .first .row[data-id=r1] .check'); await sleep(2300);
+  // From the Ahora block (decision 52: "Lo primero" is gone; Ahora is the other card of repeated rows)
+  await ev(page, ()=>{ toggleFocus('r1'); render(); }); await sleep(300);
+  await page.tap(L+' .ahora .first .row[data-id=r1] .check'); await sleep(2300);
   s = await series(page, 'r1'); check('first_complete', s.length===2 && s.find(o=>o.id==='r1').status==='done', s);
   await page.tap('#toastBtn'); await sleep(500); s = await series(page, 'r1'); check('first_complete_undo', s.length===1, s);
+  await ev(page, ()=>{ if(task('r1').focus){ task('r1').focus=null; save(); } render(); }); await sleep(300); // Ahora starts empty below
   // In bulk: two series, two next tasks, one Deshacer
   await ev(page, ()=>{ startSelect(null); UI.select.ids.add('r1'); UI.select.ids.add('r3'); bulkComplete(); }); await sleep(500);
   let b = await ev(page, ()=>({r1:DB.tasks.filter(x=>repSeries(x.repeat)===repSeries(task('r1').repeat)).length, r3:DB.tasks.filter(x=>repSeries(x.repeat)==='ser3').map(x=>x.status+':'+x.date).sort(), t:document.querySelector('#toastText').textContent}));
@@ -295,7 +296,7 @@ async function iphone(browser){
   await ev(page, ()=>rowMenu('a1')); await sleep(600);
   const mi = await ev(page, ()=>[...document.querySelectorAll('#pmenu .pm-it .pm-l')].map(e=>e.textContent));
   await menuItem(page, 'Ahora').tap(); await sleep(600);
-  x = await ev(page, L=>{ const sc=document.querySelector(L+' .scroll'), ah=sc.querySelector('.ahora'), su=sc.querySelector('.summary');
+  x = await ev(page, L=>{ const sc=document.querySelector(L+' .scroll'), ah=sc.querySelector('.ahora'), su=sc.querySelector('.searchbar');
     return {focus:!!task('a1').focus, block:!!ah, before:!!(ah&&su&&(ah.compareDocumentPosition(su)&Node.DOCUMENT_POSITION_FOLLOWING)), n:ah&&ah.querySelector('.gn').textContent, t:document.querySelector('#toastText').textContent}; }, L);
   check('ahora_from_menu', mi.includes('Ahora') && x.focus && x.block && x.before && x.n==='1' && x.t==='Añadida a Ahora', {mi, x});
   for(const id of ['a2','a3','a4','a5']){ await ev(page, id=>toggleFocus(id), id); await sleep(30); }

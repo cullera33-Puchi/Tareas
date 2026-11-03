@@ -18,7 +18,7 @@ function bindCommon(scr){
   bindBackSwipe(scr);
 }
 /* Search. The list follows the typing a moment after the last key, and the search field itself is never rebuilt:
-   only what is around it changes (summary, filters, Cancelar and the list), so the keyboard stays open on the iPhone
+   only what is around it changes (Ahora, filters, Cancelar and the list), so the keyboard stays open on the iPhone
    and the caret, an accent typed with a dead key or IME text being composed are never cut off. */
 let searchT=null;
 function bindSearch(s, around){
@@ -34,7 +34,7 @@ function bindSearch(s, around){
   s.addEventListener('compositionend', typed); // Chrome sends the last input of a composition before this event, still marked as composing
 }
 // iPhone: the Tareas screen is merged around the live field (R18): rows that still match stay where they are, the others go,
-// and the summary, filters, Cancelar and the count follow; the field is never touched
+// and Ahora, filters, Cancelar and the count follow; the field is never touched
 function searchAround(s){ return drawing(()=>searchAroundNow(s)); }
 function searchAroundNow(s){ const bar=s.closest('.searchbar'), sc=bar&&bar.parentElement, scr=sc&&sc.closest('.screen.root'); if(!scr||!sc.classList.contains('scroll')) return false;
   const html=lazyRows(viewTareas(), sc.scrollTop, innerHeight), stash=rowStash; if(!morphInto(scr, html, {keep:s})||!s.isConnected||!sc.isConnected) return false; rowStash=stash;
@@ -46,8 +46,7 @@ function onClick(e){
   const scr=e.currentTarget;
   const entry=UI.wide?null:UI.stack.find(x=>x.el===scr); if(!UI.wide&&scr.classList.contains('pushed-screen')&&!entry) return; // a popped screen still sliding out takes no taps
   if(noteClick(e)) return; // decision 47: the segment Tareas and Notas, the notes' rows, boxes and buttons
-  const f=e.target.closest('[data-filter]'); if(f){ DB.settings.filter=f.dataset.filter; UI.sumFilter=null; if(UI.wide) UI.deskView=f.dataset.filter; save(); render(); return; }
-  const sm=e.target.closest('[data-sum]'); if(sm){ const k=sm.dataset.sum; UI.sumFilter=(k==='all'||UI.sumFilter===k)?null:k; haptic(6); render(); return; }
+  const f=e.target.closest('[data-filter]'); if(f){ DB.settings.filter=f.dataset.filter; if(UI.wide) UI.deskView=f.dataset.filter; save(); render(); return; }
   const th=e.target.closest('button[data-theme]'); if(th){ DB.settings.theme=th.dataset.theme; save(); applyTheme(); render(); return; } // only the Tema buttons: <html> carries data-theme too
   const op=e.target.closest('[data-open-project]'); if(op){ if(UI.wide){ setDeskView('project:'+op.dataset.openProject); } else push('project', op.dataset.openProject); return; }
   const dv=e.target.closest('[data-view]'); if(dv){ setDeskView(dv.dataset.view); return; }
@@ -76,7 +75,7 @@ function onClick(e){
   if(UI.select){ const row=e.target.closest('.row'); if(row && !row.closest('.first')){ toggleSelected(row); return; } }
   if(UI.wide){ const row=e.target.closest('.main .mbody .row[data-id]'); if(row && deskRowClick(e, row)) return; } // R16: Comando, Mayúsculas or the selection mode
   const act=e.target.closest('[data-act]'); if(!act) { const row=e.target.closest('.row');
-    if(row && row.closest('.first')){ if(UI.wide){ if(HELD.has(row.dataset.id)) toggleHold(row.dataset.id); else openDetail(row.dataset.id); } return; } // on the iPhone bindCommon opens "Lo primero" rows; the desktop has only this handler
+    if(row && row.closest('.first')){ if(UI.wide){ if(HELD.has(row.dataset.id)) toggleHold(row.dataset.id); else openDetail(row.dataset.id); } return; } // on the iPhone bindCommon opens Ahora rows; the desktop has only this handler
     if(row) { if(row.dataset.open==='1'){ closeRow(row); return; } if(HELD.has(row.dataset.id)){ toggleHold(row.dataset.id); return; } openDetail(row.dataset.id); } return; } // a tap on a marked row unmarks it
   const row=act.closest('.row'); const a=act.dataset.act;
   const detailId = UI.wide ? detailTaskId() : (entry&&entry.kind==='detail'?entry.id:null); // the task of the screen that was tapped, not of the stack top
@@ -100,7 +99,6 @@ function onClick(e){
     case 'bulkPriority': bulkPriorityMenu(act); break;
     case 'bulkSpace': bulkSpaceMenu(act); break;
     case 'searchDone': UI.searchDone=true; render(); break;
-    case 'toggleSummary': toggleSummary(); break;
     case 'allDayMore': UI.allDayOpen=act.dataset.dayMore||null; render(); break; // decision 28d, the Día view
     case 'toggleDone': DB.settings.doneOpen=!DB.settings.doneOpen; save(); render(); break;
     case 'add': if(act.dataset.project!==undefined) addSheet(act.dataset.project||null); else addFromList(); break; // a project screen keeps its project

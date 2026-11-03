@@ -58,18 +58,9 @@ const rowSel = id => '#desk .main .group .row[data-id="'+id+'"]';
   check('R11_translucentSide', /rgba\(\d+, \d+, \d+, 0\.\d+\)/.test(r.mat.side), r.mat.side);
   await page.screenshot({path:OUT+'/e-light-hoy.png'});
 
-  // The day summary is one line; its figures filter; "Lo primero" folds
-  r.sum = await page.evaluate(()=>{ const h=document.querySelector('#desk .summary-head').getBoundingClientRect(); return {h:Math.round(h.height), nums:[...document.querySelectorAll('#desk .dsum .num')].map(n=>n.textContent), fold:!!document.querySelector('#desk .sumfold')}; });
-  check('R11_summaryLine', r.sum.h<=30 && r.sum.nums.length===3 && /para hoy$/.test(r.sum.nums[0]) && r.sum.fold, r.sum);
-  await page.click('#desk .dsum [data-sum=high]'); await page.waitForTimeout(250);
-  r.sumF = await page.evaluate(()=>({f:UI.sumFilter, ok:[...document.querySelectorAll('#desk .main .gsec .row, #desk .main > .mbody .inner > .group .row')].every(x=>task(x.dataset.id).priority==='high'), on:document.querySelector('#desk .dsum [data-sum=high]').classList.contains('on')}));
-  check('R11_figureFilters', r.sumF.f==='high' && r.sumF.ok && r.sumF.on, r.sumF);
-  await page.click('#desk .dsum [data-sum=all]'); await page.waitForTimeout(250);
-  check('R11_figureClears', await page.evaluate(()=>UI.sumFilter===null));
-  const fold0 = await page.evaluate(()=>document.querySelector('#desk .summary').classList.contains('collapsed'));
-  await page.click('#desk .sumfold'); await page.waitForTimeout(250);
-  r.fold = await page.evaluate(()=>({c:document.querySelector('#desk .summary').classList.contains('collapsed'), first:!!document.querySelector('#desk .summary .first') && getComputedStyle(document.querySelector('#desk .summary .summary-body')).display!=='none'}));
-  check('R11_loPrimeroFolds', r.fold.c!==fold0 && r.fold.first===fold0, {fold0, after:r.fold});
+  // Decision 52: no day summary line, no figures and no "Lo primero" above the list
+  r.sum = await page.evaluate(()=>({summary:!!document.querySelector('#desk .summary'), nums:document.querySelectorAll('#desk [data-sum]').length, first:[...document.querySelectorAll('#desk .main .first')].filter(e=>!e.closest('.ahora')).length}));
+  check('R11_noSummaryLine', !r.sum.summary && !r.sum.nums && !r.sum.first, r.sum);
 
   // Project filter: a "Proyecto: Todos" pop-up in the head instead of the chips
   check('R11_noChips', await page.evaluate(()=>!document.querySelector('#desk .pchips') && /Proyecto:\s*Todos/.test(document.querySelector('#desk .pfdrop').textContent)));
@@ -283,8 +274,8 @@ check('R17_reminderPopover', await page.evaluate(()=>!!document.querySelector('#
   /* ---------- The iPhone is unchanged ---------- */
   ({ctx, page} = await open(browser, {viewport:{width:390,height:844}, deviceScaleFactor:2, isMobile:true, hasTouch:true}));
   await page.evaluate(()=>{ const p=addProject('FLC','#FF9500'); addTask({title:'Uno', date:todayStr(), projectId:p.id}); addTask({title:'Dos', date:todayStr()}); render(); }); await page.waitForTimeout(300);
-  r.mob = await page.evaluate(()=>{ const row=document.querySelector('.screen.root[data-root=tareas] .scroll .group .row'); return {wide:UI.wide, cls:document.documentElement.classList.contains('wide'), html:getComputedStyle(document.documentElement).fontSize, h:Math.round(row.getBoundingClientRect().height), meta:!!row.querySelector('.row-meta .tag'), cols:!!row.querySelector('.rc-date'), summary:!!document.querySelector('.screen.root .summary .nums')}; });
-  check('iPhone_unchanged', !r.mob.wide && !r.mob.cls && r.mob.html==='17px' && r.mob.h>=52 && r.mob.meta && !r.mob.cols && r.mob.summary, r.mob);
+  r.mob = await page.evaluate(()=>{ const row=document.querySelector('.screen.root[data-root=tareas] .scroll .group .row'); return {wide:UI.wide, cls:document.documentElement.classList.contains('wide'), html:getComputedStyle(document.documentElement).fontSize, h:Math.round(row.getBoundingClientRect().height), meta:!!row.querySelector('.row-meta .tag'), cols:!!row.querySelector('.rc-date'), summary:!!document.querySelector('.screen.root .summary')}; });
+  check('iPhone_unchanged', !r.mob.wide && !r.mob.cls && r.mob.html==='17px' && r.mob.h>=52 && r.mob.meta && !r.mob.cols && !r.mob.summary, r.mob); // decision 52: no summary card either
   await page.evaluate(()=>rowMenu(DB.tasks[0].id)); await page.waitForTimeout(500);
   r.mobMenu = await page.evaluate(()=>({mac:document.querySelector('#pmenu').classList.contains('mac'), lift:!!document.querySelector('#pmenu .pm-lift'), prio:document.querySelectorAll('#pmenu .pm-prio button').length}));
   check('iPhone_menuUnchanged', !r.mobMenu.mac && r.mobMenu.lift && r.mobMenu.prio===3, r.mobMenu);

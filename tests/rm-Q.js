@@ -155,10 +155,9 @@ async function openRowSwipe(page, id){ await page.evaluate(s=>document.querySele
   check('c_open2', await openRowSwipe(page,'q5'));
   await tapSel(page, rowOf('q6')+' .check'); await page.waitForTimeout(400);
   check('c_check_ignored', await page.evaluate(()=>!HELD.has('q6')&&task('q6').status==='pending'&&!openRow));
-  // Segment, figure, tab, + and the search field
+  // Segment, tab, + and the search field (decision 52: no summary figures to probe)
   const probes = [
     ['c_segment', '.screen.root:not(.hidden-tab) [data-filter=todas]', ()=>DB.settings.filter==='hoy'],
-    ['c_figure', '.screen.root:not(.hidden-tab) [data-sum]', ()=>UI.sumFilter===null],
     ['c_tab', '#tabbar [data-tab=proyectos]', ()=>UI.tab==='tareas'],
     ['c_fab', '.screen.root:not(.hidden-tab) .fab', ()=>!document.querySelector('#sheet').classList.contains('on')],
     ['c_chip', '.screen.root:not(.hidden-tab) .pchips [data-pf]', ()=>UI.projFilter===null],

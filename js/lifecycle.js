@@ -87,7 +87,7 @@ const _render=render; render=function(){ staleView=false; checkDay(); _render();
 // A redraw while something is being typed or picked would close the keyboard or the sheet
 const busyEditing=()=>sheet.classList.contains('on')||asheet.classList.contains('on')||menuOpen()||!!UI.select||/^(INPUT|TEXTAREA)$/.test((document.activeElement||{}).tagName||'');
 // Checked every minute rather than with one timer at midnight, which a computer asleep at that hour would delay
-// A summary line that went stale with the clock is redrawn too, unless something is being typed, picked or swiped
+// Hoy gone stale with the clock (the cell Cerrar el día from 19:00) is redrawn too, unless something is being typed, picked or swiped
 const clockStale=()=>(clockKey()!==renderedClock||staleView) && !busyEditing() && !openRow;
 setInterval(()=>{ if(todayStr()!==renderedDay){ checkDay(); if(!busyEditing()) render(); } else if(!document.hidden && clockStale()) render(); }, 6e4);
 window.addEventListener('focus',()=>{ if((todayStr()!==renderedDay && !busyEditing()) || clockStale()) render(); });
@@ -104,7 +104,7 @@ function returnHome(){
   UI.stack.forEach(s=>{ if(s.kind==='note') noteLeft(s.id); }); // an empty note left open goes, as when its screen is closed
   if(UI.select){ UI.select=null; app.classList.remove('selecting'); } openRow=null; UI.projFilter=null; UI.searchDone=false; // back to Hoy as on a fresh start
   if(UI.wide){ closeSheet(); setDeskView('hoy'); log('info','Vuelta a Hoy tras más de dos horas fuera'); return; } // the desktop returns through its own view; it has no iPhone stack
-  UI.stack.forEach(s=>s.el.remove()); UI.stack=[]; UI.tab='tareas'; UI.query=''; UI.sumFilter=null; DB.settings.filter='hoy'; save(); closeSheet(); render(); const sc=rootScreen('tareas').querySelector('.scroll'); if(sc) sc.scrollTop=0; log('info','Vuelta a Hoy tras más de dos horas fuera'); }
+  UI.stack.forEach(s=>s.el.remove()); UI.stack=[]; UI.tab='tareas'; UI.query=''; DB.settings.filter='hoy'; save(); closeSheet(); render(); const sc=rootScreen('tareas').querySelector('.scroll'); if(sc) sc.scrollTop=0; log('info','Vuelta a Hoy tras más de dos horas fuera'); }
 window.addEventListener('pagehide', ()=>{ flushHeld(true); flushEdits(); });
 document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='hidden'){ hiddenAt=Date.now(); closeMenu(true); flushHeld(true); flushEdits(); return; } reloadIfChanged(); const n=rollOver(); if(n) log('info','Tareas pasadas a hoy: '+n); queueDailyBackup();
   const away=hiddenAt && Date.now()-hiddenAt>2*36e5;

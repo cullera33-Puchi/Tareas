@@ -131,11 +131,11 @@ async function iphone(browser){
   check('todas_has_waiting_due', x.todas.split(',').includes('d6') && !x.todas.split(',').includes('w2') && !x.todas.split(',').includes('d8'), x);
   check('waiting_block_keeps_others', x.wl==='w2', x);
   check('badge_counts_deadline', x.badge===9, x.badge); // the 8 of Hoy and Personal's one
-  // The summary: para hoy 8, aplazadas 1; the Aplazadas group holds only d5
-  x = await ev(page, ()=>{ const nums=[...document.querySelectorAll('.screen.root .summary .num b')].map(b=>b.textContent); const groups={}; let cur=null;
+  // Decision 52: no summary figures; the segment says 8 and the Aplazadas group holds only d5
+  x = await ev(page, ()=>{ const nums=[!!document.querySelector('.screen.root .summary'), (document.querySelector('.screen.root .seg [data-filter=hoy] .n')||{}).textContent]; const groups={}; let cur=null;
     document.querySelectorAll('.screen.root .scroll .group-title, .screen.root .scroll .group').forEach(e=>{ if(e.classList.contains('group-title')) cur=e.textContent.replace(/Repasar.*/,'').trim(); else if(cur) groups[cur]=(groups[cur]||[]).concat([...e.querySelectorAll('.row')].map(r=>r.dataset.id)); });
     return {nums, groups}; });
-  check('summary_counts', x.nums[0]==='8' && x.nums[1]==='1', x.nums);
+  check('hoy_count', x.nums[0]===false && x.nums[1]==='8', x.nums);
   check('hoy_groups', (x.groups.Aplazadas||[]).join()==='d5' && (x.groups.Hoy||[]).length===6 && !(x.groups.Hoy||[]).includes('d5') && (x.groups['Revisar hoy1']||[]).join()==='d6', x.groups); // decision 51: the waiting one due today heads Hoy in Revisar hoy
   // Row texts and colours
   const m1=await meta(page,'d1'), m2=await meta(page,'d2'), m3=await meta(page,'d3'), m4=await meta(page,'d4'), m5=await meta(page,'d5'), m6=await meta(page,'d6');

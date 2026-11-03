@@ -17,7 +17,8 @@ const srv = http.createServer((req,res)=>{ let p = decodeURIComponent(req.url.sp
   await page.reload(); await page.waitForTimeout(500);
   const r={};
   r.tasks = await page.evaluate(()=>DB.tasks.map(x=>({t:x.title,date:x.date===todayStr()?'today':x.date,carried:x.carried})));
-  r.nums = await page.$$eval('.summary .num', ns=>ns.map(n=>n.textContent));
+  r.aplazadas = await page.evaluate(()=>{ const t=[...document.querySelectorAll('.screen.root[data-root=tareas] .group-title')].map(x=>x.textContent); return {titles:t, summary:!!document.querySelector('.summary')}; }); // decision 52: no figures; the carried tasks under Aplazadas
+  if(r.aplazadas.summary || !r.aplazadas.titles.some(x=>/^Aplazadas/.test(x))) errors.push('aplazadas: '+JSON.stringify(r.aplazadas));
   r.labels = await page.$$eval('.screen.root[data-root=tareas] .group .row .row-meta', ms=>ms.map(m=>m.textContent));
   r.redLabels = await page.$$eval('.screen.root[data-root=tareas] .over', o=>o.length);
   // Moving the date by hand clears the carried flag

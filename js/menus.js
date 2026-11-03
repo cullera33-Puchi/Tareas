@@ -29,7 +29,6 @@ const MI = {
   plus:mi('<path d="M12 5v14M5 12h14"/>'),
   eye:mi('<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/>'),
   eyeOff:mi('<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/><path d="M4 4l16 16"/>'),
-  summary:mi('<rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M7 9h10M7 13h6"/>'),
   play:mi('<path d="M8 5.5v13l10.5-6.5z"/>'),
   pencil:mi('<path d="M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4"/>'),
   up:mi('<path d="M12 19V5M6 11l6-6 6 6"/>'),

@@ -50,7 +50,7 @@ const realClock = page => page.evaluate(()=>{ if(window.__RD) window.Date=window
   await page.tap(HOY+' .seg button[data-filter=hoy]'); await page.waitForTimeout(300);
   await page.tap(HOY+' .nav .vopts'); await page.waitForTimeout(350);
   r.menuHoy = await sheetItems(page);
-  check('R13_menuHoy', JSON.stringify(r.menuHoy.slice(0,4))===JSON.stringify(['Seleccionar tareas','Mostrar completadas','Agrupar por fecha  ✓','Agrupar por proyecto']) && /resumen del día/.test(r.menuHoy[4]) && r.menuHoy.length===5, r.menuHoy);
+  check('R13_menuHoy', JSON.stringify(r.menuHoy.slice(0,4))===JSON.stringify(['Seleccionar tareas','Mostrar completadas','Agrupar por fecha  ✓','Agrupar por proyecto']) && r.menuHoy.length===4, r.menuHoy); // decision 52: no Mostrar resumen del día
   // Hoy by project
   await clickItem(page, 'Agrupar por proyecto');
   r.hoyByProj = await page.evaluate(()=>{ const sc=document.querySelector('.screen.root[data-root=tareas] .scroll'); return {settings:[DB.settings.hoyGroup, DB.settings.allGroup],
@@ -80,11 +80,8 @@ const realClock = page => page.evaluate(()=>{ if(window.__RD) window.Date=window
   r.sel = await page.evaluate(()=>({selecting:document.querySelector('#app').classList.contains('selecting'), n:UI.select&&UI.select.ids.size, title:(document.querySelector('#selTitle')||{}).textContent, review:!!document.querySelector('.screen.root[data-root=tareas] [data-act=review]')}));
   check('R13_select', r.sel.selecting && r.sel.n===0 && r.sel.title==='Seleccionar' && !r.sel.review, r.sel);
   await page.tap(HOY+' [data-act=selDone]'); await page.waitForTimeout(300);
-  // Fold the summary from the menu
-  const folded0 = await page.$eval(HOY+' .summary', e=>e.classList.contains('collapsed'));
-  await page.tap(HOY+' .nav .vopts'); await page.waitForTimeout(350); await clickItem(page, folded0?'Mostrar resumen':'Plegar resumen');
-  check('R13_summaryToggle', (await page.$eval(HOY+' .summary', e=>e.classList.contains('collapsed')))===!folded0);
-  if(!folded0){ await page.tap(HOY+' .nav .vopts'); await page.waitForTimeout(350); await clickItem(page, 'Mostrar resumen'); }
+  // Decision 52: no day summary on Hoy and nothing to fold
+  check('R13_noSummary', await page.evaluate(H=>!document.querySelector(H+' .summary') && !document.querySelector(H+' [data-sum]'), HOY));
 
   // R9: Repasar (N) on the Aplazadas group
   r.reviewLink = await page.$eval(HOY+' [data-act=review]', e=>({text:e.textContent, head:e.closest('.group-title').textContent}));
@@ -126,15 +123,15 @@ const realClock = page => page.evaluate(()=>{ if(window.__RD) window.Date=window
   // No new data field
   check('R9_noNewField', await page.evaluate(()=>DB.tasks.every(x=>Object.keys(x).every(k=>['id','title','spaceId','projectId','date','reminder','priority','status','notes','carried','created','modified','completed'].includes(k)))));
 
-  // R8: before 19:00 nothing new; at 19:30 the cell at the end of Hoy and the link in the folded summary
+  // R8: before 19:00 nothing new; at 19:30 the cell at the end of Hoy (decision 52: the only entry)
   await page.evaluate(()=>{ window.__RD=Date; const RD=Date; const fixed=new RD(); fixed.setHours(12,0,0,0); window.Date=class extends RD{ constructor(...a){ super(...(a.length?a:[fixed.getTime()])); } static now(){ return fixed.getTime(); } }; render(); });
   check('R8_notBefore19', await page.evaluate(()=>!document.querySelector('.screen.root[data-root=tareas] [data-act=closeDay]')));
   await at1930(page);
-  await page.evaluate(()=>{ DB.settings.summaryState='closed'; UI.summaryFirst=false; save(); render(); }); await page.waitForTimeout(200);
-  r.r8 = await page.evaluate(()=>{ const sc=document.querySelector('.screen.root[data-root=tareas] .scroll'); const cell=sc.querySelector('.closecell'); const all=[...sc.children]; return {folded:sc.querySelector('.summary').classList.contains('collapsed'), link:(sc.querySelector('.summary-head .sumclose')||{}).textContent, cell:cell&&cell.textContent, cellAfterRows:!!cell&&all.indexOf(cell.closest('.group'))>all.indexOf([...sc.querySelectorAll('.scroll > .group')].find(g=>g.querySelector('.row'))) }; });
-  check('R8_entries', r.r8.folded && r.r8.link==='Cerrar el día' && /^Cerrar el día5 pendientes$/.test(r.r8.cell) && r.r8.cellAfterRows, r.r8);
+  await page.evaluate(()=>render()); await page.waitForTimeout(200);
+  r.r8 = await page.evaluate(()=>{ const sc=document.querySelector('.screen.root[data-root=tareas] .scroll'); const cell=sc.querySelector('.closecell'); const all=[...sc.children]; return {summary:!!sc.querySelector('.summary'), entries:sc.querySelectorAll('[data-act=closeDay]').length, cell:cell&&cell.textContent, cellAfterRows:!!cell&&all.indexOf(cell.closest('.group'))>all.indexOf([...sc.querySelectorAll('.scroll > .group')].find(g=>g.querySelector('.row'))) }; });
+  check('R8_entries', !r.r8.summary && r.r8.entries===1 && /^Cerrar el día5 pendientes$/.test(r.r8.cell) && r.r8.cellAfterRows, r.r8);
   await page.screenshot({path:OUT+'/c-light-hoy-1930.png'});
-  await page.tap(HOY+' .summary-head .sumclose'); await page.waitForTimeout(400);
+  await page.evaluate(H=>document.querySelector(H+' .closecell').scrollIntoView({block:'center'}), HOY); await page.tap(HOY+' .closecell'); await page.waitForTimeout(400);
   r.cd = await page.evaluate(()=>({h:document.querySelector('#sheet h2').textContent, nums:[...document.querySelectorAll('#sheet .cdnums div')].map(d=>d.textContent), left:document.querySelectorAll('#sheet .cdlist:not(.done) .pl').length, done:[...document.querySelectorAll('#sheet .cdlist.done .pl')].map(x=>x.textContent), acts:[...document.querySelectorAll('#sheet [data-cd]')].map(b=>b.textContent), foot:document.querySelector('#sheet .cdfoot').textContent}));
   check('R8_sheet', r.cd.h==='Cerrar el día' && r.cd.nums.join('|')==='1hecha hoy|5quedan|1prioritarias' && r.cd.left===5 && r.cd.done.join()==='Hecha hoy' && r.cd.acts.join('|')==='Todo a mañana5 tareas|Solo las no prioritarias4 tareas|Decidir una a una' && r.cd.foot==='Mañana empieza con 1 tarea.', r.cd);
   await page.screenshot({path:OUT+'/c-light-cerrar.png'});
@@ -254,7 +251,7 @@ const realClock = page => page.evaluate(()=>{ if(window.__RD) window.Date=window
   check('D_R13_button', !!r.dMopts, r.dMopts);
   await page.click('#desk .mhead .mopts'); await page.waitForTimeout(350); r.dMenu = await sheetItems(page);
   // Batch G (R16) gives the desktop its own multiple selection, so its view menu now starts with Seleccionar tareas too
-  check('D_R13_menu', r.dMenu[0]==='Seleccionar tareas' && r.dMenu[1]==='Mostrar completadas' && r.dMenu[2]==='Agrupar por fecha  ✓' && r.dMenu[3]==='Agrupar por proyecto' && /resumen del día/.test(r.dMenu[4]), r.dMenu);
+  check('D_R13_menu', r.dMenu[0]==='Seleccionar tareas' && r.dMenu[1]==='Mostrar completadas' && r.dMenu[2]==='Agrupar por fecha  ✓' && r.dMenu[3]==='Agrupar por proyecto' && r.dMenu.length===4, r.dMenu);
   await clickItem(page, 'Agrupar por proyecto');
   r.dHoyProj = await page.$$eval('#desk .gsec > .group-title', h=>h.map(x=>x.textContent.trim()));
   check('D_R13_hoyByProject', r.dHoyProj.length===2 && /^FLC/.test(r.dHoyProj[0]), r.dHoyProj);
@@ -265,8 +262,8 @@ const realClock = page => page.evaluate(()=>{ if(window.__RD) window.Date=window
   await page.evaluate(()=>{ DB.settings.hoyGroup='date'; save(); render(); });
   // R9 and R8 on the desktop
   check('D_R9_link', await page.evaluate(()=>(document.querySelector('#desk [data-act=review]')||{}).textContent==='Repasar (2)'));
-  await at1930(page); await page.evaluate(()=>{ DB.settings.summaryState='closed'; UI.summaryFirst=false; save(); render(); }); await page.waitForTimeout(200);
-  check('D_R8_entries', await page.evaluate(()=>!!document.querySelector('#desk .summary.collapsed .sumclose') && !!document.querySelector('#desk .closecell')));
+  await at1930(page); await page.evaluate(()=>render()); await page.waitForTimeout(200);
+  check('D_R8_entries', await page.evaluate(()=>!document.querySelector('#desk .summary') && document.querySelectorAll('#desk [data-act=closeDay]').length===1 && !!document.querySelector('#desk .closecell')));
   await page.click('#desk .closecell'); await page.waitForTimeout(400);
   check('D_R8_sheet', await page.evaluate(()=>document.querySelector('#sheet h2').textContent==='Cerrar el día' && document.querySelectorAll('#sheet [data-cd]').length===3));
   await page.screenshot({path:OUT+'/c-desk-cerrar.png'});

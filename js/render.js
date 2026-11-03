@@ -216,9 +216,9 @@ function renderTabbar(){
   const b=(id,ic,icF,l)=>'<button data-tab="'+id+'" class="'+(UI.tab===id?'on':'')+'">'+(UI.tab===id?icF:ic)+'<span>'+l+'</span></button>';
   tabbarEl.innerHTML = b('tareas',I.list,I.listF,'Tareas')+b('proyectos',I.folder,I.folderF,'Proyectos')+b('ajustes',I.gear,I.gearF,'Ajustes');
 }
-function resetListState(){ if(UI.noteOpen) noteLeft(UI.noteOpen); UI.query=''; UI.searchDone=false; UI.sumFilter=null; UI.projFilter=null; } // a space change starts its list with no search or filter
+function resetListState(){ if(UI.noteOpen) noteLeft(UI.noteOpen); UI.query=''; UI.searchDone=false; UI.projFilter=null; } // a space change starts its list with no search or filter
 function switchTab(tab){ if(UI.select){ UI.select=null; app.classList.remove('selecting'); }
-  if(UI.tab===tab){ const r=rootScreen(tab); if(!UI.stack.length&&r.classList.contains('hidden-tab')){ render(); return; } const sc=r.querySelector('.scroll'); sc&&sc.scrollTo({top:0,behavior:'smooth'}); return; } UI.tab=tab; UI.query=''; UI.sumFilter=null; render(); } // a current tab that does not show is drawn, never only scrolled
+  if(UI.tab===tab){ const r=rootScreen(tab); if(!UI.stack.length&&r.classList.contains('hidden-tab')){ render(); return; } const sc=r.querySelector('.scroll'); sc&&sc.scrollTo({top:0,behavior:'smooth'}); return; } UI.tab=tab; UI.query=''; render(); } // a current tab that does not show is drawn, never only scrolled
 tabbarEl.addEventListener('click', e=>{ const b=e.target.closest('[data-tab]'); if(b) switchTab(b.dataset.tab); });
 $('#selbar').addEventListener('click', e=>{ const b=e.target.closest('[data-act]'); if(!b||b.disabled||!UI.select) return; ({bulkComplete, bulkPostpone:bulkPostponeSheet, bulkMove:bulkMoveSheet, bulkDelete})[b.dataset.act](); });
 
@@ -250,7 +250,7 @@ $('#selbar').addEventListener('click', e=>{ const b=e.target.closest('[data-act]
   },{passive:false});
   function finish(commit){ mode=null; settle(null);
     const c=cur, n=nb, dd=dir, ww=w, target=commit?n.dataset.root:c.dataset.root; c.classList.remove('dragging'); n.classList.remove('dragging'); c.classList.add('tabanim'); n.classList.add('tabanim');
-    if(commit){ haptic(6); UI.tab=target; UI.query=''; UI.sumFilter=null; renderTabbar(); renderRoot(n); } // the new tab is current, and drawn, from the release, so a tap or a push in the next 420 ms acts on it; the same reset as a tap on the tab bar
+    if(commit){ haptic(6); UI.tab=target; UI.query=''; renderTabbar(); renderRoot(n); } // the new tab is current, and drawn, from the release, so a tap or a push in the next 420 ms acts on it; the same reset as a tap on the tab bar
     let placed=false; const place=()=>{ placed=true; if(commit){ c.style.transform='translate3d('+(-dd*ww)+'px,0,0)'; n.style.transform='translate3d(0,0,0)'; } else { c.style.transform='translate3d(0,0,0)'; n.style.transform='translate3d('+(dd*ww)+'px,0,0)'; } };
     const done=e=>{ c.classList.remove('tabanim'); n.classList.remove('tabanim'); if(!placed) place(); // a touch in the first frame: the screens go straight to their place
       if(!((UI.tab===target&&!UI.stack.length)||renderPending)) return; // a tab tap or a push in between has rendered already
@@ -298,7 +298,7 @@ function tagVars(c){ let v=tagCache.get(c); if(v) return v;
    noProj (inside a project, grouped by project or with a project filter: no capsule), noToday (a Hoy list or group: no "Hoy"),
    hideCarried (the Aplazadas group: no "Aplazada"), byDay (Completadas grouped by day: the time alone, not struck through),
    day (R14: a day group of Todas; a row dated that day says no date),
-   simple ("Lo primero", Ahora: no swipe), compact (Ahora, decision 39: the project capsule alone under the title, no indicators).
+   simple (Ahora: no swipe), compact (Ahora, decision 39: the project capsule alone under the title, no indicators).
    A carried task says "Aplazada" in orange where it would say "Hoy". The indicators: a star in Ahora (39), notes, voice, attachments, repeats (38),
    and the steps' progress "3/4" (46, its own column on the desktop) */
 function rowHTML(x, opts={}){
@@ -336,7 +336,7 @@ function deskRowHTML(x, opts, v){ const t=v.t; let date='', dcls='', rem=''; con
     if(x.reminder) rem=x.date&&localDay(x.reminder)===x.date?fmtTime(x.reminder):fmtDateTime(x.reminder); }
   // The project goes in a fixed column on the left, so titles start aligned and keep the room on the right; a list of one project has no column
   const pcol=opts.noProj?'':'<span class="pcol">'+(v.p?'<span class="tag" title="'+esc(v.p.name)+'">'+esc(v.p.name)+'</span>':'')+'</span>';
-  // R15, R16: the selected row (cur), the multiple selection, the selection mode's boxes and the title edited in place; "Lo primero" repeats rows and shows none of the selection
+  // R15, R16: the selected row (cur), the multiple selection, the selection mode's boxes and the title edited in place; Ahora repeats rows and shows none of the selection
   const ds=UI.dsel, own=!opts.simple, multi=deskMulti(), sel=own&&multi&&ds.ids.has(x.id), cur=own&&!multi&&ds.cur===x.id, edit=own&&ds.edit&&ds.edit.id===x.id;
   v.selecting=own&&ds.mode;
   return '<div class="row'+(v.done?' done':'')+(v.held?' held':'')+(opts.byDay?' byday':'')+(sel?' selected':'')+(cur?' cur':'')+'" data-id="'+x.id+'"'+(v.pc?' style="'+tagVars(v.pc)+'"':'')+' role="option" aria-selected="'+(sel||cur)+'" tabindex="'+(own&&ds.cur===x.id?0:-1)+'"'+(edit?'':' draggable="true"')+'>'+
@@ -344,8 +344,8 @@ function deskRowHTML(x, opts, v){ const t=v.t; let date='', dcls='', rem=''; con
     '<div class="row-text">'+(edit?'<input class="rowedit" data-role="rowedit" type="text" value="'+esc(ds.edit.text)+'" aria-label="Título" autocomplete="off" spellcheck="false">':'<div class="row-title" title="'+esc(x.title||'')+'">'+esc(x.title||'Sin título')+'</div>')+(x.status==='waiting'&&x.waitingFor&&!v.done?'<span class="wtag" title="Esperando a '+esc(x.waitingFor)+'">'+esc(x.waitingFor)+'</span>':'')+'</div>'+ // decision 41
     '<span class="inds">'+v.ind+'</span><span class="rsteps">'+v.prog+'</span><span class="row-meta"><span class="rc rc-date'+dcls+'"'+(date?' title="'+esc(date)+'"':'')+'>'+date+'</span><span class="rc rc-dl'+(dlc?' dl-'+dlc:'')+'"'+(dl?' title="Fecha límite: '+esc(fmtDate(x.deadline))+'"':'')+'>'+dl+'</span><span class="rc rc-rem"'+(rem?' title="Recordatorio: '+esc(rem)+'"':'')+'>'+(rem?I.bell+rem:'')+'</span></span>'+
     '<span class="pri'+(v.pri?(x.priority==='high'?' high':' mid'):'')+'">'+(v.pri?(x.priority==='high'?'!!!':'!!'):'')+'</span>'+
-    (v.selecting?'':opts.simple?'<span class="rowmore" aria-hidden="true"></span>':'<button class="rowmore" data-act="rowMenu" aria-label="Más" title="Más" tabindex="-1">'+I.more+'</button>')+'</div></div>'; } // "Lo primero" keeps the columns aligned with the list
-/* Decision 39: the Ahora block. iPhone: at the top of Hoy, above the summary, compact rows (circle, title, project, priority) that open the
+    (v.selecting?'':opts.simple?'<span class="rowmore" aria-hidden="true"></span>':'<button class="rowmore" data-act="rowMenu" aria-label="Más" title="Más" tabindex="-1">'+I.more+'</button>')+'</div></div>'; } // Ahora keeps the columns aligned with the list
+/* Decision 39: the Ahora block. iPhone: at the top of Hoy, above the search, compact rows (circle, title, project, priority) that open the
    detail and complete; hidden when empty. Desktop: above the list of Hoy and Todas, a drop zone for rows. Order: when each was put there */
 function ahoraHTML(){ const xs=ahoraTasks(); if(!xs.length) return '';
   return '<section class="ahora"'+(UI.wide?' data-drop-ahora=""':'')+' aria-label="Ahora"><div class="ahead">'+I.starF+'<span class="al">Ahora</span><span class="gn">'+xs.length+'</span></div><div class="first">'+xs.map(x=>rowHTML(x,{simple:true, compact:!UI.wide, noToday:true})).join('')+'</div></section>'; }
@@ -353,36 +353,8 @@ function ahoraHTML(){ const xs=ahoraTasks(); if(!xs.length) return '';
 function ahoraViewHTML(){ let xs=ahoraTasks(); if(UI.query) xs=xs.filter(queryMatcher(UI.query));
   if(!xs.length) return '<div class="empty" data-drop-ahora="">'+I.star.replace('<svg','<svg style="width:44px;height:44px"')+'<b>'+(UI.query?'Sin resultados':'Nada en Ahora')+'</b>'+(UI.query?'Prueba con otra palabra':'Arrastra aquí las tareas que vas a hacer ya, o pulsa A en una tarea. Caben '+AHORA_MAX+'.')+'</div>';
   return '<div class="group ahoralist" data-drop-ahora="">'+xs.map(x=>rowHTML(x)).join('')+'</div><div class="footnote">Hasta '+AHORA_MAX+' tareas. Se vacía al empezar el día; las que queden siguen en su sitio.</div>'; }
-// The reminder line of the summary: the next one within two hours, kept until five minutes after its time
-function soonReminder(){ return spaceTasks().filter(x=>x.status==='pending'&&x.reminder).map(x=>({x,d:new Date(x.reminder).getTime()-Date.now()})).filter(o=>o.d>-5*6e4&&o.d<2*36e5).sort((a,b)=>a.d-b.d)[0]; }
-// What the summary shows that changes with the clock alone (that reminder line and the 19:00 button): the minute timer redraws when it differs
-function clockKey(){ const o=soonReminder(); return (o?o.x.id+o.x.reminder:'')+'|'+(new Date().getHours()>=19); }
-function summaryCollapsed(n){ const st=DB.settings.summaryState||'auto'; if(st==='auto' && UI.summaryFirst) return false; return st==='closed' || (st==='auto' && n>20); }
-function summaryHTML(){
-  const t=todayStr(); const hoy=pendingFor('hoy');
-  const carried=hoy.filter(carriedOn).length, deHoy=hoy.length, prio=hoy.filter(x=>x.priority==='high').length; const doneToday=spaceTasks().filter(x=>x.status==='done'&&x.completed&&localDay(x.completed)===t).length;
-  // Only today's high-priority tasks; the list below already shows the rest.
-  const first = hoy.filter(x=>x.priority==='high').slice(0,3);
-  const soon = soonReminder(); const folded=summaryCollapsed(hoy.length), late=hoy.length&&new Date().getHours()>=19;
-  if(UI.wide){ // R11: one line. The three figures filter the list (para hoy clears it); the next reminder or the day done fill the middle;
-    // "Cerrar el día" from 19:00; the fold opens "Lo primero" under the line (the summary's own fold and setting)
-    const num=(k,n,l,c)=>'<button class="num'+(c&&n?' '+c:'')+((k==='all'?!UI.sumFilter:UI.sumFilter===k)?' on':'')+'" data-sum="'+k+'"><b>'+n+'</b><span>'+l+'</span></button>';
-    const mid = soon ? '<span class="soonl" title="Recordatorio a las '+fmtTime(soon.x.reminder)+'">'+I.bell+'<span>'+fmtTime(soon.x.reminder)+' '+esc(soon.x.title)+'</span></span>'
-      : !hoy.length&&doneToday ? '<span class="soonl ok">'+I.check+'<span>Todo hecho por hoy: '+doneToday+(doneToday===1?' tarea completada':' tareas completadas')+'</span></span>' : '<span class="soonl"></span>';
-    // With a short Hoy every task is already on screen right below: "Lo primero" would only repeat them, so it shows from 9 tasks on, in its own block
-    const firstD = hoy.length>8 ? first : [];
-    return '<section class="summary dsum'+(folded?' collapsed':'')+'"><div class="summary-head">'+num('all',deHoy,'para hoy')+num('carried',carried,carried===1?'aplazada':'aplazadas','orange')+num('high',prio,prio===1?'prioritaria':'prioritarias','red')+mid+
-      (late&&!UI.select?'<button class="sumclose" data-act="closeDay">Cerrar el día</button>':'')+
-      (firstD.length?'<button class="sumfold" data-act="toggleSummary" aria-expanded="'+!folded+'" title="'+(folded?'Mostrar':'Plegar')+' lo primero">Lo primero'+I.chevD+'</button>':'')+'</div>'+
-      (firstD.length?'<div class="summary-body"><div class="first"><div class="firsthead">Lo primero</div>'+firstD.map(x=>rowHTML(x,{simple:true,noToday:true})).join('')+'</div></div>':'')+'</section>'; }
-  // R8: from 19:00 "Cerrar el día" shows in the folded summary too, so a loaded day never hides it
-  return '<section class="summary'+(folded?' collapsed':'')+'"><div class="summary-head"><h3>Resumen del día</h3>'+(folded&&late&&!UI.select?'<button class="sumclose" data-act="closeDay">Cerrar el día</button>':'')+'<button data-act="toggleSummary" aria-label="Plegar">'+I.chevD+'</button></div>'+
-   '<div class="summary-body"><div class="nums"><button class="num" data-sum="all"><b>'+deHoy+'</b><span>para hoy</span></button><button class="num'+(carried?' orange':'')+(UI.sumFilter==='carried'?' on':'')+'" data-sum="carried"><b>'+carried+'</b><span>aplazadas</span></button><button class="num'+(prio?' red':'')+(UI.sumFilter==='high'?' on':'')+'" data-sum="high"><b>'+prio+'</b><span>prioritarias</span></button></div>'+
-   (late?'<button class="closeday" data-act="closeDay">'+I.cal+'<span>Cerrar el día, '+hoy.length+(hoy.length===1?' pendiente':' pendientes')+'</span></button>':'')+
-   (!hoy.length&&doneToday?'<div class="alldone">'+I.check+'<span>Todo hecho por hoy: '+doneToday+(doneToday===1?' tarea completada':' tareas completadas')+'</span></div>':'')+
-   ((first.length||soon)?'<div class="first">'+(first.length?'<h4>Lo primero</h4>'+first.map(x=>rowHTML(x,{simple:true,noToday:true})).join(''):'')+
-   (soon?'<div class="soon"'+(first.length?'':' style="border-top:0;padding-top:0"')+'>'+I.bell+'<span>Recordatorio a las '+fmtTime(soon.x.reminder)+': '+esc(soon.x.title)+'</span></div>':'')+'</div>':'')+'</div></section>';
-}
+// What Hoy shows that changes with the clock alone (the cell Cerrar el día from 19:00, R8): the minute timer redraws when it differs
+function clockKey(){ return String(new Date().getHours()>=19); }
 /* Group headers. R14: in Todas, a project, Hoy by project and Completadas each header sits in a .gsec with its group,
    so it stays at the top of the list (sticky, translucent) while its own rows scroll under it and the next one pushes it away */
 function gtitle(label, n, right, attrs){ return '<div class="group-title gh"'+(attrs||'')+'><span class="gl">'+label+(n!=null?'<span class="gn">'+n+'</span>':'')+'</span>'+(right||'')+'</div>'; }
@@ -415,7 +387,6 @@ function projectGroupsHTML(list, R, filter){ const ps=activeProjects(), by={}; l
 function listHTML(filter, projectId){
   let list = pendingFor(filter, projectId, UI.query);
   const root = projectId===undefined;
-  if(root && filter==='hoy' && !UI.query && UI.sumFilter) list = list.filter(x=> UI.sumFilter==='carried' ? carriedOn(x) : x.priority==='high');
   if(root && !UI.query && UI.projFilter!==null) list = list.filter(x=> UI.projFilter==='none' ? !x.projectId : x.projectId===UI.projFilter);
   const done = doneList(projectId); const dm = UI.query ? done.filter(queryMatcher(UI.query)) : [];
   const nm = UI.query ? noteHits(UI.query, projectId) : []; // decision 47: the notes found, in a group of their own
@@ -432,10 +403,10 @@ function listHTML(filter, projectId){
   let h='';
   if(rv.length) h += gtitle('Revisar hoy', rv.length, '', ' data-review-head=""')+'<div class="group" data-review="">'+rv.map(x=>R(x,{noToday:true,noReview:true})).join('')+'</div>'; // decision 36: not a drop target
   if(!list.length){ if(rv.length){} else if(!(UI.query && UI.searchDone && dm.length) && !nm.length){ // the completed matches (or notes) are listed below: no "Sin resultados" above them
-    let title, sub, acts;
+    let title, sub, acts; const dt0=filter==='hoy'?spaceTasks().filter(x=>x.status==='done'&&x.completed&&localDay(x.completed)===todayStr()).length:0;
     if(UI.query){ title='Sin resultados'; sub='Prueba con otra palabra'; acts='<button class="btn-link" data-act="clearSearch">Borrar búsqueda</button>'; }
-    else if(root && filter==='hoy' && UI.sumFilter){ title=UI.sumFilter==='carried'?'Sin aplazadas':'Sin prioritarias'; sub='Hoy no hay ninguna'; acts='<button class="btn-link" data-sum="all">Quitar filtro</button>'; }
     else if(root && UI.projFilter!==null){ const pf=UI.projFilter==='none'?null:proj(UI.projFilter); title='Nada '+(pf?'de '+esc(pf.name):'sin proyecto'); sub=filter==='hoy'?'Hoy no hay ninguna':'No hay pendientes'; acts='<button class="btn-link" data-pf="">Quitar filtro</button>'; }
+    else if(filter==='hoy' && root && dt0){ title='Todo hecho por hoy'; sub=dt0+(dt0===1?' tarea completada':' tareas completadas'); acts='<button class="btn-link" data-filter="todas">Ver todas</button>'+addBtn; } // decision 52: the day done, once said by the summary
     else if(filter==='hoy'){ title='Nada para hoy'; sub='Nada pendiente con fecha de hoy'; acts='<button class="btn-link" data-filter="todas">Ver todas</button>'+addBtn; }
     else { title='Sin tareas pendientes'; sub='Toca + o añade una desde aquí'; acts=addBtn; }
     h += '<div class="empty">'+I.inbox+'<b>'+title+'</b>'+sub+'<div class="acts">'+acts+'</div></div>';
@@ -445,14 +416,14 @@ function listHTML(filter, projectId){
   else if(!list.length){}
   else if(byProject) h += projectGroupsHTML(list, R, filter);
   else if(filter==='todas') h += dayGroupsHTML(list, R, root, projectId);
-  // Hoy: the carried tasks first, under Aplazadas with "Repasar (N)" (R9); the aplazadas filter already says it, so it keeps a plain list
-  else if(filter==='hoy' && root && UI.sumFilter!=='carried' && list.some(carriedOn)){ const c=list.filter(carriedOn), d=list.filter(x=>!carriedOn(x)); /* decision 48a: a task here by its deadline is not Aplazada */
+  // Hoy: the carried tasks first, under Aplazadas with "Repasar (N)" (R9)
+  else if(filter==='hoy' && root && list.some(carriedOn)){ const c=list.filter(carriedOn), d=list.filter(x=>!carriedOn(x)); /* decision 48a: a task here by its deadline is not Aplazada */
     h += gtitle('Aplazadas', null, UI.select?'':'<button class="gx" data-act="review">Repasar ('+c.length+')</button>')+'<div class="group">'+c.map(x=>R(x,{noToday:true,hideCarried:true})).join('')+'</div>'+
       (d.length?'<div class="group-title"'+gdrop('day',todayStr())+'>Hoy</div><div class="group"'+gdrop('day',todayStr())+'>'+d.map(x=>R(x,{noToday:true})).join('')+'</div>':''); } // decision 36: an Aplazada dropped on Hoy is confirmed for today
-  else h += (rv.length?'<div class="group-title"'+gdrop('day',todayStr())+'>Hoy</div>':'')+'<div class="group"'+(rv.length?gdrop('day',todayStr()):'')+'>'+list.map(x=>R(x,{noToday:filter==='hoy', hideCarried:root&&filter==='hoy'&&UI.sumFilter==='carried'})).join('')+'</div>'; // below Revisar hoy, the rest under Hoy
-  // R8: from 19:00 the day can be closed from the end of Hoy too, whatever the summary shows
+  else h += (rv.length?'<div class="group-title"'+gdrop('day',todayStr())+'>Hoy</div>':'')+'<div class="group"'+(rv.length?gdrop('day',todayStr()):'')+'>'+list.map(x=>R(x,{noToday:filter==='hoy'})).join('')+'</div>'; // below Revisar hoy, the rest under Hoy
+  // R8: from 19:00 the day is closed from the end of Hoy (decision 52: the only entry since the day summary went)
   if(root && filter==='hoy' && !UI.select && new Date().getHours()>=19){ const n=pendingFor('hoy').length; if(n) h += '<div class="group"><button class="cell link closecell" data-act="closeDay">'+I.cal+'<span class="lbl">Cerrar el día</span><span class="val">'+n+(n===1?' pendiente':' pendientes')+'</span></button></div>'; }
-  if(root && filter==='hoy' && !UI.sumFilter){ const tmd=addDays(todayStr(),1), tm=pendingFor('todas').filter(x=>!inHoy(x)&&(x.date===tmd||x.deadline===tmd)).length; /* decision 48a: a deadline tomorrow brings it tomorrow */ if(tm) h += '<button class="preview" data-filter="todas"><span>Mañana: '+tm+(tm===1?' tarea':' tareas')+'</span>'+I.chev+'</button>'; }
+  if(root && filter==='hoy'){ const tmd=addDays(todayStr(),1), tm=pendingFor('todas').filter(x=>!inHoy(x)&&(x.date===tmd||x.deadline===tmd)).length; /* decision 48a: a deadline tomorrow brings it tomorrow */ if(tm) h += '<button class="preview" data-filter="todas"><span>Mañana: '+tm+(tm===1?' tarea':' tareas')+'</span>'+I.chev+'</button>'; }
   h += waitingBlockHTML(root, projectId, R, filter==='hoy');
   if(done.length){ const dt=done.filter(x=>x.completed&&localDay(x.completed)===todayStr()).length;
     if(!DB.settings.doneOpen){ h += '<div class="group"><button class="cell link" data-act="toggleDone" style="justify-content:center"><span>Mostrar completadas ('+done.length+(dt?', '+dt+' hoy':'')+')</span></button></div>'; }
@@ -482,7 +453,7 @@ function viewTareas(){
   const f=DB.settings.filter; const nHoy=UI.query?0:pendingFor('hoy').length, nTodas=UI.query?0:pendingFor('todas').filter(x=>x.status!=='waiting').length; // a search hides the segment that shows them; decision 51: Todas lists its waiting tasks in the block at the foot, outside the count
   if(UI.select && UI.select.scope==='root') return selectNav()+'<div class="scroll">'+listHTML(UI.query?'todas':f)+'</div>';
   return '<header class="nav"><div class="nav-row"><button class="title" data-act="spaceMenu" aria-label="Cambiar espacio">'+esc(space().name)+I.chevD+'</button>'+'<button class="action vopts" data-act="viewMenu" aria-label="Opciones de vista">'+I.more+'</button>'+'</div></header>'+
-   '<div class="scroll">'+(f==='hoy'&&!UI.query?ahoraHTML()+summaryHTML():'')+
+   '<div class="scroll">'+(f==='hoy'&&!UI.query?ahoraHTML():'')+
    '<div class="searchbar"><div class="search">'+I.search+'<input type="search" placeholder="Buscar" value="'+esc(UI.query)+'" data-role="search" autocomplete="off"></div>'+(UI.query?'<button class="cancel" data-act="clearSearch">Cancelar</button>':'')+'</div>'+
    (UI.query?'':'<div class="seg"><button data-filter="hoy" class="'+(f==='hoy'?'on':'')+'">Hoy<span class="n">'+nHoy+'</span></button><button data-filter="todas" class="'+(f==='todas'?'on':'')+'">Todas<span class="n">'+nTodas+'</span></button></div>')+
    (!UI.query&&activeProjects().length?'<div class="pchips">'+activeProjects().map(p=>'<button class="chip'+(UI.projFilter===p.id?' on':'')+'" data-pf="'+p.id+'"'+(UI.projFilter===p.id?' style="background:'+p.color+'"':'')+'><span class="dot" style="background:'+(UI.projFilter===p.id?'#fff':p.color)+'"></span>'+esc(p.name)+'</button>').join('')+'<button class="chip'+(UI.projFilter==='none'?' on':'')+'" data-pf="none"><span class="dot" style="background:'+(UI.projFilter==='none'?'#fff':'var(--ink3)')+'"></span>Sin proyecto</button></div>':'')+

@@ -53,7 +53,7 @@ const aligned = o => Math.abs(o.icon[0]-o.icon[1])<=1 && Math.abs(o.text[0]-o.te
   const op = await page.evaluate(()=>({open:AX.open, panel:!!document.querySelector('#desk .axp'), focus:document.activeElement.dataset.role, v:document.querySelector('#desk [data-role=addbar]').value, anim:(document.querySelector('#desk .axp').getAnimations?document.querySelector('#desk .axp').getAnimations().length:1)>=0, notes:!!document.querySelector('#desk [data-role=addnotes]')}));
   check('ax_opens_on_typing', op.open && op.panel && op.focus==='addbar' && op.v==='Comprar' && op.notes, op);
   let b = await btns(page);
-  check('ax_buttons', Object.keys(b).join()==='date,proj,pri,rem,voice' && b.voice.t==='Dictar' && b.date.t==='Hoy' && b.date.on && b.proj.t==='Proyecto' && !b.proj.on && b.pri.t==='Prioridad' && b.rem.t==='Recordatorio', b);
+  check('ax_buttons', Object.keys(b).join()==='date,proj,pri,est,rem,voice' && /* decision 56: Tiempo */ b.voice.t==='Dictar' && b.date.t==='Hoy' && b.date.on && b.proj.t==='Proyecto' && !b.proj.on && b.pri.t==='Prioridad' && b.rem.t==='Recordatorio', b);
   await page.keyboard.type(' mañana #flc !!! a las 10'); await page.waitForTimeout(200);
   b = await btns(page);
   check('ax_tokens_on_buttons', b.date.t==='Mañana' && b.proj.t==='FLC' && b.proj.on && b.pri.t==='Alta' && /high/.test(b.pri.c) && b.rem.t==='10:00' && b.rem.on, b);

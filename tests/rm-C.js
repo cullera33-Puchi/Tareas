@@ -50,7 +50,7 @@ const realClock = page => page.evaluate(()=>{ if(window.__RD) window.Date=window
   await page.tap(HOY+' .seg button[data-filter=hoy]'); await page.waitForTimeout(300);
   await page.tap(HOY+' .nav .vopts'); await page.waitForTimeout(350);
   r.menuHoy = await sheetItems(page);
-  check('R13_menuHoy', JSON.stringify(r.menuHoy.slice(0,4))===JSON.stringify(['Seleccionar tareas','Mostrar completadas','Agrupar por fecha  ✓','Agrupar por proyecto']) && r.menuHoy.length===4, r.menuHoy); // decision 52: no Mostrar resumen del día
+  check('R13_menuHoy', JSON.stringify(r.menuHoy.slice(0,4))===JSON.stringify(['Seleccionar tareas','Mostrar completadas','Agrupar por fecha  ✓','Agrupar por proyecto']) && r.menuHoy[4]==='Compartir estado de la semana' && r.menuHoy.length===5, r.menuHoy); // decision 52: no Mostrar resumen del día; M4: Compartir estado de la semana
   // Hoy by project
   await clickItem(page, 'Agrupar por proyecto');
   r.hoyByProj = await page.evaluate(()=>{ const sc=document.querySelector('.screen.root[data-root=tareas] .scroll'); return {settings:[DB.settings.hoyGroup, DB.settings.allGroup],
@@ -201,7 +201,7 @@ const realClock = page => page.evaluate(()=>{ if(window.__RD) window.Date=window
   check('R14_projectAddPreset', r.projAdd.includes('FLC') && r.projAdd.includes('Hoy'), r.projAdd);
   await page.evaluate(()=>closeSheet()); await page.waitForTimeout(400);
   await page.tap('.screen.pushed-screen.project .nav .vopts'); await page.waitForTimeout(350); r.menuProj = await sheetItems(page);
-  check('R13_menuProject', r.menuProj.join('|')==='Seleccionar tareas|Mostrar completadas', r.menuProj);
+  check('R13_menuProject', r.menuProj.join('|')==='Seleccionar tareas|Mostrar completadas|Compartir estado', r.menuProj);
   await page.evaluate(()=>closeSheet()); await page.waitForTimeout(300);
   await page.tap('.screen.pushed-screen.project [data-act=back]'); await page.waitForTimeout(500);
   await page.tap('.tabbar [data-tab=tareas]'); await page.waitForTimeout(300);
@@ -254,7 +254,7 @@ const realClock = page => page.evaluate(()=>{ if(window.__RD) window.Date=window
   check('D_R13_button', !!r.dMopts, r.dMopts);
   await page.click('#desk .mhead .mopts'); await page.waitForTimeout(350); r.dMenu = await sheetItems(page);
   // Batch G (R16) gives the desktop its own multiple selection, so its view menu now starts with Seleccionar tareas too
-  check('D_R13_menu', r.dMenu[0]==='Seleccionar tareas' && r.dMenu[1]==='Mostrar completadas' && r.dMenu[2]==='Agrupar por fecha  ✓' && r.dMenu[3]==='Agrupar por proyecto' && r.dMenu.length===4, r.dMenu);
+  check('D_R13_menu', r.dMenu[0]==='Seleccionar tareas' && r.dMenu[1]==='Mostrar completadas' && r.dMenu[2]==='Agrupar por fecha  ✓' && r.dMenu[3]==='Agrupar por proyecto' && r.dMenu[4]==='Compartir estado de la semana…' && r.dMenu.length===5, r.dMenu);
   await clickItem(page, 'Agrupar por proyecto');
   r.dHoyProj = await page.$$eval('#desk .gsec > .group-title', h=>h.map(x=>x.textContent.trim()));
   check('D_R13_hoyByProject', r.dHoyProj.length===2 && /^FLC/.test(r.dHoyProj[0]), r.dHoyProj);

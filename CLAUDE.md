@@ -8,7 +8,7 @@ App web personal de gestión de tareas para iPhone (PWA instalada en pantalla de
 
 ## 2. Estado actual (2 de noviembre de 2026)
 
-- Versión publicada: **v0.26.1**. El repositorio `tareas` está en GitHub y se publica con GitHub Pages desde la rama `main`. Enric la usa instalada en el iPhone (pantalla de inicio) y en el navegador del ordenador.
+- Versión publicada: **v0.27.0**. El repositorio `tareas` está en GitHub y se publica con GitHub Pages desde la rama `main`. Enric la usa instalada en el iPhone (pantalla de inicio) y en el navegador del ordenador.
 - Sigue sin build ni dependencias de interfaz: HTML, CSS y JavaScript que se publican tal cual. El antiguo `index.html` de un solo archivo está repartido en `css/app.css` y en scripts clásicos dentro de `js/`, con el mismo comportamiento y el mismo aspecto.
 - Hecho: bloques 1 a 7 (v0.1), roadmap R1 a R20 (v0.15.0), escritorio a partir de 900 px con barra lateral, inspector, Semana, Día, Mes y vista por horas (v0.13.0 y v0.15.0), sincronización con Supabase e inicio de sesión con Google (bloque 8, v0.16.0), recordatorios con Web Push y la función `send-reminders` (bloque 9, v0.17.0), fotos y audios adjuntos en Supabase Storage (v0.19.0) y el lote de v0.20.0 (puntos 31 a 36 de la sección 8).
 - Datos: `localStorage` del dispositivo (clave `tareas-v1`) como verdad para la interfaz; copias diarias y archivos adjuntos en IndexedDB; Supabase sincroniza cuando hay sesión.
@@ -35,6 +35,7 @@ tareas/
 │   ├── attachments.js         fotos y audios adjuntos
 │   ├── steps.js               pasos (subtareas) dentro de una tarea
 │   ├── notes.js               notas de proyecto
+│   ├── status.js              resumen de estado para compartir
 │   ├── sync.js                sincronización con Supabase (bloque 8)
 │   ├── push.js                notificaciones (bloque 9)
 │   ├── lifecycle.js           vida de la app: teclado, insignia, cambio de día, recarga entre ventanas
@@ -97,6 +98,7 @@ Los datos: `DB` es un objeto único en `localStorage` bajo la clave `tareas-v1` 
 - `js/attachments.js`: archivos del dispositivo (`FS`, `FILE_CAP`); fotos (`processPhoto`, `addPhotos`); cola de subida (`attFlush`); descarga (`attDownload`); grupo Adjuntos (`attGroupHTML`); reproductor (`AP`); grabación (`recordSheet`); visor (`openViewer`); fotos arrastradas en escritorio (`attBindDrop`).
 - `js/steps.js`: pasos (subtareas) de una tarea, lista `DB.subtasks` (`addStep`, `toggleStep`, `deleteStep`, `reorderStep`, `copySteps`, `stepProgHTML`, `stepsGroupHTML`, `bindSteps`).
 - `js/notes.js`: notas de proyecto, lista `DB.projectNotes` (`addNote`, `saveNoteEdit`, `deleteNote`, `togglePin`, `toggleNoteCheck`, `noteBodyHTML`, `notesListHTML`, `viewNote`, `deskNotesHTML`, `projSegHTML`, `noteHits`, `noteTasksSheet`, `noteMakeTasks`, `shareNote`, `noteMenu`).
+- `js/status.js`: resumen de estado para compartir (M4): `statusText`, `spaceStatusText`, `stSections`, `stLine`, `stPeriod`, `statusSheet`, `statusShare`, `statusCopy`.
 - `js/sync.js`: adaptador `supabaseRemote` (sustituible en pruebas con `SY.remote`); `syncMerge`, `syncPull`, `syncPush`, `syncRun`, `syncRealtime`; arranque `syncBoot`; sesión (`syncSignIn`, `syncSignOutSheet`); sección Cuenta (`syncAccountHTML`).
 - `js/push.js`: estado `PS` (clave `tareas-push`); `pushEnable`, `pushSubscribe`, `pushCheck`, `pushRevokeSheet`, `pushTest`, `pushSignOut`; sección Notificaciones (`pushSectionHTML`, `pushDevicesHTML`); apertura desde un aviso (`openTaskFromPush`).
 - `js/lifecycle.js`: tirar para sincronizar (`bindPullRefresh`); agitar para deshacer (`armShake`); teclado (`kbFallback`); insignia (`badge`); cambio de día (`checkDay`, envoltura de `render`); `tipsSheet`; vuelta a Hoy (`returnHome`); varias ventanas (`reloadFromStorage`, `reloadIfChanged`).
@@ -255,7 +257,7 @@ Orden fijado por Enric el 2 de noviembre y revisado el 3 de noviembre: tras el r
 | 2 | M2. Fecha límite aparte de la fecha de trabajo, en rojo al acercarse aunque la tarea se aplace | hecho en v0.25.0 | alto |
 | 3 | Dictar en Notas y «Nota de voz» para el audio (punto 49 de la sección 8) | hecho en v0.26.0 | medio |
 | 4 | Quitar el resumen del día (punto 52 de la sección 8) | hecho en v0.26.1 | medio |
-| 5 | M4. Resumen de estado para compartir: texto por proyecto con lo hecho en la semana, en curso, por confirmar y próximos pasos, para Teams, correo o Claude | bajo, 1 a 2 h | medio |
+| 5 | M4. Resumen de estado para compartir: texto por proyecto con lo hecho en la semana, en curso, por confirmar y próximos pasos, para Teams, correo o Claude | hecho en v0.27.0 | medio |
 | 6 | Pausa: Enric usa la app unos días y se depuran los fallos y molestias antes de añadir funciones | según uso | medio |
 | 7 | Tiempo estimado por tarea (punto 53 de la sección 8): ver lo que es rápido para priorizar y despachar las fáciles | bajo o medio, 2 a 3 h | medio |
 | 8 | Indicador de procrastinación (punto 53 de la sección 8): señalar las tareas que se van apartando día tras día; incluye «Aplazada desde» | bajo o medio, 2 a 3 h | medio |

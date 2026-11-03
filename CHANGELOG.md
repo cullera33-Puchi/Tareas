@@ -1,5 +1,12 @@
 # Registro de cambios
 
+## v0.27.0. Resumen de estado para compartir (3 de noviembre de 2026)
+
+- «Compartir estado» en el menú de cada proyecto (pantalla del proyecto, pulsación larga en Proyectos y clic derecho en la barra lateral) y «Compartir estado de la semana» en el menú de tres puntos de Tareas, para todos los proyectos del espacio.
+- Prepara un texto listo para Teams, correo o Claude: Hecho, En curso, Por confirmar (con «esperando a» y el día de revisión) y Próximos pasos (14 días y hasta cinco sin fecha), con las entregas, los pasos y las prioritarias. Sin secciones vacías y con las fechas en palabras.
+- Periodo «Esta semana» o «Últimos 7 días». El texto se puede retocar antes de compartir o copiar.
+- Prueba nueva `rm-M4`.
+
 ## v0.26.1. Sin resumen del día (3 de noviembre de 2026)
 
 - Desaparece el resumen del día en el iPhone y en el ordenador: las cifras (para hoy, aplazadas, prioritarias), sus filtros y «Lo primero». La lista de Hoy empieza directamente.

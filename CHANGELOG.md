@@ -1,5 +1,12 @@
 # Registro de cambios
 
+## v0.28.0. Tiempo estimado, tareas arrastradas y «¿Qué hago ahora?» (3 de noviembre de 2026)
+
+- Tiempo estimado por tarea: 15 min, 30 min, 1 h o medio día, desde el detalle, la pulsación larga, el clic derecho y el alta, o escribiendo «15m», «30m», «1h» o «medio día» al final del título. Se ve en gris en la fila y va en compartir y CSV.
+- Tareas arrastradas: la app cuenta cada vez que una tarea que ya tocaba pasa a otro día (al empezar el día, Aplazar, Cerrar el día, el repaso o arrastrándola). Con 3 veces o 7 días, la fila lo dice en naranja: «Aplazada 4 veces» o «Desde el martes 27». En el repaso de aplazadas, «Partir en pasos» abre la tarea lista para escribir el primer paso.
+- «¿Qué hago ahora?»: desde «Sugerir» en el bloque Ahora o el menú de tres puntos de Hoy. Eliges el tiempo que tienes y propone tres tareas que caben: primero las que vencen, luego prioritarias, arrastradas y rápidas. Avisa si un recordatorio cae dentro de ese tiempo, y un toque pasa la tarea a Ahora.
+- Supabase: migración `0008_estimate_postponed.sql` (ya aplicada). Prueba nueva `rm-EP`.
+
 ## v0.27.1. Tareas de «Ahora» que no llegaban al ordenador (3 de noviembre de 2026)
 
 - Un dispositivo que sincronizó con una versión antigua (en el ordenador, la v0.21.0 esta mañana) recibió las tareas sin los datos que esa versión no conocía, como «Ahora», y ya no volvía a pedirlas. Ahora, cuando una versión sincroniza datos nuevos, vuelve a pedir una vez todas las filas de esa tabla y los recupera, sin enviar nada de vuelta.

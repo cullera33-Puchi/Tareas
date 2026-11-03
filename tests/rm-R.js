@@ -53,7 +53,7 @@ const aligned = o => Math.abs(o.icon[0]-o.icon[1])<=1 && Math.abs(o.text[0]-o.te
   const op = await page.evaluate(()=>({open:AX.open, panel:!!document.querySelector('#desk .axp'), focus:document.activeElement.dataset.role, v:document.querySelector('#desk [data-role=addbar]').value, anim:(document.querySelector('#desk .axp').getAnimations?document.querySelector('#desk .axp').getAnimations().length:1)>=0, notes:!!document.querySelector('#desk [data-role=addnotes]')}));
   check('ax_opens_on_typing', op.open && op.panel && op.focus==='addbar' && op.v==='Comprar' && op.notes, op);
   let b = await btns(page);
-  check('ax_buttons', Object.keys(b).join()==='date,proj,pri,rem,voice' && b.date.t==='Hoy' && b.date.on && b.proj.t==='Proyecto' && !b.proj.on && b.pri.t==='Prioridad' && b.rem.t==='Recordatorio', b);
+  check('ax_buttons', Object.keys(b).join()==='date,proj,pri,rem,voice' && b.voice.t==='Dictar' && b.date.t==='Hoy' && b.date.on && b.proj.t==='Proyecto' && !b.proj.on && b.pri.t==='Prioridad' && b.rem.t==='Recordatorio', b);
   await page.keyboard.type(' mañana #flc !!! a las 10'); await page.waitForTimeout(200);
   b = await btns(page);
   check('ax_tokens_on_buttons', b.date.t==='Mañana' && b.proj.t==='FLC' && b.proj.on && b.pri.t==='Alta' && /high/.test(b.pri.c) && b.rem.t==='10:00' && b.rem.on, b);
@@ -64,17 +64,17 @@ const aligned = o => Math.abs(o.icon[0]-o.icon[1])<=1 && Math.abs(o.text[0]-o.te
   b = await btns(page);
   check('ax_pick_project_strips', pj.v==='Comprar mañana !!! a las 10' && pj.ax==='p-casa' && b.proj.t==='Casa' && pj.focus==='addbar', {pj, b});
   await page.screenshot({path:path.join(OUT,'r-desk-composer.png')});
-  // Notes: Mayúsculas e Intro is a new line; the dictated voice note
+  // Notes: Mayúsculas e Intro is a new line; decision 49: the microphone dictates into Notas, after what is there
   await page.click('#desk [data-role=addnotes]'); await page.keyboard.type('Primera línea'); await page.keyboard.press('Shift+Enter'); await page.keyboard.type('Segunda línea');
   await page.click('#desk .axbt[data-ax=voice]'); await page.waitForTimeout(400);
-  const vo = await page.evaluate(()=>({rec:!!AX.rec, starts:window.__srStarts, v:(document.querySelector('#desk [data-role=addvoice]')||{}).value, btn:document.querySelector('#desk .axbt[data-ax=voice]').className}));
-  check('ax_dictation', vo.rec && vo.starts===1 && vo.v==='llamar a Pedro' && /rec/.test(vo.btn), vo);
+  const vo = await page.evaluate(()=>({rec:!!AX.rec, starts:window.__srStarts, v:document.querySelector('#desk [data-role=addnotes]').value, addvoice:!!document.querySelector('#desk [data-role=addvoice]'), ph:document.querySelector('#desk [data-role=addnotes]').placeholder, btn:document.querySelector('#desk .axbt[data-ax=voice]').className}));
+  check('ax_dictation', vo.rec && vo.starts===1 && vo.v==='Primera línea\nSegunda línea llamar a Pedro' && !vo.addvoice && /^Escuchando/.test(vo.ph) && /rec/.test(vo.btn), vo);
   await page.screenshot({path:path.join(OUT,'r-desk-composer-voice.png')});
   await page.click('#desk .axbt[data-ax=voice]'); await page.waitForTimeout(200);
-  check('ax_dictation_stops', await page.evaluate(()=>!AX.rec && AX.voice==='llamar a Pedro'));
+  check('ax_dictation_stops', await page.evaluate(()=>!AX.rec && AX.notes==='Primera línea\nSegunda línea llamar a Pedro' && document.querySelector('#desk .axbt[data-ax=voice]').textContent==='Dictar'));
   await page.click('#desk [data-role=addnotes]'); await page.keyboard.press('End'); await page.keyboard.press('Enter'); await page.waitForTimeout(400);
   let x = await last(page);
-  check('ax_enter_in_notes_adds_all', x.title==='Comprar' && x.date===addD(today,1) && x.projectId==='p-casa' && x.priority==='high' && x.reminder && new Date(x.reminder).getHours()===10 && x.notes==='Primera línea\nSegunda línea' && x.vn.join()==='llamar a Pedro', x);
+  check('ax_enter_in_notes_adds_all', x.title==='Comprar' && x.date===addD(today,1) && x.projectId==='p-casa' && x.priority==='high' && x.reminder && new Date(x.reminder).getHours()===10 && x.notes==='Primera línea\nSegunda línea llamar a Pedro' && !x.vn.length && await page.evaluate(()=>DB.voiceNotes.length===0), x);
   const after = await page.evaluate(()=>({open:AX.open, v:document.querySelector('#desk [data-role=addbar]').value, notes:document.querySelector('#desk [data-role=addnotes]').value, voice:!!document.querySelector('#desk [data-role=addvoice]'), focus:document.activeElement.dataset.role, toast:document.querySelector('#toastText').textContent}));
   b = await btns(page);
   check('ax_series_ready', after.open && after.v==='' && after.notes==='' && !after.voice && after.focus==='addbar' && after.toast==='Añadida: Comprar' && b.proj.t==='Casa' && b.date.t==='Hoy' && b.pri.t==='Prioridad' && b.rem.t==='Recordatorio', {after, b}); // the project chosen by hand stays; the written date does not
@@ -111,12 +111,12 @@ const aligned = o => Math.abs(o.icon[0]-o.icon[1])<=1 && Math.abs(o.text[0]-o.te
   check('ax_esc_empty', await page.evaluate(()=>!AX.open && !alertOn()));
   await page.click(AB); await page.keyboard.type('y'); await page.waitForTimeout(250); await page.keyboard.press('Backspace'); await page.mouse.click(600, 600); await page.waitForTimeout(500);
   check('ax_blur_empty_folds', await page.evaluate(()=>!AX.open));
-  // Without a recognizer: the voice note is written
+  // Without a recognizer: no Dictar button, Notas is written by hand
   await page.evaluate(()=>{ delete window.webkitSpeechRecognition; delete window.SpeechRecognition; });
-  await page.click(AB); await page.keyboard.type('Sin dictado'); await page.waitForTimeout(250); await page.click('#desk .axbt[data-ax=voice]'); await page.waitForTimeout(250);
-  const fb = await page.evaluate(()=>({focus:document.activeElement.dataset.role, rec:!!AX.rec}));
-  await page.keyboard.type('nota escrita'); await page.keyboard.press('Enter'); await page.waitForTimeout(300); x = await last(page);
-  check('ax_voice_written', fb.focus==='addvoice' && !fb.rec && x.title==='Sin dictado' && x.vn.join()==='nota escrita', {fb, x});
+  await page.click(AB); await page.keyboard.type('Sin dictado'); await page.waitForTimeout(250);
+  const fb = await page.evaluate(()=>({btn:!!document.querySelector('#desk .axbt[data-ax=voice]'), rec:!!AX.rec}));
+  await page.click('#desk [data-role=addnotes]'); await page.keyboard.type('nota escrita'); await page.keyboard.press('Enter'); await page.waitForTimeout(300); x = await last(page);
+  check('ax_voice_written', !fb.btn && !fb.rec && x.title==='Sin dictado' && x.notes==='nota escrita' && !x.vn.length, {fb, x});
   check('ax_logged', await page.evaluate(()=>LOG.some(e=>e.m==='Alta ampliada abierta') && LOG.some(e=>e.m==='Tarea añadida desde el alta ampliada') && LOG.some(e=>e.m==='Alta ampliada descartada con texto')));
   await page.keyboard.press('Escape'); await page.waitForTimeout(300);
 

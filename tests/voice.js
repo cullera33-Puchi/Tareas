@@ -17,16 +17,15 @@ const srv = http.createServer((req,res)=>{ let p = decodeURIComponent(req.url.sp
     const addFocused = await page.evaluate(()=>document.activeElement===document.querySelector('#sheet .titlein'));
     await page.fill('#sheet .titlein','Llamar a Marta'); /* R5: date options live in the strip of the date icon */ await page.click('#sheet .qbtn[data-k=date]'); /* decision 27b: the + in Hoy already proposes today (a tap on the lit Hoy chip would clear it) */ await page.locator('#sheet [data-c=hoy]:not(.on)').click({timeout:1500}).catch(()=>{}); await page.click('#sheet [data-x=ok]'); await page.waitForTimeout(400);
     await page.click('.screen.root[data-root=tareas] .group .row .row-title'); await page.waitForTimeout(500);
-    await page.click('.pushed-screen [data-act=voice]'); await page.waitForTimeout(300);
-    const micShown = !!(await page.$('#sheet .mic'));
-    const taFocused = await page.evaluate(()=>document.activeElement===document.querySelector('#sheet textarea'));
-    const hint = await page.$eval('#sheet .hint', e=>e.textContent);
-    if(!standalone) await page.click('#sheet textarea'); await page.keyboard.type('Revisar el presupuesto con el equipo antes del jueves');
-    await page.click('#sheet [data-x=ok]'); await page.waitForTimeout(500);
-    const notes = await page.$$eval('.pushed-screen .vn', n=>n.map(e=>e.textContent));
-    const stored = await page.evaluate(()=>JSON.parse(localStorage.getItem('tareas-v1')).voiceNotes.length);
+    // Decision 49: no dictated voice note any more. Dictation is the keyboard's microphone in Notas; the recording is «Nota de voz»
+    const det = await page.evaluate(()=>({voiceBtn:!!document.querySelector('.pushed-screen [data-act=voice]'), vnGroup:[...document.querySelectorAll('.pushed-screen .group-title')].some(e=>e.textContent==='Notas de voz'), audioBtn:(document.querySelector('.pushed-screen [data-act=attAudio]')||{}).textContent}));
+    await page.click('.pushed-screen [data-role=notes]'); await page.keyboard.type('Revisar el presupuesto con el equipo antes del jueves'); await page.waitForTimeout(600);
+    const stored = await page.evaluate(()=>{ const d=JSON.parse(localStorage.getItem('tareas-v1')); return {notes:d.tasks[0].notes, vn:d.voiceNotes.length}; });
+    await page.click('.pushed-screen [data-act=attAudio]'); await page.waitForTimeout(600);
+    const recTitle = await page.evaluate(()=>sheet.classList.contains('on')&&(document.querySelector('#sheet .shead h2')||{}).textContent);
     if(standalone) await page.screenshot({path:'05-voice-saved.png'});
-    out[standalone?'standalone':'browser']={addFocused, micShown, taFocused, hint, notes, stored, errors};
+    if(!(addFocused && !det.voiceBtn && !det.vnGroup && det.audioBtn==='Nota de voz' && stored.notes==='Revisar el presupuesto con el equipo antes del jueves' && !stored.vn && recTitle==='Nota de voz')) errors.push('decision 49: '+JSON.stringify({addFocused, det, stored, recTitle}));
+    out[standalone?'standalone':'browser']={addFocused, det, stored, recTitle, errors};
     await ctx.close();
   }
   console.log(JSON.stringify(out,null,1)); await browser.close(); srv.close();

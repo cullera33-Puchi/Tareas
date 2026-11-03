@@ -83,17 +83,16 @@ const vis = (page,sel)=>page.evaluate(s=>document.querySelector(s).scrollIntoVie
     for(let i=1;i<=4;i++){ await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:5+i*20,y:400}]}); await page.waitForTimeout(20); }
     check('backSwipe_underVisible', await page.evaluate(()=>{ const u=document.querySelector('.screen.under'); return !!u&&getComputedStyle(u).visibility==='visible'; }));
     await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]}); await cdp.detach(); await page.waitForTimeout(800); }
-  // Voice notes: a swipe right from the middle of a note edits it and never pops the detail; a swipe left and Eliminar deletes it
+  // Voice notes (recordings, decision 49): a swipe right from the middle of one does nothing and never pops the detail; a swipe left and Eliminar deletes it
   if(!(await page.evaluate(()=>UI.stack.length))){ await page.click(rows+' .row-title'); await page.waitForTimeout(800); }
   const vid = await page.evaluate(()=>UI.stack[UI.stack.length-1].id);
-  await page.evaluate(id=>{ DB.voiceNotes.push({id:'jvn1', taskId:id, text:'Primera nota', created:new Date().toISOString()}); save(); render(); }, vid); await page.waitForTimeout(400);
-  let vb = await L.box(page, '.pushed-screen .vn');
+  await page.evaluate(id=>{ const n=new Date().toISOString(); DB.attachments.push({id:'jvn1', taskId:id, kind:'audio', path:null, mime:'audio/mp4', size:4000, width:null, height:null, durationMs:5000, created:n, modified:n}); save(); render(); }, vid); await page.waitForTimeout(400);
+  let vb = await L.box(page, '.pushed-screen .vn[data-au]');
   await L.touchDrag(page, vb.x+60, vb.cy, 260, 0, 12, 16); await page.waitForTimeout(900);
-  check('vn_editNotPop', await page.evaluate(()=>UI.stack.length===1 && /Editar nota/.test((document.querySelector('.sheet.on')||{}).textContent||'')));
-  await page.evaluate(()=>closeSheet()); await page.waitForTimeout(700);
-  vb = await L.box(page, '.pushed-screen .vn'); await L.touchDrag(page, vb.x+300, vb.cy, -120, 0, 8, 16); await page.waitForTimeout(500);
-  const del = await L.box(page, '.pushed-screen .vn [data-vact=del]'); await L.tapAt(page, del.cx, del.cy); await page.waitForTimeout(700);
-  check('vn_delete', await page.evaluate(()=>!DB.voiceNotes.some(v=>v.id==='jvn1') && document.querySelector('#toastText').textContent==='Nota de voz eliminada'));
+  check('vn_rightNotPop', await page.evaluate(()=>UI.stack.length===1 && !document.querySelector('.sheet.on') && !document.querySelector('.pushed-screen .vn[data-au]').dataset.open));
+  vb = await L.box(page, '.pushed-screen .vn[data-au]'); await L.touchDrag(page, vb.x+300, vb.cy, -120, 0, 8, 16); await page.waitForTimeout(500);
+  const del = await L.box(page, '.pushed-screen .vn[data-au] [data-aact=del]'); await L.tapAt(page, del.cx, del.cy); await page.waitForTimeout(700);
+  check('vn_delete', await page.evaluate(()=>!DB.attachments.some(a=>a.id==='jvn1') && document.querySelector('#toastText').textContent==='Nota de voz eliminada'));
   await page.evaluate(()=>pop()); await page.waitForTimeout(800);
   // R9: review the carried ones, end, Deshacer
   const c0 = await page.evaluate(()=>pendingFor('hoy').filter(x=>x.carried).length);

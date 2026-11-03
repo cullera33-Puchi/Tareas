@@ -256,10 +256,12 @@ function projectSheet(id){
 }
 /* New or edited space */
 // What goes with a space, in words: "3 proyectos, 42 tareas y 5 notas de voz" (archived projects and old completed tasks count too)
-function spaceLoadText(L){ const n=(k,one,many)=>k?k+' '+(k===1?one:many):''; const parts=[n(L.ps.length,'proyecto','proyectos'), n((L.ns||[]).length,'nota de proyecto','notas de proyecto'), n(L.ts.length,'tarea','tareas'), n(L.vs.length,'nota de voz','notas de voz')].filter(Boolean); // decision 47: the notes of its projects
+// Decision 49: a voice note is a recording now (any dictated one left counts too)
+const spaceVoice = L => L.vs.length+L.as.filter(a=>a.kind==='audio').length;
+function spaceLoadText(L){ const n=(k,one,many)=>k?k+' '+(k===1?one:many):''; const parts=[n(L.ps.length,'proyecto','proyectos'), n((L.ns||[]).length,'nota de proyecto','notas de proyecto'), n(L.ts.length,'tarea','tareas'), n(spaceVoice(L),'nota de voz','notas de voz')].filter(Boolean); // decision 47: the notes of its projects
   return parts.length>1 ? parts.slice(0,-1).join(', ')+' y '+parts[parts.length-1] : parts.join(''); }
 // Decision 28a: confirmation with what goes, a local copy first (as before the first sync), then one Deshacer for everything
-function confirmDeleteSpace(sp){ const L=spaceLoad(sp.id), n=L.ps.length+L.ts.length+L.vs.length+L.ns.length;
+function confirmDeleteSpace(sp){ const L=spaceLoad(sp.id), n=L.ps.length+L.ts.length+spaceVoice(L)+L.ns.length;
   const text = n ? 'Se '+(n===1?'eliminará ':'eliminarán ')+spaceLoadText(L)+' del espacio "'+sp.name+'". Podrás deshacerlo durante unos segundos.' : 'El espacio "'+sp.name+'" está vacío.';
   confirmSheet('Eliminar espacio', text, async()=>{ flushEdits();
     try{ await Promise.race([BK.put(todayStr()), new Promise((_,rej)=>setTimeout(()=>rej(new Error('tiempo agotado')), 4000))]); await refreshBackups(); log('info','Copia local antes de eliminar un espacio', {space:sp.name, tasks:DB.tasks.length}); }
@@ -343,53 +345,13 @@ function planStep(ids, i, st){
       const b=e.target.closest('[data-x]'); if(!b) return; if(b.dataset.x==='skip'){ st.skipped++; planStep(ids, i+1, st); } else { st.skipped+=ids.length-i; planStep(ids, ids.length, st); } }; });
 }
 
-/* Voice note.
-   Primary route: the iOS keyboard dictation, typing into a focused textarea.
-   SpeechRecognition is only offered in a browser tab where it is known to work;
-   in standalone (home screen) mode Safari refuses it, so it is not shown. */
+/* Decision 49: the dictated voice note is gone (dictation is the keyboard's microphone in Notas). stopRec is set by the recording
+   sheet (decision 29) so closeSheet lets the microphone go however the sheet closes */
 let stopRec=null;
 const isStandalone = () => { try{ return navigator.standalone===true || matchMedia('(display-mode: standalone)').matches; }catch(e){ return false; } };
-function voiceSheet(id, editId){ if(!task(id)) return; // a note always belongs to an existing task
-  const editing=editId?DB.voiceNotes.find(v=>v.id===editId):null; if(editId&&!editing) return;
-  const SR = (!isStandalone() && (window.SpeechRecognition||window.webkitSpeechRecognition)) || null; let rec=null, recording=false, final='', sess=0; // sess: only the newest recognizer may touch the text
-  const kbHint = UI.wide ? 'El dictado no está disponible en este navegador. Escribe la nota.' : 'Toca el micrófono del teclado para dictar. Revisa el texto y guarda.'; // a desktop has no keyboard mic
-  const errHint = UI.wide ? kbHint : 'El dictado automático no está disponible. Usa el micrófono del teclado.';
-  openSheet(sheadHTML(editing?'Editar nota':'Nota de voz',editing?'Cancelar':'Descartar','Guardar')+(SR?'<button class="mic" data-x="mic" aria-label="Grabar">'+I.mic+'</button>':'')+'<div class="hint">'+(editing?(SR?'Corrige el texto o toca el micrófono para dictar de nuevo':(UI.wide?'Corrige el texto y guarda.':'Corrige el texto, o toca Volver a dictar y usa el micrófono del teclado.')):(SR?'Toca para empezar a dictar':kbHint))+'</div><textarea placeholder="El texto aparecerá aquí" enterkeyhint="done">'+(editing?esc(editing.text):'')+'</textarea>'+(editing?'<button class="btn slim" data-x="redo">Volver a dictar</button>':''), s=>{
-    const ta=$('textarea',s), mic=$('.mic',s), hint=$('.hint',s);
-    if(editing){ ta.setSelectionRange(ta.value.length, ta.value.length); }
-    // Focus synchronously inside the tap handler: iOS only opens the keyboard then.
-    if(!SR) ta.focus();
-    const fallback=msg=>{ if(mic) mic.style.display='none'; hint.textContent=msg||kbHint; ta.focus(); };
-    const stop=()=>{ recording=false; mic&&mic.classList.remove('rec'); try{ rec&&rec.stop(); }catch(e){} rec=null; if(SR&&mic&&mic.style.display!=='none') hint.textContent='Revisa el texto y guarda'; };
-    // Each recognizer's handlers act only while it is the newest one: a stopped engine's late result or end must not double the text or restart the new one
-    const start=()=>{ const my=++sess; try{ const r=rec=new SR(); r.lang='es-ES'; r.continuous=true; r.interimResults=true; final=ta.value?ta.value+' ':'';
-      r.onresult=ev=>{ if(my!==sess) return; let interim=''; for(let i=ev.resultIndex;i<ev.results.length;i++){ const x=ev.results[i]; if(x.isFinal) final+=x[0].transcript+' '; else interim+=x[0].transcript; } ta.value=(final+interim).trim(); };
-      r.onerror=e=>{ if(my!==sess) return; const er=e&&e.error; if(er==='no-speech') return; if(er==='aborted'){ if(recording) stop(); return; } // silence or an interruption are routine: the mic stays
-        stop(); fallback(errHint); };
-      r.onend=()=>{ if(my===sess&&recording){ try{ r.start(); }catch(e){ stop(); fallback(); } } };
-      r.start(); recording=true; mic.classList.add('rec'); hint.textContent='Escuchando. Toca para parar'; haptic(10); }catch(e){ stop(); fallback(); } };
-    stopRec=stop;
-    ta.addEventListener('input',()=>{ sess++; if(recording) stop(); }); // a hand edit pauses dictation and wins over any late result; the next tap on the mic goes on from the edited text
-    const saveNote=()=>{ const t=ta.value.trim(); if(!t){ ta.focus(); return false; } if(!task(id)) return true;
-      if(editing){ const cur=DB.voiceNotes.find(v=>v.id===editing.id); if(!cur) return true; if(cur.text===t) return true; const prev={text:cur.text, modified:cur.modified};
-        cur.text=t; cur.modified=new Date().toISOString(); updTask(id,{}); haptic(8); log('info','Nota de voz editada');
-        setTimeout(()=>toast('Nota de voz editada', ()=>{ const v=DB.voiceNotes.find(x=>x.id===editing.id); if(!v) return; v.text=prev.text; if(prev.modified) v.modified=prev.modified; else delete v.modified; save(); render(); }),0); return true; }
-      DB.voiceNotes.push({id:uid(), taskId:id, text:t, created:new Date().toISOString()}); updTask(id,{}); haptic(8); return true; };
-    // Decision 28b: text not saved (a new note, or an edit that changed it) asks before it goes
-    sheetGuard=()=>{ const t=ta.value.trim(); if(!t) return null; if(editing){ const cur=DB.voiceNotes.find(v=>v.id===editing.id); if(!cur||t===cur.text) return null; }
-      return {title:editing?'Los cambios de la nota no se han guardado.':'La nota no se ha guardado.', label:'Descartar nota', field:ta, discard:stop}; };
-    s.onclick=e=>{ const b=e.target.closest('[data-x]'); if(!b) return;
-      if(b.dataset.x==='mic'){ recording?stop():start(); return; }
-      if(b.dataset.x==='redo'){ ta.value=''; ta.focus(); if(SR&&!recording) start(); return; } // focus inside the tap so iOS opens the keyboard
-      stop();
-      if(b.dataset.x==='cancel'){ requestCloseSheet(); return; }
-      if(b.dataset.x==='ok'){ if(!saveNote()) return; }
-      closeSheet(); render(); };
-  });
-}
 
 /* Share */
-function shareText(id){ const x=task(id); if(!x) return ''; const p=x.projectId?proj(x.projectId):null; const vns=DB.voiceNotes.filter(v=>v.taskId===id).sort((a,b)=>a.created<b.created?-1:1);
+function shareText(id){ const x=task(id); if(!x) return ''; const p=x.projectId?proj(x.projectId):null;
   const d = x.date? new Date(x.date+'T00:00:00').toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'}) : 'sin fecha';
   const sp=DB.spaces.find(o=>o.id===x.spaceId)||space(); // the task's own space, not the one on screen
   let t='Tarea: '+x.title+'\nEspacio: '+sp.name+'\nProyecto: '+(p?p.name:'ninguno')+'\nFecha: '+d+'\nPrioridad: '+(x.priority==='high'?'alta':x.priority==='mid'?'media':'ninguna')+'\n';
@@ -397,8 +359,6 @@ function shareText(id){ const x=task(id); if(!x) return ''; const p=x.projectId?
   if(x.status==='waiting') t+='Estado: por confirmar'+(x.waitingFor?', esperando a '+x.waitingFor:'')+'\n'; // decision 41
   if(repParse(x.repeat)) t+='Se repite: '+repSummary(x.repeat).replace(/^./, c=>c.toLowerCase())+'\n'; // decision 38
   if(x.notes&&x.notes.trim()) t+='\nNotas:\n'+x.notes.trim()+'\n';
-  const stamp=iso=>{ const dt=new Date(iso); return String(dt.getDate()).padStart(2,'0')+'/'+String(dt.getMonth()+1).padStart(2,'0')+' '+fmtTime(iso); }; // absolute, as "31/10 09:15": the text is often read on another day
-  if(vns.length) t+='\nNotas de voz:\n'+vns.map(v=>'- '+stamp(v.created)+': '+v.text).join('\n')+'\n';
   const ss=stepsOf(id); if(ss.length) t+='\nPasos ('+stepsCount(id)+' hechos):\n'+ss.map(o=>'- ['+(o.done?'x':' ')+'] '+o.title).join('\n')+'\n'; // decision 46: the boxes Convertir líneas reads back
   return t; }
 async function shareTask(id){ const t=shareText(id); if(!t) return; try{ if(navigator.share){ await navigator.share({title:task(id).title, text:t}); return; } }catch(e){ if(e&&e.name==='AbortError') return; } copyText(t,'Texto copiado. Pégalo en Claude, WhatsApp o Mail.'); }
@@ -456,6 +416,7 @@ function restoreBackup(date){ const b=BACKUPS.find(x=>x.date===date); if(!b) ret
         DB.subtasks=Array.isArray(snap.data.subtasks)?snap.data.subtasks:prev.subtasks.filter(o=>tids.has(o.taskId)); // decision 46: the copy's steps; a copy from before them keeps those of its tasks
         const pids=new Set(DB.projects.map(p=>p.id)); DB.projectNotes=Array.isArray(snap.data.projectNotes)?snap.data.projectNotes:prev.projectNotes.filter(n=>pids.has(n.projectId)); } // decision 47: the same for the project notes
       if(synced){ const now=new Date().toISOString(); [DB.spaces,DB.projects,DB.tasks,DB.voiceNotes,DB.attachments,DB.subtasks,DB.projectNotes].forEach(a=>a.forEach(r=>{ r.modified=now; })); log('info','Copia restaurada con sesión iniciada: se aplicará en todos los dispositivos', {date}); }
+      foldVoiceNotes(DB); // decision 49: a copy from before it brings dictated voice notes: they go into Notas
       if(!DB.spaces.some(sp=>sp.id===DB.settings.activeSpace)){ DB.settings.activeSpace=DB.spaces[0].id; resetListState(); } save(); rollOver(); render(); haptic(10);
       log('info','Copia restaurada', {date, tasks:DB.tasks.length}); toast('Copia '+when+' restaurada', ()=>{ Object.assign(DB, prev); if(synced){ const now=new Date().toISOString(); [DB.spaces,DB.projects,DB.tasks,DB.voiceNotes,DB.attachments,DB.subtasks,DB.projectNotes].forEach(a=>a.forEach(r=>{ r.modified=now; })); } DB.settings.activeSpace=prevActive; save(); });
     }catch(e){ log('error','Restaurar copia falló: '+(e&&e.message||e)); toast('No se pudo restaurar'); } }, 'Restaurar'); }
@@ -466,9 +427,9 @@ function exportJSON(){ const t=JSON.stringify(exportData(),null,2); if(navigator
 // CSV for Excel in Spanish locales: semicolon separated, UTF-8 with BOM, one row per task.
 // A cell that starts with = + - or @ gets a leading apostrophe: Excel runs it as a formula even when quoted.
 function csvText(){ const q=v=>{ let s=String(v==null?'':v).replace(/"/g,'""').replace(/\r?\n/g,' '); if(/^[=+\-@\t\r]/.test(s)) s="'"+s; return '"'+s+'"'; }; const sp=Object.fromEntries(DB.spaces.map(s=>[s.id,s.name])); const pr={high:'Alta',mid:'Media',none:''};
-  const head=['Espacio','Proyecto','Título','Fecha','Fecha límite','Prioridad','Estado','Completada','Recordatorio','Se repite','Esperando a','Aplazada','Notas','Notas de voz','Pasos','Creada']; // decision 38: Se repite, the rule in words; decision 46: Pasos, each with its box
-  const rows=DB.tasks.slice().sort((a,b)=>(a.spaceId+(a.date||'9999')+a.created)<(b.spaceId+(b.date||'9999')+b.created)?-1:1).map(x=>{ const p=x.projectId?proj(x.projectId):null; const vn=DB.voiceNotes.filter(v=>v.taskId===x.id).map(v=>v.text).join(' | '), ps=stepsOf(x.id).map(o=>'['+(o.done?'x':' ')+'] '+o.title).join(' | ');
-    return [sp[x.spaceId]||'', p?p.name:'', x.title, x.date||'', x.deadline||'', pr[x.priority]||'', x.status==='done'?'Hecha':x.status==='waiting'?'Por confirmar':'Pendiente', x.completed?localDay(x.completed)+' '+fmtTime(x.completed):'', x.reminder?localDay(x.reminder)+' '+fmtTime(x.reminder):'', repSummary(x.repeat), x.waitingFor||'', x.carried?'Sí':'', x.notes||'', vn, ps, localDay(x.created)].map(q).join(';'); });
+  const head=['Espacio','Proyecto','Título','Fecha','Fecha límite','Prioridad','Estado','Completada','Recordatorio','Se repite','Esperando a','Aplazada','Notas','Pasos','Creada']; // decision 49: no Notas de voz column, they are in Notas; decision 38: Se repite, the rule in words; decision 46: Pasos, each with its box
+  const rows=DB.tasks.slice().sort((a,b)=>(a.spaceId+(a.date||'9999')+a.created)<(b.spaceId+(b.date||'9999')+b.created)?-1:1).map(x=>{ const p=x.projectId?proj(x.projectId):null; const ps=stepsOf(x.id).map(o=>'['+(o.done?'x':' ')+'] '+o.title).join(' | ');
+    return [sp[x.spaceId]||'', p?p.name:'', x.title, x.date||'', x.deadline||'', pr[x.priority]||'', x.status==='done'?'Hecha':x.status==='waiting'?'Por confirmar':'Pendiente', x.completed?localDay(x.completed)+' '+fmtTime(x.completed):'', x.reminder?localDay(x.reminder)+' '+fmtTime(x.reminder):'', repSummary(x.repeat), x.waitingFor||'', x.carried?'Sí':'', x.notes||'', ps, localDay(x.created)].map(q).join(';'); });
   return '﻿'+head.map(q).join(';')+'\r\n'+rows.join('\r\n')+'\r\n'; }
 async function exportCSV(){
   const name='tareas-'+todayStr()+'.csv'; const blob=new Blob([csvText()],{type:'text/csv;charset=utf-8'});
@@ -493,6 +454,7 @@ function importData(text){
   const merge=(arr,src)=>{ (Array.isArray(src)?src:[]).forEach(it=>{ if(!it||!it.id) return; const i=arr.findIndex(a=>a.id===it.id); if(i<0){ arr.push(it); added++; } else if((it.modified||'')>(arr[i].modified||'')){ arr[i]=it; updated++; } }); };
   merge(DB.spaces,d.spaces); merge(DB.projects,d.projects); merge(DB.tasks,d.tasks); merge(DB.voiceNotes,d.voiceNotes); merge(DB.attachments,d.attachments); merge(DB.subtasks,d.subtasks); merge(DB.projectNotes,d.projectNotes);
   DB.tasks.forEach(x=>{ if(x.carried===undefined) x.carried=false; });
+  foldVoiceNotes(DB); // decision 49: an older export's voice notes go into Notas
   save(); rollOver(); log('info','Importación', {added, updated, spaces:(d.spaces||[]).length, projects:(d.projects||[]).length, tasks:(d.tasks||[]).length});
   return {added, updated};
 }
@@ -513,7 +475,7 @@ function generateDemo(){
   const verbs=['Preparar','Revisar','Enviar','Cerrar','Actualizar','Llamar a','Validar','Redactar','Planificar','Documentar','Confirmar','Analizar'];
   const objs=['comité de seguimiento','SOW con legal','acta del steering','plan de cutover','RAID log','Marta por el presupuesto','mapping de Verifactu','propuesta de fase 2','sesión de formación','backlog de defectos','escenarios de prueba UAT','calendario de go-live','informe de horas','presentación a dirección','integración con BTP','matriz de riesgos','contrato marco','facturas pendientes','ampliación del equipo','notas del taller'];
   const noteTexts=['Pendiente de la respuesta del cliente.','Revisar con el equipo antes del jueves.','Incluye los cambios acordados en la última reunión.','Ver correo de ayer con el detalle.',''];
-  const tasks=[], vnotes=[], steps=[];
+  const tasks=[], steps=[];
   const stepTexts=['Pedir los datos','Revisar el borrador','Enviar al cliente','Validar con el equipo','Preparar la plantilla','Confirmar la fecha'];
   for(let i=0;i<150;i++){
     const r=rnd(); let date=null; if(r<0.2) date=addDays(t,-1-Math.floor(rnd()*10)); else if(r<0.5) date=t; else if(r<0.8) date=addDays(t,1+Math.floor(rnd()*30));
@@ -524,11 +486,11 @@ function generateDemo(){
     let reminder=null; if(!done&&rnd()<0.1){ const d=new Date(now.getTime()+Math.floor(rnd()*72)*36e5); d.setMinutes(0,0,0); reminder=d.toISOString(); }
     const id='demo-t-'+batch+'-'+i;
     tasks.push({id, title:pick(verbs)+' '+pick(objs), spaceId:sp, projectId, date, reminder, priority, status:done?'done':'pending', notes:pick(noteTexts), carried:false, created, modified:created, completed});
-    if(rnd()<0.06) vnotes.push({id:'demo-v-'+batch+'-'+i, taskId:id, text:'Nota dictada de prueba: '+pick(noteTexts.filter(Boolean)), created});
+    if(rnd()<0.06){ const x=tasks[tasks.length-1], l=vnLine({text:'Nota dictada de prueba: '+pick(noteTexts.filter(Boolean)), created}); x.notes=(x.notes?x.notes+'\n\n':'')+l; } // decision 49: a dictated note is a line of Notas
     if(rnd()<0.12){ const n=2+Math.floor(rnd()*3); for(let k=0;k<n;k++) steps.push({id:'demo-s-'+batch+'-'+i+'-'+k, taskId:id, title:pick(stepTexts), done:done||rnd()<0.4, order:(k+1)*STEP_GAP, created, modified:created}); } // decision 46
   }
-  DB.projects.push(...projects); DB.tasks.push(...tasks); DB.voiceNotes.push(...vnotes); DB.subtasks.push(...steps); save(); const n=rollOver(); render(); haptic(8);
-  log('info','Datos de prueba generados', {projects:projects.length, tasks:tasks.length, voiceNotes:vnotes.length, steps:steps.length, rolledOver:n});
+  DB.projects.push(...projects); DB.tasks.push(...tasks); DB.subtasks.push(...steps); save(); const n=rollOver(); render(); haptic(8);
+  log('info','Datos de prueba generados', {projects:projects.length, tasks:tasks.length, steps:steps.length, rolledOver:n});
   toast(tasks.length+' tareas de prueba en '+projects.length+' proyectos');
 }
 function clearDemo(){

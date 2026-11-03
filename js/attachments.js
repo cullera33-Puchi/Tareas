@@ -156,7 +156,7 @@ const attWrapHTML = x => '<div class="att-wrap" data-att-task="'+esc(x.id)+'">'+
 function deleteAttachment(id){ const i=DB.attachments.findIndex(a=>a.id===id); if(i<0) return; const [a]=DB.attachments.splice(i,1);
   if(AP.id===id) apStop(); if(task(a.taskId)) updTask(a.taskId,{}); else save(); haptic(14); attPaint(a.taskId);
   log('info', a.kind==='photo'?'Foto eliminada':'Audio eliminado');
-  toast(a.kind==='photo'?'Foto eliminada':'Audio eliminado', ()=>{ if(!DB.attachments.some(x=>x.id===a.id)) DB.attachments.push(a); save(); attPaint(a.taskId); }); }
+  toast(a.kind==='photo'?'Foto eliminada':'Nota de voz eliminada', ()=>{ if(!DB.attachments.some(x=>x.id===a.id)) DB.attachments.push(a); save(); attPaint(a.taskId); }); }
 // A task's attachments leave with it and come back with its Deshacer (deleteTask, the bulk and review deletions, a space)
 function cutAttachments(ids){ const out=DB.attachments.filter(a=>ids.has(a.taskId)); if(out.length){ DB.attachments=DB.attachments.filter(a=>!ids.has(a.taskId)); if(AP.id&&out.some(a=>a.id===AP.id)) apStop(); } return out; }
 function putAttachments(list){ (list||[]).forEach(a=>{ if(!DB.attachments.some(x=>x.id===a.id)) DB.attachments.push(a); }); }
@@ -190,11 +190,11 @@ function attGroupHTML(x){ const ps=attOf(x.id,'photo'), as=attOf(x.id,'audio'), 
   const tile=a=>{ const u=fuGet(a.id,'t'), st=AST.get(a.id), miss=!u&&(st==='err'||st==='none'||st==='off');
     return '<button class="att-ph'+(u?'':miss?' miss':' wait')+'" data-att="'+esc(a.id)+'" aria-label="Foto'+(miss?' no disponible':'')+'"><img data-att-img="'+esc(a.id)+'" alt="" draggable="false"'+(u?' src="'+u+'"':'')+'></button>'; };
   const row=a=>'<div class="vn att-au" data-au="'+esc(a.id)+'"><div class="vn-bg r"><button data-aact="del">Eliminar</button></div><div class="vn-c au-c">'+
-    '<button class="au-play" data-aact="play" aria-label="Reproducir">'+I.play+I.pause+'</button><div class="au-body"><div class="au-top"><span class="au-name">Audio, '+esc(fmtDateTime(a.created).toLowerCase())+'</span>'+
+    '<button class="au-play" data-aact="play" aria-label="Reproducir">'+I.play+I.pause+'</button><div class="au-body"><div class="au-top"><span class="au-name">Nota de voz, '+esc(fmtDateTime(a.created).toLowerCase())+'</span>'+
     '<span class="au-t"><span class="au-cur">0:00</span> de '+fmtDur(a.durationMs)+'</span></div><div class="au-bar" data-aact="seek"><i></i></div></div></div></div>';
   return '<div class="group-title">Adjuntos</div><div class="group att-group">'+(ps.length?'<div class="att-grid">'+ps.map(tile).join('')+'</div>':'')+as.map(row).join('')+
     '<button class="cell link" data-act="attPhoto"'+(UI.wide?' title="También puedes arrastrar fotos aquí"':'')+'>'+I.photo+'<span class="lbl">Añadir foto</span></button>'+
-    '<button class="cell link" data-act="attAudio">'+I.wave+'<span class="lbl">Grabar audio</span></button></div>'+(note?'<div class="footnote att-note">'+note+'</div>':''); }
+    '<button class="cell link" data-act="attAudio">'+I.wave+'<span class="lbl">Nota de voz</span></button></div>'+(note?'<div class="footnote att-note">'+note+'</div>':''); }
 // After a draw: the thumbnails not in memory yet come from the device (or are downloaded); the audio rows show the one playing
 function attHydrate(root){ if(!root) return;
   root.querySelectorAll('img[data-att-img]:not([src])').forEach(img=>{ const a=att(img.dataset.attImg); if(!a) return;
@@ -206,7 +206,7 @@ function attHydrate(root){ if(!root) return;
 const AP={el:null, id:null, raf:0, durMs:0, loading:false};
 function apEl(){ if(!AP.el){ const a=AP.el=new Audio(); a.preload='auto';
     a.addEventListener('ended', ()=>{ a.currentTime=0; apPaint(); }); a.addEventListener('pause', apPaint); a.addEventListener('playing', apPaint);
-    a.addEventListener('error', ()=>{ if(!AP.id||!a.getAttribute('src')) return; log('error','No se pudo reproducir el audio', {code:a.error&&a.error.code, mime:(att(AP.id)||{}).mime}); toast('No se pudo reproducir el audio'); apStop(); }); }
+    a.addEventListener('error', ()=>{ if(!AP.id||!a.getAttribute('src')) return; log('error','No se pudo reproducir el audio', {code:a.error&&a.error.code, mime:(att(AP.id)||{}).mime}); toast('No se pudo reproducir la nota de voz'); apStop(); }); }
   return AP.el; }
 async function apToggle(id){ const a=att(id); if(!a) return; const el=apEl();
   if(AP.id===id&&el.getAttribute('src')){ if(el.paused) el.play().catch(apFail); else el.pause(); return; }
@@ -214,7 +214,7 @@ async function apToggle(id){ const a=att(id); if(!a) return; const el=apEl();
   apStop(); AP.id=id; AP.durMs=a.durationMs||0;
   let u=fuGet(id,'f');
   if(!u){ AP.loading=true; apPaint(); const b=await attFile(a); AP.loading=false; if(AP.id!==id) return;
-    if(!b){ AP.id=null; apPaint(); toast(navigator.onLine?'Audio no disponible':'Sin conexión'); return; } u=fuMake(id,'f',b); }
+    if(!b){ AP.id=null; apPaint(); toast(navigator.onLine?'Nota de voz no disponible':'Sin conexión'); return; } u=fuMake(id,'f',b); }
   el.src=u; el.play().catch(apFail); apPaint(); }
 // iOS may refuse to play once the download has taken the tap's moment: the recording stays loaded and the next tap plays it
 function apFail(e){ if(e&&e.name==='NotAllowedError'){ apPaint(); return; } if(e&&e.name==='AbortError') return; log('warn','Reproducción: '+(e&&e.message||e)); }
@@ -230,7 +230,7 @@ function apTick(){ const el=AP.el; if(!el||!AP.id) return; const d=isFinite(el.d
   if(!el.paused) AP.raf=requestAnimationFrame(apTick); }
 // The desktop: a click on a recording (not on its play button or bar) offers what can be done with it, at the pointer
 function audioMenu(id, ev){ const el=document.querySelector('.vn[data-au="'+CSS.escape(id)+'"]'); const at=ev&&ev.clientX!=null&&UI.wide?{x:ev.clientX, y:ev.clientY}:{anchor:el};
-  popMenu(Object.assign(at, {groups:[[{label:AP.id===id&&AP.el&&!AP.el.paused?'Pausar':'Reproducir', icon:MI.play, fn:()=>apToggle(id)}],[{label:'Eliminar audio', icon:MI.trash, red:true, fn:()=>deleteAttachment(id)}]]})); }
+  popMenu(Object.assign(at, {groups:[[{label:AP.id===id&&AP.el&&!AP.el.paused?'Pausar':'Reproducir', icon:MI.play, fn:()=>apToggle(id)}],[{label:'Eliminar nota de voz', icon:MI.trash, red:true, fn:()=>deleteAttachment(id)}]]})); }
 function photoMenu(id, ev){ const a=att(id); if(!a) return; const at=ev&&ev.clientX!=null?{x:ev.clientX, y:ev.clientY}:{anchor:document.querySelector('.att-ph[data-att="'+CSS.escape(id)+'"]')};
   popMenu(Object.assign(at, {groups:[[{label:'Abrir', icon:MI.eye, fn:()=>openViewer(a.taskId, id)}],[{label:'Eliminar foto', icon:MI.trash, red:true, fn:()=>deleteAttachment(id)}]]})); }
 
@@ -246,8 +246,8 @@ function recordSheet(taskId){ if(!task(taskId)) return;
   const can=!!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia&&window.MediaRecorder);
   const R={state:'idle', rec:null, stream:null, chunks:[], blob:null, mime:'', t0:0, ms:0, timer:0, url:null, gen:0, saveAfter:false, pa:null, raf:0, auto:false};
   const maxMin=Math.round(REC_MAX_MS/6e4);
-  openSheet(sheadHTML('Grabar audio','Descartar','Guardar')+'<div class="recw"><div class="rec-time">0:00</div><button class="recbtn" data-x="rec" aria-label="Grabar"'+(can?'':' disabled')+'><span class="c"></span><span class="s"></span></button>'+
-    '<div class="hint rec-hint">'+(can?'Toca para grabar. Hasta '+maxMin+(maxMin===1?' minuto.':' minutos.'):'Este navegador no puede grabar audio.')+'</div><div class="rec-prev" hidden>'+playerHTML()+'</div></div>', s=>{
+  openSheet(sheadHTML('Nota de voz','Descartar','Guardar')+'<div class="recw"><div class="rec-time">0:00</div><button class="recbtn" data-x="rec" aria-label="Grabar"'+(can?'':' disabled')+'><span class="c"></span><span class="s"></span></button>'+
+    '<div class="hint rec-hint">'+(can?'Toca para grabar. Hasta '+maxMin+(maxMin===1?' minuto.':' minutos.'):'Este navegador no puede grabar notas de voz.')+'</div><div class="rec-prev" hidden>'+playerHTML()+'</div></div>', s=>{
     const ok=$('.hbtn.ok',s), btn=$('.recbtn',s), time=$('.rec-time',s), hint=$('.rec-hint',s), prev=$('.rec-prev',s);
     ok.disabled=true;
     const say=(t, warn)=>{ hint.textContent=t; hint.classList.toggle('warn', !!warn); };
@@ -286,7 +286,7 @@ function recordSheet(taskId){ if(!task(taskId)) return;
       FS.putFile(id, blob, {pending:true}).then(()=>{ if(!task(taskId)) return; fuMake(id,'f',blob);
           DB.attachments.push({id, taskId, kind:'audio', path:null, mime, size:blob.size, width:null, height:null, durationMs:ms, created:now, modified:now});
           updTask(taskId,{}); haptic(8); log('info','Audio añadido', {ms, size:blob.size, mime}); attFlushSoon(); attPaint(taskId); })
-        .catch(e=>{ log('error','Audio no guardado: '+(e&&e.message||e)); toast('No se pudo guardar el audio en el dispositivo'); });
+        .catch(e=>{ log('error','Audio no guardado: '+(e&&e.message||e)); toast('No se pudo guardar la nota de voz en el dispositivo'); });
       closeSheet(); };
     stopRec=cleanup; // closeSheet stops a recording and lets the microphone go, however the sheet closes
     sheetGuard=()=>R.state==='rec'||R.state==='stopping'||R.state==='done'?{title:'La grabación no se ha guardado.', label:'Descartar grabación', discard:cleanup}:null;

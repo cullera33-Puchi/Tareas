@@ -28,7 +28,7 @@ async function seed(page){
     T('q6','Revisar planos',{date:TODAY, projectId:b.id});
     T('q7','Cerrar pedido',{date:TODAY, projectId:a.id});
     T('q8','Tarea sin fecha',{reminder:rem.tom9});
-    DB.voiceNotes.push({id:'vq1', taskId:'q1', text:'Mirar la cláusula de penalizaciones', created:new Date().toISOString()});
+    { const t=new Date().toISOString(); DB.attachments.push({id:'vq1', taskId:'q1', kind:'audio', path:null, mime:'audio/mp4', size:4000, width:null, height:null, durationMs:5000, created:t, modified:t}); } // decision 49: a voice note is a recording
     window.__P={flc:a.id, obra:b.id}; save(); render();
   }, {TODAY, TOM, rem:{today18:iso(2026,10,4,18,0), tom9:iso(2026,10,5,9,0), fri12:iso(2026,10,6,12,0)}});
   await page.waitForTimeout(400); return page.evaluate(()=>window.__P);
@@ -201,16 +201,16 @@ async function openRowSwipe(page, id){ await page.evaluate(s=>document.querySele
   check('c_open8', await openRowSwipe(page,'q5'));
   await tapSel(page, rowOf('q5')+' .row-title'); await page.waitForTimeout(600);
   check('c_own_content_closes', await page.evaluate(()=>!openRow&&!UI.stack.length));
-  // Voice notes in the detail
+  // Voice notes (recordings, decision 49) in the detail
   await page.evaluate(()=>openDetail('q1')); await page.waitForTimeout(800);
-  { const b=await L.box(page, '.pushed-screen .vn[data-vn=vq1]'); await L.touchDrag(page, b.x+b.w-40, b.cy, -100, 0, 8, 16); await page.waitForTimeout(500); }
+  { const b=await L.box(page, '.pushed-screen .vn[data-au=vq1]'); await L.touchDrag(page, b.x+b.w-40, b.cy, -100, 0, 8, 16); await page.waitForTimeout(500); }
   check('c_vn_open', await page.evaluate(()=>!!openVn&&openVn.dataset.open==='l'));
   await tapSel(page, '.pushed-screen textarea'); await page.waitForTimeout(500);
   r.c5 = await page.evaluate(()=>({open:!!openVn, focus:document.activeElement&&document.activeElement.tagName}));
   check('c_vn_tap_closes_only', !r.c5.open && r.c5.focus!=='TEXTAREA', r.c5);
-  { const b=await L.box(page, '.pushed-screen .vn[data-vn=vq1]'); await L.touchDrag(page, b.x+b.w-40, b.cy, -100, 0, 8, 16); await page.waitForTimeout(500); }
-  await tapSel(page, '.pushed-screen .vn[data-vn=vq1] [data-vact=del]'); await page.waitForTimeout(500);
-  check('c_vn_own_button', await page.evaluate(()=>!DB.voiceNotes.some(v=>v.id==='vq1')));
+  { const b=await L.box(page, '.pushed-screen .vn[data-au=vq1]'); await L.touchDrag(page, b.x+b.w-40, b.cy, -100, 0, 8, 16); await page.waitForTimeout(500); }
+  await tapSel(page, '.pushed-screen .vn[data-au=vq1] [data-aact=del]'); await page.waitForTimeout(500);
+  check('c_vn_own_button', await page.evaluate(()=>!DB.attachments.some(a=>a.id==='vq1')));
   await page.evaluate(()=>pop()); await page.waitForTimeout(700);
   await ctx.close();
 

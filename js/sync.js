@@ -196,7 +196,8 @@ function syncApply(pulled, o){ o=o||{};
   if(o.pool || W.spaces.some(s=>INITIAL_SPACES.includes(s.id))) stats.remaps=syncRemapSpaces(W, o.pool||null);
   SYNC_TABLES.forEach(({table})=>{ const rows=pulled[table]||[]; if(rows.length) syncMerge(W, st, table, rows, stats);
     if(o.cursor) rows.forEach(r=>{ if(syncTime(r.server_ts)>syncTime(st.cursor[table])) st.cursor[table]=r.server_ts; }); });
-  const changed=stats.added+stats.updated+stats.removed+stats.remaps.length;
+  const folded=stats.folded=foldVoiceNotes(W); // decision 49: voice notes that came from a device on an older version go into Notas, and up as deleted
+  const changed=stats.added+stats.updated+stats.removed+stats.remaps.length+folded;
   if(changed){ const t=todayStr(); W.tasks.forEach(x=>{ if(x.status==='pending'&&x.date&&x.date<t) Object.assign(x, dayPatch(x, t, {carried:true})); if(x.focus&&localDay(x.focus)<t) x.focus=null; }); dedupeSeries(W); // two devices made the same next task of a series offline: one stays // as rollOver: never overdue, the reminder goes along (decision 25), Ahora of an earlier day emptied (decision 39), modified untouched
     if(!W.spaces.length) return stats; // never leave the app without a space (load would put Trabajo and Personal back)
     const raw=JSON.stringify(Object.assign({}, DB, W));
@@ -298,7 +299,7 @@ function syncSubscribe(){ if(SY.unsub||!SY.user||!SY.remote.subscribe) return; S
 function syncRealtime(){ const ev=SY.rt.splice(0); if(!ev.length||!SY.user) return;
   if(syncState().owner!==SY.user.id){ SY.again=true; return; } // the first connection is still matching the spaces: a run afterwards picks these up
   const pulled={}; ev.forEach(([t,row])=>{ (pulled[t]=pulled[t]||[]).push(row); });
-  try{ const a=syncApply(pulled, {}); const n=a.added+a.updated+a.removed; if(n) log('info','Cambios recibidos en tiempo real', {recibidas:a.added+a.updated, eliminadas:a.removed, conflictos:a.conflicts.length}); if(n||a.conflicts.length) syncChanged(); }
+  try{ const a=syncApply(pulled, {}); const n=a.added+a.updated+a.removed; if(n) log('info','Cambios recibidos en tiempo real', {recibidas:a.added+a.updated, eliminadas:a.removed, conflictos:a.conflicts.length}); if(n||a.conflicts.length||a.folded) syncChanged(); }
   catch(e){ log('error','Tiempo real: '+(e&&e.message||e)); } }
 function syncSetUser(user, why){
   const st=syncState();

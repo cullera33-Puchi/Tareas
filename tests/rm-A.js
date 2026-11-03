@@ -45,7 +45,7 @@ const center = async (page, sel) => { await page.$eval(sel, e=>{ const sc=e.clos
     addTask({title:'Arrastrada',date:t,carried:true,projectId:p.id}); addTask({title:'Prioritaria',date:t,priority:'high',projectId:p.id});
     addTask({title:'Suelta'}); addTask({title:'Mañana tarea',date:addDays(t,1),projectId:p.id});
     const d=addTask({title:'Hecha ayer',projectId:p.id}); d.status='done'; d.completed=new Date(Date.now()-3600e3).toISOString();
-    DB.voiceNotes.push({id:uid(),taskId:DB.tasks.find(x=>x.title==='Dos').id,text:'voz',created:new Date().toISOString()}); save(); render(); });
+    { const n=new Date().toISOString(); DB.attachments.push({id:uid(),taskId:DB.tasks.find(x=>x.title==='Dos').id,kind:'audio',path:null,mime:'audio/mp4',size:4000,width:null,height:null,durationMs:5000,created:n,modified:n}); } save(); render(); }); // decision 49: a voice note is a recording, shown by the paperclip
   await page.waitForTimeout(300);
   const HOY='.screen.root[data-root=tareas]';
   const rowSel = title => HOY+' .scroll .group .row:has(.row-title:text-is("'+title+'"))';

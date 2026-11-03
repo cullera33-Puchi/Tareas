@@ -45,12 +45,12 @@ function bindTimePick(root, o){ o=o||{}; const box=$('.tpk', root); if(!box) ret
 
 /* ---------- Decision 31: the desktop add bar opens into a composer ----------
    Once something is typed, a panel unfolds under the bar (over the list, so nothing below moves): Notas, and buttons for Fecha, Proyecto,
-   Prioridad, Recordatorio and Nota de voz (dictated with the computer's microphone where the browser can, otherwise written). The words of
+   Prioridad, Recordatorio and Dictar (decision 49: the computer's microphone writes into Notas, where the browser can dictate). The words of
    the title (mañana, #proyecto, !!, a las 9) still count and show on the buttons; a button chosen by hand takes that word out of the title.
    Intro in the title or the notes adds everything (Mayúsculas e Intro is a new line in the notes); then the bar stays open and empty with
    the date and project chosen by hand, for the next one. Esc folds it, asking first when there is something written (decision 28) */
 // AX: the composer's state, set up with UI (the first render reads it)
-function axHasText(){ return !!((UI.addDraft||'').trim()||AX.notes.trim()||AX.voice.trim()); }
+function axHasText(){ return !!((UI.addDraft||'').trim()||AX.notes.trim()); }
 // The values chosen by hand over the view's own (deskAddBase); the title's words go over both (quickTask)
 function addxBase(projectId){ const b=deskAddBase(projectId); return {date:AX.date!==undefined?AX.date:b.date, projectId:AX.projectId!==undefined?AX.projectId:b.projectId, priority:AX.priority||b.priority}; }
 function addxTask(text, projectId){ const r=quickTask(text, addxBase(projectId));
@@ -61,10 +61,9 @@ function axBtnsHTML(r){ const p=r.projectId&&proj(r.projectId), pr=r.priority, b
     b('proj', p?'<span class="pm-dot" style="background:'+p.color+'"></span>':I.folder, p?p.name:'Proyecto', !!p, '', 'Proyecto')+
     b('pri', I.flag, pr==='high'?'Alta':pr==='mid'?'Media':'Prioridad', pr!=='none', pr==='high'?'high':pr==='mid'?'mid':'', 'Prioridad')+
     b('rem', I.bell, r.reminder?(r.date&&localDay(r.reminder)===r.date?fmtTime(r.reminder):fmtDateTime(r.reminder)):'Recordatorio', !!r.reminder, '', 'Recordatorio')+
-    b('voice', I.mic, AX.rec?'Escuchando':'Nota de voz', !!(AX.rec||AX.voice.trim()), AX.rec?'rec':'', AX.rec?'Parar el dictado':'Nota de voz'); }
+    (axSR()?b('voice', I.mic, AX.rec?'Escuchando':'Dictar', !!AX.rec, AX.rec?'rec':'', AX.rec?'Parar el dictado':'Dictar en Notas'):''); } // without a recognizer Notas is written by hand
 function addxPanelHTML(projectId){ const r=addxTask(UI.addDraft||'', projectId);
-  return '<div class="axp" role="group" aria-label="Detalles de la nueva tarea"><textarea class="axn" data-role="addnotes" rows="1" placeholder="Notas">'+esc(AX.notes)+'</textarea>'+
-    (AX.voiceOn||AX.voice?'<div class="axv">'+I.mic+'<textarea class="axvt" data-role="addvoice" rows="1" placeholder="'+(AX.rec?'Escuchando. Habla y se escribirá aquí':'Nota de voz')+'">'+esc(AX.voice)+'</textarea><button class="axx" data-ax="voiceClear" aria-label="Quitar la nota de voz" title="Quitar la nota de voz">'+XICON+'</button></div>':'')+
+  return '<div class="axp" role="group" aria-label="Detalles de la nueva tarea"><textarea class="axn" data-role="addnotes" rows="1" placeholder="'+(AX.rec?'Escuchando. Habla y se escribirá aquí':'Notas')+'">'+esc(AX.notes)+'</textarea>'+
     '<div class="axb"><span class="axbs">'+axBtnsHTML(r)+'</span><span class="grow"></span><button class="axadd" data-ax="add"'+(r.title?'':' disabled')+'>Añadir</button></div><div class="addhint" id="deskSaid"></div></div>'; }
 function axBar(){ return $('#desk [data-role=addbar]'); }
 function axFocus(){ const n=axBar(); if(n){ n.focus({preventScroll:true}); const l=n.value.length; n.setSelectionRange(l,l); } }
@@ -73,30 +72,31 @@ function axStrip(kind){ const ab=axBar(); if(!ab) return; const q=parseQuick(ab.
   let v=ab.value; ts.slice().reverse().forEach(t=>{ v=v.slice(0,t.start)+v.slice(t.end); }); v=v.replace(/\s{2,}/g,' ').trim(); ab.value=v; UI.addDraft=v; }
 function axOpen(){ if(AX.open) return; AX.open=true; AX.opened=true; log('info','Alta ampliada abierta'); render(); }
 // Folds the composer (with a short fade and lift) and forgets everything it held
-function axCollapse(){ axStopVoice(); const p=$('#desk .axp'); const done=()=>{ Object.assign(AX, {open:false, notes:'', voice:'', voiceOn:false, date:undefined, projectId:undefined, priority:undefined, time:null}); UI.addDraft=''; const ab=axBar(); if(ab) ab.value=''; render(); };
+function axCollapse(){ axStopVoice(); const p=$('#desk .axp'); const done=()=>{ Object.assign(AX, {open:false, notes:'', date:undefined, projectId:undefined, priority:undefined, time:null}); UI.addDraft=''; const ab=axBar(); if(ab) ab.value=''; render(); };
   if(p&&p.animate&&!RM.matches){ try{ const a=p.animate([{opacity:1, transform:'none'},{opacity:0, transform:'translate3d(0,-6px,0)'}], {duration:140, easing:'ease-in', fill:'forwards'}); a.onfinish=done; return; }catch(e){} }
   done(); }
 function axEscape(){ if(!axHasText()){ axCollapse(); const ab=axBar(); if(ab) ab.blur(); return; }
   macAlert({title:'La tarea no se ha añadido.', text:'Lo escrito se perderá.', ok:'Descartar tarea', cancel:'Seguir editando', fn:()=>{ log('info','Alta ampliada descartada con texto'); axCollapse(); }}); }
 function axSubmit(projectId){ const ab=axBar(), r=addxTask(ab?ab.value:UI.addDraft||'', projectId); if(!r.title){ axFocus(); return false; }
   const x=addTask({title:r.title, date:r.date, projectId:r.projectId, priority:r.priority, reminder:r.reminder, notes:AX.notes.replace(/\s+$/,'')});
-  axStopVoice(); const v=AX.voice.trim(); if(v){ DB.voiceNotes.push({id:uid(), taskId:x.id, text:v, created:new Date().toISOString()}); save(); }
-  log('info','Tarea añadida desde el alta ampliada', {notas:!!x.notes, voz:!!v, recordatorio:!!x.reminder});
+  axStopVoice(); log('info','Tarea añadida desde el alta ampliada', {notas:!!x.notes, recordatorio:!!x.reminder});
   // Ready for the next one: the date and project chosen by hand stay, the rest starts again
-  Object.assign(AX, {notes:'', voice:'', voiceOn:false, priority:undefined, time:null}); UI.addDraft=''; if(ab) ab.value=''; document.querySelectorAll('#desk .axp textarea').forEach(t=>{ t.value=''; }); // a merge keeps a typed field's value
+  Object.assign(AX, {notes:'', priority:undefined, time:null}); UI.addDraft=''; if(ab) ab.value=''; document.querySelectorAll('#desk .axp textarea').forEach(t=>{ t.value=''; }); // a merge keeps a typed field's value
   haptic(6); renderAnimated(); toast('Añadida: '+x.title); axFocus(); if(x.reminder) pushOfferSoon(); return true; }
-// Dictation: the browser's recognizer where it exists (Chrome, Edge, Safari); otherwise the field to write it
-function axVoice(){ if(AX.rec){ axStopVoice(); render(); return; } AX.voiceOn=true;
-  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-  if(!SR){ render(); const t=$('#desk [data-role=addvoice]'); if(t) t.focus(); return; }
-  let r; try{ r=new SR(); }catch(e){ render(); return; } const base=AX.voice.trim()?AX.voice.trim()+' ':''; let final='';
+// Decision 49: dictation writes into Notas, after what is there. The browser's recognizer where it exists (Chrome, Edge, Safari)
+const axSR = () => window.SpeechRecognition||window.webkitSpeechRecognition||null;
+const axNotesEl = () => $('#desk [data-role=addnotes]');
+function axVoice(){ if(AX.rec){ axStopVoice(); render(); return; }
+  const SR=axSR(); if(!SR){ const t=axNotesEl(); if(t) t.focus(); return; }
+  let r; try{ r=new SR(); }catch(e){ return; }
+  const cur=AX.notes.replace(/[ \t]+$/,''), base=cur&&!cur.endsWith('\n')?cur+' ':cur; let final='';
   r.lang='es-ES'; r.continuous=true; r.interimResults=true;
   r.onresult=ev=>{ if(AX.rec!==r) return; let interim=''; for(let i=ev.resultIndex;i<ev.results.length;i++){ const x=ev.results[i]; if(x.isFinal) final+=x[0].transcript+' '; else interim+=x[0].transcript; }
-    AX.voice=(base+final+interim).trim(); const t=$('#desk [data-role=addvoice]'); if(t&&t.value!==AX.voice){ t.value=AX.voice; axFit(t); } };
-  r.onerror=e=>{ if(AX.rec!==r) return; const er=e&&e.error; if(er==='no-speech') return; log('warn','Dictado de la nota de voz: '+er);
-    axStopVoice(); render(); toast(er==='not-allowed'||er==='service-not-allowed'?'Sin permiso para el micrófono. Escribe la nota.':'Dictado no disponible. Escribe la nota.'); const t=$('#desk [data-role=addvoice]'); if(t) t.focus(); };
+    AX.notes=(base+(final+interim).trim()); const t=axNotesEl(); if(t&&t.value!==AX.notes){ t.value=AX.notes; axFit(t); } };
+  r.onerror=e=>{ if(AX.rec!==r) return; const er=e&&e.error; if(er==='no-speech') return; log('warn','Dictado en Notas: '+er);
+    axStopVoice(); render(); toast(er==='not-allowed'||er==='service-not-allowed'?'Sin permiso para el micrófono. Escribe en Notas.':'Dictado no disponible. Escribe en Notas.'); const t=axNotesEl(); if(t) t.focus(); };
   r.onend=()=>{ if(AX.rec===r){ try{ r.start(); }catch(e){ axStopVoice(); render(); } } }; // continuous: the engine stops on its own after a silence
-  try{ r.start(); AX.rec=r; log('info','Dictado de nota de voz iniciado'); }catch(e){ log('warn','Dictado no disponible: '+(e&&e.message||e)); }
+  try{ r.start(); AX.rec=r; log('info','Dictado en Notas iniciado'); }catch(e){ log('warn','Dictado no disponible: '+(e&&e.message||e)); }
   render(); }
 function axStopVoice(){ const r=AX.rec; if(!r) return; AX.rec=null; try{ r.stop(); }catch(e){} }
 function axFit(t){ t.style.height='auto'; t.style.height=Math.min(t.scrollHeight+2, 160)+'px'; }
@@ -125,10 +125,9 @@ function axBind(d){
   d.addEventListener('click', e=>{ const b=e.target.closest('.axp [data-ax]'); if(!b) return; e.stopPropagation(); const k=b.dataset.ax, pid=(axBar()||{dataset:{}}).dataset.project||null;
     if(k==='add'){ axSubmit(pid); return; }
     if(k==='voice'){ axVoice(); return; }
-    if(k==='voiceClear'){ axStopVoice(); AX.voice=''; AX.voiceOn=false; render(); axFocus(); return; }
     axPick(k, b, pid); }, true);
-  d.addEventListener('input', e=>{ const t=e.target, role=t.dataset&&t.dataset.role; if(role==='addnotes'){ AX.notes=t.value; axFit(t); } else if(role==='addvoice'){ if(AX.rec){ axStopVoice(); render(); } AX.voice=t.value; axFit(t); } });
-  d.addEventListener('keydown', e=>{ const t=e.target, role=t.dataset&&t.dataset.role; if(!/^(addbar|addnotes|addvoice)$/.test(role||'')||e.isComposing) return;
+  d.addEventListener('input', e=>{ const t=e.target, role=t.dataset&&t.dataset.role; if(role==='addnotes'){ if(AX.rec){ axStopVoice(); AX.notes=t.value; render(); } AX.notes=t.value; axFit(t); } }); // a hand edit stops the dictation and wins over any late result
+  d.addEventListener('keydown', e=>{ const t=e.target, role=t.dataset&&t.dataset.role; if(!/^(addbar|addnotes)$/.test(role||'')||e.isComposing) return;
     if(e.key==='Escape'&&AX.open){ e.preventDefault(); e.stopPropagation(); axEscape(); return; }
     if(e.key==='Enter'&&!e.shiftKey&&role!=='addbar'&&!UI.addPaste){ e.preventDefault(); e.stopPropagation(); axSubmit(axBar()&&axBar().dataset.project||null); } }, true);
   // Leaving it empty folds it; with something written it waits, as a draft

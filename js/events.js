@@ -11,7 +11,7 @@ function bindRows(box){
 function bindCommon(scr){
   scr.addEventListener('click', onClick);
   bindRows(scr);
-  if(!UI.wide) scr.querySelectorAll('.vn[data-vn], .vn[data-au], .vn[data-bk]').forEach(bindVnGestures); // voice notes, recordings (decision 29) and local copies (decision 34)
+  if(!UI.wide) scr.querySelectorAll('.vn[data-au], .vn[data-bk]').forEach(bindVnGestures); // voice notes (recordings, decisions 29 and 49) and local copies (decision 34)
   if(!UI.wide) scr.querySelectorAll('.vn[data-bk] .cell').forEach(c=>bindLongPress(c, ()=>backupMenu(c.dataset.restore, {anchor:c}))); // decision 34: a copy's menu
   scr.querySelectorAll('[data-open-project]').forEach(b=>bindLongPress(b, src=>{ if(b.dataset.openProject!=='none') projectMenu(b.dataset.openProject, src); }));
   const s=$('[data-role=search]',scr); if(s) bindSearch(s, ()=>searchAround(s));
@@ -73,8 +73,6 @@ function onClick(e){
     if(aa.dataset.aact==='seek'){ if(AP.id!==id){ apToggle(id); return; } const r=aa.getBoundingClientRect(); apSeek(id, (e.clientX-r.left)/r.width); return; } }
   const auEl=e.target.closest('.vn[data-au]'); if(auEl){ if(auEl.dataset.open){ closeVn(auEl); return; } if(UI.wide) audioMenu(auEl.dataset.au, e); return; }
   const ph=e.target.closest('.att-ph[data-att]'); if(ph){ const a=att(ph.dataset.att); if(a){ if(UI.wide&&(e.metaKey||e.ctrlKey)) photoMenu(a.id, e); else openViewer(a.taskId, a.id); } return; }
-  const va=e.target.closest('[data-vact]'); if(va){ const el=va.closest('.vn'); const vid=el&&el.dataset.vn; closeVn(el); if(va.dataset.vact==='del') deleteVoiceNote(vid); else editVoiceNote(vid); return; }
-  const vnEl=e.target.closest('.vn[data-vn]'); if(vnEl&&!e.target.closest('a')){ if(vnEl.dataset.open){ closeVn(vnEl); return; } if(UI.wide) voiceNoteMenu(vnEl.dataset.vn, e); return; }
   if(UI.select){ const row=e.target.closest('.row'); if(row && !row.closest('.first')){ toggleSelected(row); return; } }
   if(UI.wide){ const row=e.target.closest('.main .mbody .row[data-id]'); if(row && deskRowClick(e, row)) return; } // R16: Comando, Mayúsculas or the selection mode
   const act=e.target.closest('[data-act]'); if(!act) { const row=e.target.closest('.row');
@@ -130,7 +128,6 @@ function onClick(e){
     case 'toggleWaiting': UI.waitOpen=!UI.waitOpen; render(); break;
     case 'pickRepeat': if(detailId) repeatMenu(detailId, UI.wide?act:act.querySelector('.val')||act); break; // decision 38
     case 'focus': if(detailId) toggleFocus(detailId); break; // decision 39: the star of the detail and of the inspector
-    case 'voice': voiceSheet(detailId); break;
     case 'attPhoto': if(detailId) pickPhotos(detailId); break; // decision 29: inside the tap, so iOS offers the camera or the library
     case 'attAudio': if(detailId) recordSheet(detailId); break;
     case 'export': exportJSON(); break;
@@ -243,28 +240,22 @@ function bindRowGestures(row){
   row.addEventListener('touchend',end);
   row.addEventListener('touchcancel',()=>{ clearTimeout(lp); const was=mode; mode=null; if(was==='off') return; if(was==='swipe') closeRow(row); dragEnd(true); }); // a cancelled touch never completes the task or opens the buttons
 }
-// Voice note rows: right reveals Editar (a long swipe opens it), left reveals Eliminar and stops there, like task rows.
-// A recording (decision 29) has no Editar: it only slides to the left
+// Rows of voice notes (recordings, decision 29), local copies and project notes: left reveals Eliminar and stops there, like task rows
 let openVn=null;
 function closeVn(el){ if(!el) return; const c=el.querySelector('.vn-c'); c.classList.remove('drag'); c.style.transform=''; delete el.dataset.open; if(openVn===el) openVn=null; setTimeout(()=>{ if(!el.dataset.open) el.classList.remove('dir-l','dir-r'); },300); }
-function bindVnGestures(el){ if(el._vnb) return; el._vnb=1; let c=null,x0=0,y0=0,dx=0,mode=null,edge=false,thr=false; const left=!!el.querySelector('.vn-bg.l'); // once per element, as bindLongPress (R18)
-  el.addEventListener('touchstart',e=>{ c=el.querySelector('.vn-c'); if(!c){ mode='off'; return; } const t=e.touches[0]; x0=t.clientX; y0=t.clientY; dx=0; mode=null; thr=false; edge=x0<EDGE&&!!el.closest('.pushed-screen'); if(openVn&&openVn!==el) closeVn(openVn); if(openRow) closeRow(openRow); },{passive:true});
+function bindVnGestures(el){ if(el._vnb) return; el._vnb=1; let c=null,x0=0,y0=0,dx=0,mode=null,edge=false; // once per element, as bindLongPress (R18)
+  el.addEventListener('touchstart',e=>{ c=el.querySelector('.vn-c'); if(!c){ mode='off'; return; } const t=e.touches[0]; x0=t.clientX; y0=t.clientY; dx=0; mode=null; edge=x0<EDGE&&!!el.closest('.pushed-screen'); if(openVn&&openVn!==el) closeVn(openVn); if(openRow) closeRow(openRow); },{passive:true});
   el.addEventListener('touchmove',e=>{ const t=e.touches[0], mx=t.clientX-x0, my=t.clientY-y0;
     if(mode===null){ if(Math.abs(my)>8) mode='scroll'; else if(Math.abs(mx)>10){ if(edge){ mode='edge'; return; } mode='swipe'; c.classList.add('drag'); } }
     if(mode!=='swipe') return; e.preventDefault();
-    const base=el.dataset.open==='l'?-88:el.dataset.open==='r'?88:0; let raw=base+mx;
+    let raw=(el.dataset.open==='l'?-88:0)+mx;
     if(raw<-88) raw=-88+(raw+88)*0.15; // stops at Eliminar
-    if(raw>150) raw=150+(raw-150)*0.25;
-    if(!left&&raw>0) raw=0;
-    dx=Math.max(-104,Math.min(190,raw)); c.style.transform='translate3d('+dx+'px,0,0)'; el.classList.toggle('dir-r',dx>0); el.classList.toggle('dir-l',dx<0);
-    const passed=dx>150; if(passed&&!thr){ thr=true; haptic(8); } if(!passed) thr=false; },{passive:false});
+    dx=Math.max(-104,Math.min(0,raw)); c.style.transform='translate3d('+dx+'px,0,0)'; el.classList.toggle('dir-l',dx<0); },{passive:false});
   const end=()=>{ if(mode!=='swipe'){ mode=null; return; } mode=null; c.classList.remove('drag');
-    if(dx>150){ closeVn(el); editVoiceNote(el.dataset.vn); }
-    else if(dx>50){ c.style.transform='translate3d(88px,0,0)'; el.dataset.open='r'; openVn=el; }
-    else if(dx<-50){ c.style.transform='translate3d(-88px,0,0)'; el.dataset.open='l'; openVn=el; }
+    if(dx<-50){ c.style.transform='translate3d(-88px,0,0)'; el.dataset.open='l'; openVn=el; }
     else closeVn(el); };
   el.addEventListener('touchend',end); el.addEventListener('touchcancel',()=>{ mode=null; closeVn(el); }); }
-/* Decision 27c: while a row's buttons (or a voice note's) are showing, the first touch anywhere else only closes it, as on iOS. That touch
+/* Decision 27c: while a row's buttons (or a recording's, a copy's, a note's) are showing, the first touch anywhere else only closes it, as on iOS. That touch
    reaches no other handler (no detail, filter, figure, tab, button, long press, row swipe, tab slide or pull to refresh) and its click is
    dropped; the list may still scroll under it (native scrolling is left alone), but nothing acts on it. The open row's own buttons, and a
    sheet or menu on top, work as usual */
@@ -281,12 +272,6 @@ const shutEnd=e=>{ if(!shut.on) return; e.stopPropagation(); if(e.touches.length
   if(e.type==='touchend'&&!shut.moved){ if(e.cancelable) e.preventDefault(); shut.t=performance.now(); } }; // a tap: no click, no focus
 window.addEventListener('touchend', shutEnd, {capture:true, passive:false}); window.addEventListener('touchcancel', shutEnd, {capture:true, passive:true});
 document.addEventListener('click', e=>{ if(shut.t&&performance.now()-shut.t<500){ shut.t=0; e.stopPropagation(); e.preventDefault(); } }, true); // a browser that still sends the click
-function deleteVoiceNote(vid){ const i=DB.voiceNotes.findIndex(v=>v.id===vid); if(i<0) return; const [v]=DB.voiceNotes.splice(i,1); if(task(v.taskId)) updTask(v.taskId,{}); else save(); haptic(14); render(); log('info','Nota de voz eliminada');
-  toast('Nota de voz eliminada', ()=>{ if(!DB.voiceNotes.some(x=>x.id===v.id)) DB.voiceNotes.push(v); save(); render(); }); }
-function editVoiceNote(vid){ const v=DB.voiceNotes.find(x=>x.id===vid); if(v) voiceSheet(v.taskId, v.id); }
-// R17: on the desktop a Mac menu at the pointer (popMenu draws it as macMenu); the iPhone has the swipes, and the same menu anchored to the note if called there
-function voiceNoteMenu(vid, ev){ const el=document.querySelector('.vn[data-vn="'+CSS.escape(vid)+'"]'); const at=ev&&ev.clientX!=null&&UI.wide?{x:ev.clientX, y:ev.clientY}:{anchor:el};
-  popMenu(Object.assign(at, {groups:[[{label:'Editar nota', icon:MI.pencil, fn:()=>editVoiceNote(vid)}],[{label:'Eliminar nota', icon:MI.trash, red:true, fn:()=>deleteVoiceNote(vid)}]]})); }
 // Long press on a project: same 8 and 10 px tolerance as task rows; every touch starts with the flag clear, so a tap after a cancelled menu opens the project
 // R10: fn gets {row, x, y} to lift the element; once the menu is open the same finger slides over its options and lifts on one
 function bindLongPress(el, fn){ if(el._lpb) return; el._lpb=1; let t=null, x0=0, y0=0, fired=false; // once per element (R18)

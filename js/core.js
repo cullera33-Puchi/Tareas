@@ -325,7 +325,7 @@ const UI = { tab:'tareas', query:'', stack:[], scroll:{}, sumFilter:null, summar
 let deskRedraw=false; // while renderDesktop replaces the markup: a field it takes away is not a field the user left (R15)
 const MODK=/Mac|iPhone|iPad/.test(navigator.platform||navigator.userAgent||'')?'Comando':'Control'; // the key a Mac calls Comando
 const bulkN = n => n+(n===1?' tarea':' tareas');
-const AX={open:false, notes:'', voice:'', voiceOn:false, rec:null, date:undefined, projectId:undefined, priority:undefined, time:null, opened:false}; // decision 31: the desktop add bar's composer (axOpen)
+const AX={open:false, notes:'', rec:null, date:undefined, projectId:undefined, priority:undefined, time:null, opened:false}; // decision 31: the desktop add bar's composer (axOpen)
 
 /* ---------- Toast with undo ---------- */
 let toastTimer=null, undoFn=null, toastLbl=null; // toastLbl: the button is not Deshacer (Actualizar, Completar tarea): Comando Z and shaking leave it alone
@@ -437,6 +437,24 @@ function dedupeSeries(W){ const by=new Map(), out=[];
   if(!out.length) return 0; const ids=new Set(out.map(x=>x.id));
   W.tasks=W.tasks.filter(x=>!x||!ids.has(x.id)); W.voiceNotes=W.voiceNotes.filter(v=>!v||!ids.has(v.taskId)); W.attachments=(W.attachments||[]).filter(a=>!a||!ids.has(a.taskId)); if(W.subtasks) W.subtasks=W.subtasks.filter(s=>!s||!ids.has(s.taskId));
   log('info','Tarea repetida de una serie retirada: dos dispositivos crearon la misma siguiente', {ids:[...ids]}); return out.length; }
+/* Decision 49: the dictated voice note is gone from the interface; dictation is the keyboard's microphone in Notas. Each voice note left
+   (older data, a device still on an older version) becomes a line at the end of its task's notes, "2/11 18:40: texto" (local time of the
+   note, one line per note in creation order, a blank line before them when the notes had text), and is removed as any deletion is, so the
+   server marks it deleted. Idempotent: a line already in the notes is not added again (two devices may fold the same note before they
+   sync; the task merge keeps the newest and both carry the line). A note whose task is not here stays as it is. The task's modified is
+   updated so it goes up. W: DB or the working copy of a sync. Runs at the start, after every merge of a sync, an import and a restore.
+   Returns how many notes went */
+const vnLine = v => { const t=String(v.text||'').trim(), d=new Date(v.created||''); if(!t) return '';
+  return isNaN(d) ? t : d.getDate()+'/'+(d.getMonth()+1)+' '+fmtTime(v.created)+': '+t; };
+function foldVoiceNotes(W){ const list=W.voiceNotes||[]; if(!list.length) return 0;
+  const tasks=new Map(W.tasks.filter(Boolean).map(x=>[x.id, x])), go=list.filter(v=>v&&tasks.has(v.taskId)); if(!go.length) return 0;
+  const by=new Map(); go.slice().sort((a,b)=>String(a.created||'')<String(b.created||'')?-1:String(a.created||'')>String(b.created||'')?1:0).forEach(v=>{ const k=v.taskId; if(!by.has(k)) by.set(k, []); by.get(k).push(v); });
+  const now=new Date().toISOString();
+  by.forEach((vs, id)=>{ const x=tasks.get(id), notes=String(x.notes||''), add=[];
+    vs.forEach(v=>{ const l=vnLine(v); if(l && !('\n'+notes+'\n').includes('\n'+l+'\n') && !add.includes(l)) add.push(l); });
+    if(add.length){ const base=notes.replace(/\s+$/,''); x.notes=(base?base+'\n\n':'')+add.join('\n'); x.modified=now; } }); // lines already there: the task is left as it is
+  const out=new Set(go); W.voiceNotes=list.filter(v=>!out.has(v));
+  log('info','Notas de voz pasadas a Notas: '+go.length); return go.length; }
 // After a completion: the toast says when the next one of the series comes
 const doneText = (n, nx) => n===1&&nx ? 'Tarea completada, la siguiente '+dayWords(nx.date) : n===1?'Tarea completada':n+' tareas completadas';
 

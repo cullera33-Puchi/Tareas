@@ -36,7 +36,7 @@ function renderDesktop(again){
   // Each view keeps its own scroll (per space), like the iPhone tabs; a view seen for the first time opens at the top
   const body=d.querySelector('.mbody'); if(body&&UI.deskKey) UI.deskScroll[UI.deskKey]=body.scrollTop; const side=d.querySelector('.side'); const sst=side?side.scrollTop:0;
   // The add bar or the search keep focus and caret across the rebuild (a click elsewhere has already taken the focus)
-  const ae=document.activeElement, fr=ae&&d.contains(ae)&&/^(addbar|search|rowedit|addnotes|addvoice|ntitle|nbody)$/.test(ae.dataset.role||'') ? {role:ae.dataset.role, a:ae.selectionStart, b:ae.selectionEnd} : null;
+  const ae=document.activeElement, fr=ae&&d.contains(ae)&&/^(addbar|search|rowedit|addnotes|ntitle|nbody)$/.test(ae.dataset.role||'') ? {role:ae.dataset.role, a:ae.selectionStart, b:ae.selectionEnd} : null;
   const rowF=ae&&d.contains(ae)&&ae.classList.contains('row'), paneWas=UI.deskDetail; // R15: a focused row gives the focus to the selected row of the new markup
   const pop = isCalView(UI.deskView); // R17: in Semana the detail is a popover next to its card, so the seven columns keep their width
   const pane = deskPaneHTML();

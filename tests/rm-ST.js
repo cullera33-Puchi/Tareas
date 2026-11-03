@@ -250,7 +250,7 @@ async function iphone(browser){
   x = await ev(page, ()=>({share:shareText('t1'), csv:csvText()}));
   const head = x.csv.split('\r\n')[0], line = x.csv.split('\r\n').find(l=>l.includes('Preparar comité'))||'';
   check('m_share_text', /\nPasos \(3 de 4 hechos\):\n- \[x\] Pedir los datos a Marta\n- \[x\] Revisar el borrador\n- \[x\] Enviar convocatoria\n- \[ \] Reservar sala\n$/.test(x.share), x.share);
-  check('m_csv', head.includes('"Notas de voz";"Pasos";"Creada"') && line.includes('"[x] Pedir los datos a Marta | [x] Revisar el borrador | [x] Enviar convocatoria | [ ] Reservar sala"'), {head, line});
+  check('m_csv', head.includes('"Notas";"Pasos";"Creada"') && line.includes('"[x] Pedir los datos a Marta | [x] Revisar el borrador | [x] Enviar convocatoria | [ ] Reservar sala"'), {head, line});
   // Export, import and a local backup restored
   x = await ev(page, async()=>{ const ex=exportData(); const n=ex.subtasks.length; const saved=JSON.stringify(ex);
     DB.subtasks=DB.subtasks.filter(s=>s.taskId!=='t1'); save(); const r1=importData(saved); const back=stepsOf('t1').length;

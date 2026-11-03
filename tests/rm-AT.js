@@ -289,7 +289,7 @@ async function appTests(browser){
   /* ---------- A records audio with the fake microphone ---------- */
   await A.page.click(DET+' [data-act=attAudio]'); await A.page.waitForTimeout(600);
   const s0 = await A.page.evaluate(()=>({title:document.querySelector('.sheet h2').textContent, ok:document.querySelector('.sheet .hbtn.ok').disabled, hint:document.querySelector('.rec-hint').textContent}));
-  check('rec_sheet', s0.title==='Grabar audio' && s0.ok && s0.hint==='Toca para grabar. Hasta 10 minutos.', s0);
+  check('rec_sheet', s0.title==='Nota de voz' && s0.ok && s0.hint==='Toca para grabar. Hasta 10 minutos.', s0);
   await A.page.click('.sheet .recbtn'); await A.page.waitForTimeout(1700);
   const s1 = await A.page.evaluate(()=>({on:document.querySelector('.recbtn').classList.contains('on'), t:document.querySelector('.rec-time').textContent, hint:document.querySelector('.rec-hint').textContent}));
   check('rec_recording', s1.on && s1.t==='0:01' && s1.hint==='Grabando. Toca para parar.', s1);
@@ -329,7 +329,7 @@ async function appTests(browser){
     const open = await A.page.evaluate(()=>{ const e=document.querySelector('.screen.pushed-screen.detail .att-au'); return e.dataset.open==='l' && getComputedStyle(e.querySelector('.vn-bg.r')).display==='block'; });
     await A.page.screenshot({path:path.join(OUT,'a-light-audio-swipe.png')});
     await A.page.click(DET+' .att-au [data-aact=del]'); await A.page.waitForTimeout(500);
-    const gone = await A.page.evaluate(()=>!DB.attachments.some(a=>a.kind==='audio') && !document.querySelector('.screen.pushed-screen.detail .att-au') && document.querySelector('#toastText').textContent==='Audio eliminado');
+    const gone = await A.page.evaluate(()=>!DB.attachments.some(a=>a.kind==='audio') && !document.querySelector('.screen.pushed-screen.detail .att-au') && document.querySelector('#toastText').textContent==='Nota de voz eliminada');
     await A.page.click('#toastBtn'); await A.page.waitForTimeout(500);
     check('audio_swipe_delete_undo', open && gone && await A.page.evaluate(()=>DB.attachments.some(a=>a.kind==='audio') && !!document.querySelector('.screen.pushed-screen.detail .att-au')), {open, gone}); }
   check('A_settled', await synced(A.page));
@@ -358,7 +358,7 @@ async function appTests(browser){
   // A click on a recording (not its button) offers its menu at the pointer
   { const bb=await box(B.page, '#desk .pane .att-au .au-name'); await B.page.mouse.click(bb.cx, bb.cy); await B.page.waitForTimeout(300);
     const items = await B.page.evaluate(()=>[...document.querySelectorAll('#pmenu [role=menuitem], #pmenu button')].map(x=>x.textContent.trim()).filter(Boolean));
-    check('B_audio_menu', items.some(t=>/Eliminar audio/.test(t)) && items.some(t=>/Reproducir/.test(t)), items); await B.page.keyboard.press('Escape'); await B.page.waitForTimeout(200); }
+    check('B_audio_menu', items.some(t=>/Eliminar nota de voz/.test(t)) && items.some(t=>/Reproducir/.test(t)), items); await B.page.keyboard.press('Escape'); await B.page.waitForTimeout(200); }
 
   /* ---------- Delete with Deshacer, seen on both devices ---------- */
   await A.page.evaluate(()=>openDetail('t1')); await A.page.waitForTimeout(700);

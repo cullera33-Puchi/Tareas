@@ -91,7 +91,7 @@ const SEED = { spaces:[{id:'trabajo',name:'Trabajo',order:0,created:T0},{id:'per
     tk('r3', {title:'Pagar alquiler', repeat:'M1:1@2026-11-01#ser3', created:'2026-11-01T08:00:00.000Z', modified:'2026-11-01T08:00:00.000Z'}),
     tk('a1', {title:'Llamar a Marta'}), tk('a2', {title:'Enviar acta', projectId:'p1'}), tk('a3', {title:'Preparar comité', priority:'mid'}),
     tk('a4', {title:'Leer contrato'}), tk('a5', {title:'Pedir presupuesto'}), tk('a6', {title:'Ordenar carpeta'}) ],
-  voiceNotes:[{id:'v1', taskId:'r1', text:'Añadir el gráfico', created:T0}], attachments:[], settings:{tipsSeen:true} };
+  voiceNotes:[], attachments:[{id:'v1', taskId:'r1', kind:'audio', path:null, mime:'audio/mp4', size:4000, width:null, height:null, durationMs:5000, created:T0, modified:T0}], settings:{tipsSeen:true} }; // decision 49: a voice note is a recording
 async function open(browser, o){
   const vp = o.desk ? {viewport:{width:1280,height:800}, deviceScaleFactor:1} : {viewport:{width:390,height:844}, deviceScaleFactor:2, isMobile:true, hasTouch:true};
   const ctx = await browser.newContext(Object.assign(vp, {colorScheme:o.theme||'light'})); const page = await ctx.newPage();
@@ -105,7 +105,7 @@ const ev = (page, fn, arg) => page.evaluate(fn, arg);
 const toastText = page => ev(page, ()=>document.querySelector('#toast').classList.contains('on')?document.querySelector('#toastText').textContent:'');
 // A menu item by its label (the iPhone menu, or a Mac menu whose key follows the label)
 const menuItem = (page, label) => page.locator('#pmenu .pm-it').filter({has: page.locator('.pm-l', {hasText: new RegExp('^'+label.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'$')})}).first();
-const series = (page, id) => ev(page, id=>{ const s=repSeries(task(id).repeat); return DB.tasks.filter(x=>repSeries(x.repeat)===s).map(x=>({id:x.id, status:x.status, date:x.date, title:x.title, projectId:x.projectId, priority:x.priority, notes:x.notes, reminder:x.reminder, reminderSent:x.reminderSent||null, vn:DB.voiceNotes.filter(v=>v.taskId===x.id).length, repeat:x.repeat})); }, id);
+const series = (page, id) => ev(page, id=>{ const s=repSeries(task(id).repeat); return DB.tasks.filter(x=>repSeries(x.repeat)===s).map(x=>({id:x.id, status:x.status, date:x.date, title:x.title, projectId:x.projectId, priority:x.priority, notes:x.notes, reminder:x.reminder, reminderSent:x.reminderSent||null, vn:DB.attachments.filter(a=>a.taskId===x.id&&a.kind==='audio').length, repeat:x.repeat})); }, id);
 
 /* ======================= 2 and 3. Engine and iPhone ======================= */
 async function iphone(browser){
@@ -213,7 +213,7 @@ async function iphone(browser){
   check('delete_only_undo', x.d==='2026-11-04' && x.rem===new Date(2026,10,4,16,0).toISOString(), x);
   await ev(page, ()=>confirmDelete('r1')); await sleep(600); await page.tap('#asheet .it[data-i="1"]'); await sleep(700);
   const gone = await ev(page, ()=>!task('r1')); await page.tap('#toastBtn'); await sleep(400);
-  check('delete_series', gone && await ev(page, ()=>!!task('r1') && DB.voiceNotes.some(v=>v.taskId==='r1')), gone);
+  check('delete_series', gone && await ev(page, ()=>!!task('r1') && DB.attachments.some(a=>a.taskId==='r1')), gone);
   // In bulk: asked once
   await ev(page, ()=>{ startSelect(null); ['r1','r3','a6'].forEach(i=>UI.select.ids.add(i)); bulkDelete(); }); await sleep(600);
   const bo = await ev(page, ()=>[...document.querySelectorAll('#asheet .it')].map(e=>e.textContent)); await shot(page, 'm7-bulk-delete');

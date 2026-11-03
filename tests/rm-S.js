@@ -140,7 +140,7 @@ async function pullDown(page, sel){ const b=await page.evaluate(s=>{ const e=doc
   const sp = [...fake.t.spaces.values()];
   check('A_remap', !A1.spaces.includes('trabajo') && !A1.spaces.includes('personal') && A1.t1===A1.spaces[0] && A1.p===A1.spaces[0] && A1.t3===A1.spaces[1] && A1.active===A1.spaces[0], A1);
   check('A_backupBefore', A1.backup && A1.backup.date===today && A1.backup.tasks===before.tasks && A1.backup.spaces.includes('trabajo'), A1.backup);
-  check('A_uploaded', sp.length===2 && sp.map(s=>s.name).sort().join()==='Personal,Trabajo' && fake.t.projects.size===1 && fake.t.tasks.size===3 && fake.t.voice_notes.size===2 && fake.t.tasks.get('ta-1').space_id===A1.spaces[0] && fake.t.tasks.get('ta-1').date===today && fake.t.voice_notes.get('va-1').task_id==='ta-1',
+  check('A_uploaded', sp.length===2 && sp.map(s=>s.name).sort().join()==='Personal,Trabajo' && fake.t.projects.size===1 && fake.t.tasks.size===3 && fake.t.voice_notes.size===0 && fake.t.tasks.get('ta-1').space_id===A1.spaces[0] && fake.t.tasks.get('ta-1').date===today && /Orden del día\n\n\d+\/\d+ \d\d:\d\d: Incluir el punto de riesgos$/.test(fake.t.tasks.get('ta-1').notes), // decision 49: the voice notes went into Notas at the start and never went up
     {spaces:sp.map(s=>s.name), p:fake.t.projects.size, t:fake.t.tasks.size, v:fake.t.voice_notes.size});
   check('A_demoNotPushed', TABLES.every(t=>[...fake.t[t].keys()].every(id=>!id.startsWith('demo-'))) && before.tasks>100);
   check('A_logged', ['Copia local antes de la primera sincronización','Primera conexión completada'].every(m=>A1.log.includes(m)) && A1.log.some(m=>/^Sincronización \(inicio|sesión\)/.test(m)) && A1.log.some(m=>/^Espacio Trabajo con identificador nuevo/.test(m)), A1.log.slice(-8));
@@ -154,7 +154,7 @@ async function pullDown(page, sel){ const b=await page.evaluate(s=>{ const e=doc
   let b = await acct(B.page); check('B_signedOut_ui', b && b.cells[0]==='Iniciar sesión con Google' && /dispositivo/.test(b.foot), b);
   await B.page.click('[data-act=signIn]'); check('B_firstSync', await synced(B.page));
   const B1 = await B.page.evaluate(()=>({spaces:DB.spaces.map(s=>s.id+':'+s.name), tb:task('tb-1')&&task('tb-1').spaceId, ta1:!!task('ta-1'), vn:DB.voiceNotes.length, active:DB.settings.activeSpace, theme:DB.settings.theme}));
-  check('B_merge', fake.t.spaces.size===2 && B1.spaces.length===2 && B1.tb===A1.spaces[0] && B1.ta1 && B1.vn===2 && B1.active===A1.spaces[0] && fake.t.tasks.get('tb-1').space_id===A1.spaces[0], {B1, server:fake.t.spaces.size});
+  check('B_merge', fake.t.spaces.size===2 && B1.spaces.length===2 && B1.tb===A1.spaces[0] && B1.ta1 && B1.vn===0 && B1.active===A1.spaces[0] && fake.t.tasks.get('tb-1').space_id===A1.spaces[0], {B1, server:fake.t.spaces.size});
   check('A_gotB_realtime', await until(A.page, ()=>!!task('tb-1')), 'A never received tb-1');
   b = await acct(B.page); check('B_signedIn_ui', b && b.cells[1]==='Sincronizado hace un momento' && b.foot==='Al cerrar sesión, los datos se quedan en este dispositivo y dejan de sincronizarse.', b);
   await B.page.screenshot({path:path.join(OUT,'s2-account-desktop.png')});
@@ -175,25 +175,25 @@ async function pullDown(page, sel){ const b=await page.evaluate(s=>{ const e=doc
   check('conflict_newerLocalElsewhereWins', (await localTask(B.page,'ta-2')).title==='Revisar SOW (A3)' && serverTitle('ta-2')==='Revisar SOW (A3)', {b:await localTask(B.page,'ta-2'), s:serverTitle('ta-2')});
   check('conflict_logged', await B.page.evaluate(()=>LOG.some(e=>/^Conflicto resuelto: gana la copia del servidor/.test(e.m))));
 
-  /* ---------- 5. Delete with voice notes, and Deshacer after the deletion went up ---------- */
+  /* ---------- 5. Delete, and Deshacer after the deletion went up (decision 49: no voice notes left; rm-VN2 covers their deletion) ---------- */
   await A.page.evaluate(()=>deleteTask('ta-1'));
-  check('delete_server', await until(A.page, ()=>!SY.running&&SY.status==='ok'&&syncCollect(true).count===0, null, 3500) && !!fake.t.tasks.get('ta-1').deleted && !!fake.t.voice_notes.get('va-1').deleted, {t:fake.t.tasks.get('ta-1').deleted, v:fake.t.voice_notes.get('va-1').deleted});
-  check('delete_B', await until(B.page, ()=>!task('ta-1') && !DB.voiceNotes.some(v=>v.id==='va-1')), 'B kept ta-1');
+  check('delete_server', await until(A.page, ()=>!SY.running&&SY.status==='ok'&&syncCollect(true).count===0, null, 3500) && !!fake.t.tasks.get('ta-1').deleted, {t:fake.t.tasks.get('ta-1').deleted});
+  check('delete_B', await until(B.page, ()=>!task('ta-1')), 'B kept ta-1');
   const toastOn = await A.page.evaluate(()=>document.querySelector('#toast').classList.contains('on') && !!undoFn);
   await A.page.click('#toastBtn'); await synced(A.page);
-  check('undo_server', toastOn && fake.t.tasks.get('ta-1').deleted===null && fake.t.voice_notes.get('va-1').deleted===null, {toastOn, t:fake.t.tasks.get('ta-1').deleted});
-  check('undo_B', await until(B.page, ()=>!!task('ta-1') && DB.voiceNotes.some(v=>v.id==='va-1') && task('ta-1').spaceId===DB.spaces[0].id||!!task('ta-1')), 'B did not get ta-1 back');
+  check('undo_server', toastOn && fake.t.tasks.get('ta-1').deleted===null, {toastOn, t:fake.t.tasks.get('ta-1').deleted});
+  check('undo_B', await until(B.page, ()=>!!task('ta-1') && task('ta-1').spaceId===DB.spaces[0].id), 'B did not get ta-1 back');
 
   /* ---------- 6. Offline: changes wait and go up on reconnect ---------- */
   fake.down.add(A.page); await A.ctx.setOffline(true); await A.page.waitForTimeout(300);
   const off = await A.page.evaluate(()=>{ const x=addTask({title:'Hecho sin conexión', date:todayStr()}); updTask('ta-3',{priority:'high'}); deleteTask('ta-2'); return x.id; });
   await A.page.waitForTimeout(1900); await A.page.click('[data-tab=ajustes]'); await A.page.waitForTimeout(300);
   a = await acct(A.page);
-  check('offline_ui', a && a.cells[1]==='Sin conexión. Se sincronizará al volver' && a.cells[2]==='Cambios pendientes4', a); // new task, edit, deleted task and its voice note
+  check('offline_ui', a && a.cells[1]==='Sin conexión. Se sincronizará al volver' && a.cells[2]==='Cambios pendientes3', a); // new task, edit, deleted task
   await A.page.screenshot({path:path.join(OUT,'s3-offline-iphone.png')});
   check('offline_notSent', !fake.t.tasks.has(off) && fake.t.tasks.get('ta-3').priority==='mid' && !fake.t.tasks.get('ta-2').deleted);
   fake.down.delete(A.page); await A.ctx.setOffline(false); await synced(A.page);
-  check('offline_sentOnReconnect', fake.t.tasks.has(off) && fake.t.tasks.get('ta-3').priority==='high' && !!fake.t.tasks.get('ta-2').deleted && !!fake.t.voice_notes.get('va-2').deleted);
+  check('offline_sentOnReconnect', fake.t.tasks.has(off) && fake.t.tasks.get('ta-3').priority==='high' && !!fake.t.tasks.get('ta-2').deleted);
   check('offline_B', await until(B.page, id=>!!task(id) && task('ta-3').priority==='high' && !task('ta-2'), off), 'B missing offline changes');
   check('demo_neverPushed', TABLES.every(t=>[...fake.t[t].keys()].every(id=>!id.startsWith('demo-'))));
 

@@ -315,7 +315,7 @@ function rowHTML(x, opts={}){
     if(dl) meta.push(dl);
     if(x.status==='waiting'&&x.waitingFor) meta.push('<span class="waitfor">Esperando a '+esc(x.waitingFor)+'</span>');
     if(x.reminder) meta.push('<span class="bell">'+I.bell+(x.date&&localDay(x.reminder)===x.date?fmtTime(x.reminder):fmtDateTime(x.reminder))+'</span>'); } // the reminder's own day when it is not the task's date (moved task, no date)
-  const ind=opts.compact?'':(x.focus&&!done&&!opts.simple?'<span class="ist" title="En Ahora">'+I.starF+'</span>':'')+(x.notes&&x.notes.trim()?I.note:'')+(DB.voiceNotes.some(v=>v.taskId===x.id)?I.mic:'')+(hasAtt(x.id)?I.clip:'')+(x.repeat&&repParse(x.repeat)?'<span class="irp" title="'+esc(repSummary(x.repeat))+'">'+I.repeat+'</span>':''); // decision 29: a paperclip when it has photos or audio
+  const ind=opts.compact?'':(x.focus&&!done&&!opts.simple?'<span class="ist" title="En Ahora">'+I.starF+'</span>':'')+(x.notes&&x.notes.trim()?I.note:'')+(hasAtt(x.id)?I.clip:'')+(x.repeat&&repParse(x.repeat)?'<span class="irp" title="'+esc(repSummary(x.repeat))+'">'+I.repeat+'</span>':''); // decision 29: a paperclip when it has photos or audio
   const pri = done?'':x.priority==='high'?'<span class="pri high">!!!</span>':x.priority==='mid'?'<span class="pri mid">!!</span>':'';
   const prog=opts.compact?'':stepProgHTML(x); // decision 46: "3/4" and its ring, next to the indicators; on the desktop a column of its own
   const pc=p?p.color:null;
@@ -538,9 +538,9 @@ function viewAjustes(){
 /* ---------- Detail view ---------- */
 function viewDetail(id){
   const x=task(id); if(!x) return '';
-  const p=x.projectId?proj(x.projectId):null; const vns=DB.voiceNotes.filter(v=>v.taskId===id).sort((a,b)=>a.created<b.created?1:-1);
+  const p=x.projectId?proj(x.projectId):null;
   const pl={high:'Alta',mid:'Media',none:'Ninguna'}[x.priority]||'Ninguna'; const chev=I.chev.replace('<svg','<svg class="chev"'); const links=detailLinks(x.notes);
-  if(UI.wide) return inspectorHTML(x, p, vns, links);
+  if(UI.wide) return inspectorHTML(x, p, links);
   return '<header class="nav"><div class="nav-row"><button class="back" data-act="back">'+(UI.wide?'Cerrar':I.back+'Atrás')+'</button><div class="nav-title">Detalles</div><div class="actions">'+(x.status==='pending'?'<button class="action star'+(x.focus?' on':'')+'" data-act="focus" aria-label="'+(x.focus?'Quitar de Ahora':'Ahora')+'" aria-pressed="'+!!x.focus+'">'+(x.focus?I.starF:I.star)+'</button>':'')+'<button class="action" data-act="share" aria-label="Compartir">'+I.share+'</button><button class="action" data-act="menu" aria-label="Más">'+I.more+'</button></div></div></header>'+
    '<div class="scroll">'+
    '<div class="group"><div class="cell input"><textarea class="titlein" data-role="title" rows="1" placeholder="Título" enterkeyhint="done">'+esc(x.title)+'</textarea></div><div class="cell input"><textarea data-role="notes" placeholder="Notas">'+esc(x.notes)+'</textarea></div>'+(links.length?'<div class="links">'+linksHTML(links)+'</div>':'')+convertHTML(x)+'</div>'+
@@ -553,16 +553,15 @@ function viewDetail(id){
    '<button class="cell" data-act="pickPriority"><span class="lbl">Prioridad</span><span class="val '+(x.priority==='none'?'':x.priority)+'">'+pl+'</span>'+chev+'</button></div>'+
    (pushNote(x)?'<div class="footnote push-note">'+pushNote(x)+'</div>':'')+
    stepsGroupHTML(x)+ // decision 46
-   '<div class="group-title">Notas de voz</div><div class="group">'+vns.map(vnHTML).join('')+'<button class="cell link" data-act="voice">'+I.mic.replace('<svg','<svg style="width:18px;height:18px"')+'<span class="lbl">Añadir nota de voz</span></button></div>'+
    attWrapHTML(x)+
    '</div>';
 }
 /* R17: the desktop detail as a Mac inspector. The title and notes (the same fields and roles as the iPhone, for bindDetail),
    then a form: Proyecto a pop-up menu, Fecha and Recordatorio popovers with the calendar, Prioridad a three-position segment;
-   voice notes; and when it was created and last changed at the foot */
+   steps and attachments; and when it was created and last changed at the foot */
 const UPDOWN='<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 4.5L6 2l2.5 2.5M3.5 7.5L6 10l2.5-2.5"/></svg>';
 const XICON='<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M2 2l8 8M10 2l-8 8"/></svg>';
-function inspectorHTML(x, p, vns, links){
+function inspectorHTML(x, p, links){
   const pop=(act, val, none, ic, extra)=>'<button class="ipop" data-act="'+act+'" aria-haspopup="'+(act==='pickProject'||act==='pickRepeat'?'menu':'dialog')+'">'+(extra||'')+'<span class="val'+(none?' none':'')+'">'+val+'</span>'+ic+'</button>';
   const seg=[['none','Ninguna',''],['mid','Media','!!'],['high','Alta','!!!']].map(([k,l,mk])=>'<button class="'+k+(x.priority===k?' on':'')+'" data-act="setPri" data-pr="'+k+'" role="radio" aria-checked="'+(x.priority===k)+'">'+(mk?'<span class="pri '+k+'">'+mk+'</span>':'')+l+'</button>').join('');
   return '<header class="ihead"><button class="ix back" data-act="back" aria-label="Cerrar" title="Cerrar (Esc)">'+XICON+'</button><span class="grow"></span>'+(x.status==='pending'?'<button class="star'+(x.focus?' on':'')+'" data-act="focus" aria-label="'+(x.focus?'Quitar de Ahora':'Ahora')+'" aria-pressed="'+!!x.focus+'" title="'+(x.focus?'Quitar de Ahora (A)':'Ahora (A)')+'">'+(x.focus?I.starF:I.star)+'</button>':'')+'<button data-act="share" aria-label="Compartir" title="Compartir">'+I.share+'</button><button data-act="menu" aria-label="Más" title="Más">'+I.more+'</button></header>'+
@@ -576,7 +575,6 @@ function inspectorHTML(x, p, vns, links){
    '<span class="ilbl">Repetir</span>'+pop('pickRepeat', repParse(x.repeat)?esc(repSummary(x.repeat)):'Nunca', !repParse(x.repeat), I.repeat)+ // decision 38
    '<span class="ilbl">Prioridad</span><div class="seg iseg" role="radiogroup" aria-label="Prioridad">'+seg+'</div></div>'+
    stepsGroupHTML(x)+ // decision 46
-   '<div class="group-title">Notas de voz</div><div class="group">'+vns.map(vnHTML).join('')+'<button class="cell link" data-act="voice">'+I.mic.replace('<svg','<svg style="width:16px;height:16px"')+'<span class="lbl">Añadir nota de voz</span></button></div>'+
    attWrapHTML(x)+
    '<div class="ifoot">'+[['Creada',x.created],['Modificada',x.modified],['Completada',x.status==='done'&&x.completed]].filter(o=>o[1]).map(o=>{ const w=fmtDateTime(o[1]); return o[0]+' '+w[0].toLowerCase()+w.slice(1)+'<br>'; }).join('')+(pushNote(x)?'<span class="push-note">'+pushNote(x)+'</span>':'')+'</div>'+
    '</div>';
@@ -588,8 +586,6 @@ function convertHTML(x){ const n=UI.convertedNotes[x.id]===x.notes?0:noteItems(x
 function convertNoteLines(id){ const x=task(id); if(!x) return; const ls=noteItems(x.notes); if(!ls.length) return;
   const ids=addMany(ls, {date:null, projectId:x.projectId, priority:'none'}, x.projectId?{}:{spaceId:x.spaceId}); UI.convertedNotes[id]=x.notes; renderAnimated();
   log('info','Líneas de notas convertidas en tareas', {n:ids.length}); toast(ids.length===1?'1 tarea creada':ids.length+' tareas creadas', ()=>{ removeTasks(ids); delete UI.convertedNotes[id]; }); }
-// A voice note row: swipe right to edit, left to delete (on the desktop, a click offers both)
-const vnHTML = v => '<div class="vn" data-vn="'+v.id+'"><div class="vn-bg l"><button data-vact="edit">Editar</button></div><div class="vn-bg r"><button data-vact="del">Eliminar</button></div><div class="vn-c"><small>'+fmtDateTime(v.created)+(v.modified?', editada':'')+'</small>'+linkify(v.text)+'</div></div>';
 function linksHTML(links){ return links.map(l=>'<a href="'+esc(l.href)+'"'+(l.href.startsWith('tel:')?'':' target="_blank" rel="noopener"')+'>'+esc(l.label)+'</a>').join(''); }
 function bindDetail(el, id){
   const x=task(id); if(!x) return;

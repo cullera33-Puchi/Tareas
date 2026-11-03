@@ -1,6 +1,6 @@
 require('./lib/out.js'); // outputs (screenshots, downloads) go to tests/out
 // Decision 28 (minor decisions of 2 November), port 9820.
-//  a. Deleting a space takes its projects (archived too), tasks (old completed too) and voice notes, after a confirmation that counts them,
+//  a. Deleting a space takes its projects (archived too), tasks (old completed too) and voice notes (recordings since decision 49), after a confirmation that counts them,
 //     with a local copy first and one Deshacer; the only space still cannot go. Sync: the deletion and its Deshacer reach another device
 //     (fake server copied from rm-S.js, same rules).
 //  b. Closing Nota de voz (new or edit) or Nueva tarea with text not saved asks first: Descartar or Seguir editando (iPhone action sheet,
@@ -98,7 +98,8 @@ const SEED = { spaces:[{id:'trabajo',name:'Trabajo',order:0,created:C},{id:'pers
   projects:[P('p1',{name:'FLC'}), P('p2',{name:'Antiguo', archived:true, order:1}), P('p3',{name:'Obra', color:'#34C759', order:2}), P('pp',{spaceId:'personal', name:'Casa'})],
   tasks:[T('t1',{projectId:'p1', title:'Preparar comité'}), T('t2',{projectId:'p2', status:'done', completed:OLD, title:'Cerrar fase uno'}), T('t3',{title:'Revisar SOW'}),
     T('t4',{projectId:'p3', status:'done', completed:RECENT, title:'Pedir planos'}), T('t5',{projectId:'p1', title:'Enviar acta'}), T('tp1',{spaceId:'personal', projectId:'pp', title:'Llamar al fontanero'})],
-  voiceNotes:[{id:'v1',taskId:'t1',text:'Incluir el punto de riesgos',created:C},{id:'v2',taskId:'t3',text:'Pedir la versión firmada',created:C},{id:'vp',taskId:'tp1',text:'Antes del viernes',created:C}],
+  voiceNotes:[], // decision 49: the voice notes are recordings now (local, not uploaded yet)
+  attachments:[['v1','t1'],['v2','t3'],['vp','tp1']].map(([id,taskId])=>({id, taskId, kind:'audio', path:null, mime:'audio/mp4', size:4000, width:null, height:null, durationMs:5000, created:C, modified:C})),
   settings:{tipsSeen:true} };
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 async function tapAt(page, x, y){ const cdp=await page.context().newCDPSession(page); await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y}]}); await sleep(40); await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]}); await cdp.detach(); }
@@ -109,7 +110,7 @@ async function drag(page, x, y, dx, dy, n=10){ const cdp=await page.context().ne
 const ui = page => page.evaluate(()=>{ const as=document.querySelector('#asheet'); return {sheet:document.querySelector('#sheet').classList.contains('on'), asheet:as.classList.contains('on'), alert:as.classList.contains('alert'),
   t:(as.querySelector('.t,.al-t')||{}).textContent||'', x:(as.querySelector('.al-x')||{}).textContent||'', btns:[...as.querySelectorAll('button')].map(b=>b.textContent), red:[...as.querySelectorAll('.red')].map(b=>b.textContent),
   focus:document.activeElement?(document.activeElement.textContent||document.activeElement.tagName):'', tag:document.activeElement&&document.activeElement.tagName, scrimLight:document.querySelector('#scrim').classList.contains('light'), scrim:document.querySelector('#scrim').classList.contains('on')}; });
-const counts = page => page.evaluate(()=>({spaces:DB.spaces.map(s=>s.id).join(','), projects:DB.projects.length, tasks:DB.tasks.length, vns:DB.voiceNotes.length, active:DB.settings.activeSpace}));
+const counts = page => page.evaluate(()=>({spaces:DB.spaces.map(s=>s.id).join(','), projects:DB.projects.length, tasks:DB.tasks.length, vns:DB.attachments.filter(a=>a.kind==='audio').length, active:DB.settings.activeSpace}));
 const toastOn = page => page.evaluate(()=>document.querySelector('#toast').classList.contains('on')?document.querySelector('#toastText').textContent:'');
 
 (async()=>{
@@ -151,53 +152,23 @@ const toastOn = page => page.evaluate(()=>document.querySelector('#toast').class
 
   /* ================= b. iPhone ================= */
   { const {ctx, page} = await device(browser, {tag:'Mb', seed:SEED});
-    const nv = ()=>page.evaluate(()=>DB.voiceNotes.length);
-    const n0 = await nv();
-    await page.evaluate(()=>openDetail('t1')); await sleep(700);
-    // New note with text: the backdrop asks
-    await tap(page, '.pushed-screen [data-act=voice]'); await sleep(300);
-    await page.focus('#sheet textarea'); await page.keyboard.type('Texto sin guardar'); await sleep(400);
+    // Decision 49: the dictated voice note sheet is gone; its guard checks (a ghost tap, Seguir editando, a drag down) run on Nueva tarea
+    const nt = ()=>page.evaluate(()=>DB.tasks.length); const t0 = await nt();
+    await tap(page, '.screen.root:not(.hidden-tab) .fab'); await sleep(300); await page.keyboard.type('Algo pendiente'); await sleep(400);
     await tapAt(page, 195, 80); await sleep(60);
-    let u = await ui(page); check('b_backdrop_asks', u.sheet && u.asheet && !u.alert && u.red.join()==='Descartar nota' && u.btns.includes('Seguir editando') && u.t==='La nota no se ha guardado.', u);
+    let u = await ui(page); check('b_add_asks', u.sheet && u.asheet && u.red.join()==='Descartar tarea' && u.t==='La tarea no se ha añadido.', u);
     await tapAt(page, 195, 80); await sleep(100); // a second tap within 450 ms (a ghost) is ignored
     u = await ui(page); check('b_guard_kept', u.sheet && u.asheet, u);
     await page.screenshot({path:path.join(OUT,'q2-m-discard.png')});
-    await sleep(500); await tap(page, '#asheet .it.cancel'); await sleep(500);
-    u = await ui(page); check('b_keep_editing', u.sheet && !u.asheet && u.tag==='TEXTAREA' && await page.evaluate(()=>document.querySelector('#sheet textarea').value==='Texto sin guardar'), u);
-    // Descartar in the header asks too; Descartar nota closes without saving
-    await tap(page, '#sheet [data-x=cancel]'); await sleep(550);
-    u = await ui(page); check('b_header_asks', u.sheet && u.asheet && u.red.join()==='Descartar nota', u);
-    await tap(page, '#asheet .it.red'); await sleep(600);
-    u = await ui(page); check('b_discarded', !u.sheet && !u.asheet && (await nv())===n0, {u, n:await nv()});
-    // A drag down with text: the sheet goes back up and asks; Guardar then closes at once and saves
-    await tap(page, '.pushed-screen [data-act=voice]'); await sleep(300);
-    await page.focus('#sheet textarea'); await page.keyboard.type('Nota arrastrada'); await sleep(500);
+    await sleep(400); await tap(page, '#asheet .it.cancel'); await sleep(500);
+    u = await ui(page); check('b_add_keep', u.sheet && !u.asheet && u.tag==='INPUT' && await page.evaluate(()=>document.querySelector('#sheet .titlein').value==='Algo pendiente'), u);
+    // A drag down with text: the sheet goes back up and asks
     { const b=await box(page, '#sheet .handle'); await drag(page, b.cx, b.cy+4, 0, 240, 10); await sleep(600); }
     u = await ui(page); const tr = await page.evaluate(()=>document.querySelector('#sheet').style.transform);
     check('b_drag_asks', u.sheet && u.asheet && tr==='', {u, tr});
-    await tap(page, '#asheet .it.cancel'); await sleep(500);
-    await tap(page, '#sheet [data-x=ok]'); await sleep(600);
-    u = await ui(page); check('b_save_closes', !u.sheet && !u.asheet && (await nv())===n0+1, {u, n:await nv()});
-    // No text: closes at once
-    await tap(page, '.pushed-screen [data-act=voice]'); await sleep(600); await tapAt(page, 195, 80); await sleep(600);
-    u = await ui(page); check('b_empty_closes', !u.sheet && !u.asheet, u);
-    // Edit: unchanged closes at once, changed asks
-    await page.evaluate(()=>voiceSheet('t1','v1')); await sleep(600); await tap(page, '#sheet [data-x=cancel]'); await sleep(600);
-    u = await ui(page); check('b_edit_unchanged', !u.sheet && !u.asheet, u);
-    await page.evaluate(()=>voiceSheet('t1','v1')); await sleep(300); await page.focus('#sheet textarea'); await page.keyboard.type(' y plazos'); await sleep(400);
-    await tap(page, '#sheet [data-x=cancel]'); await sleep(550);
-    u = await ui(page); check('b_edit_changed_asks', u.asheet && u.t==='Los cambios de la nota no se han guardado.', u);
-    await tap(page, '#asheet .it.red'); await sleep(600);
-    check('b_edit_discarded', await page.evaluate(()=>DB.voiceNotes.find(v=>v.id==='v1').text==='Incluir el punto de riesgos' && !document.querySelector('#sheet').classList.contains('on')));
-    await page.evaluate(()=>pop()); await sleep(700);
-    // Nueva tarea
-    const nt = ()=>page.evaluate(()=>DB.tasks.length); const t0 = await nt();
-    await tap(page, '.screen.root:not(.hidden-tab) .fab'); await sleep(300); await page.keyboard.type('Algo pendiente'); await sleep(400);
-    await tapAt(page, 195, 80); await sleep(150);
-    u = await ui(page); check('b_add_asks', u.sheet && u.asheet && u.red.join()==='Descartar tarea' && u.t==='La tarea no se ha añadido.', u);
-    await sleep(400); await tap(page, '#asheet .it.cancel'); await sleep(500);
-    u = await ui(page); check('b_add_keep', u.sheet && !u.asheet && u.tag==='INPUT' && await page.evaluate(()=>document.querySelector('#sheet .titlein').value==='Algo pendiente'), u);
-    await tapAt(page, 195, 80); await sleep(550); await tap(page, '#asheet .it.red'); await sleep(600);
+    await tap(page, '#asheet .it.cancel'); await sleep(500); await until(page, ()=>!document.querySelector('#asheet').classList.contains('on')&&document.querySelector('#sheet').classList.contains('on')&&!document.querySelector('#sheet').classList.contains('drag')); await sleep(500);
+    const by = await page.evaluate(()=>{ const q=document.querySelector('#sheet').getBoundingClientRect(); return q.top>200?80:q.bottom+200; }); // after the drag the sheet may sit at the top (kbFallback): the backdrop is below it
+    await tapAt(page, 195, by); await until(page, ()=>document.querySelector('#asheet').classList.contains('on')); await sleep(550); await tap(page, '#asheet .it.red'); await sleep(600);
     u = await ui(page); check('b_add_discarded', !u.sheet && (await nt())===t0, u);
     // After an Enter (added, field empty) the backdrop closes at once
     await tap(page, '.screen.root:not(.hidden-tab) .fab'); await sleep(300); await page.keyboard.type('Tarea en serie'); await page.keyboard.press('Enter'); await sleep(500);
@@ -240,16 +211,16 @@ const toastOn = page => page.evaluate(()=>document.querySelector('#toast').class
     await page.keyboard.press('Enter'); await until(page, ()=>DB.spaces.length===1);
     let c = await counts(page); check('c_space_deleted', c.spaces==='personal' && c.tasks===1, c);
     await page.click('#toastBtn'); await sleep(500); c = await counts(page); check('c_space_undo', c.spaces==='trabajo,personal' && c.tasks===4 && c.vns===2, c);
-    // b on the desktop: Escape on a voice note with text asks with the alert; Escape again goes back to the text
+    // b on the desktop: Escape on a sheet with text asks with the alert; Escape again goes back to the text (decision 49: Nueva tarea, the voice note sheet is gone)
     await page.evaluate(()=>{ setDeskView('hoy'); openDetail('t1'); }); await sleep(400);
-    await page.evaluate(()=>voiceSheet('t1')); await sleep(300); await page.focus('#sheet textarea'); await page.keyboard.type('Escrita en el Mac'); await sleep(300);
+    await page.evaluate(()=>addSheet()); await sleep(300); await page.focus('#sheet .titlein'); await page.keyboard.type('Escrita en el Mac'); await sleep(300);
     await page.keyboard.press('Escape'); await sleep(350);
-    u = await ui(page); check('Db_esc_asks', u.sheet && u.alert && u.t==='La nota no se ha guardado.' && u.btns.join()==='Seguir editando,Descartar nota' && u.focus==='Descartar nota', u);
+    u = await ui(page); check('Db_esc_asks', u.sheet && u.alert && u.t==='La tarea no se ha añadido.' && u.btns.join()==='Seguir editando,Descartar tarea' && u.focus==='Descartar tarea', u);
     await page.screenshot({path:path.join(OUT,'q2-d-discard.png')});
     await page.keyboard.press('Escape'); await sleep(400);
-    u = await ui(page); check('Db_keep', u.sheet && !u.asheet && u.tag==='TEXTAREA', u);
+    u = await ui(page); check('Db_keep', u.sheet && !u.asheet && u.tag==='INPUT', u);
     await page.click('#scrim', {position:{x:20,y:20}}); await sleep(400); await page.click('#asheet .al-btn.def'); await sleep(600);
-    u = await ui(page); check('Db_discard', !u.sheet && !u.asheet && await page.evaluate(()=>DB.voiceNotes.length===2), u);
+    u = await ui(page); check('Db_discard', !u.sheet && !u.asheet && await page.evaluate(()=>!DB.tasks.some(x=>x.title==='Escrita en el Mac')), u);
     // Dark
     await page.emulateMedia({colorScheme:'dark'}); await page.evaluate(()=>confirmDelete('t1')); await sleep(350); await page.screenshot({path:path.join(OUT,'q2-d-alert-dark.png')}); await page.keyboard.press('Escape'); await sleep(300);
     await ctx.close(); }
@@ -346,24 +317,24 @@ const toastOn = page => page.evaluate(()=>document.querySelector('#toast').class
     await ctx.close(); }
 
   /* ================= a. Sync: the cascade and its Deshacer reach the other device ================= */
-  { const A = await device(browser, {tag:'A', seed:SEED, fake:true});
+  { const A = await device(browser, {tag:'A', seed:Object.assign({}, SEED, {attachments:[]}), fake:true}); // no local recordings to upload: the fake has no storage
     await A.page.click('[data-tab=ajustes]'); await sleep(300); await A.page.click('[data-act=signIn]'); check('S_A_sync', await synced(A.page));
     const B = await device(browser, {tag:'B', seed:{spaces:SEED.spaces, projects:[], tasks:[], voiceNotes:[], settings:{tipsSeen:true}}, fake:true, desk:true});
     await B.page.evaluate(()=>setDeskView('settings')); await sleep(300); await B.page.click('[data-act=signIn]'); check('S_B_sync', await synced(B.page));
     const sid = await A.page.evaluate(()=>DB.spaces.find(s=>s.name==='Trabajo').id);
-    check('S_B_has', await until(B.page, id=>DB.tasks.filter(x=>x.spaceId===id).length===5 && DB.voiceNotes.length===3 && DB.projects.length===4, sid), await counts(B.page));
+    check('S_B_has', await until(B.page, id=>DB.tasks.filter(x=>x.spaceId===id).length===5 && DB.projects.length===4, sid), await counts(B.page));
     await B.page.evaluate(id=>{ DB.settings.activeSpace=id; save(); setDeskView('hoy'); }, sid); await sleep(300);
     await A.page.evaluate(id=>confirmDeleteSpace(DB.spaces.find(s=>s.id===id)), sid); await sleep(550); await tap(A.page, '#asheet .it.red');
     await until(A.page, ()=>DB.spaces.length===1); await A.page.evaluate(()=>{ window.__undo=undoFn; });
     check('S_A_synced_after', await synced(A.page));
-    const srvDel = ()=>({space:!!(fake.t.spaces.get(sid)||{}).deleted, projects:['p1','p2','p3'].every(id=>!!(fake.t.projects.get(id)||{}).deleted), tasks:['t1','t2','t3','t4','t5'].every(id=>!!(fake.t.tasks.get(id)||{}).deleted), vns:['v1','v2'].every(id=>!!(fake.t.voice_notes.get(id)||{}).deleted), keep:!(fake.t.tasks.get('tp1')||{}).deleted&&!(fake.t.voice_notes.get('vp')||{}).deleted&&!(fake.t.projects.get('pp')||{}).deleted});
-    let sd = srvDel(); check('S_server_deleted', sd.space && sd.projects && sd.tasks && sd.vns && sd.keep, sd);
-    check('S_B_gone', await until(B.page, id=>!DB.spaces.some(s=>s.id===id) && DB.tasks.length===1 && DB.projects.length===1 && DB.voiceNotes.length===1, sid), await counts(B.page));
+    const srvDel = ()=>({space:!!(fake.t.spaces.get(sid)||{}).deleted, projects:['p1','p2','p3'].every(id=>!!(fake.t.projects.get(id)||{}).deleted), tasks:['t1','t2','t3','t4','t5'].every(id=>!!(fake.t.tasks.get(id)||{}).deleted), keep:!(fake.t.tasks.get('tp1')||{}).deleted&&!(fake.t.projects.get('pp')||{}).deleted});
+    let sd = srvDel(); check('S_server_deleted', sd.space && sd.projects && sd.tasks && sd.keep, sd);
+    check('S_B_gone', await until(B.page, id=>!DB.spaces.some(s=>s.id===id) && DB.tasks.length===1 && DB.projects.length===1, sid), await counts(B.page));
     const bAct = await B.page.evaluate(()=>({active:DB.settings.activeSpace, ok:DB.spaces.some(s=>s.id===DB.settings.activeSpace), title:(document.querySelector('#desk .sidetitle, #desk .side h1, #desk .spacebtn')||{}).textContent||''}));
     check('S_B_active_moved', bAct.ok, bAct);
     await A.page.evaluate(()=>{ window.__undo(); render(); }); check('S_A_undo_synced', await synced(A.page));
-    sd = srvDel(); check('S_server_restored', !sd.space && ['t1','t2','t3','t4','t5'].every(id=>!(fake.t.tasks.get(id)||{}).deleted) && ['p1','p2','p3'].every(id=>!(fake.t.projects.get(id)||{}).deleted) && ['v1','v2'].every(id=>!(fake.t.voice_notes.get(id)||{}).deleted), sd);
-    check('S_B_restored', await until(B.page, id=>DB.spaces.some(s=>s.id===id) && DB.tasks.length===6 && DB.projects.length===4 && DB.voiceNotes.length===3, sid), await counts(B.page));
+    sd = srvDel(); check('S_server_restored', !sd.space && ['t1','t2','t3','t4','t5'].every(id=>!(fake.t.tasks.get(id)||{}).deleted) && ['p1','p2','p3'].every(id=>!(fake.t.projects.get(id)||{}).deleted), sd); // decision 49: the recordings are local here (not uploaded), so only the device's own cascade counts them
+    check('S_B_restored', await until(B.page, id=>DB.spaces.some(s=>s.id===id) && DB.tasks.length===6 && DB.projects.length===4, sid), await counts(B.page));
     await A.ctx.close(); await B.ctx.close(); }
   }catch(e){ errors.push('fatal: '+(e&&e.stack||e)); }
   await browser.close(); srv.close();

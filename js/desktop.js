@@ -229,7 +229,7 @@ function bindColResize(d){
     delete c[g.dataset.col]; DB.settings.colWidths=c; save(); applyColWidths(d); });
   d.addEventListener('click', e=>{ if(e.target.closest('.colhead')) e.stopPropagation(); }, true); } // the header is not a row: a click on it does nothing
 function deskMain(){
-  const v=UI.deskView; let title='', body='', search=true, pf=false, seg='', notes=false, pit=null;
+  const v=UI.deskView; let title='', body='', search=true, pf=false, seg='', notes=false, pit=null, pitProj=false;
   if(v==='hoy'||v==='todas'){ const f=v; title=f==='hoy'?'Hoy':'Todas'; pf=true;
     body = addBarHTML(null)+colHeadHTML()+(UI.query?'':ahoraHTML())+
       listHTML(UI.query?'todas':f); }
@@ -237,10 +237,10 @@ function deskMain(){
   else if(v==='waiting'){ title='Por confirmar'; body=colHeadHTML()+waitingViewHTML(); } // decision 41
   else if(isCalView(v)){ title={day:'Día',week:'Semana',month:'Mes'}[v]; pf=true; body=weekHTML(); } // the project filter applies here too, so it stays visible and clearable
   else if(v.startsWith('project:')){ const id=v.slice(8); const p=id==='none'?null:proj(id); if(id!=='none'&&(!p||p.archived||p.spaceId!==space().id)){ UI.deskView=DB.settings.filter||'hoy'; return deskMain(); } /* gone, archived or in another space */ title=p?p.name:'Sin proyecto';
-    if(p){ seg=projSegHTML(p); notes=projTab(p.id)==='notes'; } body=notes?deskNotesHTML(p):addBarHTML(p?p.id:null)+colHeadHTML()+listHTML('todas', p?p.id:null); // decision 47: Tareas or Notas
+    if(p){ notes=projTab(p.id)==='notes'; seg=projSegHTML(p)+(notes?pitBackHTML(p):''); pitProj=true; } body=notes?deskNotesHTML(p):addBarHTML(p?p.id:null)+colHeadHTML()+listHTML('todas', p?p.id:null); // decision 47: Tareas or Notas
     if(p&&!notes) pit=p; } // decision 59: the post-it column beside the tasks (the stylesheet shows it from 1300 px, without the inspector)
   else if(v==='settings'){ title='Ajustes'; search=false; const h=viewAjustes(); body=h.slice(h.indexOf('<div class="scroll">')); }
   const cal=isCalView(v);
   const pitOn=pit&&!pitFolded();
-  return '<main class="main'+(v==='hoy'?' with-agenda':'')+(pitOn?' with-pit':'')+'"><div class="mhead'+(cal?' wide-head':'')+'"><h1>'+esc(title)+'</h1>'+seg+(pf?'<span class="pfslot">'+pfDropHTML()+'</span>':'')+(search?'<div class="searchbar"><div class="search">'+I.search+'<input type="search" placeholder="Buscar" value="'+esc(UI.query)+'" data-role="search" autocomplete="off"></div>'+(UI.query?'<button class="cancel" data-act="clearSearch">Cancelar</button>':'')+'</div>':'')+(pit?pitOpenBtnHTML(pit):'')+(v==='hoy'||v==='todas'||(v.startsWith('project:')&&!notes)?'<button class="mopts" data-act="viewMenu" aria-label="Opciones de vista" title="Opciones de vista">'+I.more+'</button>':'')+'</div><div class="mbody'+(cal?' calbody':notes?' notesbody':'')+'"><div class="inner'+(cal?' week-inner':v==='settings'?' settings':notes?' notes-inner':'')+'">'+body+'</div></div>'+(v==='hoy'?agendaHTML():'')+(pitOn?pitColHTML(pit):'')+'</main>';
+  return '<main class="main'+(v==='hoy'?' with-agenda':'')+(pitOn?' with-pit':'')+(pitProj?' pit-proj':'')+'"><div class="mhead'+(cal?' wide-head':'')+'"><h1>'+esc(title)+'</h1>'+seg+(pf?'<span class="pfslot">'+pfDropHTML()+'</span>':'')+(search?'<div class="searchbar"><div class="search">'+I.search+'<input type="search" placeholder="Buscar" value="'+esc(UI.query)+'" data-role="search" autocomplete="off"></div>'+(UI.query?'<button class="cancel" data-act="clearSearch">Cancelar</button>':'')+'</div>':'')+(pit?pitOpenBtnHTML(pit):'')+(v==='hoy'||v==='todas'||(v.startsWith('project:')&&!notes)?'<button class="mopts" data-act="viewMenu" aria-label="Opciones de vista" title="Opciones de vista">'+I.more+'</button>':'')+'</div><div class="mbody'+(cal?' calbody':notes?' notesbody':'')+'"><div class="inner'+(cal?' week-inner':v==='settings'?' settings':notes?' notes-inner':'')+'">'+body+'</div></div>'+(v==='hoy'?agendaHTML():'')+(pitOn?pitColHTML(pit):'')+'</main>';
 }

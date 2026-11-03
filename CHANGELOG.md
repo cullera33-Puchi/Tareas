@@ -1,5 +1,12 @@
 # Registro de cambios
 
+## v0.29.1. Notas de proyecto sin duplicar en el ordenador (3 de noviembre de 2026)
+
+- Con la columna de notas a la vista, desaparece el segmento Tareas y Notas de la cabecera del proyecto: la columna es el acceso a las notas.
+- El título «Notas (N)» de la columna abre la vista completa de notas, que lleva «Volver a tareas» en la cabecera.
+- Con la ventana estrecha o el detalle de una tarea abierto, el segmento sigue como antes. En el iPhone no cambia nada.
+- Prueba `rm-PIT` ampliada.
+
 ## v0.29.0. Escritorio: lista a todo el ancho, columnas ajustables y notas al lado (3 de noviembre de 2026)
 
 - Las listas del ordenador ocupan todo el ancho de la ventana; el título se queda con el espacio libre, en una línea, con el título completo al pasar el ratón.

@@ -75,6 +75,16 @@ async function visibility(browser){
   check('v_pane_hides', !c.shown && !c.btn, c);
   await ev(page, ()=>pop()); await until(page, ()=>!app.classList.contains('has-pane')); await calm(page); c = await col(page);
   check('v_pane_back', c.shown, c);
+  // v0.29.1: where the column fits, no segment Tareas and Notas; the column's title opens the full Notas view, which has «Volver a tareas»
+  const hd = () => ev(page, ()=>({seg:!!document.querySelector('#desk .mhead .pseg')?.offsetParent, back:!!document.querySelector('#desk .mhead .pitback')?.offsetParent, tab:projTab('p1')}));
+  x = await hd(page); check('v_no_seg', !x.seg && !x.back && x.tab==='tasks', x);
+  await page.click('#desk .pitcol .pitttl'); await calm(page); c = await col(page); x = await hd(page);
+  check('v_title_opens_notes', !c.shown && x.tab==='notes' && !x.seg && x.back, {c, x}); await shot(page, 'v-notes-back');
+  await page.click('#desk .mhead .pitback'); await calm(page); c = await col(page); x = await hd(page);
+  check('v_back_to_tasks', c.shown && x.tab==='tasks' && !x.seg, {c, x});
+  await ev(page, ()=>{ UI.dsel.cur='a1'; openDetail('a1'); }); await until(page, ()=>app.classList.contains('has-pane')); await calm(page);
+  x = await hd(page); check('v_pane_seg', x.seg && !x.back, x);
+  await ev(page, ()=>pop()); await until(page, ()=>!app.classList.contains('has-pane')); await calm(page);
   // Notas tab, Sin proyecto, other views
   await ev(page, ()=>setProjTab('p1','notes')); await calm(page); c = await col(page); check('v_notes_tab', !c.shown, c);
   await ev(page, ()=>setProjTab('p1','tasks')); await calm(page);

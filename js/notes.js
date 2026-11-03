@@ -265,7 +265,9 @@ document.addEventListener('keydown', e=>{ if(!UI.wide||!deskNotesOn()) return; i
    empties it), then the notes as post-its in the project's colour, pinned first and then the newest, as many as the height allows and «Ver
    todas (N)» for the rest (pitFit, again on each drawing and on a resize). A click on a card opens it in place as an editor (the same saving
    as Notas, saveNoteEdit); a click elsewhere or Esc closes it. Its boxes tick with one click while it is closed; a right click opens the note's
-   menu. A button folds the column (DB.settings.pitFold, a device setting), and «Notas (N)» in the column head unfolds it. No new data */
+   menu. A button folds the column (DB.settings.pitFold, a device setting), and «Notas (N)» in the column head unfolds it. Where the column
+   fits, it is the only way to the notes (v0.29.1): the segment Tareas and Notas is hidden, the column's title opens the full Notas view and
+   that view has «Volver a tareas»; with a narrower window or the inspector open the segment stays. No new data */
 UI.pitOpen=null; UI.pitDraft='';
 const PIT_I='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M14.5 4.5v15"/></svg>';
 const pitFolded = () => !!DB.settings.pitFold;
@@ -274,6 +276,9 @@ function pitProject(){ if(!UI.wide) return null; const v=UI.deskView||''; if(!v.
 // The button that unfolds it, in the column head; shown by the stylesheet only where the column would be
 function pitOpenBtnHTML(p){ if(!pitFolded()) return ''; const k=DB.projectNotes.filter(n=>n&&n.projectId===p.id).length;
   return '<button class="pitshow" data-act="pitUnfold" title="Mostrar las notas del proyecto">'+PIT_I+'<span>Notas ('+k+')</span></button>'; }
+// On a wide window the column is the way to the notes, so the segment Tareas and Notas is hidden (stylesheet); the full Notas view
+// returns to the tasks with this button instead
+function pitBackHTML(p){ return '<button class="pitback" data-pseg="tasks" data-pid="'+esc(p.id)+'" title="Volver a las tareas del proyecto">'+I.back+'<span>Volver a tareas</span></button>'; }
 // A card's title (the first line of the text when the note has none) and its text without that line
 function pitCardHTML(n, color){ const t=String(n.title||'').trim(), st=' style="--pc:'+esc(color)+'"';
   if(UI.pitOpen===n.id) return '<div class="pitcard open" data-pit="'+esc(n.id)+'"'+st+'><textarea class="pit-ti" data-role="pittitle" rows="1" placeholder="Título" autocomplete="off" aria-label="Título de la nota">'+esc(n.title||'')+'</textarea>'+
@@ -286,7 +291,7 @@ function pitCardHTML(n, color){ const t=String(n.title||'').trim(), st=' style="
     '<div class="pit-d">'+esc(noteWhen(noteTime(n)))+'</div>'+(bh?'<div class="pitv">'+bh+'</div>':'')+'</div>'; }
 function pitColHTML(p){ if(pitFolded()) return ''; const ns=notesOf(p.id);
   if(UI.pitOpen&&!ns.some(n=>n.id===UI.pitOpen)) UI.pitOpen=null; // a note of another project, or gone
-  return '<aside class="pitcol" data-pid="'+esc(p.id)+'" aria-label="Notas de '+esc(p.name)+'"><div class="pithead"><b>Notas</b><span class="n">'+ns.length+'</span><span class="grow"></span>'+
+  return '<aside class="pitcol" data-pid="'+esc(p.id)+'" aria-label="Notas de '+esc(p.name)+'"><div class="pithead"><button class="pitttl" data-act="pitAll" title="Abrir todas las notas"><b>Notas</b><span class="n">'+ns.length+'</span></button><span class="grow"></span>'+
     '<button class="pitb" data-act="pitAdd" title="Nueva nota" aria-label="Nueva nota">'+I.plus+'</button><button class="pitb" data-act="pitFold" title="Ocultar las notas" aria-label="Ocultar las notas">'+PIT_I+'</button></div>'+
     '<div class="pitnew"><textarea data-role="pitnew" rows="1" placeholder="Escribe una nota…" autocomplete="off" aria-label="Nueva nota">'+esc(UI.pitDraft||'')+'</textarea></div>'+
     '<div class="pitlist">'+ns.map(n=>pitCardHTML(n, p.color)).join('')+(ns.length?'':'<div class="pithint">Intro guarda la nota y la primera línea es su título. Mayúsculas e Intro, otra línea.</div>')+

@@ -37,6 +37,7 @@ const MI = {
   check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5l5 5L19.5 6.5"/></svg>',
   wait:mi('<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>'),
   unwait:mi('<path d="M9 14L4 9l5-5M4 9h10.5a5.5 5.5 0 010 11H11"/>'),
+  share:mi('<path d="M12 3v13M7 8l5-5 5 5M5 13v7h14v-7"/>'),
   star:mi('<path d="M12 3.2l2.7 5.5 6 .9-4.35 4.25 1.03 6L12 17l-5.38 2.85 1.03-6L3.3 9.6l6-.9z"/>'),
   starOff:mi('<path d="M12 3.2l2.7 5.5 6 .9-4.35 4.25 1.03 6L12 17l-5.38 2.85 1.03-6L3.3 9.6l6-.9z"/><path d="M4 4l16 16"/>'),
   repeat:mi('<path d="M17 3l3 3-3 3M4 11.5V10a4 4 0 014-4h12M7 21l-3-3 3-3M20 12.5V14a4 4 0 01-4 4H4"/>'),

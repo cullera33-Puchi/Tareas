@@ -645,6 +645,13 @@ body.pdragging,body.pdragging *{cursor:grabbing !important;user-select:none;-web
 .mact.red,.mact.red svg{color:var(--red);}
 .mact:disabled{opacity:.4;}
 body.desktop .sheet.keysheet{width:min(680px, calc(100% - 48px));}
+/* Roadmap M4: the status text, generated and editable */
+.stsheet .stchips{margin:0 0 10px;justify-content:center;}
+.stsheet .sttext{display:block;background:var(--card);height:clamp(220px, 50svh, 560px);min-height:0;line-height:1.45;white-space:pre-wrap;}
+body.desktop .stsheet .stchips{justify-content:flex-start;}
+body.desktop .stsheet .sheet-actions{gap:8px;}
+body.desktop .stsheet .sheet-actions .btn{flex:none;height:30px;min-width:84px;padding:0 14px;border-radius:7px;font-size:13px;font-weight:500;}
+body.desktop .stsheet .sttext{height:min(460px, calc(80svh - 170px));font-size:13px;border-radius:8px;padding:10px 12px;}
 .keys{columns:2;column-gap:28px;margin:0 0 8px;}
 .keys .kg{break-inside:avoid;margin:0 0 12px;}
 .keys .ks{margin:0 0 4px;font-size:12px;font-weight:600;color:var(--ink2);}

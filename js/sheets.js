@@ -103,7 +103,11 @@ function viewMenu(src){ const top=UI.stack[UI.stack.length-1]; const inProject=U
   // R10 and R17: an anchored menu, the grouping as a checked pair. On the desktop Seleccionar tareas starts its own selection (R16)
   popMenu({anchor:src, align:UI.wide?'right':undefined, groups:[
     [{label:'Seleccionar tareas', icon:MI.select, fn:()=>UI.wide?startDeskSelect():startSelect(null)}].concat([{label:DB.settings.doneOpen?'Ocultar completadas':'Mostrar completadas', icon:DB.settings.doneOpen?MI.eyeOff:MI.eye, fn:()=>{ DB.settings.doneOpen=!DB.settings.doneOpen; save(); render(); }}]),
-    f==='hoy'||f==='todas'?[{label:'Agrupar por fecha', icon:MI.cal, on:g==='date', fn:()=>setGrouping(k,'date')}, {label:'Agrupar por proyecto', icon:MI.folder, on:g==='project', fn:()=>setGrouping(k,'project')}]:[] ]}); }
+    f==='hoy'||f==='todas'?[{label:'Agrupar por fecha', icon:MI.cal, on:g==='date', fn:()=>setGrouping(k,'date')}, {label:'Agrupar por proyecto', icon:MI.folder, on:g==='project', fn:()=>setGrouping(k,'project')}]:[],
+    statusItems(inProject?(UI.wide?UI.deskView.slice(8):top.id):undefined) ]}); }
+// Roadmap M4: Compartir estado for a real project (pid), Compartir estado de la semana for the space (pid undefined); nothing for Sin proyecto
+const statusItems = pid => pid===undefined ? [{label:UI.wide?'Compartir estado de la semana…':'Compartir estado de la semana', icon:MI.share, fn:()=>statusSheet(null)}]
+  : pid&&proj(pid) ? [{label:UI.wide?'Compartir estado…':'Compartir estado', icon:MI.share, fn:()=>statusSheet(pid)}] : [];
 /* R14: a day header of Todas. A long press (iPhone) or a right click (desktop, at the pointer: pt) offers to move its tasks to another day */
 function dayHeadMenu(head, pt){ const sec=head.closest('.gsec'), day=head.dataset.dayHead; if(!sec||UI.select) return;
   const xs=[...sec.querySelectorAll('.group [data-id]')].map(r=>task(r.dataset.id)).filter(x=>x&&x.status==='pending'); if(!xs.length) return;
@@ -141,7 +145,7 @@ function projectMenu(id, src){ const p=proj(id); if(!p) return; const ps=activeP
   // the iPhone lifts the project's row; the desktop opens at the pointer (a right click on the sidebar)
   popMenu({lift:UI.wide?null:src&&src.row, x:src&&src.x, y:src&&src.y, groups:[[{label:UI.wide?'Renombrar o cambiar color…':'Renombrar o cambiar color', icon:MI.pencil, fn:()=>projectSheet(id)}],
     (i>0?[{label:'Subir', icon:MI.up, fn:()=>moveProject(id,-1)}]:[]).concat(i<ps.length-1?[{label:'Bajar', icon:MI.down, fn:()=>moveProject(id,1)}]:[]),
-    [{label:'Archivar', icon:MI.archive, red:true, fn:archive}] ]}); }
+    statusItems(id), [{label:'Archivar', icon:MI.archive, red:true, fn:archive}] ]}); }
 
 // Header used by sheets with text fields: on the iPhone the bottom of a sheet ends up under the keyboard bar
 function sheadHTML(title, cancel, ok){ return '<div class="shead"><button class="hbtn" data-x="cancel">'+cancel+'</button><h2>'+title+'</h2><button class="hbtn ok" data-x="ok">'+ok+'</button></div>'; }

@@ -10,14 +10,15 @@ const srv=http.createServer((q,s)=>{let p=decodeURIComponent(q.url.split('?')[0]
   page.on('pageerror',e=>errors.push(e.message));
   await page.goto('http://localhost:'+PORT+'/'); await page.waitForTimeout(400);
   await page.evaluate(()=>{ addTask({title:'Revisar plan de cutover',date:todayStr()}); render(); });
-  await page.tap('.screen.root[data-root=tareas] .group .row .row-title'); await page.waitForTimeout(600);
-  await page.tap('.pushed-screen [data-act=voice]'); await page.waitForTimeout(1500);
+  // v0.26 (decision 49): the dictation sheet is gone; Nuevo proyecto is a sheet with header actions and a field focused inside the tap
+  await page.evaluate(()=>switchTab('proyectos')); await page.waitForTimeout(600);
+  await page.tap('.screen.root[data-root=proyectos] [data-act=newProject]'); await page.waitForTimeout(1500);
   const st=await page.evaluate(()=>({top:sheet.classList.contains('top'), kbup:document.documentElement.classList.contains('kbup'), head:!!document.querySelector('#sheet .shead [data-x=ok]'), log:LOG.slice(-2).map(e=>e.m)}));
   await page.screenshot({path:OUT+'/kb2-'+mode+'.png'});
-  await page.keyboard.type('Nota uno'); await page.tap('#sheet .shead [data-x=ok]'); await page.waitForTimeout(500);
-  st.saved=await page.evaluate(()=>DB.voiceNotes.map(v=>v.text)); st.open=await page.evaluate(()=>sheet.classList.contains('on'));
+  await page.keyboard.type('Proyecto uno'); await page.tap('#sheet .shead [data-x=ok]'); await page.waitForTimeout(500);
+  st.saved=await page.evaluate(()=>DB.projects.filter(p=>p.name==='Proyecto uno').map(p=>p.name)); st.open=await page.evaluate(()=>sheet.classList.contains('on'));
   // add sheet with header: Añadir from the header
-  await page.tap('.pushed-screen .back, .pushed-screen [data-back]').catch(()=>{}); await page.evaluate(()=>{ pop&&pop(); }).catch(()=>{}); await page.waitForTimeout(500);
+  await page.evaluate(()=>{ while(UI.stack.length) pop(); switchTab('tareas'); }).catch(()=>{}); await page.waitForTimeout(800);
   await page.evaluate(()=>addSheet()); await page.waitForTimeout(300); await page.waitForTimeout(1300); /* after kbFallback('late') */
   // R5 (batch B): Nueva tarea has no header; Añadir is in the icon bar on the keyboard (.qadd). It must stay clear of the iOS 26 floating bar:
   // with kbup the sheet keeps 64 px under it; with the sheet moved to the top (no keyboard reported) the bar is in the top half

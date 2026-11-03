@@ -1,5 +1,13 @@
 # Registro de cambios
 
+## v0.26.0. Dictar en Notas y «Nota de voz» para el audio (3 de noviembre de 2026)
+
+- Desaparece la nota de voz dictada: se dicta con el micrófono del teclado directamente en Notas. En el ordenador, el micrófono de la alta ampliada («Dictar») escribe en el campo de notas.
+- Las notas de voz que ya había se añaden al final de las notas de su tarea, una línea por nota con su fecha y hora («2/11 18:40: texto»). Se hace solo, una vez, al abrir la app, al sincronizar, al importar y al restaurar una copia, sin duplicar líneas aunque lo hagan dos dispositivos.
+- «Grabar audio» pasa a llamarse «Nota de voz» en el iPhone y en el ordenador.
+- Compartir y CSV dejan la sección de notas de voz: su texto ya va en Notas.
+- Sin cambios en Supabase.
+
 ## v0.25.1. «Revisar hoy» y «Por confirmar más adelante» (3 de noviembre de 2026)
 
 - En Hoy, las tareas por confirmar cuyo día de revisión ha llegado (o con la entrega hoy) van en un grupo propio «Revisar hoy» al principio de la lista, con «Esperando a» en cada fila. Siguen contando en «para hoy».

@@ -31,8 +31,8 @@ const tk = (id, o) => Object.assign({id, title:id, spaceId:'trabajo', projectId:
 const SEED = () => ({ spaces:[{id:'trabajo',name:'Trabajo',order:0,created:T0},{id:'personal',name:'Personal',order:1,created:T0}],
   projects:[{id:'p1', spaceId:'trabajo', name:'FLC', color:'#007AFF', order:0, archived:false, created:T0, modified:T0},{id:'p2', spaceId:'trabajo', name:'Transformación digital OCA', color:'#34C759', order:1, archived:false, created:T0, modified:T0},
     {id:'p9', spaceId:'personal', name:'Casa', color:'#FF9500', order:0, archived:false, created:T0, modified:T0}],
-  tasks:[ tk('a1', {title:'Enviar acta', estimate:15, created:C(1)}),
-    tk('a2', {title:LONG, projectId:'p2', priority:'high', created:C(2)}),
+  tasks:[ tk('a1', {title:'Enviar acta', estimate:15, notes:'Ver correo', created:C(1)}),
+    tk('a2', {title:LONG, projectId:'p2', priority:'high', focus:new Date(2026,10,4,8,0).toISOString(), notes:'Con notas', created:C(2)}),
     tk('a3', {title:'Informe mensual', date:'2026-11-10', deadline:'2026-11-04', estimate:60, created:C(3)}), // in Hoy by its deadline: the Fecha column shows
     tk('a4', {title:'Reunión SteerCo', reminder:new Date(2026,10,4,16,30).toISOString(), created:C(4)}),
     tk('a5', {title:'Llamar al banco', carried:true, created:C(5)}), // Aplazada: the Fecha column shows
@@ -96,6 +96,10 @@ async function main(browser){
   check('title_ellipsis', x.ellipsis && x.ws==='nowrap' && x.to==='ellipsis', x);
   check('ahora_review_rows', !!g.rows['a6@ahora'] && !!g.rows.a7, Object.keys(g.rows));
   check('aligned_closed', aligned(g).length===0, aligned(g));
+  // v0.29.3: the indicators keep fixed slots, so the star of Ahora and the notes icon sit in the same column on every row
+  x = await ev(page, ()=>{ const L='#desk .mbody .row[data-id]:not(.first .row)', m=(id,s)=>{ const e=document.querySelector(L.replace('[data-id]','[data-id='+id+']')+' '+s); if(!e) return null; const b=e.getBoundingClientRect(); return Math.round(b.left+b.width/2); };
+    return {starA2:m('a2','.ist svg'), starA6:m('a6','.ist svg'), noteA1:m('a1','.is-nt svg'), noteA2:m('a2','.is-nt svg')}; });
+  check('ind_slots', x.starA2!==null && x.starA2===x.starA6 && x.noteA1!==null && x.noteA1===x.noteA2 && x.noteA1>x.starA2, x);
   const h0 = g.head;
   // The header follows the rows: a list without reminders, estimates or deadlines shows none of them
   await ev(page, ()=>{ DB.settings.activeSpace='personal'; resetListState(); save(); setDeskView('hoy'); }); await calm(page);

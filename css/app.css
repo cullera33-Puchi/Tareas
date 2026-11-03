@@ -603,13 +603,16 @@ body.pdragging,body.pdragging *{cursor:grabbing !important;user-select:none;-web
 /* Date, reminder and notes columns only take room when some row of the list uses them */
 .app.desktop .main:not(:has(.row .rc-date:not(:empty))) .rc-date{display:none;}
 .app.desktop .main:not(:has(.row .rc-rem:not(:empty))) .rc-rem{display:none;}
-.app.desktop .main:not(:has(.row .inds:not(:empty))) .inds{display:none;}
+.app.desktop .main:not(:has(.row .inds .is:not(:empty))) .inds{display:none;}
+.app.desktop .main:not(:has(.row .is-st:not(:empty))) .is-st,.app.desktop .main:not(:has(.row .is-nt:not(:empty))) .is-nt,
+.app.desktop .main:not(:has(.row .is-cl:not(:empty))) .is-cl,.app.desktop .main:not(:has(.row .is-rp:not(:empty))) .is-rp{display:none;}
 .app.desktop .row-meta{flex:none;display:flex;margin:0;font-size:12px;font-variant-numeric:tabular-nums;}
 .rc{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right;}
 .rc-date{width:var(--col-date,84px);}
 .rc-rem{width:var(--col-rem,100px);}
 .rc-rem svg{width:11px;height:11px;margin-right:3px;vertical-align:-1px;}
-.app.desktop .inds{width:auto;min-width:34px;justify-content:flex-end;gap:4px;} /* up to three icons: notes, voice, paperclip (decision 29); right-aligned, so the columns after them stay put */
+.app.desktop .inds{width:auto;justify-content:flex-end;gap:4px;} /* fixed slots (deskIndHTML): star, notes, paperclip, repeat, each centred in its own column */
+.app.desktop .inds .is{width:14px;display:flex;justify-content:center;align-items:center;}
 .app.desktop .inds svg{width:12px;height:12px;}
 .app.desktop .pri{width:22px;font-size:13px;}
 .app.desktop .rowmore{width:24px;height:24px;border-radius:5px;}

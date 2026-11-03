@@ -1,5 +1,10 @@
 # Registro de cambios
 
+## v0.29.3. Iconos de las filas alineados en el ordenador (3 de noviembre de 2026)
+
+- La estrella de «Ahora», el icono de notas, el clip y el de repetición tienen cada uno su propia columna fija en las filas del ordenador: ya no se desplazan según los demás iconos de la fila. Una columna que ninguna fila usa no ocupa sitio.
+- Prueba `rm-COL` ampliada.
+
 ## v0.29.2. Nueva tarea con el proyecto del filtro (3 de noviembre de 2026)
 
 - Con un filtro de proyecto activo, Nueva tarea propone ese proyecto también en Todas (antes solo en Hoy), en iPhone y ordenador.

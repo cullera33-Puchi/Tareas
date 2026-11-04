@@ -277,6 +277,10 @@ body.desktop .toast{left:auto;right:28px;bottom:28px;width:360px;}
 .cell.link{color:var(--blue);}
 .cell input[type=text]{flex:1;background:none;border:0;outline:0;}
 .cell .pdot{width:12px;height:12px;border-radius:50%;flex:none;}
+/* Ajustes, Atajo de iOS: the key shown once and the function's address, selectable and wrapped */
+.cell.sc-show{flex-direction:column;align-items:flex-start;gap:4px;}
+.cell.sc-show .lbl{flex:none;color:var(--ink2);font-size:.8125rem;}
+.sc-code{font:.8125rem/1.35 ui-monospace,"SF Mono",Menlo,monospace;color:var(--ink);word-break:break-all;-webkit-user-select:all;user-select:all;}
 .picon{width:30px;height:30px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;color:#fff;}
 .picon svg{width:17px;height:17px;}
 .footnote{font-size:0.765rem;color:var(--ink2);padding:0 16px 14px;line-height:1.4;}

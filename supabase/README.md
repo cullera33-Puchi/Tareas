@@ -11,6 +11,9 @@ Si alguna fila dice FALTA: SQL Editor, **+ New query**, pega `all.sql` entero y 
 ## 3. La función de notificaciones
 Edge Functions, `send-reminders` (el nombre exacto). Pega `functions/send-reminders/index.ts`, pulsa **Deploy** y comprueba que **Verify JWT** está desactivado. Hay que repetirlo cada vez que cambie ese archivo (lo indica el CHANGELOG).
 
+## 4. La función del Atajo de iOS
+Edge Functions, `add-task` (el nombre exacto). Pega `functions/add-task/index.ts`, pulsa **Deploy** y comprueba que **Verify JWT** está desactivado: el Atajo no lleva sesión, se identifica con la clave que crea Ajustes, Atajo de iOS. No necesita secretos.
+
 ## Qué hay en cada migración
 
 | Archivo | Qué crea | Versión |
@@ -24,5 +27,6 @@ Edge Functions, `send-reminders` (el nombre exacto). Pega `functions/send-remind
 | `migrations/0007_deadline.sql` | Fecha límite de una tarea | v0.25.0 |
 | `migrations/0008_estimate_postponed.sql` | Tiempo estimado y veces que se aplaza una tarea | v0.28.0 |
 | `migrations/0009_closed_day.sql` | Día cerrado en todos los dispositivos (Cerrar el día) | v0.30.0 |
+| `migrations/0010_inbox.sql` | Siri y el Atajo de iOS: bandeja de entrada y clave personal del atajo | v0.31.0 |
 
-`all.sql` es la suma de las nueve en orden. Las claves de la app (URL y clave pública) no van aquí: están en los secretos del repositorio de GitHub.
+`all.sql` es la suma de las diez en orden. Las claves de la app (URL y clave pública) no van aquí: están en los secretos del repositorio de GitHub.

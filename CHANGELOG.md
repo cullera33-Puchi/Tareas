@@ -1,5 +1,13 @@
 # Registro de cambios
 
+## v0.31.0. Siri y Atajo de iOS (4 de noviembre de 2026)
+
+- Atajo de iOS y Siri: «Oye Siri, añadir tarea» y la frase dictada llegan a una bandeja en Supabase; la app la recoge al sincronizar, con el aviso «N tareas recibidas desde Siri» y Deshacer.
+- Se entienden al final de la frase: «urgente» o «prioridad alta», «prioridad media», «proyecto PAM», «15 minutos», «media hora», «una hora», «medio día», y las fechas y horas de siempre. Sin fecha dicha va a hoy, o a mañana si el día está cerrado.
+- También desde la hoja de compartir: el enlace va a las notas de la tarea.
+- Ajustes, sección «Atajo de iOS»: crear y revocar la clave personal y elegir el espacio (Deloitte de inicio).
+- Supabase: tablas `inbox` y `shortcut_keys` (`0010_inbox.sql`) y función `add-task`, ya aplicadas. Prueba nueva `rm-SI`.
+
 ## v0.30.0. Carga en horas, tareas olvidadas, posponer recordatorios y cerrar el día (3 de noviembre de 2026)
 
 - Carga del día en horas: Hoy suma el tiempo estimado de lo que muestra («5 h 45»), en gris, naranja desde las horas de trabajo y rojo desde 1,5 veces. Las horas de trabajo se ajustan por espacio en Ajustes (6 h de inicio). En Semana y Día, la barra de carga mide horas.

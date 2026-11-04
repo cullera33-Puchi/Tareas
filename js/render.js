@@ -507,7 +507,7 @@ function viewAjustes(){
   const th=DB.settings.theme||'auto'; const dev=UI.wide?'este dispositivo':'este iPhone'; // the desktop reuses this view
   return '<header class="nav"><div class="nav-row"><div class="title">Ajustes</div></div></header>'+
    '<div class="scroll">'+
-   syncAccountHTML(dev)+pushSectionHTML(dev)+
+   syncAccountHTML(dev)+pushSectionHTML(dev)+shortcutSectionHTML(dev)+
    '<div class="group-title">Espacios</div><div class="group">'+DB.spaces.slice().sort((a,b)=>a.order-b.order).map(sp=>'<button class="cell" data-edit-space="'+sp.id+'"><span class="lbl">'+esc(sp.name)+'</span>'+(sp.id===space().id?'<span class="val">Activo</span>':'')+I.chev.replace('<svg','<svg class="chev"')+'</button>').join('')+'<button class="cell link" data-act="newSpace">'+I.plus.replace('<svg','<svg style="width:18px;height:18px"')+'<span class="lbl">Nuevo espacio</span></button></div>'+
    '<div class="footnote">Al eliminar un espacio se eliminan también sus proyectos, tareas y notas de voz.</div>'+
    '<div class="group-title">Horas de trabajo al día</div><div class="group">'+DB.spaces.slice().sort((a,b)=>a.order-b.order).map(sp=>'<button class="cell" data-day-hours="'+sp.id+'" aria-haspopup="menu"><span class="lbl">'+esc(sp.name)+'</span><span class="val">'+dayHours(sp.id)+' h</span>'+I.chev.replace('<svg','<svg class="chev"')+'</button>').join('')+'</div>'+ // decision 60a

@@ -71,7 +71,8 @@ const syncDemoId = id => String(id).startsWith('demo-');
 const syncSkip = (table, rec) => syncDemoId(rec.id) || (table==='spaces'&&INITIAL_SPACES.includes(rec.id)) || ((table==='voice_notes'||table==='attachments'||table==='subtasks')&&syncDemoId(rec.taskId)) || (table==='project_notes'&&syncDemoId(rec.projectId)) || (table==='attachments'&&!rec.path);
 // A table the database does not have yet (attachments before 0003_attachments.sql ran, subtasks before 0005_subtasks.sql, project_notes before
 // 0006_project_notes.sql): left out of this session's sync
-const SYNC_LATE={attachments:['0003_attachments.sql','Los adjuntos se quedan en este dispositivo'], subtasks:['0005_subtasks.sql','Los pasos se quedan en este dispositivo'], project_notes:['0006_project_notes.sql','Las notas de proyecto se quedan en este dispositivo']};
+const SYNC_LATE={attachments:['0003_attachments.sql','Los adjuntos se quedan en este dispositivo'], subtasks:['0005_subtasks.sql','Los pasos se quedan en este dispositivo'], project_notes:['0006_project_notes.sql','Las notas de proyecto se quedan en este dispositivo'],
+  inbox:['0010_inbox.sql','Siri y el Atajo de iOS no están disponibles'], shortcut_keys:['0010_inbox.sql','Siri y el Atajo de iOS no están disponibles']}; // not synced tables: the Shortcut's inbox and key (js/inbox.js)
 // Whether a request failed because the table is not there (PostgREST's PGRST205, PostgreSQL's 42P01). The first time it is noted in missing and logged
 function syncAbsent(missing, table, error){ if(!SYNC_LATE[table]||!error) return false; const m=String(error.message||'')+' '+String(error.code||'');
   if(!/42P01|PGRST20[0-9]|does not exist|could not find the table|schema cache/i.test(m)) return false;
@@ -102,7 +103,7 @@ function supabaseRemote(cfg){
   // Decisions 29 and 46 published before 0003_attachments.sql or 0005_subtasks.sql ran: the table is not there, the rest syncs as before and
   // the attachments or the steps stay on the device
   const missing=new Set(), absent=(table, error)=>syncAbsent(missing, table, error);
-  return { missing,
+  return { missing, baseUrl:cfg.url,
     async init(){
       if(!client){ if(!window.supabase) await loadScript(SUPABASE_JS);
         client=window.supabase.createClient(cfg.url, cfg.anonKey, {auth:{flowType:'pkce', detectSessionInUrl:true, persistSession:true, autoRefreshToken:true, storageKey:'tareas-auth'}}); }
@@ -126,6 +127,7 @@ function supabaseRemote(cfg){
     async markDeleted(table, items){ return rows(await db().from(table).upsert(items.map(x=>({id:x.id, deleted:x.ts, modified:x.ts})), {onConflict:'id', defaultToNull:false}).select('id')); },
     subscribe(uid, onRow, onStatus){ const c=db(); const ch=c.channel('tareas-'+uid);
       T.filter(t=>!missing.has(t)).forEach(t=>ch.on('postgres_changes', {event:'*', schema:'public', table:t, filter:'owner_id=eq.'+uid}, p=>{ if(p&&p.new&&p.new.id) onRow(t, p.new); }));
+      if(!missing.has('inbox')) ch.on('postgres_changes', {event:'INSERT', schema:'public', table:'inbox', filter:'owner_id=eq.'+uid}, p=>{ if(p&&p.new&&p.new.id) onRow('inbox', p.new); }); // Siri: a phrase just arrived
       ch.subscribe((st, err)=>onStatus(st, err)); return ()=>{ try{ c.removeChannel(ch); }catch(e){} }; },
     // Block 9: the Edge Function's public key, this device's subscription (0002_push.sql) and the account's devices
     async pushKey(){ const r=await fetch(fnUrl+'?publicKey', {headers:{apikey:cfg.anonKey}}); const j=await r.json().catch(()=>({}));
@@ -140,6 +142,12 @@ function supabaseRemote(cfg){
     // supabase-js sends a Blob as a form whose file part carries the Blob's own type: the type is set on the Blob itself
     async fileUpload(path, blob, mime){ const type=mime||blob.type||'application/octet-stream', b=blob.type===type?blob:new Blob([blob], {type});
       const {error}=await db().storage.from(ATT_BUCKET).upload(path, b, {contentType:type, upsert:true, cacheControl:'31536000'}); if(error) throw error; },
+    // Siri and the iOS Shortcut (0010_inbox.sql): the rows not taken yet, oldest first, and marking them taken; the account's key row
+    async inboxList(){ const res=await db().from('inbox').select('id,text,url,source,created').is('taken', null).order('created', {ascending:true}).limit(100); if(absent('inbox', res.error)) return []; return rows(res); },
+    async inboxTake(ids, ts){ return rows(await db().from('inbox').update({taken:ts}).in('id', ids).select('id')); },
+    async keyGet(){ const res=await db().from('shortcut_keys').select('space_id,created,revoked').maybeSingle(); if(absent('shortcut_keys', res.error)) return null; if(res.error) throw res.error; return res.data||null; },
+    async keyPut(row){ const res=await db().from('shortcut_keys').upsert(row, {onConflict:'owner_id'}); if(absent('shortcut_keys', res.error)) throw new Error('Falta 0010_inbox.sql'); if(res.error) throw res.error; },
+    async keyPatch(owner, patch){ return rows(await db().from('shortcut_keys').update(patch).eq('owner_id', owner).select('owner_id')); },
     async fileUrl(path, ttl){ const {data, error}=await db().storage.from(ATT_BUCKET).createSignedUrl(path, ttl||SIGN_TTL); if(error) throw error; if(!data||!data.signedUrl) throw new Error('Sin enlace firmado'); return data.signedUrl; }
   };
 }
@@ -292,6 +300,7 @@ function syncRun(reason){
     if(!SY.user || SY.user.id!==user.id) return false; // signed out meanwhile
     const pool=first?(pulled.spaces||[]).filter(r=>!r.deleted).map(r=>syncFromRow('spaces', r)):null;
     const a=syncApply(pulled, {cursor:true, pool});
+    await inboxPickup(); // Siri: the inbox rows become tasks, which this pass pushes (js/inbox.js)
     const p=await syncPush(syncCollect(false));
     st=syncState(); st.fields=fsig; if(first){ st.owner=user.id; log('info','Primera conexión completada', {spaces:DB.spaces.length, projects:DB.projects.length, tasks:DB.tasks.length, remaps:a.remaps.length}); }
     st.lastSync=new Date().toISOString(); syncWrite(st); SY.lastSync=st.lastSync; SY.retry=0;
@@ -306,7 +315,7 @@ function syncRun(reason){
 const syncMissingKey = () => SY&&SY.remote&&SY.remote.missing?[...SY.remote.missing].join():'';
 function syncResubscribe(){ if(SY.unsub&&SY.subKey!==syncMissingKey()){ SY.unsub(); SY.unsub=null; syncSubscribe(); } }
 function syncSubscribe(){ if(SY.unsub||!SY.user||!SY.remote.subscribe) return; SY.subKey=syncMissingKey();
-  let was=false; SY.unsub=SY.remote.subscribe(SY.user.id, (table,row)=>{ SY.rt.push([table,row]); clearTimeout(SY.rtT); SY.rtT=setTimeout(syncRealtime, 250); }, (st, err)=>{
+  let was=false; SY.unsub=SY.remote.subscribe(SY.user.id, (table,row)=>{ if(table==='inbox'){ clearTimeout(SY.ibT); SY.ibT=setTimeout(()=>syncRun('Siri'), 300); return; } SY.rt.push([table,row]); clearTimeout(SY.rtT); SY.rtT=setTimeout(syncRealtime, 250); }, (st, err)=>{
     if(st==='SUBSCRIBED'){ if(was) syncRun('tiempo real'); was=true; } // back after a cut: catch up with what came meanwhile
     else if(st==='CHANNEL_ERROR'||st==='TIMED_OUT') log('warn','Tiempo real: '+st+(err?' '+(err.message||err):'')); }); }
 // Changes from another device, a few at a time, through the same merge

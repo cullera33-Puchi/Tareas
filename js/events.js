@@ -152,6 +152,11 @@ function onClick(e){
     case 'signOut': syncSignOutSheet(); break;
     case 'pushEnable': pushEnable(); break; // block 9: inside the tap, so iOS shows the permission prompt
     case 'pushTest': pushTest(); break;
+    case 'scCreate': shortcutCreateAsk(); break; // Siri and the iOS Shortcut (js/inbox.js)
+    case 'scRevoke': shortcutRevoke(); break;
+    case 'scSpace': shortcutSpaceMenu(act.querySelector('.val')||act); break;
+    case 'scCopyKey': if(SK.newKey) copyText(SK.newKey, 'Clave copiada'); break;
+    case 'scCopyUrl': copyText(shortcutUrl(), 'Dirección copiada'); break;
   }
 }
 

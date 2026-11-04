@@ -418,11 +418,11 @@ async function sqlTests(){
   await db.close();
   db = await pgSetup(); const all = strip(fs.readFileSync(path.join(ROOT, 'supabase/all.sql'), 'utf8'));
   err = null; try { await db.exec(all); await db.exec(all); } catch(e){ err = e.message; }
-  check('sql_all_twice', !err && /0001 a 0009/.test(all.split('\n')[0]) && /migrations\/0009_closed_day\.sql/.test(all), err);
+  check('sql_all_twice', !err && /0001 a 00\d\d/.test(all.split('\n')[0]) && /migrations\/0009_closed_day\.sql/.test(all), err);
   let rows = []; try { rows = (await db.query(fs.readFileSync(path.join(ROOT, 'supabase/check.sql'), 'utf8'))).rows; } catch(e){ err = e.message; }
   check('sql_check_all_ok', rows.length>=24 && rows.every(x=>x.Estado==='OK') && rows.some(x=>/spaces\.closed_day \(0009\)/.test(x.Pieza)), {err, bad:rows.filter(x=>x.Estado!=='OK'), n:rows.length});
   const readme = fs.readFileSync(path.join(ROOT, 'supabase/README.md'), 'utf8');
-  check('sql_readme', /`migrations\/0009_closed_day\.sql`/.test(readme) && /suma de las nueve/.test(readme));
+  check('sql_readme', /`migrations\/0009_closed_day\.sql`/.test(readme) && /suma de las \w+ en orden/.test(readme));
   await db.close();
 }
 // The service worker: the actions of a desktop notification and the ?snooze= it opens (read from the source, the worker needs HTTPS push)

@@ -14,10 +14,10 @@ OUT=$ROOT/tests/out; LOGS=$OUT/logs; mkdir -p "$LOGS"
 # in the console, which most tests count as an error. Locally it holds nulls, exactly what the workflow writes without
 # secrets: the app stays local only. rm-S serves its own 404 for it to cover the missing case.
 [ -f "$ROOT/config.js" ] || echo 'window.TAREAS_CONFIG = {"url":null,"anonKey":null};' > "$ROOT/config.js"
-ALL="smoke voice swipe roll spaces settings rowbg update features batch34 batch5 batch6 swiperight links multi four desk mock rm-A rm-B rm-C rm-D rm-E rm-F rm-G rm-H rm-I-vn rm-I-kb2 rm-I-guard rm-I-repro rm-J rm-S rm-P rm-Q rm-Q2 rm-AT rm-R rm-RF rm-ST rm-NP rm-LOG rm-DL rm-RP rm-RH rm-VN2 rm-NS rm-M4 rm-EP rm-COL rm-PIT rm-PF rm-LH"
+ALL="smoke voice swipe roll spaces settings rowbg update features batch34 batch5 batch6 swiperight links multi four desk mock rm-A rm-B rm-C rm-D rm-E rm-F rm-G rm-H rm-I-vn rm-I-kb2 rm-I-guard rm-I-repro rm-J rm-S rm-P rm-Q rm-Q2 rm-AT rm-R rm-RF rm-ST rm-NP rm-LOG rm-DL rm-RP rm-RH rm-VN2 rm-NS rm-M4 rm-EP rm-COL rm-PIT rm-PF rm-LH rm-SI"
 TESTS=${*:-$ALL}
 LIMIT=${TEST_TIMEOUT:-300}
-if [[ " $TESTS " =~ " rm-P "|" rm-AT " ]] && ! command -v "${DENO:-deno}" >/dev/null 2>&1; then echo "Warning: Deno not found (set DENO or put deno on PATH): rm-P and rm-AT will fail"; fi
+if [[ " $TESTS " =~ " rm-P "|" rm-AT "|" rm-SI " ]] && ! command -v "${DENO:-deno}" >/dev/null 2>&1; then echo "Warning: Deno not found (set DENO or put deno on PATH): rm-P, rm-AT and rm-SI will fail"; fi
 pass=0; failed=(); retried=(); start=$(date +%s)
 for t in $TESTS; do
   if [ ! -f "$ROOT/tests/$t.js" ]; then echo "$t: FAIL no such test"; failed+=("$t"); continue; fi

@@ -7,7 +7,7 @@ with checks(orden, pieza, ok) as (
   union all select 4,  'Tabla voice_notes', to_regclass('public.voice_notes') is not null
   union all select 5,  'Reglas de acceso activas en las tablas', not exists (
       select 1 from pg_class c join pg_namespace n on n.oid=c.relnamespace
-      where n.nspname='public' and c.relname in ('spaces','projects','tasks','voice_notes','attachments','subtasks','project_notes','push_subscriptions','push_keys') and not c.relrowsecurity)
+      where n.nspname='public' and c.relname in ('spaces','projects','tasks','voice_notes','attachments','subtasks','project_notes','push_subscriptions','push_keys','inbox','shortcut_keys') and not c.relrowsecurity)
   union all select 6,  'Notificaciones: tabla push_subscriptions (0002)', to_regclass('public.push_subscriptions') is not null
   union all select 7,  'Notificaciones: tabla privada push_keys (0002)', to_regclass('public.push_keys') is not null
   union all select 8,  'Notificaciones: columna tasks.reminder_sent (0002)', exists (select 1 from information_schema.columns where table_schema='public' and table_name='tasks' and column_name='reminder_sent')
@@ -27,6 +27,9 @@ with checks(orden, pieza, ok) as (
   union all select 22, 'Aplazamientos: columna tasks.carried_since (0008)', exists (select 1 from information_schema.columns where table_schema='public' and table_name='tasks' and column_name='carried_since')
   union all select 23, 'Día cerrado: columna spaces.closed_day (0009)', exists (select 1 from information_schema.columns where table_schema='public' and table_name='spaces' and column_name='closed_day')
   union all select 24, 'Tiempo real: tablas publicadas', (select count(*) from pg_publication_tables where pubname='supabase_realtime' and schemaname='public' and tablename in ('spaces','projects','tasks','voice_notes','attachments','subtasks','project_notes')) = 7
+  union all select 25, 'Siri y Atajo: tabla inbox (0010)', to_regclass('public.inbox') is not null
+  union all select 26, 'Siri y Atajo: tabla shortcut_keys (0010)', to_regclass('public.shortcut_keys') is not null
+  union all select 27, 'Siri y Atajo: inbox en tiempo real (0010)', exists (select 1 from pg_publication_tables where pubname='supabase_realtime' and schemaname='public' and tablename='inbox')
 )
 select orden as "N.º", pieza as "Pieza", case when ok then 'OK' else 'FALTA' end as "Estado"
 from checks order by orden;

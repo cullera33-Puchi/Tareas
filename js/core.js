@@ -2,7 +2,7 @@
 /* Tareas. Core: version, log, utilities, data (DB in localStorage), UI state, Deshacer toast and the task actions.
    A classic script: index.html loads every file of js/ in order and they share their global names. Only declarations and
    listeners run at load; the start itself (first screen, timers, sync, service worker) is in boot.js, the last file. */
-const APP_VERSION = '0.30.0';
+const APP_VERSION = '0.31.0';
 let pendingSW = null; // service worker installed and waiting to take over
 let updateRequested = false; // the user asked for the waiting worker to take over
 
@@ -41,26 +41,26 @@ function localDay(iso){ const d=new Date(iso); return d.getFullYear()+'-'+String
 function fmtDateTime(iso){ if(!iso) return ''; const d=new Date(iso); const s=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); return fmtDate(s)+' '+fmtTime(iso); }
 const MESES_FULL = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 const WD = {domingo:0,lunes:1,martes:2,'miércoles':3,miercoles:3,jueves:4,viernes:5,'sábado':6,sabado:6};
-// Next occurrence of a weekday (0 = Sunday); strict skips today
-function nextWeekday(dow, strict){ const t=todayStr(); const d=new Date(t+'T00:00:00'); let diff=(dow-d.getDay()+7)%7; if(diff===0&&strict) diff=7; return addDays(t,diff); }
+// Next occurrence of a weekday (0 = Sunday); strict skips today. base: the day counted from (today when not given; the inbox of Siri uses the day it was said)
+function nextWeekday(dow, strict, base){ const t=base||todayStr(); const d=new Date(t+'T00:00:00'); let diff=(dow-d.getDay()+7)%7; if(diff===0&&strict) diff=7; return addDays(t,diff); }
 // Quick options without repeats: one whose date (or instant) is already offered is left out, so on a Thursday 'Viernes' is not a second 'Mañana'
 const uniqueBy = (list, key) => { const seen=new Set(); return list.filter(o=>{ const k=key(o); if(seen.has(k)) return false; seen.add(k); return true; }); };
 // 'Fin de semana' in Aplazar: the next weekend day, so on a Saturday it is Sunday (the same as 'Mañana') and never a week ahead
 function weekendDay(){ const t=todayStr(); return new Date(t+'T00:00:00').getDay()===6 ? addDays(t,1) : nextWeekday(6,true); }
-// Day and optional month (1-12) to the next matching date from today
-function dateFromDM(day, month){ const t=todayStr(); const y=+t.slice(0,4), m=+t.slice(5,7); const mk=(yy,mm)=>{ if(day<1||day>new Date(yy,mm,0).getDate()) return null; return yy+'-'+String(mm).padStart(2,'0')+'-'+String(day).padStart(2,'0'); };
+// Day and optional month (1-12) to the next matching date from today (or from base)
+function dateFromDM(day, month, base){ const t=base||todayStr(); const y=+t.slice(0,4), m=+t.slice(5,7); const mk=(yy,mm)=>{ if(day<1||day>new Date(yy,mm,0).getDate()) return null; return yy+'-'+String(mm).padStart(2,'0')+'-'+String(day).padStart(2,'0'); };
   if(month){ if(month<1||month>12) return null; const c=mk(y,month); return (c&&c>=t)?c:mk(y+1,month); }
   for(let k=0;k<3;k++){ const mm=(m-1+k)%12+1, yy=y+Math.floor((m-1+k)/12); const c=mk(yy,mm); if(c&&c>=t) return c; } return null; } // a month without that day is skipped: 'el 30' on 31 January is 30 March
 // Trailing date words in a quick-add title: 'hoy', 'mañana', 'pasado mañana', a weekday, 'el 12', '12/11', '12 de noviembre'
-function quickDateMatch(text){
-  const t=todayStr(); const rules=[
+function quickDateMatch(text, base){
+  const t=base||todayStr(); const rules=[
     [/\s+pasado\s+mañana\s*$/i, ()=>addDays(t,2)],
     [/\s+mañana\s*$/i, ()=>addDays(t,1)],
     [/\s+hoy\s*$/i, ()=>t],
-    [/\s+(?:el\s+)?(lunes|martes|mi[eé]rcoles|jueves|viernes|s[aá]bado|domingo)\s*$/i, m=>nextWeekday(WD[m[1].toLowerCase()], true)],
-    [/\s+(?:el\s+)?(\d{1,2})\s+de\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)\s*$/i, m=>dateFromDM(+m[1], MESES_FULL.indexOf(m[2].toLowerCase())+1)],
-    [/\s+(?:el\s+)?(\d{1,2})\/(\d{1,2})\s*$/, m=>dateFromDM(+m[1],+m[2])],
-    [/\s+el\s+(?:día\s+)?(\d{1,2})\s*$/i, m=>dateFromDM(+m[1],null)] ];
+    [/\s+(?:el\s+)?(lunes|martes|mi[eé]rcoles|jueves|viernes|s[aá]bado|domingo)\s*$/i, m=>nextWeekday(WD[norm(m[1])], true, t)],
+    [/\s+(?:el\s+)?(\d{1,2})\s+de\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)\s*$/i, m=>dateFromDM(+m[1], MESES_FULL.indexOf(m[2].toLowerCase())+1, t)],
+    [/\s+(?:el\s+)?(\d{1,2})\/(\d{1,2})\s*$/, m=>dateFromDM(+m[1],+m[2],t)],
+    [/\s+el\s+(?:día\s+)?(\d{1,2})\s*$/i, m=>dateFromDM(+m[1],null,t)] ];
   for(const [re,fn] of rules){ const m=text.match(re); if(m){ const d=fn(m); if(d) return {index:m.index, len:m[0].length, date:d}; } }
   return null;
 }

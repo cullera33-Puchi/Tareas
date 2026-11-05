@@ -1746,3 +1746,4 @@ body.desktop .cxprog .cx-line{font-size:13px;}
 .rpi.on .rbox svg{opacity:1;}
 .rpi .rpt{flex:1;min-width:0;}
 .app.desktop .rpi{min-height:32px;font-size:13px;}
+.remsheet .rvias{margin:10px 0 2px;flex-wrap:wrap;}

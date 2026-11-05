@@ -341,6 +341,9 @@ function deskIndHTML(x, v, opts){ if(opts.compact) return '';
   return indSlotsHTML(k=> k==='st'?(x.focus&&!v.done&&!opts.simple&&!opts.inFocus?'<span class="ist" title="En Ahora">'+I.starF+'</span>':'')
     : k==='nt'?(x.notes&&x.notes.trim()?I.note:'') : k==='cl'?(hasAtt(x.id)?I.clip:'')
     : (x.repeat&&repParse(x.repeat)?'<span class="irp" title="'+esc(repSummary(x.repeat))+'">'+I.repeat+'</span>':'')); }
+/* v0.33.1: a right-hand column takes room only when some row of the list uses it (the :has rules of the stylesheet). The blocks at the
+   foot of a list, Completadas and Por confirmar más adelante, are rows apart (opts.xs, class xs): what they show (the time a task was
+   done, a review day) never opens a column in the list above them or in its header; their own rows get the columns of the list plus theirs */
 function deskRowHTML(x, opts, v){ const t=v.t; let date='', dcls='', rem=''; const dl=x.deadline?dlText(x.deadline):'', dlc=dlLevel(x); // decision 48a: a column of its own
   if(v.done){ if(x.completed) date=opts.byDay?fmtTime(x.completed):fmtDateTime(x.completed); }
   else { const dg=x.status==='pending'&&x.date&&x.date<=t?dragText(x):''; // decision 56b, as on the iPhone
@@ -354,16 +357,18 @@ function deskRowHTML(x, opts, v){ const t=v.t; let date='', dcls='', rem=''; con
   // R15, R16: the selected row (cur), the multiple selection, the selection mode's boxes and the title edited in place; Ahora repeats rows and shows none of the selection
   const ds=UI.dsel, own=!opts.simple, multi=deskMulti(), sel=own&&multi&&ds.ids.has(x.id), cur=own&&!multi&&ds.cur===x.id, edit=own&&ds.edit&&ds.edit.id===x.id;
   v.selecting=own&&ds.mode;
-  return '<div class="row'+(v.done?' done':'')+(v.held?' held':'')+(opts.byDay?' byday':'')+(sel?' selected':'')+(cur?' cur':'')+'" data-id="'+x.id+'"'+(v.pc?' style="'+tagVars(v.pc)+'"':'')+' role="option" aria-selected="'+(sel||cur)+'" tabindex="'+(own&&ds.cur===x.id?0:-1)+'"'+(edit?'':' draggable="true"')+'>'+
+  return '<div class="row'+(v.done?' done':'')+(v.held?' held':'')+(opts.byDay?' byday':'')+(opts.xs?' xs':'')+(sel?' selected':'')+(cur?' cur':'')+'" data-id="'+x.id+'"'+(v.pc?' style="'+tagVars(v.pc)+'"':'')+' role="option" aria-selected="'+(sel||cur)+'" tabindex="'+(own&&ds.cur===x.id?0:-1)+'"'+(edit?'':' draggable="true"')+'>'+
     '<div class="row-content">'+(v.selecting?'<span class="selbox">'+I.check+'</span>':'<button class="check'+(v.shownDone?' done':x.status==='waiting'?' waiting':'')+'" data-act="check" aria-label="Completar" tabindex="-1">'+I.check+'</button>')+pcol+
-    '<div class="row-text">'+(edit?'<input class="rowedit" data-role="rowedit" type="text" value="'+esc(ds.edit.text)+'" aria-label="Título" autocomplete="off" spellcheck="false">':'<div class="row-title" title="'+esc(x.title||'')+'">'+esc(x.title||'Sin título')+'</div>')+(x.status==='waiting'&&x.waitingFor&&!v.done?'<span class="wtag" title="Esperando a '+esc(x.waitingFor)+'">'+esc(x.waitingFor)+'</span>':'')+(v.done?'':respTagHTML(x))+'</div>'+ // decisions 41 and 48c
+    '<div class="row-text">'+(edit?'<input class="rowedit" data-role="rowedit" type="text" value="'+esc(ds.edit.text)+'" aria-label="Título" autocomplete="off" spellcheck="false">':'<div class="row-title" title="'+esc(x.title||'')+'">'+esc(x.title||'Sin título')+'</div>')+'</div>'+
+    // v0.33.1: Esperando a and the responsible in a column of their own, Persona, right after the title (decisions 41 and 48c)
+    '<span class="rc rc-per">'+(x.status==='waiting'&&x.waitingFor&&!v.done?'<span class="wtag" title="Esperando a '+esc(x.waitingFor)+'">'+MI.wait+esc(x.waitingFor)+'</span>':'')+(v.done?'':respTagHTML(x))+'</span>'+
     '<span class="inds">'+deskIndHTML(x, v, opts)+'</span><span class="rsteps">'+v.prog+'</span><span class="row-meta"><span class="rc rc-date'+dcls+'"'+(date?' title="'+esc(date)+'"':'')+'>'+date+'</span><span class="rc rc-dl'+(dlc?' dl-'+dlc:'')+'"'+(dl?' title="Fecha límite: '+esc(fmtDate(x.deadline))+'"':'')+'>'+dl+'</span><span class="rc rc-rem"'+(rem?' title="Recordatorio: '+esc(rem)+'"':'')+'>'+(rem?I.bell+rem:'')+'</span><span class="rc rc-est"'+(x.estimate&&!v.done?' title="Tiempo estimado: '+esc(estLabel(x.estimate).toLowerCase())+'"':'')+'>'+(x.estimate&&!v.done?estLabel(x.estimate):'')+'</span></span>'+ // decision 56a: a column of its own
     '<span class="pri'+(v.pri?(x.priority==='high'?' high':' mid'):'')+'">'+(v.pri?(x.priority==='high'?'!!!':'!!'):'')+'</span>'+
     (v.selecting?'':opts.simple?'<span class="rowmore" aria-hidden="true"></span>':'<button class="rowmore" data-act="rowMenu" aria-label="Más" title="Más" tabindex="-1">'+I.more+'</button>')+'</div></div>'; } // Ahora keeps the columns aligned with the list
 /* Decision 39: the Ahora block. iPhone: at the top of Hoy, above the search, compact rows (circle, title, project, priority) that open the
    detail and complete; hidden when empty. Desktop: above the list of Hoy and Todas, a drop zone for rows. Order: when each was put there */
 function ahoraHTML(){ const xs=ahoraTasks(); if(!xs.length) return '';
-  return '<section class="ahora"'+(UI.wide?' data-drop-ahora=""':'')+' aria-label="Ahora"><div class="ahead">'+I.starF+'<span class="al">Ahora</span><span class="gn">'+xs.length+'</span><span class="grow"></span><button class="asug afoco" data-act="focusOn" title="Solo las tareas de Ahora">Foco</button><button class="asug" data-act="suggest">Sugerir</button></div><div class="first">'+xs.map(x=>rowHTML(x,{simple:true, compact:!UI.wide, noToday:true})).join('')+'</div></section>'; }
+  return '<section class="ahora"'+(UI.wide?' data-drop-ahora=""':'')+' aria-label="Ahora"><div class="ahead">'+I.starF+'<span class="al">Ahora</span><span class="gn">'+xs.length+'</span><span class="grow"></span><button class="aib" data-act="focusOn" title="Modo foco" aria-label="Modo foco">'+I.focus+'</button><button class="aib" data-act="suggest" title="¿Qué hago ahora?" aria-label="¿Qué hago ahora?">'+I.bulb+'</button></div><div class="first">'+xs.map(x=>rowHTML(x,{simple:true, compact:!UI.wide, noToday:true})).join('')+'</div></section>'; }
 /* Decision 65d: focus mode, the Ahora tasks alone, large, with their usual gestures and completing; nothing else of Hoy. iPhone: the whole
    Tareas tab with Salir del foco in its bar. Desktop: the list area of Hoy (focusMainHTML), the sidebar stays */
 const focusRowsHTML = () => '<div class="group focuslist">'+ahoraTasks().map(x=>rowHTML(x, {noToday:true, inFocus:true})).join('')+'</div>'+
@@ -451,7 +456,7 @@ function listHTML(filter, projectId){
     if(!DB.settings.doneOpen){ h += '<div class="group"><button class="cell link" data-act="toggleDone" style="justify-content:center"><span>Mostrar completadas ('+done.length+(dt?', '+dt+' hoy':'')+')</span></button></div>'; }
     else { const t=todayStr(), yd=addDays(t,-1); const by={}, order=[]; done.forEach(x=>{ const d=x.completed?localDay(x.completed):'0000'; if(!by[d]){ by[d]=[]; order.push(d); } by[d].push(x); });
       h += '<div class="group"><button class="cell link" data-act="toggleDone" style="justify-content:center"><span>Ocultar completadas</span></button></div>';
-      order.forEach(d=>{ const label=d===t?'Hoy':d===yd?'Ayer':d==='0000'?'Sin fecha':fmtDate(d); h += gsec(gtitle(label, by[d].length), by[d].map(x=>R(x,{byDay:true})).join('')); }); } }
+      order.forEach(d=>{ const label=d===t?'Hoy':d===yd?'Ayer':d==='0000'?'Sin fecha':fmtDate(d); h += gsec(gtitle(label, by[d].length), by[d].map(x=>R(x,{byDay:true, xs:true})).join('')); }); } } // xs: see deskRowHTML
   return h;
 }
 /* Decisions 41 and 51: the folded block at the end of a list. In Hoy, Por confirmar más adelante (N): the waiting tasks whose review day has
@@ -462,7 +467,7 @@ function waitingBlockHTML(root, projectId, R, hoy){ let ws=hoy?waitingList(proje
   if(root&&filterOn()) ws=ws.filter(passFilter);
   if(!ws.length) return ''; const open=!!UI.waitOpen;
   const head=gtitle(hoy?'Por confirmar más adelante':'Por confirmar', ws.length, '<button class="gx" data-act="toggleWaiting" aria-expanded="'+open+'">'+(open?'Ocultar ':'Mostrar ')+(hoy?'las que esperan':'por confirmar')+'</button>');
-  return '<div class="wblock">'+(open?gsec(head, ws.map(x=>R(x)).join(''), ' data-waiting=""'):head)+'</div>'; }
+  return '<div class="wblock">'+(open?gsec(head, ws.map(x=>R(x,{xs:true})).join(''), ' data-waiting=""'):head)+'</div>'; }
 // Every waiting task of the space (or of a project): those to review today first, in the order of the lists, then the rest by review day
 function waitingAll(projectId){ let xs=spaceTasks().filter(x=>x.status==='waiting'&&waitIn(x));
   if(projectId!==undefined) xs=xs.filter(x=> projectId===null ? !x.projectId : x.projectId===projectId);

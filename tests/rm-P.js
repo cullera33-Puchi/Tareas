@@ -209,6 +209,12 @@ async function fnTests(st){
   const nE = PUSHES.length, r5 = await fnCall('POST', '', {}); const pe = PUSHES.slice(nE).filter(p => p.url==='/push/a1').map(p => decrypt(p.body, dA1));
   const pE = pe.find(p => p.tag==='e1t'), pL = pe.find(p => p.tag==='lng');
   check('fn_cipher_not_clipped', r5.json && r5.json.sent===2 && pE && pE.title==='e1:'+'A'.repeat(300) && pE.body==='e1:'+'B'.repeat(120) && pE.data.projectId==='p2' && pL && pL.title.length===180 && pL.title.endsWith('…') && pL.data.projectId===null && m1.pt.data.projectId==='p1', {json:r5.json, pE, pL});
+  // One budget for both: an encrypted title over 2400 characters, or an encrypted project name over 600, leaves only «Recordatorio»
+  store.t.projects.push({ id:'p3', name:'e1:'+'P'.repeat(700), deleted:null });
+  store.t.tasks.push(T('e1big', { reminder:iso(-10e3), title:'e1:'+'A'.repeat(2500) }), T('e1proj', { project_id:'p3', reminder:iso(-10e3), title:'e1:'+'A'.repeat(100) }));
+  const nB = PUSHES.length, r6 = await fnCall('POST', '', {}); const pb = PUSHES.slice(nB).filter(p => p.url==='/push/a1').map(p => decrypt(p.body, dA1));
+  const bT = pb.find(p => p.tag==='e1big'), bP = pb.find(p => p.tag==='e1proj');
+  check('fn_cipher_budget', r6.json && r6.json.sent===2 && bT && bT.title==='Recordatorio' && bT.body==='' && bP && bP.title==='Recordatorio' && bP.body==='', {json:r6.json, bT, bP});
   GONE.clear(); store.t.push_subscriptions.push({ id:'sA3', owner_id:'user-A', endpoint:EP('a3'), p256dh:dA2.p256dh, auth:dA2.authB64, deleted:null });
   const n0 = PUSHES.length; const tNo = await fnCall('POST', '', {test:true}), tBad = await fnCall('POST', '', {test:true}, {Authorization:'Bearer nope'});
   check('fn_test_needs_session', tNo.status===401 && tBad.status===401 && PUSHES.length===n0, [tNo.status, tBad.status]);

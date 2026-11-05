@@ -152,7 +152,11 @@ class Fake {
       case 'pull': { let rs=this.rows(own, a.table); if(a.after) rs=rs.filter(r=>Date.parse(r.server_ts)>Date.parse(a.after));
         rs.sort((x,y)=>x.server_ts<y.server_ts?-1:x.server_ts>y.server_ts?1:x.id<y.id?-1:1); return JSON.parse(JSON.stringify(rs.slice(0,a.limit))); }
       case 'byIds': return JSON.parse(JSON.stringify(this.rows(own, a.table).filter(r=>a.ids.includes(r.id))));
-      case 'upsert': return this.write(own, a.table, a.rows);
+      // failUpsert: the next writes of a table fail; hook: before the first write that names its row, another device changes that row without
+      // touching modified (fn), and the columns sent for it are kept (keys)
+      case 'upsert': if(this.failUpsert&&this.failUpsert[a.table]>0){ this.failUpsert[a.table]--; throw new Error('HTTP 500 upsert failed'); }
+        if(this.hook&&a.table===this.hook.table&&!this.hook.keys){ const r=a.rows.find(x=>x.id===this.hook.id); if(r){ this.hook.keys=Object.keys(r).sort(); this.hook.fn(this.t[a.table].get(r.id)); } }
+        return this.write(own, a.table, a.rows);
       case 'markDeleted': return this.write(own, a.table, a.items.map(x=>({id:x.id, deleted:x.ts, modified:x.ts})));
       case 'subscribe': this.subs.set(page, a.uid); return true;
       case 'unsubscribe': this.subs.delete(page); return true;
@@ -164,7 +168,7 @@ class Fake {
         if(!k||Object.keys(a.match).some(c=>a.match[c]===null?k[c]!=null:k[c]!==a.match[c])) return []; Object.assign(k, a.patch);
         if(this.lose.patch){ this.lose.patch--; throw new Error('Failed to fetch'); } return [{kid:k.kid}]; }
       case 'upload': if(a.path===this.failPath) throw new Error('HTTP 500 storage error'); if(this.failUpload>0){ this.failUpload--; throw new Error('Failed to fetch'); } if(!a.path.startsWith(own+'/')) throw new Error('row-level security'); this.store.set(a.path, {b64:a.b64, mime:a.mime}); return true;
-      case 'download': { const o=this.store.get(a.path); if(!o) throw new Error('HTTP 400'); return o; }
+      case 'download': { if(a.path===this.rateLimitPath) throw new Error('HTTP 429 Too Many Requests'); const o=this.store.get(a.path); if(!o) throw new Error('HTTP 400 {"statusCode":"404","error":"not_found","message":"Object not found"}'); return o; }
       case 'inboxList': return this.inbox.filter(x=>x.owner_id===own&&!x.taken).map(x=>({id:x.id, text:x.text, url:x.url, source:x.source, created:x.created}));
       case 'inboxTake': return this.inbox.filter(x=>x.owner_id===own&&a.ids.includes(x.id)).map(x=>{ x.taken=a.ts; if(a.o&&a.o.clear){ x.text=''; x.url=null; } return {id:x.id}; });
       case 'inboxClear': return this.inbox.filter(x=>x.owner_id===own&&x.taken&&x.text!=='').map(x=>{ x.text=''; x.url=null; return {id:x.id}; });
@@ -306,6 +310,13 @@ async function appTests(browser){
   fake.inbox.push({id:'ib-new', owner_id:U, text:'Llamar a Pepe mañana', url:null, source:'siri', created:new Date().toISOString(), taken:null});
   await ap.evaluate(()=>syncRun('prueba')); await synced(ap);
   const ibn=fake.inbox.find(x=>x.id==='ib-new'), ibt=fake.t.tasks.get('ib-ib-new');
+  fake.inbox.push({id:'ib-after', owner_id:U, text:'Pedir presupuesto', url:null, source:'siri', created:new Date().toISOString(), taken:null}); fake.failUpsert={tasks:3};
+  await ap.evaluate(()=>syncRun('prueba')); await until(ap, ()=>!SY.running);
+  const ibA=fake.inbox.find(x=>x.id==='ib-after');
+  check('siri_kept_until_pushed', !!ibA.taken && ibA.text==='Pedir presupuesto' && !fake.t.tasks.has('ib-ib-after'), {ibA, f:fake.failUpsert});
+  fake.failUpsert={}; fake.inbox.push({id:'ib-old2', owner_id:U, text:'Tomada por un dispositivo antiguo', url:'https://x', source:'share', created:new Date().toISOString(), taken:new Date().toISOString()});
+  await ap.evaluate(()=>{ SY.retry=0; return syncRun('prueba'); }); await synced(ap);
+  check('siri_cleared_after_push', ibA.text==='' && fake.t.tasks.has('ib-ib-after') && isEnc(fake.t.tasks.get('ib-ib-after').title) && fake.inbox.find(x=>x.id==='ib-old2').text==='' && fake.inbox.find(x=>x.id==='ib-old2').url===null, {ibA});
   check('siri_cleared', !!ibn.taken && ibn.text==='' && ibt && isEnc(ibt.title) && await ap.evaluate(()=>!!task('ib-ib-new')&&task('ib-ib-new').title.startsWith('Llamar a Pepe')), {ibn, t:ibt&&ibt.title});
 
   /* ---------- B (desktop): sync paused until the password ---------- */
@@ -504,7 +515,25 @@ async function appTests(browser){
   fake.put(W, 'attachments', {id:'pg1', task_id:'g1', kind:'photo', path:PG, mime:'image/jpeg', size:PHOTO.length, width:10, height:10, duration_ms:null, purged:null, modified:new Date().toISOString(), created:new Date().toISOString()});
   for(let i=0;i<8&&!fake.keys.get(W).migrated;i++){ await synced(gp); await gp.evaluate(async()=>{ await crFetch(SY.user); CR.resumeAt=0; await cryptoMigrate(); }); await until(gp, ()=>!CR.migrating); }
   fake.failPath=null; await toSettings(gp); s = await section(gp);
-  check('G_file_set_aside', !!fake.keys.get(W).migrated && s && s.cells.includes('1 archivo no se pudo cifrar') && await gp.evaluate(()=>LOG.filter(e=>/no se ha podido cifrar/.test(e.m)).length===3), {s, migrated:fake.keys.get(W).migrated});
+  const gsa = 'G_file_set_aside'; check(gsa, !!fake.keys.get(W).migrated && s && s.cells.includes('1 archivo no se pudo cifrar') && await gp.evaluate(()=>LOG.filter(e=>/no se ha podido cifrar/.test(e.m)).length===3), {s, migrated:fake.keys.get(W).migrated});
+  // Set aside, tried again about once a day: once it goes through it leaves the list and Ajustes no longer counts it
+  await gp.evaluate(()=>{ const F=crFiles(CR.kid); F.asideAt=0; crFilesWrite(F); return crRetryAside(); }); await gp.waitForTimeout(300);
+  s = await section(gp);
+  check('G_aside_retried', Buffer.from(fake.store.get(PG).b64,'base64').slice(0,8).toString()==='TAREASE1' && await gp.evaluate(()=>crAside()===0) && s && !s.cells.some(c=>/no se pud/.test(c)), s);
+  // A rate limit (or 401, 403, 408) on a file is a failure to retry, never «not found»: the file is not counted as done while plain
+  const PR=W+'/g1/limite.jpg'; fake.store.set(PR, {b64:PHOTO.toString('base64'), mime:'image/jpeg'}); fake.rateLimitPath=PR; fake.keys.get(W).migrated=null;
+  fake.put(W, 'attachments', {id:'pr1', task_id:'g1', kind:'photo', path:PR, mime:'image/jpeg', size:PHOTO.length, width:10, height:10, duration_ms:null, purged:null, modified:new Date().toISOString(), created:new Date().toISOString()});
+  await synced(gp); await gp.evaluate(async()=>{ await crFetch(SY.user); CR.resumeAt=0; await cryptoMigrate(); });
+  const rl = {m:fake.keys.get(W).migrated, done:await gp.evaluate(p=>crFiles(CR.kid).done.includes(p), PR)};
+  fake.rateLimitPath=null; await synced(gp); await gp.evaluate(async()=>{ await crFetch(SY.user); CR.resumeAt=0; await cryptoMigrate(); });
+  check('G_rate_limit_retried', rl.m===null && !rl.done && !!fake.keys.get(W).migrated && Buffer.from(fake.store.get(PR).b64,'base64').slice(0,8).toString()==='TAREASE1', rl);
+  // The migration sends only id, modified and the encrypted columns: a change made meanwhile without touching modified stays
+  fake.keys.get(W).migrated=null; fake.put(W, 'tasks', {id:'g4', title:'Cuarta en claro', notes:'', status:'pending', priority:'none', date:'2099-01-01', modified:new Date().toISOString(), created:new Date().toISOString()});
+  fake.hook={table:'tasks', id:'g4', keys:null, fn:row=>{ row.priority='high'; row.date='2099-02-02'; }};
+  await synced(gp); await gp.evaluate(async()=>{ await crFetch(SY.user); CR.resumeAt=0; await cryptoMigrate(); });
+  const g4=fake.t.tasks.get('g4');
+  check('G_migration_columns_only', fake.hook.keys && fake.hook.keys.join()==='id,modified,notes,title' && g4.priority==='high' && g4.date==='2099-02-02' && isEnc(g4.title) && !!fake.keys.get(W).migrated, {keys:fake.hook.keys, g4});
+  fake.hook=null;
   // Password change: the answer lost (the row tells it went through); another device changed it meanwhile (nothing overwritten)
   fake.lose={patch:1}; const pc1 = await gp.evaluate(([a,b])=>cryptoChangePassword(a,b), [PW1, PW2]); const w1=fake.keys.get(W).wrapped;
   fake.racePatch=true; const pc2 = await gp.evaluate(([a,b])=>cryptoChangePassword(a,b), [PW2, PW1]);

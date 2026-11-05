@@ -41,9 +41,11 @@ function crUnread(table, rec, local){ const bad=[]; if(!rec) return rec;
     const lv=local&&local[f], mine=lv!=null&&lv!==''&&lv!==CRYPTO_PLACEHOLDER&&lv!==CRYPTO_UNREAD&&!cryptoIsEnc(lv); // a ciphertext kept here as text is not a value
     rec[f]=mine?lv:CRYPTO_PLACEHOLDER; if(!mine) bad.push(f); });
   rec.cxBad=bad.length?bad:undefined; return rec; }
+// Only a 404 (or a 400 whose body says not found) means the file is not in Storage; any other answer (429, 401, 403, 408...) is a failure to retry
+const crNotFound = e => { const m=String(e&&(e.message||e.error)||e); return /^HTTP 404\b/.test(m)||(/^HTTP 400\b/.test(m)&&/not.?found/i.test(m))||/object not found/i.test(m); };
 // The file as Storage has it, through the adapter's own download or its signed URL
 async function crRawDownload(R, path, ttl){ if(R.fileDownload) return R.fileDownload(path, ttl);
-  const r=await fetch(await R.fileUrl(path, ttl), {cache:'no-store'}); if(!r.ok) throw new Error('HTTP '+r.status); return r.blob(); }
+  const r=await fetch(await R.fileUrl(path, ttl), {cache:'no-store'}); if(!r.ok) throw new Error('HTTP '+r.status+' '+(await r.text().catch(()=>'')).slice(0,200)); return r.blob(); }
 // The key kept in IndexedDB, when it is this account's (and the server row's, once known): unlocked or activated in another window
 async function crLoadStored(user){ if(crKey()) return; const r=await cryptoKeyLoad().catch(()=>null);
   if(r&&r.owner===user.id&&(!CR.row||r.kid===CR.row.kid)){ CR.key=r.key; CR.kid=r.kid; CR.owner=r.owner; } }
@@ -96,8 +98,6 @@ function cryptoRemote(inner){ if(!inner||inner.__crypto) return inner;
       return blob; } let k=crKey(); if(!k&&SY&&SY.user){ await crLoadStored(SY.user); k=crKey()||(CR.key&&CR.owner===SY.user.id?CR.key:null); }
     if(!k){ CR.force=true; throw crLockedErr(); }
     return new Blob([await cryptoDecFile(k, u, path)], {type:blob.type}); };
-  // Siri (decision 62): with encryption on, the phrase leaves the server when its task is made; the task goes up encrypted
-  if(inner.inboxTake) w.inboxTake=(ids, ts)=>inner.inboxTake(ids, ts, crOn()?{clear:true}:undefined);
   return w; }
 
 /* ---------- The account's state and the gate of each pass ---------- */
@@ -278,7 +278,9 @@ async function cryptoMigrate(){ const user=SY&&SY.user, k=crKey(); if(CR.migrati
       for(const table of crMigTables()){ const seen=new Set();
         await crScan(inner, table, async page=>{ const send=[];
           for(const r of page){ if(!seen.has(r.id)){ seen.add(r.id); CR.prog.n++; }
-            const o=await cryptoSealRow(k, table, r); if(o!==r){ const x=Object.assign({}, o); delete x.owner_id; delete x.server_ts; send.push(x); } }
+            // only id, modified and the encrypted columns: the rest of the row stays as the server has it (a change made meanwhile without
+            // touching modified, such as rollOver's date, is never undone); every row of a request carries the same columns
+            const o=await cryptoSealRow(k, table, r); if(o!==r){ const x={id:r.id, modified:r.modified}; CRYPTO_COLS[table].forEach(c=>{ if(c in r) x[c]=o[c]; }); send.push(x); } }
           for(let i=0;i<send.length;i+=100) await inner.upsert(table, send.slice(i, i+100));
           stats.filas+=send.length; crPaint(); }); }
       if(!syncMissing('attachments')&&inner.fileUpload){ const F=crFiles(kid), done=new Set([...F.done, ...F.aside]); let failed=0;
@@ -289,12 +291,12 @@ async function cryptoMigrate(){ const user=SY&&SY.user, k=crKey(); if(CR.migrati
           if(!todo.size&&!UQ.running) break; if(round) CR.prog.of+=todo.size;
           for(const [path, mime] of todo){
             try{ let blob=null;
-              try{ blob=await crRawDownload(inner, path, SIGN_TTL); }catch(e){ if(syncOffline(e)) throw e; if(!/HTTP 4\d\d|not found|object not found/i.test(String(e&&e.message||e))) throw e; stats.sinArchivo++; log('warn','Cifrado: archivo no encontrado en el servidor, se deja'); }
+              try{ blob=await crRawDownload(inner, path, SIGN_TTL); }catch(e){ if(syncOffline(e)||!crNotFound(e)) throw e; stats.sinArchivo++; log('warn','Cifrado: archivo no encontrado en el servidor, se deja'); }
               if(blob){ const u=new Uint8Array(await blob.arrayBuffer());
                 if(!cryptoFileEnc(u)){ await inner.fileUpload(path, new Blob([await cryptoEncFile(k, u, path)], {type:mime||blob.type}), mime||blob.type); stats.archivos++; } }
               done.add(path); F.done.push(path); }
             catch(e){ if(syncOffline(e)) throw e; F.fails[path]=(F.fails[path]||0)+1;
-              if(F.fails[path]>=CR_FILE_TRIES){ F.aside.push(path); done.add(path); stats.apartados++; log('error','Cifrado: un archivo no se ha podido cifrar tras '+CR_FILE_TRIES+' intentos y se deja aparte: '+(e&&e.message||e)); }
+              if(F.fails[path]>=CR_FILE_TRIES){ F.aside.push(path); F.asideAt=Date.now(); done.add(path); stats.apartados++; log('error','Cifrado: un archivo no se ha podido cifrar tras '+CR_FILE_TRIES+' intentos y se deja aparte: '+(e&&e.message||e)); }
               else{ failed++; log('warn','Cifrado: un archivo no se ha podido cifrar, se intentará de nuevo: '+(e&&e.message||e)); } }
             crFilesWrite(F); CR.prog.n++; crPaint(); }
           if(failed) break; }
@@ -311,8 +313,26 @@ async function cryptoMigrate(){ const user=SY&&SY.user, k=crKey(); if(CR.migrati
   finally{ CR.migrating=false; CR.busy=false; const p=CR.prog; crPaint(); if(p&&p.done) setTimeout(()=>{ if(CR.prog===p) CR.prog=null; }, 0); syncRun('cifrado'); } }
 // Files set aside by this device's migration (Ajustes says how many)
 const crAside = () => CR.kid ? crFiles(CR.kid).aside.length : 0;
+/* The files set aside are tried again about once a day, once the server copy is marked done: one encrypted (or found encrypted, or gone)
+   leaves the list */
+async function crRetryAside(){ const k=crKey(), kid=CR.kid; if(!k||!CR.row||!CR.row.migrated||CR.migrating||CR.busy||CR.asideBusy) return; const F=crFiles(kid);
+  if(!F.aside.length||Date.now()-(F.asideAt||0)<864e5) return; const inner=SY.remote.inner||SY.remote; if(!inner.fileUpload) return;
+  CR.asideBusy=true; F.asideAt=Date.now(); crFilesWrite(F); let n=0;
+  try{ for(const path of F.aside.slice()){ let ok=false;
+      try{ const blob=await crRawDownload(inner, path, SIGN_TTL), u=new Uint8Array(await blob.arrayBuffer());
+        if(!cryptoFileEnc(u)) await inner.fileUpload(path, new Blob([await cryptoEncFile(k, u, path)], {type:blob.type}), blob.type); ok=true; }
+      catch(e){ if(crNotFound(e)) ok=true; else if(syncOffline(e)) break; }
+      if(ok){ const G=crFiles(kid); G.aside=G.aside.filter(p=>p!==path); G.done.push(path); crFilesWrite(G); n++; } }
+    if(n){ log('info','Cifrado: archivos apartados cifrados ahora', {n, quedan:crFiles(kid).aside.length}); crPaint(); } }
+  finally{ CR.asideBusy=false; } }
+/* Siri (decision 62): with encryption on, the phrases already taken leave the server once their tasks have gone up encrypted: after a
+   successful push, on every pass (this also empties the phrases an older device took after the migration). A failure is only logged */
+async function cryptoAfterPush(){ const inner=SY&&SY.remote&&(SY.remote.inner||SY.remote); if(!crKey()||!inner||!inner.inboxClear||syncMissing('inbox')) return;
+  try{ const n=((await inner.inboxClear())||[]).length; if(n) log('info','Cifrado: frases de Siri vaciadas en el servidor', {n}); }
+  catch(e){ log('warn','Cifrado: no se pudieron vaciar las frases de Siri: '+(e&&e.message||e)); } }
 // After a pass that reached the server: while the account's row says the server copy is not all encrypted, this device (with the key) goes on
-function cryptoResume(){ if(!SY||!SY.user||!crKey()||!CR.row||CR.row.migrated||CR.migrating||CR.busy||Date.now()<CR.resumeAt) return;
+function cryptoResume(){ if(SY&&SY.user&&crKey()&&CR.row&&CR.row.migrated){ crRetryAside(); return; }
+  if(!SY||!SY.user||!crKey()||!CR.row||CR.row.migrated||CR.migrating||CR.busy||Date.now()<CR.resumeAt) return;
   setTimeout(()=>{ if(!CR.migrating&&!CR.busy&&crKey()&&CR.row&&!CR.row.migrated){ log('info','Cifrado: se continúa el cifrado del servidor'); cryptoMigrate(); } }, 0); }
 
 /* ---------- Unlock on another device ---------- */

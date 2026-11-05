@@ -149,7 +149,7 @@ function supabaseRemote(cfg){
       const {error}=await db().storage.from(ATT_BUCKET).upload(path, b, {contentType:type, upsert:true, cacheControl:'31536000'}); if(error) throw error; },
     // Siri and the iOS Shortcut (0010_inbox.sql): the rows not taken yet, oldest first, and marking them taken; the account's key row
     async inboxList(){ const res=await db().from('inbox').select('id,text,url,source,created').is('taken', null).order('created', {ascending:true}).limit(100); if(absent('inbox', res.error)) return []; return rows(res); },
-    // o.clear (decision 63a, encryption on): the phrase leaves the server in the same update, the task goes up encrypted (0012_encryption.sql)
+    // o.clear: the phrase leaves the server in the same update (kept for completeness; with encryption on the app empties them after its push)
     async inboxTake(ids, ts, o){ return rows(await db().from('inbox').update(Object.assign({taken:ts}, o&&o.clear?{text:'', url:null}:{})).in('id', ids).select('id')); },
     // Activating encryption: the phrases already taken leave the server
     async inboxClear(){ const res=await db().from('inbox').update({text:'', url:null}).not('taken', 'is', null).neq('text', '').select('id'); if(absent('inbox', res.error)) return []; return rows(res); },
@@ -163,7 +163,7 @@ function supabaseRemote(cfg){
     async keyPut(row){ const res=await db().from('shortcut_keys').upsert(row, {onConflict:'owner_id'}); if(absent('shortcut_keys', res.error)) throw new Error('Falta 0010_inbox.sql'); if(res.error) throw res.error; },
     async keyPatch(owner, patch){ return rows(await db().from('shortcut_keys').update(patch).eq('owner_id', owner).select('owner_id')); },
     // A file as it is in Storage (cryptoRemote opens an encrypted one)
-    async fileDownload(path, ttl){ const url=await this.fileUrl(path, ttl); const r=await fetch(url, {cache:'no-store'}); if(!r.ok) throw new Error('HTTP '+r.status); return r.blob(); },
+    async fileDownload(path, ttl){ const url=await this.fileUrl(path, ttl); const r=await fetch(url, {cache:'no-store'}); if(!r.ok) throw new Error('HTTP '+r.status+' '+(await r.text().catch(()=>'')).slice(0,200)); return r.blob(); },
     async fileUrl(path, ttl){ const {data, error}=await db().storage.from(ATT_BUCKET).createSignedUrl(path, ttl||SIGN_TTL); if(error) throw error; if(!data||!data.signedUrl) throw new Error('Sin enlace firmado'); return data.signedUrl; }
   };
 }
@@ -328,6 +328,7 @@ function syncRun(reason){
     const a=syncApply(pulled, {cursor:true, pool});
     await inboxPickup(); // Siri: the inbox rows become tasks, which this pass pushes (js/inbox.js)
     const p=await syncPush(syncCollect(false));
+    await cryptoAfterPush(); // decision 63a: the Siri phrases taken leave the server once their tasks are up encrypted
     st=syncState(); st.fields=fsig; if(first){ st.owner=user.id; log('info','Primera conexión completada', {spaces:DB.spaces.length, projects:DB.projects.length, tasks:DB.tasks.length, remaps:a.remaps.length}); }
     st.lastSync=new Date().toISOString(); syncWrite(st); SY.lastSync=st.lastSync; SY.retry=0;
     log('info','Sincronización ('+reason+')', {recibidas:a.added+a.updated, eliminadas:a.removed, conflictos:a.conflicts.length, enviadas:p.pushed, borradas:p.deleted, mantenidas:p.kept, ms:Date.now()-t0});

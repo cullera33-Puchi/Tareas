@@ -27,6 +27,9 @@ self.addEventListener('message', e => {
 self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
+  // novedades.json (decision 64): network only, never cached, so the notes of a new version are read before installing it.
+  // Without respondWith the browser fetches it itself; offline it fails and the page falls back to the usual update notice.
+  if (new URL(req.url).pathname.endsWith('/novedades.json')) return;
   // config.js (Supabase URL and public key, written at deploy) goes network first, so corrected keys reach installed
   // phones on the next deploy without a new version; offline, the cached copy is used.
   if (new URL(req.url).pathname.endsWith('/config.js')) {

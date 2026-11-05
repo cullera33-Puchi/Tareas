@@ -1,0 +1,50 @@
+[
+  {
+    "version": "0.33.1",
+    "date": "2026-11-05",
+    "items": [
+      "Antes de actualizar, la app te enseña lo nuevo de cada versión que te faltaba, con «Actualizar» o «Más tarde».",
+      "En Ajustes, «Novedades» junto a la versión muestra esta lista cuando quieras.",
+      "Ajustes ya no ofrece generar datos de prueba. Si quedan en el dispositivo, solo aparece la opción de eliminarlos."
+    ]
+  },
+  {
+    "version": "0.33.0",
+    "date": "2026-11-05",
+    "items": [
+      "Modo foco: el botón «Foco» del bloque Ahora deja a la vista solo esas tareas. «Salir del foco» vuelve a Hoy.",
+      "Repetir desde que la hice: la siguiente se cuenta desde el día en que la completas, no por calendario.",
+      "Una serie puede terminar un día concreto o después de un número de veces. Al completar la última, la app te avisa.",
+      "Las series nuevas no se acumulan: si un día no la haces, pasa sola a su siguiente fecha, con su recordatorio."
+    ]
+  },
+  {
+    "version": "0.32.0",
+    "date": "2026-11-05",
+    "items": [
+      "Responsable en cada tarea, con sugerencias de tus contactos. Se ve en la fila y sirve de filtro.",
+      "«Enviar recordatorio» a esa persona por WhatsApp, por correo o por la hoja de compartir, con el mensaje que quieras.",
+      "Contactos en Ajustes: se crean solos al escribir un nombre nuevo y puedes añadirles correo y teléfono.",
+      "En la vista por horas del ordenador, cada bloque dura su tiempo estimado y se alarga o se acorta arrastrando el borde."
+    ]
+  },
+  {
+    "version": "0.31.0",
+    "date": "2026-11-04",
+    "items": [
+      "Añade tareas con Siri o con el Atajo de iOS: dilo y la tarea aparece en la app al sincronizar.",
+      "Al final de la frase puedes decir «urgente», «proyecto» y su nombre, «media hora», una fecha o una hora.",
+      "En Ajustes, sección Atajo de iOS, creas tu clave y eliges el espacio al que llegan."
+    ]
+  },
+  {
+    "version": "0.30.0",
+    "date": "2026-11-03",
+    "items": [
+      "Hoy suma el tiempo estimado de sus tareas y se pone en naranja o en rojo si pasas de tus horas de trabajo.",
+      "«Repasar olvidadas» para las tareas sin fecha que llevan un mes sin cambios.",
+      "Posponer un recordatorio 10 minutos, una hora, a la tarde o a mañana, desde el aviso o desde la tarea.",
+      "Cerrar el día vale en todos tus dispositivos: Hoy pasa a mostrar las de mañana, con «Reabrir hoy»."
+    ]
+  }
+]

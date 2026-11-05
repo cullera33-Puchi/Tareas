@@ -426,6 +426,20 @@ body.desktop .toast{left:auto;right:28px;bottom:28px;width:360px;}
 .sheet .list .cell:active{background:var(--fill);}
 .sheet .hint{text-align:center;color:var(--ink2);font-size:0.765rem;margin:4px 0 10px;}
 .sheet .hint.warn{color:var(--red);margin:8px 0 0;}
+/* Decision 64: release notes. The list scrolls inside the sheet; the title and the actions stay in view */
+.sheet.nvsheet{display:flex;flex-direction:column;}
+.nvsheet .handle,.nvsheet h2,.nvsheet .sheet-actions{flex:none;}
+.nv-list{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;background:var(--card);border-radius:12px;padding:0 16px;}
+.nv-ver{padding:12px 0 14px;}
+.nv-ver+.nv-ver{border-top:0.5px solid var(--sep);}
+.nv-head{display:flex;align-items:baseline;gap:8px;margin-bottom:6px;}
+.nv-v{font-weight:600;font-size:0.941rem;}
+.nv-tag{font-size:0.706rem;font-weight:600;color:var(--blue);}
+.nv-d{margin-left:auto;color:var(--ink2);font-size:0.765rem;white-space:nowrap;}
+.nv-items{margin:0;padding:0 0 0 18px;font-size:0.882rem;line-height:1.38;}
+.nv-items li+li{margin-top:6px;}
+.nv-items li::marker{color:var(--ink2);}
+body.desktop .sheet.nvsheet{width:480px;}
 .sheet textarea{width:100%;min-height:110px;background:var(--bg);border:0;border-radius:10px;padding:10px 12px;outline:0;resize:none;line-height:1.4;}
 .sheet input[type=date],.sheet input[type=datetime-local]{width:100%;height:44px;background:var(--bg);border:0;border-radius:10px;padding:0 12px;outline:0;color:var(--ink);}
 .cal{padding:6px 0 0;}

@@ -25,10 +25,11 @@ if('serviceWorker' in navigator){
   let reloading=false;
   // Offer the update until it is applied: on install, on every return to the app and from Settings.
   let offerLater=null;
-  const offerUpdate = sw => { if(pendingSW!==sw) log('info','Nueva versión descargada, pendiente de aplicar'); pendingSW=sw; if(onSettings()) render();
+  const offerUpdate = sw => { if(pendingSW!==sw){ log('info','Nueva versión descargada, pendiente de aplicar'); NV.list=null; } pendingSW=sw; if(onSettings()) render();
+    if(!NV.list) nvFetch(); // decision 64: what is new, read now so «Actualizar» can show it
     // Never replace a live Deshacer: show the notice once that toast is gone (Ajustes offers it meanwhile)
-    clearTimeout(offerLater); if(undoFn && undoFn!==applyUpdate){ offerLater=setTimeout(()=>offerUpdate(sw), 4500); return; }
-    toast('Nueva versión disponible', applyUpdate, 'Actualizar'); };
+    clearTimeout(offerLater); if(undoFn && undoFn!==updateTap){ offerLater=setTimeout(()=>offerUpdate(sw), 4500); return; }
+    toast('Nueva versión disponible', updateTap, 'Actualizar'); };
   navigator.serviceWorker.register('sw.js').then(reg=>{
     if(!reg) return; // some embedded browsers resolve without a registration
     if(reg.waiting && navigator.serviceWorker.controller) offerUpdate(reg.waiting);

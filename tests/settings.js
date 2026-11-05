@@ -12,7 +12,7 @@ const srv = http.createServer((req,res)=>{ let p = decodeURIComponent(req.url.sp
   await page.goto('http://localhost:8774/'); await page.waitForTimeout(400); const r={};
   await page.click('#tabbar [data-tab=ajustes]'); await page.waitForTimeout(200);
   // Demo data
-  const t0=Date.now(); await page.click('.screen.root[data-root=ajustes] [data-act=demo]'); await page.waitForTimeout(400);
+  const t0=Date.now(); await page.evaluate(()=>generateDemo()); /* decision 64 release: Ajustes no longer offers it */ await page.waitForTimeout(400);
   r.demo = await page.evaluate(()=>({tasks:DB.tasks.length, projects:DB.projects.length, vnotes:DB.voiceNotes.length, demo:demoCount(), carried:DB.tasks.filter(x=>x.carried).length, done:DB.tasks.filter(x=>x.status==='done').length, today:pendingFor('hoy').length}));
   await page.click('#tabbar [data-tab=tareas]'); const t1=Date.now(); await page.waitForTimeout(300); await page.screenshot({path:'14-demo-tasks.png'});
   r.renderMs = await page.evaluate(()=>{ const a=performance.now(); render(); return Math.round(performance.now()-a); });

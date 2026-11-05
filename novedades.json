@@ -1,5 +1,15 @@
 [
   {
+    "version": "0.35.0",
+    "date": "2026-11-05",
+    "items": [
+      "Personas: en Proyectos del iPhone y en la barra lateral del ordenador, cada persona con algo pendiente contigo y su número de tareas.",
+      "Al abrir una persona ves dos grupos: lo que le toca a ella como responsable y lo que esperas de ella.",
+      "«Recordar todo» le envía un solo mensaje con toda su lista, por WhatsApp, correo o la hoja de compartir, y lo puedes editar antes.",
+      "Solo salen las tareas del espacio activo, y cuando completas lo último con alguien desaparece de la lista."
+    ]
+  },
+  {
     "version": "0.34.0",
     "date": "2026-11-05",
     "items": [

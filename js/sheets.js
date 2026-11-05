@@ -4,7 +4,7 @@
    listeners run at load; the start itself (first screen, timers, sync, service worker) is in boot.js, the last file. */
 /* Multi-select: entered from the long-press menu; a bottom bar replaces the tab bar */
 function renderSelbar(){ const n=UI.select?UI.select.ids.size:0; const b=(act,ic,l,red)=>'<button data-act="'+act+'"'+(n?'':' disabled')+(red?' class="red"':'')+'>'+ic+'<span>'+l+'</span></button>'; $('#selbar').innerHTML=b('bulkComplete',I.check,'Completar')+b('bulkPostpone',I.cal,'Aplazar')+b('bulkMove',I.folder,'Mover')+(n&&bulkRemindOn()?b('bulkRemind',MI.send,'Recordar'):'')+b('bulkDelete',I.trash,'Eliminar',true); } // decision 48c: Recordar when every selected task has the same person
-function startSelect(id){ flushHeld(true); const top=UI.stack[UI.stack.length-1]; UI.select={scope: top&&top.kind==='project'?'project':'root', ids:new Set(id?[id]:[]), all:false}; if(openRow) closeRow(openRow); app.classList.add('selecting'); render(); renderSelbar(); haptic(6); }
+function startSelect(id){ flushHeld(true); const top=UI.stack[UI.stack.length-1]; UI.select={scope: top&&(top.kind==='project'||top.kind==='person')?'project':'root', ids:new Set(id?[id]:[]), all:false}; if(openRow) closeRow(openRow); app.classList.add('selecting'); render(); renderSelbar(); haptic(6); }
 function endSelect(){ if(UI.wide){ endDeskSelect(); return; } UI.select=null; app.classList.remove('selecting'); render(); } // the desktop's own selection (R16) ends the same way
 function visibleRowIds(){ const scr=UI.select.scope==='project'?UI.stack[UI.stack.length-1].el:rootScreen('tareas'); return [...scr.querySelectorAll('.scroll .row[data-id], .scroll .rph[data-id]')].filter(r=>!r.closest('.first')).map(r=>r.dataset.id); } // rows of a long list not drawn yet count too
 function updateSelectUI(){ const n=UI.select.ids.size; const t=$('#selTitle'); if(t) t.textContent=n?n+(n===1?' seleccionada':' seleccionadas'):'Seleccionar'; const b=$('[data-act=selAll]'); if(b) b.textContent=UI.select.all?'Ninguna':'Todas'; renderSelbar(); } // the label always says what a tap will do
@@ -126,7 +126,7 @@ function reviewEnd(st, asSheet){ const T=st.tally, decided=Object.keys(T).some(k
 /* R13: the view options, from the three dots of the Tareas bar (and of a project) on the iPhone and of the column head on the desktop */
 function setGrouping(key, g){ if(DB.settings[key]===g) return; DB.settings[key]=g; save(); haptic(4); renderAnimated(); }
 function spaceMenu(src){ const pickSpace=s=>{ DB.settings.activeSpace=s.id; save(); resetListState();
-    if(UI.wide){ UI.deskDetail=null; if(UI.deskView.startsWith('project:')&&UI.deskView!=='project:none') UI.deskView=DB.settings.filter||'hoy'; } // the other space's project and task never stay on screen
+    if(UI.wide){ UI.deskDetail=null; if(UI.deskView.startsWith('project:')&&UI.deskView!=='project:none'||UI.deskView.startsWith('person:')&&!personRemindable(UI.deskView.slice(7)).length) UI.deskView=DB.settings.filter||'hoy'; } // decision 65a: a person with nothing in the new space leaves too // the other space's project and task never stay on screen
     render(); };
   const sps=DB.spaces.slice().sort((a,b)=>a.order-b.order);
   popMenu({anchor:src, align:'left', groups:[sps.map(s=>({label:s.name, on:s.id===space().id, fn:()=>pickSpace(s)})), [{label:'Nuevo espacio', icon:MI.plus, fn:()=>spaceSheet(null)}]]}); }

@@ -49,6 +49,7 @@ function onClick(e){
   const f=e.target.closest('[data-filter]'); if(f){ DB.settings.filter=f.dataset.filter; if(UI.wide) UI.deskView=f.dataset.filter; save(); render(); return; }
   const th=e.target.closest('button[data-theme]'); if(th){ DB.settings.theme=th.dataset.theme; save(); applyTheme(); render(); return; } // only the Tema buttons: <html> carries data-theme too
   const op=e.target.closest('[data-open-project]'); if(op){ if(UI.wide){ setDeskView('project:'+op.dataset.openProject); } else push('project', op.dataset.openProject); return; }
+  const opp=e.target.closest('[data-open-person]'); if(opp){ if(UI.wide) setDeskView('person:'+opp.dataset.openPerson); else push('person', opp.dataset.openPerson); return; } // decision 65a
   const dv=e.target.closest('[data-view]'); if(dv){ setDeskView(dv.dataset.view); return; }
   const wk=e.target.closest('[data-week]'); if(wk){ calNav(wk.dataset.week); return; }
   const cv=e.target.closest('[data-cal-view]'); if(cv){ if(UI.deskView!==cv.dataset.calView) setDeskView(cv.dataset.calView); return; } // R19, R20: Día, Semana, Mes
@@ -115,6 +116,7 @@ function onClick(e){
     case 'respFilterMenu': respFilterMenu(act); break; // decision 48c
     case 'pickResp': if(detailId) responsibleSheet(detailId, UI.wide?act:null); break;
     case 'sendRemind': if(detailId) remindSheet([detailId]); break;
+    case 'remindAll': remindAll(act.dataset.person); break; // decision 65a: the person's view
     case 'newContact': contactSheet(null); break;
     case 'bulkRemind': bulkRemind(); break;
     case 'weekModeMenu': weekModeMenu(act); break;

@@ -1,5 +1,13 @@
 # Registro de cambios
 
+## v0.35.0. Vista «Por persona» (5 de noviembre de 2026)
+
+- Personas (punto 65a): sección «Personas» en la pestaña Proyectos del iPhone y en la barra lateral del escritorio, con las personas que tienen alguna tarea abierta en el espacio activo, ordenadas por número de tareas.
+- Pantalla de cada persona con dos grupos: «Le toca a X» (responsable) y «Esperando a X» (por confirmar); una tarea en los dos sale solo en el segundo. Orden por fecha y prioridad. Las filas no repiten la persona de la vista.
+- «Recordar todo»: un solo mensaje con toda la lista de esa persona, por WhatsApp, correo o la hoja de compartir, editable. En el iPhone, celda arriba con el canal; en el escritorio, botón en la cabecera junto al buscador.
+- Sin pendientes, la pantalla dice «Nada pendiente con X» y la persona sale de la lista. Renombrar el contacto mantiene la vista.
+- Sin cambios en Supabase ni en el modelo de datos. Prueba nueva `rm-PP`.
+
 ## v0.34.0. Cifrado de extremo a extremo (5 de noviembre de 2026)
 
 - Cifrado (punto 63a): en Ajustes, sección «Cifrado», se activa con una contraseña de al menos 12 caracteres con letras, números y algún símbolo, escrita dos veces, tras confirmar que no hay recuperación. Antes de cifrar se hace una copia local. Después se cifra en el servidor todo lo existente (también lo borrado, las notas de voz antiguas y los archivos de fotos y audios), con barra de avance; si se interrumpe, lo termina cualquier dispositivo desbloqueado.

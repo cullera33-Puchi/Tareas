@@ -429,10 +429,12 @@ const BK = {
      a copy that would replace that day's copy of another account, or one asked to be apart (own: the copy before emptying the device for
      another account), takes its own key (day, owner and time), so no copy ever replaces another account's (a copy of no account, made
      before the device first synced, belongs to it and may be replaced). day: the day it shows */
-  async put(date, owner, own){ owner=owner!==undefined?owner:syncState().owner||null; let key=date; // owner: from the sync state, signed in or not
+  async put(date, owner, own){ owner=owner!==undefined?owner:syncPrevOwner()||null; let key=date; // owner: the account these data belong to, signed in or not
     const cur=own?null:(await this.list()).find(b=>b.date===date); if(own||(cur&&cur.owner&&cur.owner!==owner)) key=date+'#'+(owner||'sin-cuenta')+'#'+Date.now();
     const snap={date:key, day:date, created:new Date().toISOString(), data:exportData(), owner}; await this.tx('readwrite', (st,meta)=>{ st.put(snap); meta.put(BK.metaOf(snap)); });
-    const old=(await this.list()).slice(7); if(old.length) await this.tx('readwrite', (st,meta)=>{ old.forEach(b=>{ st.delete(b.date); meta.delete(b.date); }); }); }
+    // Seven copies of this device's account (or of none) are kept; another account's copies (made when the device was emptied for this one)
+    // never count and are never removed automatically: they may be the only home of what that account had not sent. Ajustes deletes them
+    const mine=syncPrevOwner()||null, old=(await this.list()).filter(b=>!b.owner||b.owner===mine).slice(7); if(old.length) await this.tx('readwrite', (st,meta)=>{ old.forEach(b=>{ st.delete(b.date); meta.delete(b.date); }); }); }
 };
 let BACKUPS=[];
 async function refreshBackups(){ try{ BACKUPS=await BK.list(); }catch(e){ BACKUPS=[]; } }

@@ -13,7 +13,7 @@ function log(level, msg, extra){
   const e = { t:new Date().toISOString(), l:level, m:String(msg) };
   if(extra!==undefined){ try{ e.x = typeof extra==='string' ? extra : JSON.stringify(extra); }catch(err){ e.x = String(extra); } }
   LOG.push(e); if(LOG.length>400) LOG = LOG.slice(-400);
-  try{ localStorage.setItem(LOGKEY, JSON.stringify(LOG)); }catch(err){}
+  try{ if(!localStorage.getItem('tareas-switching')) localStorage.setItem(LOGKEY, JSON.stringify(LOG)); }catch(err){} // a switch to another account under way (js/sync.js): no window writes the old log back
 }
 window.addEventListener('error', e => log('error', e.message||'Error', (e.filename||'').split('/').pop()+':'+e.lineno+':'+e.colno+(e.error&&e.error.stack?'\n'+e.error.stack:'')));
 window.addEventListener('unhandledrejection', e => log('error', 'Promesa rechazada: '+(e.reason&&e.reason.message||e.reason), e.reason&&e.reason.stack));

@@ -546,10 +546,36 @@ async function switchMore(browser){
   // 5. With the marker of a switch, no window saves; at the next start a sync state already for the new account means blank data
   const m5 = await gp.evaluate(()=>{ localStorage.setItem('tareas-switching', '{"to":"x"}'); const before=localStorage.getItem('tareas-v1'); addTask({title:'Desde otra ventana'}); const same=localStorage.getItem('tareas-v1')===before; localStorage.removeItem('tareas-switching'); return same; });
   check('marker_blocks_save', m5);
+  // 3. That restart also forgets what the sync state knew (nothing of the new account is then taken for deleted); the missing tables stay
+  const r3 = await gp.evaluate(b=>{ localStorage.setItem('tareas-switching', JSON.stringify({to:b.uid})); syncWrite({user:{id:b.uid, email:b.email}, firstFor:b.uid, known:{tasks:{g9:'sig'}}, cursor:{tasks:'2026-11-05T00:00:00.000Z'}, del:{}, missing:['contacts']});
+    const had=DB.tasks.length; syncSwitchBoot(); const st=syncState(); return {had, n:DB.tasks.length, known:Object.keys(st.known.tasks||{}).length, cursor:st.cursor.tasks||null, missing:st.missing, first:st.firstFor===b.uid, marker:localStorage.getItem('tareas-switching')}; }, B3);
+  check('boot_resets_known', r3.had>0 && r3.n===0 && r3.known===0 && !r3.cursor && JSON.stringify(r3.missing)==='["contacts"]' && r3.first && !r3.marker, r3);
+  await gp.evaluate(()=>{ addTask({title:'g1'}); }); // data again, for the restart below
   await gp.evaluate(b=>{ localStorage.setItem('tareas-switching', JSON.stringify({to:b.uid})); localStorage.setItem('tareas-sync', JSON.stringify({user:{id:b.uid, email:b.email}, firstFor:b.uid, known:{}, cursor:{}, del:{}})); }, B3);
   await gp.reload(); await gp.waitForTimeout(500);
   check('boot_reblanks', await gp.evaluate(()=>!DB.tasks.length&&!/g1/.test(localStorage.getItem('tareas-v1'))&&!localStorage.getItem('tareas-switching')));
   await G.ctx.close();
+  // 1. What counts as unsent after a pass: an edit made during the pass (after its clean moment), a row still different at its end, and with the
+  // clock moved back anything different; a roll-over change alone never
+  const H = await TF.device(browser, f3, {tag:'H', user:A3, seed:seed([tk('h1', {title:'Uno'}), tk('h2', {title:'Dos'})])}, PORT, errors); const hp=H.page;
+  await hp.evaluate(()=>{ localStorage.removeItem('tareas-sync'); }); await hp.reload(); await signIn(hp); await synced(hp);
+  const st1 = await hp.evaluate(()=>{ const st=syncState(); return {clean:st.cleanAt, last:st.lastSync, dirty:st.dirty}; });
+  check('pass_marks_clean', !!st1.clean && Date.parse(st1.clean)<=Date.parse(st1.last) && Array.isArray(st1.dirty) && st1.dirty.length===0, st1);
+  await hp.evaluate(()=>syncSignOut()); await until(hp, ()=>!SY.user);
+  const p1 = await hp.evaluate(async()=>{ const out={}; const x=task('h1'); x.date='2026-01-02'; x.carried=true; out.roll=await syncOtherPending(); // roll-over only
+    let st=syncState(); const clean=Date.parse(st.cleanAt); st.lastSync=new Date(clean+60e3).toISOString(); syncWrite(st);
+    const y=task('h2'); y.title='Editada durante la pasada'; y.modified=new Date(clean+30e3).toISOString(); out.during=await syncOtherPending();
+    st=syncState(); st.dirty=['tasks:h1']; syncWrite(st); out.dirty=await syncOtherPending();
+    st=syncState(); st.dirty=[]; st.cleanAt=new Date(Date.now()+864e5).toISOString(); syncWrite(st); y.modified=new Date(Date.now()-864e5*2).toISOString(); out.clockBack=await syncOtherPending(); return out; });
+  check('pending_clean_rules', p1.roll===0 && p1.during===1 && p1.dirty===2 && p1.clockBack===2, p1);
+  // 2. Copies: seven of this account (or none) are kept; another account's never count and are never removed automatically
+  // 6. A copy made after a switch but before the new account's first pass carries the new account
+  const c2 = await hp.evaluate(async()=>{ await BK.clear(); for(let i=0;i<3;i++) await BK.put('2026-10-0'+(i+1), 'otra-cuenta', true); for(let i=1;i<=9;i++) await BK.put('2026-10-'+String(10+i), undefined);
+    const l=await BK.list(); const st=syncState(); syncWrite({user:null, firstFor:'cuenta-nueva', known:{}, cursor:{}, del:{}}); await BK.put('2026-09-01'); const l2=await BK.list(); localStorage.setItem('tareas-sync', JSON.stringify(st));
+    return {other:l.filter(b=>b.owner==='otra-cuenta').length, mine:l.filter(b=>b.owner!=='otra-cuenta').length, oldest:l.filter(b=>b.owner!=='otra-cuenta').map(b=>b.date).sort()[0], newOwner:(l2.find(b=>b.date==='2026-09-01')||{}).owner}; });
+  check('backups_other_kept', c2.other===3 && c2.mine===7 && c2.oldest==='2026-10-13', c2);
+  check('backup_owner_prev', c2.newOwner==='cuenta-nueva', c2);
+  await H.ctx.close();
 }
 
 module.exports = { pgSetup, strip, MIGS };

@@ -83,8 +83,9 @@ async function pushFlush(){ if(!SY||!SY.user||!SY.remote.pushSave||!PS.sub||PS.s
   catch(e){ log(syncOffline(e)?'warn':'error','Suscripción no guardada en la cuenta: '+(e&&e.message||e)); }
   finally{ PS.flushing=false; pushPaint(); } }
 // This device no longer receives: the browser's subscription goes too, so turning it on again starts clean
+// Returns the promise of the browser's unsubscription (the account switch waits for it, js/sync.js)
 function pushDrop(){ PS.sub=null; PS.savedFor=null; pushWrite();
-  if('serviceWorker' in navigator) navigator.serviceWorker.ready.then(r=>r.pushManager&&r.pushManager.getSubscription()).then(s=>s&&s.unsubscribe()).catch(()=>{}); }
+  if('serviceWorker' in navigator) return navigator.serviceWorker.ready.then(r=>r.pushManager&&r.pushManager.getSubscription()).then(s=>s&&s.unsubscribe()).catch(()=>{}); return Promise.resolve(); }
 // At start: the browser may have renewed or dropped the subscription meanwhile
 function pushCheck(){ if(pushStatus()!=='on') return;
   navigator.serviceWorker.ready.then(reg=>reg.pushManager.getSubscription()).then(sub=>{

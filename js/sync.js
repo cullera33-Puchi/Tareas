@@ -350,10 +350,12 @@ function syncRun(reason){
     const pool=first?(pulled.spaces||[]).filter(r=>!r.deleted).map(r=>crUnread('spaces', syncFromRow('spaces', r), null)):null;
     const a=syncApply(pulled, {cursor:true, pool});
     await inboxPickup(); // Siri: the inbox rows become tasks, which this pass pushes (js/inbox.js)
+    const cleanAt=new Date().toISOString(); // what changes after this moment is not in this upload (syncOtherPending)
     const p=await syncPush(syncCollect(false));
     await cryptoAfterPush(); // decision 63a: the Siri phrases taken leave the server once their tasks are up encrypted
     st=syncState(); st.fields=fsig; if(first){ st.owner=user.id; log('info','Primera conexión completada', {spaces:DB.spaces.length, projects:DB.projects.length, tasks:DB.tasks.length, remaps:a.remaps.length}); }
     st.lastSync=new Date().toISOString(); st.missing=SY.remote.missing?[...SY.remote.missing]:[]; // the tables this database lacks, for the unsent count of another account's sign-in (syncOtherPending)
+    st.cleanAt=cleanAt; try{ const left=syncCollect(true); st.dirty=Object.keys(left.up).flatMap(t=>left.up[t].map(x=>t+':'+x.row.id)).slice(0, 2000); }catch(e){ st.dirty=[]; } // and what stayed different after it (a local copy kept, an edit during the pass)
     syncWrite(st); SY.lastSync=st.lastSync; SY.retry=0;
     log('info','Sincronización ('+reason+')', {recibidas:a.added+a.updated, eliminadas:a.removed, conflictos:a.conflicts.length, enviadas:p.pushed, borradas:p.deleted, mantenidas:p.kept, ms:Date.now()-t0});
     return true; };
@@ -449,11 +451,13 @@ const syncWithin = (p, ms) => Promise.race([p, new Promise(r=>setTimeout(()=>r(n
    and the photos or recordings of its live tasks whose file is waiting here. Not counted: what rollOver changes without touching modified,
    demo data, attachments of tasks that are gone, files of attachments that are gone, and tables its database lacks (st.missing, kept by its
    last pass). Returns the number, or -1 when the files cannot be read (unknown: treated as unsent) */
-async function syncOtherPending(){ const st=syncState(), since=syncTime(st.lastSync), missing=new Set(st.missing||[]), firstOnly=!st.owner; let n=0;
+// A row that differs from what the server holds counts when it changed after the last clean moment of a pass (cleanAt, with 5 s of margin),
+// when it was still different at the end of that pass (st.dirty), or always when the clock is now before that moment (moved back)
+async function syncOtherPending(){ const st=syncState(), clean=syncTime(st.cleanAt||st.lastSync), since=clean-5000, missing=new Set(st.missing||[]), dirty=new Set(st.dirty||[]), firstOnly=!st.owner||Date.now()<clean; let n=0;
   SYNC_TABLES.forEach(({list, table})=>{ if(missing.has(table)) return; const known=(st.known||{})[table]||{}, here=new Set();
     DB[list].forEach(rec=>{ if(!rec||rec.id==null) return; here.add(rec.id); if(syncSkip(table, rec)) return; const k=known[rec.id];
       if(k===undefined||k==='x'){ n++; return; } // never seen by the server, or back after its deletion went up
-      if(firstOnly||syncTime(rec.modified)>since){ if(syncSig(syncToRow(table, rec))!==k) n++; } });
+      if(firstOnly||dirty.has(table+':'+rec.id)||syncTime(rec.modified)>since){ if(syncSig(syncToRow(table, rec))!==k) n++; } });
     Object.keys(known).forEach(id=>{ if(known[id]!=='x'&&!here.has(id)&&!syncDemoId(id)) n++; }); }); // deleted here, not sent
   const waiting=new Set(DB.attachments.filter(a=>a&&!a.path&&!syncDemoId(a.id)&&!syncDemoId(a.taskId)&&task(a.taskId)).map(a=>a.id));
   if(waiting.size){ const metas=await syncWithin(FS.allMeta().catch(()=>null), 3000); if(!metas) return -1;
@@ -498,6 +502,7 @@ async function syncSwitchAccount(force){ if(!syncOtherOwner()||SY.switching) ret
   const fail=msg=>{ try{ localStorage.removeItem(SWITCH_KEY); }catch(e){} SY.switching=false; syncCover(false); toast(msg); };
   try{ await BK.tagOwnerless(prev); }catch(e){ log('warn','Copias locales sin marcar: '+(e&&e.message||e)); }
   if(!syncLocalEmpty()){ try{ await BK.put(todayStr(), prev, true); await refreshBackups(); }catch(e){ log('error','Copia local antes de cambiar de cuenta no disponible: '+(e&&e.message||e)); fail('No se pudo guardar la copia local. No se ha cambiado nada'); return; } }
+  LOG=[]; try{ localStorage.removeItem(LOGKEY); }catch(e){} // the old account's log (with its email) goes first; with the marker no window writes it back
   try{ localStorage.setItem(SWITCH_KEY, JSON.stringify({to:user.id, at:new Date().toISOString()})); }catch(e){ fail('No se pudo cambiar de cuenta. No se ha cambiado nada'); return; }
   const prevSync=localStorage.getItem(SYNC_KEY);
   // the account's sync state starts empty, as a first connection that has nothing to merge (and needs no backup: the device will be empty)
@@ -507,24 +512,31 @@ async function syncSwitchAccount(force){ if(!syncOtherOwner()||SY.switching) ret
   try{ localStorage.setItem(KEY, JSON.stringify(fresh)); }
   catch(e){ // the data stay the old account's: so does its sync state (or one that only knows the owner: its next pass then only sends)
     let back=false; try{ localStorage.setItem(SYNC_KEY, prevSync||'{}'); back=true; }catch(x){} if(!back) try{ localStorage.setItem(SYNC_KEY, JSON.stringify({owner:prev, firstFor:prev})); }catch(x){}
-    log('error','No se pudo vaciar el dispositivo: '+(e&&e.message||e)); fail('No se pudo cambiar de cuenta. No se ha cambiado nada'); return; }
+    fail('No se pudo cambiar de cuenta. No se ha cambiado nada'); log('error','No se pudo vaciar el dispositivo: '+(e&&e.message||e)); return; } // logged once the marker is gone, so it is kept
   DB=fresh; // nothing of the old account stays in memory either
   [TEAM_KEY, CR_FLAG, CR_FILES, 'tareas-inbox'].forEach(k=>{ try{ localStorage.removeItem(k); }catch(e){} });
   try{ localStorage.setItem(BK_SKIP, todayStr()); }catch(e){} // no daily copy of the empty device today: the account's data are on the server
-  try{ pushDrop(); localStorage.removeItem(PUSH_KEY); }catch(e){} // the old account's notifications stop reaching this device
+  let dropped=null; try{ dropped=pushDrop(); localStorage.removeItem(PUSH_KEY); }catch(e){} // the old account's notifications stop reaching this device
+  await syncWithin(Promise.resolve(dropped).catch(()=>{}), 3000);
   await syncWithin(FS.tx(['files','thumbs','meta'], 'readwrite', (f,t,m)=>{ f.clear(); t.clear(); m.clear(); }).catch(()=>{}), 5000);
   await syncWithin(Promise.all([cryptoKeyForget().catch(()=>{}), cryptoKdbDo('readwrite', st=>st.delete('ecdh')).catch(()=>{})]), 5000);
-  LOG=[]; try{ localStorage.removeItem(LOGKEY); }catch(e){} log('info','Dispositivo vaciado para otra cuenta'); // the old account's log (with its email) goes too
   location.reload(); }
 // The screen over the app while the device is emptied
 function syncCover(on){ let el=document.getElementById('switching'); app.inert=!!on||teamDenied();
   if(!on){ if(el) el.remove(); return; } if(el) return; el=document.createElement('div'); el.id='switching'; el.className='noaccess'; el.setAttribute('role','alert');
   el.innerHTML='<div class="na-box"><h1>Vaciando este dispositivo</h1><p>Un momento.</p></div>'; document.body.appendChild(el); if(sheet.classList.contains('on')) closeSheet(); }
 // At start: a switch was under way. Its sync state already for the new account: the data must be blank (a window that wrote the old data back
-// meanwhile is undone). Otherwise it never got that far: nothing to do. Then the marker goes
+// meanwhile is undone). Otherwise it never got that far: the marker stays while it is fresh (another window may be switching now), and goes once older than a minute
 function syncSwitchBoot(){ let m=null; try{ m=JSON.parse(localStorage.getItem(SWITCH_KEY)||'null'); }catch(e){} if(!m) return;
-  const st=syncState(); if(st.firstFor===m.to&&!st.owner&&!syncLocalEmpty()){ const s=DB.settings||{}, fresh=blank(); ['theme','tipsSeen'].forEach(k=>{ if(k in s) fresh.settings[k]=s[k]; });
-    try{ localStorage.setItem(KEY, JSON.stringify(fresh)); DB=fresh; log('warn','Datos de otra cuenta escritos durante el cambio: se vacía de nuevo'); }catch(e){} }
+  const st=syncState();
+  if(st.firstFor===m.to&&!st.owner){ // it got as far as the new account's sync state: finish what an interruption may have left of the old one
+    LOG=[]; try{ localStorage.removeItem(LOGKEY); }catch(e){}
+    FS.tx(['files','thumbs','meta'], 'readwrite', (f,t,x)=>{ f.clear(); t.clear(); x.clear(); }).catch(()=>{}); cryptoKeyForget().catch(()=>{}); cryptoKdbDo('readwrite', s=>s.delete('ecdh')).catch(()=>{});
+    if(!syncLocalEmpty()){ const s=DB.settings||{}, fresh=blank(); ['theme','tipsSeen'].forEach(k=>{ if(k in s) fresh.settings[k]=s[k]; });
+      try{ localStorage.setItem(KEY, JSON.stringify(fresh)); DB=fresh; syncWrite({user:st.user||null, firstFor:m.to, known:{}, cursor:{}, del:{}, missing:st.missing||[]}); // and nothing the new account already had here is taken for deleted
+        log('warn','Datos de otra cuenta escritos durante el cambio: se vacía de nuevo'); }catch(e){} }
+    else log('info','Dispositivo vaciado para otra cuenta'); }
+  else if(Date.now()-(Date.parse(m.at)||0)<60e3) return; // still under way in another window (this one restarted on its marker): it ends it
   try{ localStorage.removeItem(SWITCH_KEY); }catch(e){} }
 // Another window started emptying the device: this one starts again too, so it never writes the old account's data back
 window.addEventListener('storage', e=>{ if(e.key===SWITCH_KEY&&e.newValue) location.reload(); });

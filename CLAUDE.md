@@ -211,6 +211,8 @@ Cambios acordados con Enric sobre el diseño de abajo. Mandan sobre el texto del
 
 71. **Equipo, detalles cerrados por Enric el 5 de noviembre (construcción pausada por Enric; se retoma cuando lo pida).** (1) Cifrado obligatorio para cada invitado al entrar por primera vez. (2) Una tarea recibida con «Avisar a…» llega a una bandeja «Recibidas» con «Añadir a mis tareas» (eligiendo proyecto) o «Descartar». (3) Invitación: Enric escribe el correo en Ajustes, «Equipo», y la app prepara el enlace para enviarlo por WhatsApp o correo; la persona entra con Google. (4) Quitar el acceso no avisa a la persona. Aceptado también: el aviso de «Avisar a…» no muestra el contenido («Enric te ha enviado una tarea»); doble control de acceso (reglas de la base de datos más un filtro en el alta que Enric activa en el panel de Supabase); la cuenta de Enric pasa a administrador sin escribir su correo en el código. La política de Deloitte está revisada por Enric y no tiene impacto. Pasar Google Cloud a «Producción» no tiene coste. Encargo completo para retomarlo: versión 0.36.0 con los puntos 63b, c y d.
 
+72. **Mejoras añadidas al roadmap por Enric el 5 de noviembre, a partir de otras apps (diseño sin cerrar; se acuerdan antes de construir, regla 6).** (a) Planificar el día (inspirada en Sunsama): recorrido corto por la mañana que repasa aplazadas y entregas, muestra la carga en horas frente al tope y elige las 3 a 5 de «Ahora»; sin cambio de datos (2 a 3 h). (b) «Algún día» (inspirada en Things 3): lugar para ideas y tareas sin fecha que no se quieren ver a diario; no cuentan como olvidadas ni aparecen en «Sin fecha»; estado nuevo (1 a 2 h). (c) Fases dentro de un proyecto (inspirada en Things 3): encabezados dentro de un proyecto (por ejemplo Diseño, Realización, Go-live) con las tareas agrupadas debajo; campo nuevo (3 a 4 h). Descartadas por Enric: matriz urgente e importante, temporizador de tiempo real frente a estimado y crear tareas reenviando correos (llevaría correo de Deloitte a un servicio personal).
+
 
 ## 9. Decisiones pendientes de Enric (revisión del 1 de noviembre)
 
@@ -305,6 +307,7 @@ Orden fijado por Enric el 2 de noviembre y revisado el 3 de noviembre: tras el r
 | 22 | Duración de los bloques en la vista por horas (campo nuevo, parte de R20) | hecho en v0.32.0 (con el tiempo estimado, sin campo nuevo) | alto |
 | 22b | Cifrado de extremo a extremo y equipo con acceso por invitación y «Avisar a…» (punto 63 de la sección 8) | cifrado hecho en v0.34.0; queda el equipo, 6 a 7 h | máximo |
 | 22c | Vista «Por persona», repetir desde que se completa, resumen de la mañana, modo foco y repeticiones con inicio, fin y sin acumular (punto 65 de la sección 8) | modo foco, repetir desde que se completa y repeticiones con fin hechos en v0.33.0; «Por persona» hecha en v0.35.0; queda el resumen de la mañana (2 h) | medio |
+| 22d | Planificar el día, «Algún día» y fases dentro de un proyecto (punto 72 de la sección 8) | 2 a 3 h, 1 a 2 h y 3 a 4 h | medio |
 | 23 | Fase 2, tareas compartidas entre personas (punto 43, diseño cerrado; después del punto 63) | muy alto, 2 a 3 días | máximo |
 | 24 | App aparte o evolución para gestión de proyectos con el equipo (ver abajo) | muy alto, semanas | máximo, por fases |
 

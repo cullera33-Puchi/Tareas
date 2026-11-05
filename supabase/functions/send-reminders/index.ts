@@ -205,7 +205,7 @@ async function sendDue(c: Conf) {
       title: clip(t.title || 'Recordatorio', 180),
       body: clip((t.project_id && names.get(t.project_id)) || 'Recordatorio', 80),
       tag: t.id,
-      data: { taskId: t.id, projectId: t.project_id || null, url: './?task=' + encodeURIComponent(t.id) }, // projectId: the additional data of an encrypted project name
+      data: { taskId: t.id, projectId: t.project_id || null, url: './?task=' + encodeURIComponent(t.id) }, // projectId: which project the name belongs to
     };
     const b = badges.get(t.owner_id + '|' + t.date); if (b !== undefined) msg.badge = b;
     subs.filter(s => s.owner_id === t.owner_id).forEach(sub => jobs.push({ sub, msg }));

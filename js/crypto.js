@@ -4,8 +4,8 @@
    - The account's data key: a random 256-bit AES-GCM key. It never leaves a device in clear: the server keeps it wrapped (AES-KW) by a
      key derived from the encryption password (PBKDF2-SHA256, CRYPTO_ITER rounds, a random 16-byte salt). Changing the password wraps
      the same data key again, so nothing has to be encrypted again.
-   - A text value: 'e1:' + base64url(12-byte random IV || ciphertext and tag), AES-GCM with the additional data 'table.column.id', so a
-     value only opens in its own row and column. '' and null are never encrypted. A value without the prefix is plain (from before).
+   - A text value: 'e1:' + base64url(12-byte random IV || ciphertext and tag), AES-GCM with the additional data 'table.column', so a
+     value only opens in its own table and column. '' and null are never encrypted. A value without the prefix is plain (from before).
    - A file: the ASCII magic TAREASE1, a 12-byte IV and the ciphertext, with the storage path as additional data. A file without the
      magic is an old plain file and is read as it is.
    - On a device: the data key as a NON-extractable CryptoKey in IndexedDB 'tareas-keys' (other apps share the origin: keep the prefix),
@@ -21,7 +21,11 @@ function cryptoB64(u){ u=u instanceof Uint8Array?u:new Uint8Array(u); let s=''; 
   return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); }
 function cryptoUnb64(s){ s=String(s||'').replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4) s+='='; const b=atob(s), u=new Uint8Array(b.length); for(let i=0;i<b.length;i++) u[i]=b.charCodeAt(i); return u; }
 const cryptoIsEnc = v => typeof v==='string' && v.startsWith(CRYPTO_PREFIX);
-const cryptoAad = (table, col, id) => cryptoTE.encode(table+'.'+col+'.'+id);
+// The additional data of a text value: its table and column (not the row: a device on an older version may copy a value into another row,
+// such as a duplicate or the next task of a series, and it must still open there)
+const cryptoAad = (table, col) => cryptoTE.encode(table+'.'+col);
+// A column that does not open: the layer marks it so the merge keeps this device's value, or shows CRYPTO_PLACEHOLDER and never sends it back
+const CRYPTO_UNREAD='\u0000tareas-unreadable', CRYPTO_PLACEHOLDER='(texto no legible)';
 
 /* ---------- Keys ---------- */
 // The key that wraps the data key, from the password. salt: base64url
@@ -52,14 +56,16 @@ async function cryptoDec(key, value, aad){ if(!cryptoIsEnc(value)) return value;
 /* A row as the server will hold it: every listed column that is not empty encrypted, except a value that already opens with this key and
    its additional data, which goes as it is (never encrypted twice). Returns the same object when nothing changes */
 async function cryptoSealRow(key, table, row){ const cols=CRYPTO_COLS[table]; if(!cols||!row) return row; let out=row;
-  for(const c of cols){ const v=row[c]; if(!(c in row)||v==null||v==='') continue; const aad=cryptoAad(table, c, row.id);
+  for(const c of cols){ const v=row[c]; if(!(c in row)||v==null||v==='') continue; const aad=cryptoAad(table, c);
     if(cryptoIsEnc(v)){ try{ await cryptoDec(key, v, aad); continue; }catch(e){} } // 'e1:...' that does not open is someone's text: encrypted
     if(out===row) out=Object.assign({}, row); out[c]=await cryptoEnc(key, v, aad); }
   return out; }
-// The server's row opened: each listed column that starts with 'e1:' decrypted; throws if one does not open
-async function cryptoDecRow(key, table, row){ const cols=CRYPTO_COLS[table]; if(!cols||!row) return row; let out=row;
-  for(const c of cols){ if(!cryptoIsEnc(row[c])) continue; if(out===row) out=Object.assign({}, row); out[c]=await cryptoDec(key, row[c], cryptoAad(table, c, row.id)); }
+// The server's row opened: each listed column that starts with 'e1:' decrypted. One that does not open is CRYPTO_UNREAD, or throws with strict
+async function cryptoDecRow(key, table, row, strict){ const cols=CRYPTO_COLS[table]; if(!cols||!row) return row; let out=row;
+  for(const c of cols){ if(!cryptoIsEnc(row[c])) continue; if(out===row) out=Object.assign({}, row);
+    try{ out[c]=await cryptoDec(key, row[c], cryptoAad(table, c)); }catch(e){ if(strict) throw e; out[c]=CRYPTO_UNREAD; } }
   return out; }
+const cryptoRowUnread = (table, row) => !!(row && CRYPTO_COLS[table] && CRYPTO_COLS[table].some(c=>row[c]===CRYPTO_UNREAD));
 const cryptoRowEnc = (table, row) => !!(row && CRYPTO_COLS[table] && CRYPTO_COLS[table].some(c=>cryptoIsEnc(row[c])));
 
 /* ---------- Files ---------- */
@@ -86,11 +92,11 @@ const cryptoKeySave = (key, kid, owner) => cryptoKdbDo('readwrite', st=>st.put({
 const cryptoKeyForget = () => cryptoKdbDo('readwrite', st=>st.delete('data'));
 
 /* ---------- A reminder in the service worker ---------- */
-// The title (tasks.title.<taskId>) and the project name (projects.name.<projectId>) of a push, opened with the key of this device.
+// The title (tasks.title) and the project name (projects.name) of a push, opened with the key of this device.
 // Without a key, or when a value does not open, nothing secret is shown: «Recordatorio» as the title and no project
-async function cryptoPushPayload(d){ d=d||{}; const data=d.data&&typeof d.data==='object'?d.data:{};
+async function cryptoPushPayload(d){ d=d||{};
   if(!cryptoIsEnc(d.title)&&!cryptoIsEnc(d.body)) return d;
   let k=null; try{ k=await cryptoKeyLoad(); }catch(e){}
-  const open=async(v, table, col, id)=>{ if(!cryptoIsEnc(v)) return v; if(!k||!id) return null; try{ return await cryptoDec(k.key, v, cryptoAad(table, col, id)); }catch(e){ return null; } };
-  const title=await open(d.title, 'tasks', 'title', data.taskId), body=await open(d.body, 'projects', 'name', data.projectId);
+  const open=async(v, table, col)=>{ if(!cryptoIsEnc(v)) return v; if(!k) return null; try{ return await cryptoDec(k.key, v, cryptoAad(table, col)); }catch(e){ return null; } };
+  const title=await open(d.title, 'tasks', 'title'), body=await open(d.body, 'projects', 'name');
   return Object.assign({}, d, {title:title==null?'Recordatorio':title, body:body==null?'':body}); }

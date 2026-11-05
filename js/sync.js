@@ -76,10 +76,11 @@ const syncSkip = (table, rec) => syncDemoId(rec.id) || (table==='spaces'&&INITIA
 const SYNC_LATE={attachments:['0003_attachments.sql','Los adjuntos se quedan en este dispositivo'], subtasks:['0005_subtasks.sql','Los pasos se quedan en este dispositivo'], project_notes:['0006_project_notes.sql','Las notas de proyecto se quedan en este dispositivo'], contacts:['0011_contacts.sql','Los contactos se quedan en este dispositivo'],
   inbox:['0010_inbox.sql','Siri y el Atajo de iOS no están disponibles'], shortcut_keys:['0010_inbox.sql','Siri y el Atajo de iOS no están disponibles'], // not synced tables: the Shortcut's inbox and key (js/inbox.js)
   crypto_keys:['0012_encryption.sql','El cifrado no se puede activar']}; // decision 63a: the account's wrapped data key (js/e2e.js)
-// Whether a request failed because the table is not there (PostgREST's PGRST205, PostgreSQL's 42P01). The first time it is noted in missing and logged
+// Whether a request failed because the table is not there: PostgREST's PGRST205 («Could not find the table»), PostgreSQL's 42P01 («relation
+// does not exist»). Nothing else: PGRST002 (a schema cache still loading, as right after all.sql) is a passing error that fails the pass and
+// is retried, never a reason to leave a table out (decision 63a: a table left out would be marked encrypted). The first time it is logged
 function syncAbsent(missing, table, error){ if(!SYNC_LATE[table]||!error) return false; const m=String(error.message||'')+' '+String(error.code||'');
-  if(!/42P01|PGRST20[0-9]|does not exist|could not find the table|schema cache/i.test(m)) return false;
-  if(table==='crypto_keys'&&!/42P01|PGRST205/.test(m)) return false; // decision 63a: only a table truly missing (PGRST002, a schema cache still loading, is not)
+  if(!/42P01|PGRST205|could not find the table|relation .* does not exist/i.test(m)) return false;
   if(!missing.has(table)){ missing.add(table); log('warn','La base de datos no tiene todavía la tabla '+table+': falta '+SYNC_LATE[table][0]+'. '+SYNC_LATE[table][1]); } return true; }
 const syncMissing = table => !!(SY&&SY.remote&&SY.remote.missing&&SY.remote.missing.has(table));
 // The columns this version syncs, per table: a change makes the next run pull that table whole (see syncRun)
@@ -188,8 +189,8 @@ function syncMerge(W, st, table, rows, stats){
   const at=new Map(); W[list].forEach((r,i)=>{ if(r&&r.id!=null) at.set(r.id,i); });
   let removed=false;
   rows.forEach(row=>{ if(!row||row.id==null||syncDemoId(row.id)) return; const id=row.id;
-    const remote=row.deleted?null:syncFromRow(table,row), rsig=remote?syncSig(syncToRow(table,remote)):'x';
     const i=at.has(id)?at.get(id):-1, local=i>=0?W[list][i]:null;
+    const remote=row.deleted?null:crUnread(table, syncFromRow(table,row), local), rsig=remote?syncSig(syncToRow(table,remote)):'x'; // decision 63a: a text that did not open
     if(!local){
       if(remote){ // known and missing here: deleted on this device and not yet sent. The later of the two wins
         const pend=known[id]!==undefined && known[id]!=='x', d=pend?(dels[id]=dels[id]||new Date().toISOString()):null;
@@ -243,7 +244,7 @@ function syncCollect(dry){ const st=syncState(), now=new Date().toISOString(), u
   SYNC_TABLES.forEach(({list, table})=>{ const known=st.known[table], dels=st.del[table], here=new Set(); up[table]=[]; del[table]=[]; if(syncMissing(table)) return;
     DB[list].forEach(rec=>{ if(!rec||rec.id==null) return; here.add(rec.id); if(syncSkip(table, rec)) return;
       if(known[rec.id]==='x' && !dry){ rec.modified=now; bumped=true; } // back after its deletion went up: this copy is the newest
-      const row=syncToRow(table, rec), s=syncSig(row); if(s!==known[rec.id]){ up[table].push({row:syncSendRow(table, row), s}); n++; }
+      const row=syncToRow(table, rec), s=syncSig(row); if(s!==known[rec.id]){ const send=syncNoPlaceholder(table, rec, syncSendRow(table, row)); up[table].push({row:send, s, solo:send!==row&&!!rec.cxBad}); n++; }
       if(!dry) delete dels[rec.id]; });
     Object.keys(known).forEach(id=>{ if(known[id]==='x' || here.has(id) || syncDemoId(id)) return; n++;
       if(!dry){ if(!dels[id]) dels[id]=now; del[table].push({id, ts:dels[id]}); } }); });
@@ -266,9 +267,15 @@ async function syncUpsert(table, rows){ for(;;){ const send=rows.map(r=>{ let o=
       // decision 56: the three columns of 0008 come together, so one refused means the three are missing: one line in the log, not three
       const g=c in NOCOL_FILE&&NOCOL_FILE[c]!==NOCOL_FILE.deadline ? Object.keys(NOCOL_FILE).filter(k=>NOCOL_FILE[k]===NOCOL_FILE[c]) : [c]; g.forEach(k=>SYNC_NOCOL.add(table+'.'+k));
       log('warn','La base de datos no tiene todavía '+(g.length>1?'las columnas '+listY(g.map(k=>table+'.'+k)):'la columna '+table+'.'+c)+': falta '+(NOCOL_FILE[c]||'0004_repeat_focus.sql')+'. '+NOCOL_WHAT[g[0]]+(g.length>1?' se quedan':' se queda')+' en este dispositivo'); } } }
+// Decision 63a: a text shown as CRYPTO_PLACEHOLDER (it did not open, crUnread) never goes up: the server keeps its own value for that column
+function syncNoPlaceholder(table, rec, row){ const bad=(rec.cxBad||[]).filter(f=>rec[f]===CRYPTO_PLACEHOLDER); if(!bad.length) return row; const out=Object.assign({}, row);
+  SYNC_FIELDS[table].forEach(([f,c])=>{ if(bad.includes(f)) delete out[c]; }); return out; }
 async function syncPush(c){ const out={pushed:0, deleted:0, kept:0}; const late={};
   for(const {table} of SYNC_TABLES){
-    for(let i=0;i<c.up[table].length;i+=SYNC_CHUNK){ const part=c.up[table].slice(i,i+SYNC_CHUNK);
+    // A row without some column (a text that did not open) goes alone: PostgREST takes the columns of a request from all its rows, and a column
+    // missing from one row would be written as empty
+    const all=c.up[table], parts=[]; for(let i=0, normal=all.filter(x=>!x.solo);i<normal.length;i+=SYNC_CHUNK) parts.push(normal.slice(i,i+SYNC_CHUNK)); all.filter(x=>x.solo).forEach(x=>parts.push([x]));
+    for(const part of parts){
       const ok=new Set((await syncUpsert(table, part.map(x=>x.row))).map(r=>r.id)); const st=syncState();
       part.forEach(x=>{ if(ok.has(x.row.id)){ st.known[table][x.row.id]=x.s; out.pushed++; } else (late[table]=late[table]||[]).push(x.row.id); }); syncWrite(st); }
     for(let i=0;i<c.del[table].length;i+=SYNC_CHUNK){ const part=c.del[table].slice(i,i+SYNC_CHUNK);
@@ -317,7 +324,7 @@ function syncRun(reason){
       if(again.length){ again.forEach(t=>{ delete st.cursor[t]; }); syncWrite(st); st=syncState(); log('info','Sincronización completa por campos nuevos', {tablas:again}); } }
     const pulled=await syncPull(first?null:st.cursor);
     if(!SY.user || SY.user.id!==user.id) return false; // signed out meanwhile
-    const pool=first?(pulled.spaces||[]).filter(r=>!r.deleted).map(r=>syncFromRow('spaces', r)):null;
+    const pool=first?(pulled.spaces||[]).filter(r=>!r.deleted).map(r=>crUnread('spaces', syncFromRow('spaces', r), null)):null;
     const a=syncApply(pulled, {cursor:true, pool});
     await inboxPickup(); // Siri: the inbox rows become tasks, which this pass pushes (js/inbox.js)
     const p=await syncPush(syncCollect(false));
@@ -356,7 +363,7 @@ function syncSetUser(user, why){
   else if(SY.user){ const asked=SY.signingOut||why==='user'||cryptoSignOutRecent(); SY.user=null; st.user=null; // cryptoSignOutRecent: «Cerrar sesión» in another window
     // A session that ends without «Cerrar sesión» (revoked or expired elsewhere, such as a global sign-out from another app of the project):
     // said in the log, in a notice and in Ajustes until the next sign-in. The encryption key stays; the next sign-in checks it against the account
-    if(asked) log('info','Sesión cerrada'); else { st.lost=new Date().toISOString(); CR.force=true; log('warn','La sesión se ha cerrado sin pedirlo: se deja de sincronizar', why); }
+    if(asked){ log('info','Sesión cerrada'); CR.key=null; CR.kid=null; CR.owner=null; } else { st.lost=new Date().toISOString(); CR.force=true; log('warn','La sesión se ha cerrado sin pedirlo: se deja de sincronizar', why); }
     syncWrite(st); if(SY.unsub){ SY.unsub(); SY.unsub=null; } clearTimeout(SY.timer); SY.status='idle'; if(!asked) syncLostNotice(); }
   syncPaint(); }
 // The notice of a session ended without asking: once per app session (Ajustes keeps saying it until the next sign-in)

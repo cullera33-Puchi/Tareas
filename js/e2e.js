@@ -31,8 +31,16 @@ const crKey = () => crOn()&&CR.key&&CR.owner===SY.user.id&&CR.kid===CR.row.kid ?
 const cryptoLocked = () => crOn() && !crKey();
 const crErr = (msg, code) => { const e=new Error(msg); e.code=code; return e; };
 const crLockedErr = () => crErr('Falta la contraseña de cifrado', 'tareas_locked');
-// A row that does not open with this key: left out, said once per table (never shown as e1:...)
-function crBad(table, row){ if(CR.bad.has(table)) return; CR.bad.add(table); log('error','Cifrado: una fila de '+table+' no se puede descifrar y se deja fuera', {id:row&&row.id}); }
+// A row with a text that does not open with this key: kept, that text marked (CRYPTO_UNREAD, see crUnread); said once per table
+function crBad(table, row){ if(CR.bad.has(table)) return; CR.bad.add(table); log('error','Cifrado: un texto de '+table+' no se puede descifrar; la fila se conserva sin él', {id:row&&row.id}); }
+async function crOpenRow(k, table, r){ const o=await cryptoDecRow(k, table, r); if(cryptoRowUnread(table, o)) crBad(table, r); return o; }
+/* A record from the server whose text could not be opened (sync.js calls it before comparing): this device's value stays when it has one;
+   else CRYPTO_PLACEHOLDER, and the field is listed in cxBad, a local mark that keeps it from ever going up (syncCollect) */
+function crUnread(table, rec, local){ const bad=[]; if(!rec) return rec;
+  (SYNC_FIELDS[table]||[]).forEach(([f])=>{ if(rec[f]!==CRYPTO_UNREAD) return;
+    const lv=local&&local[f], mine=lv!=null&&lv!==''&&lv!==CRYPTO_PLACEHOLDER&&lv!==CRYPTO_UNREAD&&!cryptoIsEnc(lv); // a ciphertext kept here as text is not a value
+    rec[f]=mine?lv:CRYPTO_PLACEHOLDER; if(!mine) bad.push(f); });
+  rec.cxBad=bad.length?bad:undefined; return rec; }
 // The file as Storage has it, through the adapter's own download or its signed URL
 async function crRawDownload(R, path, ttl){ if(R.fileDownload) return R.fileDownload(path, ttl);
   const r=await fetch(await R.fileUrl(path, ttl), {cache:'no-store'}); if(!r.ok) throw new Error('HTTP '+r.status); return r.blob(); }
@@ -43,17 +51,20 @@ async function crLoadStored(user){ if(crKey()) return; const r=await cryptoKeyLo
 /* ---------- The layer around the remote adapter ---------- */
 function cryptoRemote(inner){ if(!inner||inner.__crypto) return inner;
   const w=Object.create(inner); w.__crypto=true; w.inner=inner;
-  /* Rows from the server, opened. Without the key: the stored one is tried, and the account is read again; on, the pass stops before
-     anything is merged (locked). Off, rows with encrypted values are still never merged as text: a key of this user opens them, else they
-     are left out (the first pass with the key pulls them whole again). With the key, a value that does not open leaves its row out */
+  /* Rows from the server, opened. Without the key: the stored one is tried, and the account is read again (at most every few seconds); on,
+     the pass stops before anything is merged (locked). Off, read just now, with no key of this user anywhere: a text that starts with 'e1:'
+     is somebody's text and comes as it is. Off with a key of this user: it opens what it can. Otherwise such rows are left out (the first
+     pass with the key pulls them whole again). With the key, a text that does not open is marked and its row kept (crUnread) */
   const open=async(table, rows)=>{ if(!CRYPTO_COLS[table]||!Array.isArray(rows)||!rows.some(r=>cryptoRowEnc(table, r))) return rows;
     let k=crKey();
-    if(!k&&SY&&SY.user){ await crLoadStored(SY.user); if(!crKey()&&!CR.busy) await crFetch(SY.user); await crLoadStored(SY.user); k=crKey(); }
+    if(!k&&SY&&SY.user){ await crLoadStored(SY.user); if(!crKey()&&!CR.busy&&!(CR.for===SY.user.id&&CR.row!==undefined&&Date.now()-CR.at<5e3)) await crFetch(SY.user); await crLoadStored(SY.user); k=crKey(); }
     if(!k&&(crOn()||!SY||!SY.user)){ CR.force=true; throw crLockedErr(); }
-    const k2=k||(CR.key&&SY.user&&CR.owner===SY.user.id?CR.key:null), out=[];
+    const k2=k||(CR.key&&CR.owner===SY.user.id?CR.key:null);
+    if(!k2&&CR.row===null&&CR.for===SY.user.id&&Date.now()-CR.at<5e3) return rows; // off for sure, and no key ever here: plain text
+    const out=[];
     for(const r of rows){ if(!cryptoRowEnc(table, r)){ out.push(r); continue; }
       if(!k2){ CR.force=true; if(!CR.skipLogged){ CR.skipLogged=true; log('warn','Cifrado: filas cifradas y sin clave en este dispositivo; se dejan fuera', {table}); } continue; }
-      try{ out.push(await cryptoDecRow(k2, table, r)); }catch(e){ crBad(table, r); } }
+      out.push(await crOpenRow(k2, table, r)); }
     return out; };
   w.pull=async(table, after, limit)=>open(table, await inner.pull(table, after, limit));
   w.byIds=async(table, ids)=>open(table, await inner.byIds(table, ids));
@@ -66,7 +77,7 @@ function cryptoRemote(inner){ if(!inner||inner.__crypto) return inner;
     return inner.subscribe(uid, (table, row)=>{ chain=chain.then(async()=>{
       if(!cryptoRowEnc(table, row)){ onRow(table, row); return; }
       const k=crKey(); if(!k){ CR.force=true; crCheckSoon(); return; } // another device turned encryption on: a pass reads the account
-      let r; try{ r=await cryptoDecRow(k, table, row); }catch(e){ crBad(table, row); return; } onRow(table, r); }).catch(e=>log('error','Tiempo real: '+(e&&e.message||e))); }, onStatus); };
+      onRow(table, await crOpenRow(k, table, row)); }).catch(e=>log('error','Tiempo real: '+(e&&e.message||e))); }, onStatus); };
   /* Files up: encrypted with the key. Without it, nothing goes while an activation is under way here (it would escape the encryption of the
      server copy), and the account is read again first, so a file never goes up plain to an account that has just turned encryption on */
   if(inner.fileUpload) w.fileUpload=async(path, blob, mime)=>{ let k=crKey();
@@ -76,8 +87,13 @@ function cryptoRemote(inner){ if(!inner||inner.__crypto) return inner;
       if(!k&&crOn()) throw crLockedErr(); }
     if(!k) return inner.fileUpload(path, blob, mime);
     const enc=await cryptoEncFile(k, new Uint8Array(await blob.arrayBuffer()), path); return inner.fileUpload(path, new Blob([enc], {type:mime||blob.type}), mime); };
+  /* Files down: opened with the key. A plain one found while the account is on (uploaded by a device on an older version) is encrypted and
+     put back at the same path */
   if(inner.fileDownload||inner.fileUrl) w.fileDownload=async(path, ttl)=>{ const blob=await crRawDownload(inner, path, ttl), u=new Uint8Array(await blob.arrayBuffer());
-    if(!cryptoFileEnc(u)) return blob; let k=crKey(); if(!k&&SY&&SY.user){ await crLoadStored(SY.user); k=crKey()||(CR.key&&CR.owner===SY.user.id?CR.key:null); }
+    if(!cryptoFileEnc(u)){ const k=crKey();
+      if(k&&inner.fileUpload&&!CR.migrating){ try{ await inner.fileUpload(path, new Blob([await cryptoEncFile(k, u, path)], {type:blob.type}), blob.type); log('info','Cifrado: un archivo sin cifrar en el servidor se ha cifrado'); }
+        catch(e){ log('warn','Cifrado: no se pudo cifrar un archivo sin cifrar del servidor: '+(e&&e.message||e)); } }
+      return blob; } let k=crKey(); if(!k&&SY&&SY.user){ await crLoadStored(SY.user); k=crKey()||(CR.key&&CR.owner===SY.user.id?CR.key:null); }
     if(!k){ CR.force=true; throw crLockedErr(); }
     return new Blob([await cryptoDecFile(k, u, path)], {type:blob.type}); };
   // Siri (decision 62): with encryption on, the phrase leaves the server when its task is made; the task goes up encrypted
@@ -123,7 +139,7 @@ const CR_LISTS={tasks:'tasks', projects:'projects', spaces:'spaces', subtasks:'s
 async function cryptoRepairLocal(k){ const fix=[];
   for(const table of Object.keys(CRYPTO_COLS)){ const fields=SYNC_FIELDS[table].filter(([,c])=>CRYPTO_COLS[table].includes(c));
     for(const rec of DB[CR_LISTS[table]]||[]){ if(!rec) continue;
-      for(const [f,c] of fields){ if(!cryptoIsEnc(rec[f])) continue; try{ fix.push([CR_LISTS[table], rec.id, f, rec[f], await cryptoDec(k, rec[f], cryptoAad(table, c, rec.id))]); }catch(e){} } } }
+      for(const [f,c] of fields){ if(!cryptoIsEnc(rec[f])) continue; try{ fix.push([CR_LISTS[table], rec.id, f, rec[f], await cryptoDec(k, rec[f], cryptoAad(table, c))]); }catch(e){} } } }
   let n=0; fix.forEach(([list, id, f, was, v])=>{ const rec=(DB[list]||[]).find(x=>x&&x.id===id); if(rec&&rec[f]===was){ rec[f]=v; n++; } }); // applied at once, on the current data
   if(n){ SY.quiet=true; try{ save(); } finally{ SY.quiet=false; } log('info','Cifrado: textos guardados cifrados en este dispositivo vuelven a ser texto', {n}); if(!busyEditing()&&!touchDrag) render(); }
   return n; }
@@ -146,7 +162,8 @@ async function crForget(why){ CR.key=null; CR.kid=null; CR.owner=null; CR.keyP=P
 // Only from «Cerrar sesión» (syncSignOutSheet): a session that ends without asking keeps the key, checked against the account at the next sign-in
 async function cryptoSignedOut(){ CR.keyP=Promise.resolve(); CR.row=undefined; CR.for=null; CR.asked=false; CR.lockLogged=false; CR.bad.clear(); CR.repaired=null;
   try{ localStorage.setItem(CR_OUT, String(Date.now())); }catch(e){}
-  if(CR.key||CR.owner) await crForget('sesión cerrada'); else await cryptoKeyForget().catch(()=>{}); }
+  if(CR.key||CR.owner) await crForget('sesión cerrada'); else await cryptoKeyForget().catch(()=>{});
+  try{ localStorage.setItem(CR_OUT, String(Date.now())); }catch(e){} } // again, after the key left IndexedDB: the other windows drop theirs
 const cryptoSignOutRecent = () => { let t=0; try{ t=+localStorage.getItem(CR_OUT)||0; }catch(e){} return Date.now()-t<60e3; };
 // Another window of the app used «Cerrar sesión»: this one drops the key from memory too (IndexedDB is already empty)
 window.addEventListener('storage', e=>{ if(e.key!==CR_OUT||!e.newValue) return; CR.key=null; CR.kid=null; CR.owner=null; CR.keyP=Promise.resolve(); CR.row=undefined; CR.for=null; CR.repaired=null; });
@@ -191,7 +208,9 @@ function crProgPaint(){ const l=document.querySelector('#sheet [data-role=cxline
   if(p&&p.done){ const h=document.querySelector('#sheet [data-role=cxhint]'); if(h) h.textContent='Lo que escribas se cifra en este dispositivo antes de guardarse en tu cuenta.'; const c=document.querySelector('#sheet .cxprog [data-x=close]'); if(c) c.textContent='Hecho'; } }
 const crLock = fn => (navigator.locks&&navigator.locks.request) ? navigator.locks.request('tareas-sync', fn) : fn();
 // The uploads of attachments under way finish before the key exists (a new one waits: the upload layer refuses while CR.busy)
-async function crWaitUploads(){ for(let t0=Date.now(); UQ.running&&Date.now()-t0<120e3;) await crSleep(100); }
+// (the migration's file rounds wait for it again, and list once more after it, so a long upload is never missed)
+async function crWaitUploads(){ const t0=Date.now(); while(UQ.running&&Date.now()-t0<120e3) await crSleep(100);
+  if(UQ.running) log('warn','Cifrado: una subida de adjunto sigue en curso; el cifrado de archivos la espera'); }
 /* Turns encryption on: a full pass, a local backup, the data key made and stored here and on the server, then the server copy encrypted.
    No pass runs from the moment the key is made until the server row is stored (CR.busy). If the server's answer is lost and the row cannot
    be read either, the key and the flag stay: the next pass decides by the kid of the server row (crFlagCheck) */
@@ -215,6 +234,7 @@ async function cryptoActivate(pw){ if(CR.busy||CR.migrating||CR.activating||!SY|
     try{ await SY.remote.cryptoPut(row); outcome='stored'; }
     catch(e){ let got; try{ got=await crFetch(user); }catch(x){ outcome='unknown'; throw e; } // the answer was lost and the row cannot be read: undecided
       if(got&&got.kid===kid) outcome='stored'; else throw e; }
+    try{ await cryptoKeySave(key, kid, user.id); }catch(e){} // again, once the row is confirmed (a window may have cleared it meanwhile)
     crFlagWrite(null); CR.row={kid, salt:row.salt, iterations:row.iterations, wrapped:row.wrapped, created:now, modified:now, migrated:null}; CR.for=user.id; CR.at=Date.now();
     CR.key=key; CR.kid=kid; CR.owner=user.id; CR.keyP=Promise.resolve(); CR.asked=true; CR.repaired=kid;
     const st=syncState(); st.cryptoKid=kid; syncWrite(st); // this device's data never held server text: no need to pull it whole again
@@ -227,40 +247,60 @@ async function cryptoActivate(pw){ if(CR.busy||CR.migrating||CR.activating||!SY|
     if(e&&e.code==='tareas_on') syncRun('cifrado'); return; }
   CR.busy=false; CR.prog.step=null; crPaint();
   await cryptoMigrate(); CR.activating=false; }
-// Every page of a table on the server, as the server holds it, in server_ts order (paged like syncPull); fn may write before the next page
+// Every page of a table on the server, as the server holds it, in server_ts order (paged like syncPull) until an empty page; fn may write
+// before the next one (what it writes comes again at the end and is skipped, as it already opens)
 async function crScan(R, table, fn){ let after=null;
   for(;;){ const page=await R.pull(table, after, SYNC_PAGE); if(!page.length) return; const full=page.length>=SYNC_PAGE;
     const last=page[page.length-1].server_ts, keep=full?page.filter(r=>r.server_ts!==last):page, use=keep.length?keep:page;
-    await fn(use); if(!full) return; after=use[use.length-1].server_ts; } }
+    await fn(use); after=use[use.length-1].server_ts; } }
 // An estimate of the rows and files the account holds, for «Cifrando N de M»: what this device knows of the server
 const crEstimate = () => { const st=syncState(); return Object.keys(CRYPTO_COLS).reduce((n,t)=>n+Object.keys(st.known[t]||{}).length, 0)+DB.attachments.filter(a=>a&&a.path).length; };
+/* Files of the account already encrypted (or set aside after CR_FILE_TRIES failures) by this device's migration, per kid, so a run that
+   starts again does not download them all once more: {kid, done:[path], fails:{path:n}, aside:[path]} */
+const CR_FILES='tareas-crypto-files', CR_FILE_TRIES=3;
+function crFiles(kid){ let v=null; try{ v=JSON.parse(localStorage.getItem(CR_FILES)||'null'); }catch(e){} if(!v||v.kid!==kid) v={kid, done:[], fails:{}, aside:[]}; return v; }
+const crFilesWrite = v => { try{ localStorage.setItem(CR_FILES, JSON.stringify(v)); }catch(e){} };
+// The tables the migration must reach: a missing one (only a table truly absent, 42P01 or PGRST205, is noted missing) is skipped
+const crMigTables = () => Object.keys(CRYPTO_COLS).filter(t=>!syncMissing(t));
 /* Encrypts in place what the server holds for the account, while the key row says it is not done (migrated null). Any device with the key
-   runs it, so a cut on one device (or its loss) never leaves it half done. Page by page, each written back right after it is read: every
-   row of every listed table, deleted ones and voice notes included, sent again with the same modified and deleted (the write trigger takes
-   an equal modified); every attachment file without the magic, listed again until none is new; the Siri phrases already taken are emptied.
-   What already opens with the key is skipped, so it can run again. At the end the row is marked, only if still unmarked */
+   runs it, so a cut on one device (or its loss) never leaves it half done. The row is read again under the lock: done meanwhile, nothing
+   to do. Page by page, each written back right after it is read: every row of every listed table, deleted ones and voice notes included,
+   sent again with the same modified and deleted (the write trigger takes an equal modified); every attachment file without the magic,
+   listed again (and the upload queue waited for) until none is new; the Siri phrases already taken are emptied. Any error of the server
+   stops the run before the row is marked; a file that fails CR_FILE_TRIES times is set aside (logged, and Ajustes says how many) */
 async function cryptoMigrate(){ const user=SY&&SY.user, k=crKey(); if(CR.migrating||!user||!k||!CR.row||CR.row.migrated) return;
-  const kid=CR.kid, inner=SY.remote.inner||SY.remote, t0=Date.now(), stats={filas:0, archivos:0, frases:0, sinArchivo:0};
+  const kid=CR.kid, inner=SY.remote.inner||SY.remote, t0=Date.now(), stats={filas:0, archivos:0, frases:0, sinArchivo:0, apartados:0};
   CR.migrating=true; CR.busy=true; CR.prog=Object.assign(CR.prog||{}, {n:0, of:crEstimate(), step:null, done:false}); crPaint();
-  log('info','Cifrado: cifrando los datos del servidor', {estimados:CR.prog.of});
+  let skipped=false;
   try{ await crLock(async()=>{
-      for(const table of Object.keys(CRYPTO_COLS)){ if(syncMissing(table)) continue; const seen=new Set();
+      const row=await crFetch(user); if(!row||row.kid!==kid||row.migrated){ skipped=true; return; }
+      log('info','Cifrado: cifrando los datos del servidor', {estimados:CR.prog.of});
+      for(const table of crMigTables()){ const seen=new Set();
         await crScan(inner, table, async page=>{ const send=[];
           for(const r of page){ if(!seen.has(r.id)){ seen.add(r.id); CR.prog.n++; }
             const o=await cryptoSealRow(k, table, r); if(o!==r){ const x=Object.assign({}, o); delete x.owner_id; delete x.server_ts; send.push(x); } }
           for(let i=0;i<send.length;i+=100) await inner.upsert(table, send.slice(i, i+100));
           stats.filas+=send.length; crPaint(); }); }
-      if(!syncMissing('attachments')&&inner.fileUpload){ const done=new Set();
-        for(let round=0; round<5; round++){ const todo=new Map();
+      if(!syncMissing('attachments')&&inner.fileUpload){ const F=crFiles(kid), done=new Set([...F.done, ...F.aside]); let failed=0;
+        for(let round=0; round<20; round++){ while(UQ.running) await crSleep(200); // an upload started before the activation: its file is listed after it
+          const todo=new Map();
           await crScan(inner, 'attachments', async page=>{ page.forEach(a=>{ if(a.path&&!a.purged&&!done.has(a.path)) todo.set(a.path, a.mime); }); });
           DB.attachments.forEach(a=>{ if(a&&a.path&&!done.has(a.path)) todo.set(a.path, a.mime); }); // uploaded from here, its row not up yet
-          if(!todo.size) break; if(round) CR.prog.of+=todo.size;
-          for(const [path, mime] of todo){ let blob=null;
-            try{ blob=await crRawDownload(inner, path, SIGN_TTL); }catch(e){ if(syncOffline(e)) throw e; stats.sinArchivo++; log('warn','Cifrado: archivo no encontrado en el servidor, se deja'); }
-            if(blob){ const u=new Uint8Array(await blob.arrayBuffer());
-              if(!cryptoFileEnc(u)){ await inner.fileUpload(path, new Blob([await cryptoEncFile(k, u, path)], {type:mime||blob.type}), mime||blob.type); stats.archivos++; } }
-            done.add(path); CR.prog.n++; crPaint(); } } }
+          if(!todo.size&&!UQ.running) break; if(round) CR.prog.of+=todo.size;
+          for(const [path, mime] of todo){
+            try{ let blob=null;
+              try{ blob=await crRawDownload(inner, path, SIGN_TTL); }catch(e){ if(syncOffline(e)) throw e; if(!/HTTP 4\d\d|not found|object not found/i.test(String(e&&e.message||e))) throw e; stats.sinArchivo++; log('warn','Cifrado: archivo no encontrado en el servidor, se deja'); }
+              if(blob){ const u=new Uint8Array(await blob.arrayBuffer());
+                if(!cryptoFileEnc(u)){ await inner.fileUpload(path, new Blob([await cryptoEncFile(k, u, path)], {type:mime||blob.type}), mime||blob.type); stats.archivos++; } }
+              done.add(path); F.done.push(path); }
+            catch(e){ if(syncOffline(e)) throw e; F.fails[path]=(F.fails[path]||0)+1;
+              if(F.fails[path]>=CR_FILE_TRIES){ F.aside.push(path); done.add(path); stats.apartados++; log('error','Cifrado: un archivo no se ha podido cifrar tras '+CR_FILE_TRIES+' intentos y se deja aparte: '+(e&&e.message||e)); }
+              else{ failed++; log('warn','Cifrado: un archivo no se ha podido cifrar, se intentará de nuevo: '+(e&&e.message||e)); } }
+            crFilesWrite(F); CR.prog.n++; crPaint(); }
+          if(failed) break; }
+        if(failed) throw new Error(failed===1?'Un archivo sin cifrar':failed+' archivos sin cifrar'); }
       if(inner.inboxClear&&!syncMissing('inbox')) stats.frases=((await inner.inboxClear())||[]).length; });
+    if(skipped){ CR.prog=null; log('info','Cifrado: el servidor ya estaba cifrado'); return; }
     const now=new Date().toISOString(); await inner.cryptoPatch(user.id, {kid, migrated:null}, {migrated:now});
     if(CR.row&&CR.row.kid===kid&&!CR.row.migrated) CR.row.migrated=now;
     CR.prog.done=true; CR.wait=0; CR.resumeAt=0;
@@ -269,6 +309,8 @@ async function cryptoMigrate(){ const user=SY&&SY.user, k=crKey(); if(CR.migrati
     log(syncOffline(e)?'warn':'error','Cifrado interrumpido: '+(e&&e.message||e)+'. Continuará en la próxima sincronización');
     const l=document.querySelector('#sheet .cxprog'); if(l) closeSheet(); if(CR.activating) toast('El cifrado se completará en la próxima sincronización'); }
   finally{ CR.migrating=false; CR.busy=false; const p=CR.prog; crPaint(); if(p&&p.done) setTimeout(()=>{ if(CR.prog===p) CR.prog=null; }, 0); syncRun('cifrado'); } }
+// Files set aside by this device's migration (Ajustes says how many)
+const crAside = () => CR.kid ? crFiles(CR.kid).aside.length : 0;
 // After a pass that reached the server: while the account's row says the server copy is not all encrypted, this device (with the key) goes on
 function cryptoResume(){ if(!SY||!SY.user||!crKey()||!CR.row||CR.row.migrated||CR.migrating||CR.busy||Date.now()<CR.resumeAt) return;
   setTimeout(()=>{ if(!CR.migrating&&!CR.busy&&crKey()&&CR.row&&!CR.row.migrated){ log('info','Cifrado: se continúa el cifrado del servidor'); cryptoMigrate(); } }, 0); }
@@ -343,5 +385,6 @@ function cryptoSectionHTML(dev){
   if(!crKey()) return g(cell('Falta la contraseña de cifrado', '', true)+btn('cxUnlock','Desbloquear'),
     'El cifrado está activado en tu cuenta. Escribe su contraseña para ver y sincronizar tus datos en '+dev+'.');
   if(CR.migrating||!CR.row.migrated) return g(cell(CR.migrating?crProgText()||'Cifrando':'Cifrado sin terminar'), 'Se están cifrando los datos que ya había en tu cuenta. Si se interrumpe, continúa en la próxima sincronización.');
-  return g(cell('Cifrado activado'+(CR.row.created?' el '+crDay(CR.row.created):''))+btn('cxPass','Cambiar contraseña'),
-    'Lo que escribes se cifra en '+dev+' antes de guardarse en tu cuenta. Sin la contraseña nadie puede leerlo, tampoco el servidor.'); }
+  const aside=crAside();
+  return g(cell('Cifrado activado'+(CR.row.created?' el '+crDay(CR.row.created):''))+(aside?cell(aside===1?'1 archivo no se pudo cifrar':aside+' archivos no se pudieron cifrar', '', true):'')+btn('cxPass','Cambiar contraseña'),
+    (aside?'Esos archivos siguen sin cifrar en el servidor. ':'')+'Lo que escribes se cifra en '+dev+' antes de guardarse en tu cuenta. Sin la contraseña nadie puede leerlo, tampoco el servidor.'); }

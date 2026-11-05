@@ -30,6 +30,7 @@ const srv = http.createServer((req,res)=>{ let p = decodeURIComponent(req.url.sp
   const f=path.join(ROOT,p); if(!fs.existsSync(f)||fs.statSync(f).isDirectory()){ res.writeHead(404,{'Content-Type':'text/html'}); res.end('<h1>404</h1>'); return; }
   res.writeHead(200,{'Content-Type':TYPES[path.extname(f)]||'application/octet-stream'}); res.end(fs.readFileSync(f)); });
 const r={}, fails=[], errors=[]; const check=(name, ok, info)=>{ r[name]=ok?true:(info===undefined?false:info); if(!ok) fails.push(name); };
+const sleep=ms=>new Promise(res=>setTimeout(res,ms));
 const shot=(page, name)=>page.screenshot({path:path.join(OUT, name+'.png')});
 
 /* ======================= 1. SQL ======================= */
@@ -162,7 +163,7 @@ class Fake {
       case 'cryptoPatch': { const k=this.keys.get(own); if(this.racePatch){ this.racePatch=false; if(k) k.wrapped='cambiada-en-otro-dispositivo'; }
         if(!k||Object.keys(a.match).some(c=>a.match[c]===null?k[c]!=null:k[c]!==a.match[c])) return []; Object.assign(k, a.patch);
         if(this.lose.patch){ this.lose.patch--; throw new Error('Failed to fetch'); } return [{kid:k.kid}]; }
-      case 'upload': if(this.failUpload>0){ this.failUpload--; throw new Error('Failed to fetch'); } if(!a.path.startsWith(own+'/')) throw new Error('row-level security'); this.store.set(a.path, {b64:a.b64, mime:a.mime}); return true;
+      case 'upload': if(a.path===this.failPath) throw new Error('HTTP 500 storage error'); if(this.failUpload>0){ this.failUpload--; throw new Error('Failed to fetch'); } if(!a.path.startsWith(own+'/')) throw new Error('row-level security'); this.store.set(a.path, {b64:a.b64, mime:a.mime}); return true;
       case 'download': { const o=this.store.get(a.path); if(!o) throw new Error('HTTP 400'); return o; }
       case 'inboxList': return this.inbox.filter(x=>x.owner_id===own&&!x.taken).map(x=>({id:x.id, text:x.text, url:x.url, source:x.source, created:x.created}));
       case 'inboxTake': return this.inbox.filter(x=>x.owner_id===own&&a.ids.includes(x.id)).map(x=>{ x.taken=a.ts; if(a.o&&a.o.clear){ x.text=''; x.url=null; } return {id:x.id}; });
@@ -220,7 +221,7 @@ async function device(browser, o){
   if(o.old) await page.addInitScript(()=>{ if(!localStorage.getItem('__updated')) window.__noCrypto=true; }); // until it «updates»
   if(o.user) await page.addInitScript(u=>{ window.__fakeUser=u; }, o.user);
   // A database without 0012_encryption.sql: the adapter answers as supabaseRemote does (absent, logged once)
-  if(o.absent) await page.addInitScript(()=>{ const R=window.__tareasRemote; R.missing=new Set(); R.cryptoGet=async()=>{ syncAbsent(R.missing, 'crypto_keys', {code:'PGRST205', message:"Could not find the table 'public.crypto_keys' in the schema cache"}); return null; }; });
+  if(o.absent) await page.addInitScript(()=>{ const R=window.__tareasRemote; R.missing=new Set(); R.cryptoGet=async()=>{ window.__cg=(window.__cg||0)+1; syncAbsent(R.missing, 'crypto_keys', {code:'PGRST205', message:"Could not find the table 'public.crypto_keys' in the schema cache"}); return null; }; });
   await page.addInitScript(s=>{ if(!localStorage.getItem('tareas-v1')) localStorage.setItem('tareas-v1', s); }, JSON.stringify(o.seed));
   await page.goto(URL0); await page.waitForTimeout(600); return {ctx, page};
 }
@@ -284,7 +285,7 @@ async function appTests(browser){
   const tdel=fake.t.tasks.get('tdel'), vn1=fake.t.voice_notes.get('vn1');
   check('server_all_cipher', left.length===0 && [...fake.t.tasks.values()].every(x=>isEnc(x.title)) && isEnc(fake.t.projects.get('p1').name) && isEnc(fake.t.contacts.get('c1').phone) && isEnc(fake.t.project_notes.get('n1').body) && isEnc(fake.t.subtasks.get('s1').title), left);
   const a4=fake.t.tasks.get('a4').title;
-  check('server_typed_prefix_encrypted', isEnc(a4) && a4!=='e1:texto que parece cifrado' && (await ap.evaluate(async([v])=>cryptoDec(CR.key, v, cryptoAad('tasks','title','a4')), [a4]))==='e1:texto que parece cifrado', a4);
+  check('server_typed_prefix_encrypted', isEnc(a4) && a4!=='e1:texto que parece cifrado' && (await ap.evaluate(async([v])=>cryptoDec(CR.key, v, cryptoAad('tasks','title')), [a4]))==='e1:texto que parece cifrado', a4);
   check('server_deleted_and_voice', isEnc(tdel.title) && isEnc(tdel.notes) && tdel.deleted==='2026-11-03T10:00:00.000Z' && tdel.modified==='2026-11-03T10:00:00.000Z' && isEnc(vn1.text), {tdel, vn1});
   check('server_files', files.length===1 && files[0].magic==='TAREASE1', files);
   check('server_inbox_cleared', fake.inbox[0].text==='' && fake.inbox[0].url===null, fake.inbox[0]);
@@ -299,7 +300,7 @@ async function appTests(browser){
   // A change goes up encrypted, bound to its row and column
   await ap.evaluate(()=>updTask('a1', {title:'Preparar comité de dirección'})); await synced(ap);
   const enc1 = fake.t.tasks.get('a1').title;
-  const dec1 = await ap.evaluate(async([v])=>({ok:await cryptoDec(CR.key, v, cryptoAad('tasks','title','a1')), other:await cryptoDec(CR.key, v, cryptoAad('tasks','title','a3')).then(()=>'opened', ()=>'refused')}), [enc1]);
+  const dec1 = await ap.evaluate(async([v])=>({ok:await cryptoDec(CR.key, v, cryptoAad('tasks','title')), other:await cryptoDec(CR.key, v, cryptoAad('tasks','notes')).then(()=>'opened', ()=>'refused')}), [enc1]);
   check('A_edit_encrypted', isEnc(enc1) && dec1.ok==='Preparar comité de dirección' && dec1.other==='refused', {enc1, dec1});
   // Siri: a phrase becomes a task and leaves the server in the same update
   fake.inbox.push({id:'ib-new', owner_id:U, text:'Llamar a Pepe mañana', url:null, source:'siri', created:new Date().toISOString(), taken:null});
@@ -331,8 +332,28 @@ async function appTests(browser){
   fake.put(U, 'tasks', {id:'tbad', title:'e1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', notes:'', status:'pending', priority:'none', date:today, modified:new Date().toISOString(), created:new Date().toISOString()});
   fake.put(U, 'tasks', {id:'tbad2', title:'e1:BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB', notes:'', status:'pending', priority:'none', date:today, modified:new Date().toISOString(), created:new Date().toISOString()});
   await bp.evaluate(()=>syncRun('prueba')); await synced(bp);
-  check('B_bad_row_left_out', await bp.evaluate(()=>!task('tbad')&&!task('tbad2')&&LOG.filter(e=>/no se puede descifrar/.test(e.m)).length===1&&!JSON.stringify(DB).includes('e1:AAAA')));
-  fake.t.tasks.delete('tbad'); fake.t.tasks.delete('tbad2');
+  check('B_unreadable_kept', await bp.evaluate(()=>task('tbad')&&task('tbad').title===CRYPTO_PLACEHOLDER&&task('tbad2')&&task('tbad2').title===CRYPTO_PLACEHOLDER&&LOG.filter(e=>/no se puede descifrar/.test(e.m)).length===1&&!JSON.stringify(DB).includes('e1:AAAA')&&!JSON.stringify(DB).includes(CRYPTO_UNREAD)));
+  // Changing such a task never sends the placeholder: the server keeps its own text
+  await bp.evaluate(()=>updTask('tbad', {priority:'high'})); await synced(bp);
+  check('B_placeholder_never_pushed', fake.t.tasks.get('tbad').priority==='high' && fake.t.tasks.get('tbad').title==='e1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', fake.t.tasks.get('tbad'));
+  // A ciphertext copied into another row by a device on an older version (a duplicate, the next of a series) opens there too
+  fake.put(U, 'tasks', {id:'cp1', title:fake.t.tasks.get('a1').title, notes:'', status:'pending', priority:'none', date:today, modified:new Date().toISOString(), created:new Date().toISOString()});
+  // A text that does not open in a row this device has: its own value stays, the rest of the newer copy comes
+  const a3row=fake.t.tasks.get('a3'), a3title=a3row.title; Object.assign(a3row, {title:'e1:'+'D'.repeat(50), priority:'mid', modified:new Date().toISOString(), server_ts:fake.ts()});
+  await bp.evaluate(()=>syncRun('prueba')); await synced(bp);
+  const bx2 = await bp.evaluate(()=>({cp:task('cp1')&&task('cp1').title, a3:task('a3').title, pri:task('a3').priority, bad:task('a3').cxBad||null}));
+  check('B_copied_cipher_opens', bx2.cp==='Preparar comité de dirección', bx2);
+  check('B_unreadable_local_kept', bx2.a3==='Llamar al fontanero hoy' && bx2.pri==='mid' && !bx2.bad, bx2);
+  // Its next change sends this device's text, readable again
+  await bp.evaluate(()=>updTask('a3', {priority:'high'})); await synced(bp);
+  const a3dec = await bp.evaluate(async([v])=>cryptoDec(CR.key, v, cryptoAad('tasks','title')).catch(()=>null), [fake.t.tasks.get('a3').title]);
+  check('B_unreadable_repaired', a3dec==='Llamar al fontanero hoy' && fake.t.tasks.get('a3').title!==a3title, a3dec);
+  // A plain file uploaded after activation by a device on an older version: opened, and encrypted in place
+  const oldPath=U+'/tvn/old.jpg'; fake.store.set(oldPath, {b64:PHOTO.toString('base64'), mime:'image/jpeg'});
+  fake.put(U, 'attachments', {id:'ph2', task_id:'tvn', kind:'photo', path:oldPath, mime:'image/jpeg', size:PHOTO.length, width:10, height:10, duration_ms:null, purged:null, modified:new Date().toISOString(), created:new Date().toISOString()});
+  await bp.evaluate(()=>syncRun('prueba')); await synced(bp);
+  const ph2 = await bp.evaluate(async()=>{ const a=DB.attachments.find(x=>x.id==='ph2'); const b=a&&await attDownload(a); return b?b.size:null; });
+  check('B_plain_file_reencrypted', ph2===PHOTO.length && Buffer.from(fake.store.get(oldPath).b64,'base64').slice(0,8).toString()==='TAREASE1', ph2);
   check('B_own_task_up_encrypted', fake.t.tasks.has('b1') && isEnc(fake.t.tasks.get('b1').title) && plainLeft().length===0, plainLeft());
   const photo = await bp.evaluate(async()=>{ const a=DB.attachments.find(x=>x.id==='ph1'); const b=a&&await attDownload(a); return b?{size:b.size, type:b.type, head:new TextDecoder().decode(new Uint8Array(await b.arrayBuffer()).slice(0,15))}:null; });
   check('B_photo_opens', photo && photo.size===PHOTO.length && photo.type==='image/jpeg' && photo.head==='JPEG fake photo', photo);
@@ -409,11 +430,11 @@ async function appTests(browser){
   await op.fill('#sheet [data-role=cxpw]', PW2); await op.click('#sheet .hbtn.ok');
   check('old_updated_unlocked', await until(op, ()=>!!CR.key&&!document.querySelector('#sheet.on'), null, 15000) && await synced(op));
   const Ox = await op.evaluate(()=>({t:task('a1')&&task('a1').title, p:proj('p1')&&proj('p1').name, any:/e1:[A-Za-z0-9_-]{30}/.test(JSON.stringify(DB)), log:LOG.map(e=>e.m).filter(m=>/^Cifrado:/.test(m))}));
-  const a1now = fake.t.tasks.get('a1').title, a1dec = await ap.evaluate(async([v])=>cryptoDec(CR.key, v, cryptoAad('tasks','title','a1')), [a1now]);
+  const a1now = fake.t.tasks.get('a1').title, a1dec = await ap.evaluate(async([v])=>cryptoDec(CR.key, v, cryptoAad('tasks','title')), [a1now]);
   check('old_repaired', Ox.t==='Preparar comité de dirección' && Ox.p==='FLC' && !Ox.any && Ox.log.includes('Cifrado: las tablas cifradas se descargan enteras una vez') && Ox.log.includes('Cifrado: textos guardados cifrados en este dispositivo vuelven a ser texto'), Ox);
   check('old_never_double', a1dec==='Preparar comité de dirección' && plainLeft().length===0, {a1dec});
   // The upload layer keeps a value that already opens as it is (never encrypted twice), and encrypts one that does not
-  const seal = await op.evaluate(async([v])=>{ const o=await cryptoSealRow(CR.key, 'tasks', {id:'a1', title:v, notes:'e1:nota que no abre'}); return {same:o.title===v, notes:o.notes!=='e1:nota que no abre'&&o.notes.startsWith('e1:')&&(await cryptoDec(CR.key, o.notes, cryptoAad('tasks','notes','a1')))==='e1:nota que no abre'}; }, [a1now]);
+  const seal = await op.evaluate(async([v])=>{ const o=await cryptoSealRow(CR.key, 'tasks', {id:'a1', title:v, notes:'e1:nota que no abre'}); return {same:o.title===v, notes:o.notes!=='e1:nota que no abre'&&o.notes.startsWith('e1:')&&(await cryptoDec(CR.key, o.notes, cryptoAad('tasks','notes')))==='e1:nota que no abre'}; }, [a1now]);
   check('seal_keeps_cipher', seal.same && seal.notes, seal);
   // The pull opens with the key kept on the device even when this window has lost it from memory (7), and with a key of this user when the
   // account looks off; never as text (5)
@@ -431,8 +452,8 @@ async function appTests(browser){
     && fake.t.tasks.get('d1').title==='Tarea de D', s);
   const DU='9b2f6d3e-0000-4000-8000-00000000d001';
   fake.put(DU, 'tasks', {id:'dx', title:'e1:'+'C'.repeat(60), notes:'', status:'pending', priority:'none', date:today, modified:new Date().toISOString(), created:new Date().toISOString()});
-  await dp.evaluate(()=>syncRun('prueba')); await synced(dp);
-  check('D_cipher_not_merged', await dp.evaluate(()=>!task('dx')&&LOG.some(e=>/filas cifradas y sin clave/.test(e.m))));
+  const dGets = await dp.evaluate(async()=>{ const n0=window.__cg||0; CR.force=true; await syncRun('prueba'); return (window.__cg||0)-n0; }); await synced(dp);
+  check('D_off_text_as_text', await dp.evaluate(()=>task('dx')&&task('dx').title==='e1:'+'C'.repeat(60)) && dGets===1, {dGets});
   const busyUp = await dp.evaluate(async()=>{ CR.busy=true; try{ await SY.remote.fileUpload(SY.user.id+'/d1/x.jpg', new Blob(['abc'], {type:'image/jpeg'}), 'image/jpeg'); return 'sent'; }catch(e){ return e.code; } finally{ CR.busy=false; } });
   check('D_busy_upload_waits', busyUp==='tareas_wait' && !fake.store.has(DU+'/d1/x.jpg'), busyUp);
   await D.ctx.close();
@@ -460,7 +481,30 @@ async function appTests(browser){
   // The work of a device lost midway: any device with the key finishes it while the row says it is not done
   fake.keys.get(W).migrated=null; fake.put(W, 'tasks', {id:'g2', title:'Dejada en claro', notes:'', status:'pending', priority:'none', date:today, modified:new Date().toISOString(), created:new Date().toISOString()});
   await gp.evaluate(()=>{ CR.force=true; CR.resumeAt=0; return syncRun('prueba'); });
-  check('G_other_device_finishes', await until(gp, ()=>CR.row&&!!CR.row.migrated&&!CR.migrating, null, 20000) && isEnc(fake.t.tasks.get('g2').title) && !!fake.keys.get(W).migrated);
+  // (waits on the server: this device's own copy of the row says done until the next pass reads it again)
+  for(let t0=Date.now(); Date.now()-t0<30000 && !(isEnc(fake.t.tasks.get('g2').title) && fake.keys.get(W).migrated); ) await sleep(200);
+  check('G_other_device_finishes', isEnc(fake.t.tasks.get('g2').title) && !!fake.keys.get(W).migrated && await until(gp, ()=>CR.row&&!!CR.row.migrated&&!CR.migrating, null, 20000), {g2:fake.t.tasks.get('g2').title, m:fake.keys.get(W).migrated});
+  // A passing error of the server (PGRST002, a schema cache loading) stops the run and never marks it done; it is not a missing table
+  check('absent_strict', await gp.evaluate(()=>['subtasks','project_notes','contacts','attachments','inbox'].every(t=>!syncAbsent(new Set(), t, {code:'PGRST002', message:'Could not query the database for the schema cache. Retrying.'}))));
+  fake.keys.get(W).migrated=null; fake.put(W, 'subtasks', {id:'gs1', task_id:'g1', title:'Paso en claro', done:false, sort_order:0, modified:new Date().toISOString(), created:new Date().toISOString()}); 
+  await synced(gp);
+  // the migration's own scan meets the passing error (a sync pass running meanwhile must not take it instead)
+  await gp.evaluate(async()=>{ await crFetch(SY.user); CR.resumeAt=0; const orig=crScan; let n=1;
+    crScan=async(R, table, fn)=>{ if(table==='subtasks'&&n>0){ n--; return orig(Object.assign(Object.create(R), {pull:async()=>{ throw new Error('PGRST002 Could not query the database for the schema cache. Retrying.'); }}), table, fn); } return orig(R, table, fn); };
+    try{ await cryptoMigrate(); } finally{ crScan=orig; } });
+  check('G_transient_not_done', fake.keys.get(W).migrated===null && fake.t.subtasks.get('gs1').title==='Paso en claro' && await gp.evaluate(()=>LOG.some(e=>/^Cifrado interrumpido: PGRST002/.test(e.m))));
+  await gp.evaluate(async()=>{ CR.resumeAt=0; await cryptoMigrate(); });
+  check('G_transient_then_done', !!fake.keys.get(W).migrated && isEnc(fake.t.subtasks.get('gs1').title));
+  // Done already on the server (another device): a run that thinks it is not reads the row under the lock and does nothing
+  const gSkip = await gp.evaluate(async()=>{ const n0=LOG.filter(e=>e.m==='Cifrado: cifrando los datos del servidor').length; CR.row.migrated=null; CR.resumeAt=0; await cryptoMigrate();
+    return {scans:LOG.filter(e=>e.m==='Cifrado: cifrando los datos del servidor').length-n0, said:LOG.some(e=>e.m==='Cifrado: el servidor ya estaba cifrado'), migrated:!!CR.row.migrated}; });
+  check('G_done_elsewhere_skips', gSkip.scans===0 && gSkip.said && gSkip.migrated, gSkip);
+  // A file that keeps failing: tried three times, then set aside so the rest is marked done; Ajustes says so
+  const PG=W+'/g1/mal.jpg'; fake.store.set(PG, {b64:PHOTO.toString('base64'), mime:'image/jpeg'}); fake.failPath=PG; fake.keys.get(W).migrated=null;
+  fake.put(W, 'attachments', {id:'pg1', task_id:'g1', kind:'photo', path:PG, mime:'image/jpeg', size:PHOTO.length, width:10, height:10, duration_ms:null, purged:null, modified:new Date().toISOString(), created:new Date().toISOString()});
+  for(let i=0;i<8&&!fake.keys.get(W).migrated;i++){ await synced(gp); await gp.evaluate(async()=>{ await crFetch(SY.user); CR.resumeAt=0; await cryptoMigrate(); }); await until(gp, ()=>!CR.migrating); }
+  fake.failPath=null; await toSettings(gp); s = await section(gp);
+  check('G_file_set_aside', !!fake.keys.get(W).migrated && s && s.cells.includes('1 archivo no se pudo cifrar') && await gp.evaluate(()=>LOG.filter(e=>/no se ha podido cifrar/.test(e.m)).length===3), {s, migrated:fake.keys.get(W).migrated});
   // Password change: the answer lost (the row tells it went through); another device changed it meanwhile (nothing overwritten)
   fake.lose={patch:1}; const pc1 = await gp.evaluate(([a,b])=>cryptoChangePassword(a,b), [PW1, PW2]); const w1=fake.keys.get(W).wrapped;
   fake.racePatch=true; const pc2 = await gp.evaluate(([a,b])=>cryptoChangePassword(a,b), [PW2, PW1]);
@@ -471,7 +515,7 @@ async function appTests(browser){
 
   /* ---------- The service worker: an encrypted reminder shows in clear ---------- */
   const pay = {title:fake.t.tasks.get('a1').title, body:fake.t.projects.get('p1').name, tag:'a1', data:{taskId:'a1', projectId:'p1', url:'./?task=a1'}};
-  const helper = await ap.evaluate(async([p])=>({ok:await cryptoPushPayload(p), wrong:await cryptoPushPayload(Object.assign({}, p, {data:{taskId:'a3', projectId:'p1'}})), plain:await cryptoPushPayload({title:'Hola', body:'FLC', data:{}})}), [pay]);
+  const helper = await ap.evaluate(async([p])=>({ok:await cryptoPushPayload(p), wrong:await cryptoPushPayload(Object.assign({}, p, {title:'e1:'+'A'.repeat(60)})), plain:await cryptoPushPayload({title:'Hola', body:'FLC', data:{}})}), [pay]);
   check('push_helper', helper.ok.title==='Preparar comité de dirección' && helper.ok.body==='FLC' && helper.wrong.title==='Recordatorio' && helper.wrong.body==='FLC' && helper.plain.title==='Hola', helper);
   const cdp=await A.ctx.newCDPSession(ap); let regId=null; cdp.on('ServiceWorker.workerRegistrationUpdated', e=>e.registrations.forEach(x=>{ if(!x.isDeleted) regId=x.registrationId; }));
   await cdp.send('ServiceWorker.enable'); await until(ap, ()=>navigator.serviceWorker.controller!==null, null, 6000); await ap.waitForTimeout(300);

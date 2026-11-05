@@ -1408,7 +1408,7 @@ body.sdragging,body.sdragging *{cursor:grabbing !important;-webkit-user-select:n
 .ahead .aib + .aib{margin-left:8px;}
 .ahead .aib:active{opacity:.4;}
 .app.desktop .ahead{padding-right:8px;}
-.app.desktop .ahead .aib{margin:-8px 0;border-radius:6px;transition:background-color .15s;}
+.app.desktop .ahead .aib{margin:-8px 0;border-radius:6px;}
 .app.desktop .ahead .aib + .aib{margin-left:2px;}
 .app.desktop .ahead .aib::after{display:none;}
 .app.desktop .ahead .aib svg{width:15px;height:15px;}

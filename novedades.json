@@ -3,9 +3,11 @@
     "version": "0.33.1",
     "date": "2026-11-05",
     "items": [
-      "Antes de actualizar, la app te enseña lo nuevo de cada versión que te faltaba, con «Actualizar» o «Más tarde».",
-      "En Ajustes, «Novedades» junto a la versión muestra esta lista cuando quieras.",
-      "Ajustes ya no ofrece generar datos de prueba. Si quedan en el dispositivo, solo aparece la opción de eliminarlos."
+      "Antes de actualizar, la app te enseña lo nuevo de cada versión que te faltaba, con «Actualizar» o «Más tarde». En Ajustes, «Novedades» lo muestra cuando quieras.",
+      "En el ordenador, los títulos largos se leen enteros en dos líneas y las columnas que nadie usa ya no ocupan sitio.",
+      "Columna nueva «Persona» en el ordenador, con a quién esperas y quién es el responsable.",
+      "Responsable y «Esperando a» se eligen en una lista con buscador: tocas un nombre y listo, o añades uno nuevo.",
+      "«Foco» y «Sugerir» pasan a ser dos iconos en la línea de Ahora, y Ajustes ya no ofrece generar datos de prueba."
     ]
   },
   {

@@ -36,7 +36,7 @@ const shot=(page, name)=>page.screenshot({path:path.join(OUT, name+'.png')});
 const EMPTY = {spaces:[{id:'trabajo',name:'Trabajo',order:0},{id:'personal',name:'Personal',order:1}],projects:[],tasks:[],voiceNotes:[],settings:{tipsSeen:true}};
 const until = (page, fn, arg, ms=8000) => page.waitForFunction(fn, arg, {timeout:ms});
 const sheetOn = page => until(page, ()=>{ const s=document.querySelector('#sheet'); return s.classList.contains('on') && s.getAnimations().every(a=>a.playState!=='running'); });
-const sheetOff = page => until(page, ()=>!document.querySelector('#sheet').classList.contains('on'));
+const sheetOff = page => until(page, ()=>{ const s=document.querySelector('#sheet'); return !s.classList.contains('on') && s.getAnimations().every(a=>a.playState!=='running'); });
 const sheetInfo = page => page.evaluate(()=>{ const s=document.querySelector('#sheet'); return { on:s.classList.contains('on'), title:(s.querySelector('h2')||{}).textContent,
   vers:[...s.querySelectorAll('.nv-v')].map(e=>e.textContent.replace('Versión ','')), tags:[...s.querySelectorAll('.nv-ver')].map(e=>{ const t=e.querySelector('.nv-tag'); return t?t.textContent:''; }),
   items:[...s.querySelectorAll('.nv-ver')].map(e=>e.querySelectorAll('li').length), btns:[...s.querySelectorAll('.sheet-actions .btn')].map(b=>b.textContent),
@@ -80,6 +80,7 @@ const cell = (page, act) => page.$('.screen.root[data-root=ajustes] [data-act='+
   await (await cell(page,'demoClear')).click(); await until(page, ()=>document.querySelector('#asheet').classList.contains('on'));
   await page.click('#asheet .it:not(.cancel)'); await until(page, ()=>demoCount()===0 && !document.querySelector('[data-act=demoClear]'));
   check('demo_cleared', true);
+  await page.evaluate(()=>document.querySelector('#toast').classList.remove('on')); // the Datos de prueba eliminados notice
   const hits0=nvHits; await (await cell(page,'news')).click(); await sheetOn(page);
   x = await sheetInfo(page); await shot(page, 'M-light-ajustes');
   check('ajustes_list', x.title==='Novedades' && x.vers.join()==='0.34.0,0.33.2,0.33.1,0.33.0' && x.tags.join()===',,Instalada,' && x.items.join()==='4,3,3,3' && x.btns.join()==='Cerrar' && x.listScroll==='auto' && nvHits===hits0+1, x);
@@ -94,6 +95,7 @@ const cell = (page, act) => page.$('.screen.root[data-root=ajustes] [data-act='+
   x = await page.evaluate(()=>({v:APP_VERSION, sw:!!pendingSW, toast:document.querySelector('#toast').classList.contains('on')?document.querySelector('#toastText').textContent:''}));
   check('later_keeps', x.v==='0.33.1' && x.sw && x.toast!=='Actualizando', x);
   await ajustes(page); await page.evaluate(()=>render());
+  await page.evaluate(()=>{ document.querySelector('#toast').classList.remove('on'); const sc=document.querySelector('.screen.root[data-root=ajustes] .scroll'); sc.scrollTop=sc.scrollHeight; }); await shot(page, 'M-light-ajustes-version');
   await (await cell(page,'news')).click(); await sheetOn(page); x = await sheetInfo(page);
   check('ajustes_with_update', x.vers.join()==='0.34.0,0.33.2,0.33.1,0.33.0' && x.tags.join()==='Nueva,Nueva,Instalada,' && x.btns.join()==='Más tarde,Actualizar', x);
   await page.click('#sheet [data-x=later]'); await sheetOff(page);

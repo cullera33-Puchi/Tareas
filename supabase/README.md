@@ -28,5 +28,6 @@ Edge Functions, `add-task` (el nombre exacto). Pega `functions/add-task/index.ts
 | `migrations/0008_estimate_postponed.sql` | Tiempo estimado y veces que se aplaza una tarea | v0.28.0 |
 | `migrations/0009_closed_day.sql` | Día cerrado en todos los dispositivos (Cerrar el día) | v0.30.0 |
 | `migrations/0010_inbox.sql` | Siri y el Atajo de iOS: bandeja de entrada y clave personal del atajo | v0.31.0 |
+| `migrations/0011_contacts.sql` | Responsable de una tarea y lista de contactos | v0.32.0 |
 
-`all.sql` es la suma de las diez en orden. Las claves de la app (URL y clave pública) no van aquí: están en los secretos del repositorio de GitHub.
+`all.sql` es la suma de las once en orden. Las claves de la app (URL y clave pública) no van aquí: están en los secretos del repositorio de GitHub.

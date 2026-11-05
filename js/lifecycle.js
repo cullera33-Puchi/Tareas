@@ -102,7 +102,7 @@ function tipsSheet(){ // the desktop has no swipes or long presses: it explains 
 let hiddenAt=0;
 function returnHome(){
   UI.stack.forEach(s=>{ if(s.kind==='note') noteLeft(s.id); }); // an empty note left open goes, as when its screen is closed
-  if(UI.select){ UI.select=null; app.classList.remove('selecting'); } openRow=null; UI.projFilter=null; UI.searchDone=false; // back to Hoy as on a fresh start
+  if(UI.select){ UI.select=null; app.classList.remove('selecting'); } openRow=null; UI.projFilter=null; UI.respFilter=null; UI.searchDone=false; // back to Hoy as on a fresh start
   if(UI.wide){ closeSheet(); setDeskView('hoy'); log('info','Vuelta a Hoy tras más de dos horas fuera'); return; } // the desktop returns through its own view; it has no iPhone stack
   UI.stack.forEach(s=>s.el.remove()); UI.stack=[]; UI.tab='tareas'; UI.query=''; DB.settings.filter='hoy'; save(); closeSheet(); render(); const sc=rootScreen('tareas').querySelector('.scroll'); if(sc) sc.scrollTop=0; log('info','Vuelta a Hoy tras más de dos horas fuera'); }
 window.addEventListener('pagehide', ()=>{ flushHeld(true); flushEdits(); });

@@ -44,6 +44,8 @@ const MI = {
   flag:mi('<path d="M5.5 21V4M5.5 4.5h11.5l-2.5 4.25 2.5 4.25H5.5"/>'), // decision 48a: Fecha límite
   est:mi('<path d="M7 3h10M7 21h10M8 3v3a4.5 4.5 0 002 3.7L12 11l2-1.3A4.5 4.5 0 0016 6V3M8 21v-3a4.5 4.5 0 012-3.7l2-1.3 2 1.3a4.5 4.5 0 012 3.7v3"/>'), // decision 56: Tiempo
   bell:mi('<path d="M6 9.5a6 6 0 0112 0v3.5l2 3H4l2-3zM10 19.5a2 2 0 004 0"/>'), // decision 55: Posponer recordatorio
+  person:mi('<circle cx="12" cy="8" r="3.6"/><path d="M4.8 20a7.2 7.2 0 0114.4 0"/>'), // decision 48c: Responsable
+  send:mi('<path d="M21 3L10 14M21 3l-7 18-4-7-7-4z"/>'), // decision 48c: Enviar recordatorio
   bulb:mi('<path d="M9 18h6M10 21h4M12 3a6 6 0 00-3.5 10.9c.6.5 1 1.2 1 2V16h5v-.1c0-.8.4-1.5 1-2A6 6 0 0012 3z"/>'), // decision 56: ¿Qué hago ahora?
 };
 const pmEl=$('#pmenu');
@@ -259,9 +261,10 @@ function deskTaskMenu(id){ const x=task(id); if(!x) return null; const done=x.st
   return {groups:[
     [{label:done?'Marcar pendiente':'Completar', key:'C', fn:()=>{ releaseHold(id); leaveRows(id); setTimeout(()=>{ completeTask(id); renderAnimated(); },200); }}].concat(x.status==='pending'?[{label:x.focus?'Quitar de Ahora':'Ahora', key:'A', fn:()=>toggleFocus(id)}]:[]).concat(waitItems(x)), // decisions 39 and 41
     [{label:'Fecha', menu:()=>dateMenu(id)}].concat(x.status!=='done'?[{label:'Fecha límite', menu:()=>deadlineMenu(id)}]:[], canSnooze(x)?[{label:'Posponer recordatorio', menu:()=>snoozeMenu(id)}]:[], [{label:'Prioridad', menu:()=>({title:'Prioridad', groups:[prioItems(x, id)]})}].concat(x.status!=='done'?[{label:'Tiempo', menu:()=>estimateMenu(id)}]:[], [{label:'Proyecto', key:'P', menu:()=>projectPickMenu(id)}])).concat(DB.spaces.length>1?[{label:'Mover a otro espacio', menu:()=>spaceMoveMenu(id)}]:[]),
+    (x.status!=='done'?[{label:'Responsable…', fn:()=>responsibleSheet(id)}]:[]).concat(canRemind(x)?[{label:'Enviar recordatorio…', fn:()=>remindSheet([id])}]:[]), // decision 48c
     [{label:'Duplicar', fn:()=>duplicateTask(id)}],
     [{label:'Eliminar', key:'Supr', red:true, fn:()=>confirmDelete(id)}] ]}; }
-function duplicateTask(id){ const x=task(id); if(!x) return; const n=addTask(Object.assign({title:x.title, projectId:x.projectId, priority:x.priority, notes:x.notes, spaceId:x.spaceId}, x.deadline?{deadline:x.deadline}:{}, x.estimate?{estimate:x.estimate}:{})); /* decision 48a: the deadline too; decision 56: the estimate, never the counters */ copySteps(id, n.id); /* decision 46: the steps, unchecked */ haptic(8); renderAnimated(); toast('Tarea duplicada'); openDetail(n.id); }
+function duplicateTask(id){ const x=task(id); if(!x) return; const n=addTask(Object.assign({title:x.title, projectId:x.projectId, priority:x.priority, notes:x.notes, spaceId:x.spaceId}, x.deadline?{deadline:x.deadline}:{}, x.estimate?{estimate:x.estimate}:{}, x.responsible?{responsible:x.responsible}:{})); /* decision 48c: the responsible too; decision 48a: the deadline too; decision 56: the estimate, never the counters */ copySteps(id, n.id); /* decision 46: the steps, unchecked */ haptic(8); renderAnimated(); toast('Tarea duplicada'); openDetail(n.id); }
 function leaveRows(id){ document.querySelectorAll('.row[data-id="'+id+'"]').forEach(r=>r.classList.add('leaving')); }
 function confirmDelete(id, after){ const x=task(id); if(!x) return; releaseHold(id);
   const go=fn=>()=>{ leaveRows(id); setTimeout(()=>{ fn(); after?after():renderAnimated(); },200); };
@@ -278,7 +281,7 @@ function askRepeatDelete(o, onlyFn, seriesFn){ const one=o.n===1, k=o.rep||1;
 function detailMenu(id, src){ const x=task(id); if(!x) return;
   popMenu({anchor:src, align:'right', groups:[
     [{label:x.status==='done'?'Marcar pendiente':'Marcar completada', icon:x.status==='done'?MI.undo:MI.done, key:'C', fn:()=>{ completeTask(id,true); render(); }}].concat(waitItems(x, MI, src)), // decision 41
-    (DB.spaces.length>1?[{label:'Mover a otro espacio', icon:MI.space, menu:()=>spaceMoveMenu(id)}]:[]).concat([{label:'Duplicar', icon:MI.dup, fn:()=>duplicateTask(id)}]),
+    (canRemind(x)?[{label:UI.wide?'Enviar recordatorio…':'Enviar recordatorio', icon:MI.send, fn:()=>remindSheet([id])}]:[]).concat(DB.spaces.length>1?[{label:'Mover a otro espacio', icon:MI.space, menu:()=>spaceMoveMenu(id)}]:[], [{label:'Duplicar', icon:MI.dup, fn:()=>duplicateTask(id)}]), // decision 48c
     [{label:'Eliminar tarea', icon:MI.trash, red:true, key:'Supr', fn:()=>confirmDelete(id, closeDetailOf(id))}] ]}); }
 // After a delete from the detail, close that task's detail only if it is still the one showing: Atrás may have been tapped meanwhile
 const closeDetailOf = id => ()=>{ if(detailTaskId()===id) pop(); else renderAnimated(); };
@@ -334,9 +337,9 @@ function waitingSheet(id, src){ const x=task(id); if(!x||x.status==='done') retu
   const line=()=>{ const d=sel?days.find(o=>o[0]===sel)[1]:x.date; return d?(d<=todayStr()?'Se queda hoy en Revisar hoy, arriba de la lista.':'Vuelve a Hoy '+dayWords(d)+', en Revisar hoy.'):'Sin día de revisión: queda en Por confirmar.'; };
   const field='<input type="text" class="wfor" data-role="waitfor" placeholder="Nombre o motivo (opcional)" value="'+esc(x.waitingFor||'')+'" autocomplete="off" enterkeyhint="done"'+(UI.wide?' autofocus':'')+'>';
   const back=x.status==='waiting'?'<button class="wback" data-x="unwait">Volver a pendiente</button>':''; // decision 50
-  const body='<div class="wsheet"><label class="wlbl">Esperando a</label>'+field+'<div class="wlbl">Revisar</div><div class="chips wchips">'+chips()+'</div><div class="hint wline">'+line()+'</div>';
+  const body='<div class="wsheet"><label class="wlbl">Esperando a</label>'+field+'<div class="chips psug"></div><div class="wlbl">Revisar</div><div class="chips wchips">'+chips()+'</div><div class="hint wline">'+line()+'</div>';
   const save=(close, s)=>{ const v=$('[data-role=waitfor]', s).value; close(); setWaiting(id, v, sel?days.find(o=>o[0]===sel)[1]:undefined); renderAnimated(); };
-  const bind=(s, close)=>{ const inp=$('[data-role=waitfor]', s);
+  const bind=(s, close)=>{ const inp=$('[data-role=waitfor]', s); bindPersonField(s, inp); // decision 48c: the contacts and the names already used
     inp.addEventListener('keydown', e=>{ if(e.key==='Enter'&&!e.isComposing){ e.preventDefault(); save(close, s); } });
     s.onclick=e=>{ const c=e.target.closest('[data-wd]'); if(c){ sel=c.dataset.wd; $('.wchips', s).innerHTML=chips(); $('.wline', s).textContent=line(); haptic(4); return; }
       const b=e.target.closest('[data-x]'); if(!b) return; if(b.dataset.x==='ok') save(close, s); else if(b.dataset.x==='unwait'){ close(); unWait(id); renderAnimated(); } else close(); }; };

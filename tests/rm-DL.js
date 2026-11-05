@@ -249,7 +249,7 @@ async function desktop(browser){
   // The inspector: Fecha límite after Fecha, a popover with the calendar, Deshacer
   await page.click('#desk .main .row[data-id=d4]:not(.first .row) .row-title'); await until(page, ()=>!!document.querySelector('#desk .pane [data-act=pickDeadline]'));
   x = await ev(page, ()=>({pops:[...document.querySelectorAll('#desk .pane .iform .ipop')].map(b=>b.dataset.act).join(), val:document.querySelector('#desk .pane [data-act=pickDeadline] .val').textContent}));
-  check('insp_row', /^pickProject,pickDate,pickDeadline,pickReminder,pickRepeat(,pickEstimate)?$/.test(x.pops) && x.val==='20 nov', x); // decision 56 adds Tiempo after Prioridad
+  check('insp_row', /^pickProject,pickDate,pickDeadline,pickReminder,(pickResp,)?pickRepeat(,pickEstimate)?$/.test(x.pops) && x.val==='20 nov', x); // decision 56 adds Tiempo after Prioridad
   await page.click('#desk .pane [data-act=pickDeadline]'); await until(page, ()=>!!document.querySelector('#pmenu [data-d="2026-11-25"]'));
   await sleep(350); await shot(page, 'd2-inspector-popover');
   await page.click('#pmenu [data-d="2026-11-25"]'); await until(page, ()=>!menuOpen());
@@ -280,10 +280,10 @@ async function desktop(browser){
 }
 
 /* ======================= 4. Sync ======================= */
-const TABLES = ['spaces','projects','tasks','voice_notes','attachments','subtasks','project_notes'];
+const TABLES = ['spaces','projects','tasks','voice_notes','attachments','subtasks','project_notes','contacts'];
 const COLS = { spaces:['name','sort_order','members'], projects:['space_id','name','color','sort_order','archived'],
   tasks:['space_id','project_id','title','date','reminder','priority','status','notes','carried','assignees','completed','repeat','focus','waiting_for','deadline'], voice_notes:['task_id','text'],
-  attachments:['task_id','kind','path','mime','size','width','height','duration_ms','purged'], subtasks:['task_id','title','done','sort_order'], project_notes:['project_id','title','body','pinned'] };
+  attachments:['task_id','kind','path','mime','size','width','height','duration_ms','purged'], subtasks:['task_id','title','done','sort_order'], project_notes:['project_id','title','body','pinned'], contacts:['name','email','phone'] };
 // rm-RF's in-memory server; noCol: a database where 0007 has not run (an upload naming deadline is refused whole, with PostgREST's message)
 const NEWCOLS=['deadline'];
 class Fake {

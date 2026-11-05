@@ -4,7 +4,8 @@
    listeners run at load; the start itself (first screen, timers, sync, service worker) is in boot.js, the last file. */
 /* ---------- R12, R19, R20: the desktop calendar. Día, Semana and Mes share the cards, the drops and the day headers; Día and Semana show
    as Lista (a column of cards per day) or Horas (a 7:00 to 21:00 grid where a reminder on the task's own date is a half-hour block).
-   Blocks always last half an hour: a task has no duration. The mini month of the sidebar and the agenda of Hoy reuse the same pieces. ---------- */
+   A block lasts the task's estimate (decision 56a: 15 or 30 minutes, an hour, half a day), half an hour without one; its bottom edge
+   drags to another of those four (owner, 4 November). The mini month of the sidebar and the agenda of Hoy reuse the same pieces. ---------- */
 // Function declarations only, from when the first render ran before this part of the single script (the constants are with UI)
 function isCalView(v){ return CAL_VIEWS.includes(v); }
 function calMode(){ return DB.settings.calMode==='hours'?'hours':'list'; } // view preferences, as hoyGroup
@@ -40,7 +41,7 @@ function weekendHTML(start, end){ if(!workWeekOn()) return ''; const wk=[]; for(
   return '<aside class="wwkd" aria-label="Fin de semana"><div class="wkh"><span class="l">Fin de semana</span><span class="n">'+xs.length+'</span></div>'+wk.map(d=>{ const l=calSort(xs.filter(x=>x.date===d)), dd=new Date(d+'T00:00:00');
     return '<div class="wkd'+dayCls(d)+'" data-day="'+d+'"><div class="wkdl">'+DIAS_FULL[dd.getDay()]+' '+dd.getDate()+'</div><div class="wl" data-keep="wk'+d+'">'+l.map(x=>calCardHTML(x,'')).join('')+'</div></div>'; }).join('')+'</aside>'; }
 // As in the lists, a search ignores the project filter
-function calFilter(){ if(UI.query) return queryMatcher(UI.query); if(UI.projFilter!==null) return x=> UI.projFilter==='none' ? !x.projectId : x.projectId===UI.projFilter; return ()=>true; }
+function calFilter(){ if(UI.query) return queryMatcher(UI.query); if(filterOn()) return passFilter; return ()=>true; } // the project filter and the responsible's (decision 48c)
 // The tasks dated from start to end: pending ones (and waiting ones on their review day, decision 41), and done ones completed in that span
 function calTasks(start, end){ const pf=calFilter(); return spaceTasks().filter(x=>x.date&&x.date>=start&&x.date<=end&&(isOpen(x)||(x.completed&&localDay(x.completed)>=start))&&pf(x)); }
 // The minute of the day of a reminder set on the task's own date; any other reminder gives the task no time in the calendar
@@ -52,11 +53,11 @@ function calSort(xs){ const tm=xs.map(x=>[x,remMin(x)]); return tm.filter(a=>a[1
 function calCardHTML(x, kind, style){ const p=x.projectId?proj(x.projectId):null, m=remMin(x), done=x.status==='done', tm=m!==null?fmtTime(x.reminder):'';
   const wt=x.status==='waiting'?'\nPor confirmar'+(x.waitingFor?', esperando a '+x.waitingFor:''):''; // decision 41
   const dlc=dlLevel(x), dl=x.deadline&&!done?'<span class="cic cdl'+(dlc?' dl-'+dlc:'')+'">'+MI.flag+'</span>':''; // decision 48a: a flag, grey, orange or red
-  const tip=x.title+(p?'\n'+p.name:'')+(tm?'\n'+tm:'')+(x.carried&&!done?'\nAplazada':'')+(x.deadline?'\n'+dlText(x.deadline):'')+wt+(repParse(x.repeat)?'\n'+repSummary(x.repeat):'')+(stepStats(x.id)?'\n'+stepsCount(x.id)+' pasos':'');
+  const tip=x.title+(p?'\n'+p.name:'')+(tm?'\n'+tm:'')+(x.carried&&!done?'\nAplazada':'')+(x.deadline?'\n'+dlText(x.deadline):'')+wt+(x.responsible?'\nResponsable: '+x.responsible:'')+(repParse(x.repeat)?'\n'+repSummary(x.repeat):'')+(stepStats(x.id)?'\n'+stepsCount(x.id)+' pasos':'');
   return '<div class="wcard'+(kind?' '+kind:'')+(done?' done':'')+(x.carried&&!done?' carried':'')+'" draggable="true" data-id="'+x.id+'" title="'+esc(tip)+'" style="'+(p?'--pc:'+p.color+';':'')+(style||'')+'">'+
     (kind==='mc'?'<span class="mdot"></span>':'<button class="check'+(done?' done':x.status==='waiting'?' waiting':'')+'" data-act="wcheck" aria-label="Completar">'+I.check+'</button>')+
-    (kind==='hb'?'<span class="tm">'+tm+'</span>':'')+'<div class="t">'+(x.priority==='high'?'<span class="pri high">!!!</span>':x.priority==='mid'?'<span class="pri mid">!!</span>':'')+esc(x.title)+'</div>'+
-    dl+(x.focus&&!done?'<span class="cic ist">'+I.starF+'</span>':'')+(repParse(x.repeat)?'<span class="cic irp">'+I.repeat+'</span>':'')+(stepStats(x.id)?'<span class="cic">'+stepProgHTML(x)+'</span>':'')+(tm&&kind!=='hb'?'<span class="tm">'+tm+'</span>':'')+'</div>'; } // decisions 38, 39 and 46: repeats, in Ahora, its steps
+    (/^hb/.test(kind)?'<span class="tm">'+tm+'</span>':'')+'<div class="t">'+(x.priority==='high'?'<span class="pri high">!!!</span>':x.priority==='mid'?'<span class="pri mid">!!</span>':'')+esc(x.title)+'</div>'+
+    dl+(x.focus&&!done?'<span class="cic ist">'+I.starF+'</span>':'')+(repParse(x.repeat)?'<span class="cic irp">'+I.repeat+'</span>':'')+(stepStats(x.id)?'<span class="cic">'+stepProgHTML(x)+'</span>':'')+(tm&&!/^hb/.test(kind)?'<span class="tm">'+tm+'</span>':'')+(/^hb/.test(kind)&&!done?'<span class="hbd"></span><span class="hbr" title="Arrastra para cambiar la duración"></span>':'')+'</div>'; } // decisions 38, 39 and 46: repeats, in Ahora, its steps
 // R12: a day's header: name and date, pending count, high-priority count and a load bar. Decision 60a: the bar measures the estimated hours
 // of the day's open tasks (its line says them too): full at half as much again as the space's working hours, orange from them, red from there
 function dayHeadHTML(d, xs){ const t=todayStr(), dd=new Date(d+'T00:00:00'), pend=xs.filter(isOpen), n=pend.length, hi=pend.filter(x=>x.priority==='high').length, dn=xs.length-n;
@@ -70,10 +71,14 @@ function dayCls(d){ const t=todayStr(); return (d===t?' today':'')+(d<t?' past':
 function weekListHTML(days){ const xs=calTasks(days[0], days[days.length-1]);
   return '<div class="wgrid" style="grid-template-columns:'+calCols(days)+'">'+days.map(d=>{ const l=calSort(xs.filter(x=>x.date===d));
     return '<div class="wday'+dayCls(d)+'" data-day="'+d+'">'+dayHeadHTML(d,l)+'<div class="wl" data-keep="wl'+d+'">'+l.map(x=>calCardHTML(x,'')).join('')+'</div></div>'; }).join('')+'</div>'; }
-// Half-hour blocks side by side when they overlap
+// How long a block lasts: the task's estimate, or half an hour. Its height in the grid, which ends at H1
+const blockMin = x => EST_VALUES.includes(+x.estimate) ? +x.estimate : SLOT;
+const blockPx = (m, dur) => Math.max(4, (Math.min(m+dur, H1)-m)/SLOT*SH-2);
+// Blocks side by side when they overlap: each cluster of overlapping blocks splits the column into lanes, a block takes the first lane
+// free at its start, and every block of the cluster has the cluster's lane width, so none hides another
 function layoutBlocks(list){ const out=[]; let cl=[], ends=[], end=-1;
   const flush=()=>{ const k=ends.length; cl.forEach(c=>{ c.k=k; out.push(c); }); cl=[]; ends=[]; };
-  list.forEach(x=>{ const m=remMin(x); if(cl.length&&m>=end) flush(); let col=ends.findIndex(e=>e<=m); if(col<0){ col=ends.length; ends.push(0); } ends[col]=m+SLOT; end=cl.length?Math.max(end,m+SLOT):m+SLOT; cl.push({x,m,col}); });
+  list.forEach(x=>{ const m=remMin(x), dur=blockMin(x); if(cl.length&&m>=end) flush(); let col=ends.findIndex(e=>e<=m); if(col<0){ col=ends.length; ends.push(0); } ends[col]=m+dur; end=cl.length?Math.max(end,m+dur):m+dur; cl.push({x,m,col,dur}); });
   if(cl.length) flush(); return out; }
 function nowY(){ const n=new Date(), m=n.getHours()*60+n.getMinutes()+n.getSeconds()/60; return m>=H0&&m<H1?(m-H0)/SLOT*SH:null; }
 function hhmm(m){ return Math.floor(m/60)+':'+String(m%60).padStart(2,'0'); }
@@ -89,7 +94,7 @@ function hoursHTML(days, agenda){ const t=todayStr(), xs=calTasks(days[0], days[
     return '<div class="hallday'+dayCls(d)+'" data-day="'+d+'" data-allday="1">'+(agenda?'<span class="hcount">'+(a.length?a.length+(a.length===1?' tarea sin hora':' tareas sin hora'):'Ninguna tarea sin hora')+'</span>':'<div class="wl" data-keep="all'+d+'">'+shown.map(x=>calCardHTML(x,'')).join('')+link+'</div>')+'</div>'; }).join('')+'</div>';
   let labels=''; for(let m=H0;m<H1;m+=60) labels+='<span style="top:'+((m-H0)/SLOT*SH)+'px">'+hhmm(m)+'</span>';
   const col=d=>{ let s=''; for(let m=H0;m<H1;m+=SLOT){ const dt=new Date(d+'T00:00:00'); dt.setHours(0,m,0,0); s+='<div class="hs'+(m%60?' half':'')+(dt.getTime()<=now?' past':'')+'" data-slot="'+d+'T'+String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0')+'"></div>'; }
-    const b=layoutBlocks(calSort(per(d).filter(inGrid))).map(c=>calCardHTML(c.x,'hb','top:'+((c.m-H0)/SLOT*SH)+'px;height:'+(SH-2)+'px;left:calc('+c.col+' * 100% / '+c.k+' + 2px);width:calc(100% / '+c.k+' - 4px);')).join('');
+    const b=layoutBlocks(calSort(per(d).filter(inGrid))).map(c=>calCardHTML(c.x,'hb'+(c.dur<SLOT?' short':c.dur>SLOT?' tall':''),'top:'+((c.m-H0)/SLOT*SH)+'px;height:'+blockPx(c.m, c.dur)+'px;left:calc('+c.col+' * 100% / '+c.k+' + 2px);width:calc(100% / '+c.k+' - 4px);')).join('');
     const y=d===t?nowY():null; return '<div class="hcol'+dayCls(d)+'" data-hday="'+d+'">'+s+b+(d===t?'<div class="hnow" style="transform:translateY('+(y===null?0:y)+'px)'+(y===null?';display:none':'')+'"></div>':'')+'</div>'; };
   return '<div class="hours'+(agenda?' agenda':'')+'">'+head+all+'<div class="hscroll" data-keep="hours"><div class="hrow hgrid" style="grid-template-columns:'+cols+';height:'+((H1-H0)/SLOT*SH)+'px"><div class="hgut hlab">'+labels+'</div>'+days.map(col).join('')+'</div></div></div>'; }
 // The red line moves with the clock without a redraw
@@ -127,3 +132,22 @@ function miniMonthHTML(){ const ym=UI.miniYM||calAnchor().slice(0,7), v=UI.deskV
   return '<div class="minical">'+calendarHTML(ym, null, {mini:true, range:s?[s, v==='week'?addDays(s,6):s]:null})+'</div>'; }
 // R20: next to Hoy, on screens wider than 1400 px, the day's agenda with the same hours grid
 function agendaHTML(){ return '<aside class="hagenda"><div class="ahead"><b>Agenda</b><span>'+(()=>{ const d=new Date(); return DIAS_FULL[d.getDay()]+' '+d.getDate(); })()+'</span></div>'+hoursHTML([todayStr()], true)+'</aside>'; }
+/* R20 (owner, 4 November): the bottom edge of an hour block drags to another duration, snapping to the four estimates (15 min, 30 min,
+   1 h, medio día), with the block growing as the pointer goes and its new length beside its time; on release setEstimate sets it, with
+   Deshacer, as everywhere else. Esc gives the old length back. Pointer events, not the HTML5 drag that moves the block: the block stops
+   being draggable for the gesture, so a resize never moves it, and a move keeps its estimate */
+function bindBlockResize(d){
+  d.addEventListener('pointerdown', e=>{ const h=e.target.closest('.wcard.hb .hbr'); if(!h||e.button!==0) return; const c=h.closest('.wcard'), x=task(c.dataset.id), m0=x&&remMin(x); if(!x||m0===null) return;
+    e.preventDefault(); e.stopPropagation(); const y0=e.clientY, d0=blockMin(x), pid=e.pointerId, lbl=c.querySelector('.hbd'); let v=d0;
+    const snap=m=>EST_VALUES.reduce((a,b)=>Math.abs(b-m)<Math.abs(a-m)?b:a);
+    c.draggable=false; d._resizing=true; c.classList.add('resizing'); document.body.classList.add('hresizing'); try{ h.setPointerCapture(pid); }catch(err){}
+    const paint=()=>{ c.style.height=blockPx(m0, v)+'px'; c.classList.toggle('short', v<SLOT); c.classList.toggle('tall', v>SLOT); if(lbl) lbl.textContent=estLabel(v); };
+    paint();
+    const mv=ev=>{ const n=snap(d0+(ev.clientY-y0)/SH*SLOT); if(n!==v){ v=n; paint(); haptic(4); } };
+    const end=apply=>{ h.removeEventListener('pointermove', mv); h.removeEventListener('pointerup', up); h.removeEventListener('pointercancel', cancel); window.removeEventListener('keydown', esc, true);
+      try{ h.releasePointerCapture(pid); }catch(err){} d._resizing=false; c.draggable=true; c.classList.remove('resizing'); document.body.classList.remove('hresizing');
+      const swallow=ev=>{ ev.stopPropagation(); ev.preventDefault(); }; d.addEventListener('click', swallow, true); setTimeout(()=>d.removeEventListener('click', swallow, true), 0); // the click after it opens nothing
+      if(apply&&v!==d0){ log('info','Duración cambiada en la vista por horas', {m:v}); setEstimate(x.id, v); } else { v=d0; paint(); } };
+    const up=()=>end(true), cancel=()=>end(false), esc=ev=>{ if(ev.key!=='Escape') return; ev.preventDefault(); ev.stopPropagation(); end(false); };
+    h.addEventListener('pointermove', mv); h.addEventListener('pointerup', up); h.addEventListener('pointercancel', cancel); window.addEventListener('keydown', esc, true); });
+}

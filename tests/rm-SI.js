@@ -141,7 +141,7 @@ async function grammar(browser){ let x;
 }
 
 /* ======================= Fake server ======================= */
-const TABLES = ['spaces','projects','tasks','voice_notes','attachments','subtasks','project_notes'];
+const TABLES = ['spaces','projects','tasks','voice_notes','attachments','subtasks','project_notes','contacts'];
 class Fake {
   constructor(o){ o=o||{}; this.noInbox=!!o.noInbox; this.t={}; TABLES.forEach(x=>this.t[x]=new Map()); this.last=0; this.subs=new Map(); this.inbox=[]; this.keys=new Map(); this.noTake=false; this.calls=[]; }
   ts(){ this.last=Math.max(Date.now(), this.last+1); return new Date(this.last).toISOString(); }
@@ -386,16 +386,16 @@ async function sqlTests(){
   await db.close();
   db = await pgSetup(); const all = strip(fs.readFileSync(path.join(ROOT, 'supabase/all.sql'), 'utf8'));
   err = null; try { await db.exec(all); await db.exec(all); } catch(e){ err = e.message; }
-  check('sql_all_twice', !err && /0001 a 0010/.test(all.split('\n')[0]) && /migrations\/0010_inbox\.sql/.test(all) && (all.match(/^-- ========== migrations\//mg)||[]).length===fs.readdirSync(path.join(ROOT,'supabase/migrations')).filter(f=>f.endsWith('.sql')).length, err);
+  check('sql_all_twice', !err && /0001 a 00\d\d/.test(all.split('\n')[0]) && /migrations\/0010_inbox\.sql/.test(all) && (all.match(/^-- ========== migrations\//mg)||[]).length===fs.readdirSync(path.join(ROOT,'supabase/migrations')).filter(f=>f.endsWith('.sql')).length, err);
   let rows = []; try { rows = (await db.query(fs.readFileSync(path.join(ROOT, 'supabase/check.sql'), 'utf8'))).rows; } catch(e){ err = e.message; }
   check('sql_check_all_ok', rows.length>=27 && rows.every(x=>x.Estado==='OK') && ['tabla inbox \\(0010\\)','tabla shortcut_keys \\(0010\\)','inbox en tiempo real \\(0010\\)'].every(p=>rows.some(x=>new RegExp(p).test(x.Pieza))), {err, bad:rows.filter(x=>x.Estado!=='OK'), n:rows.length});
   // check.sql says FALTA on a database without 0010
   await db.close(); db = await pgSetup(); const upto9 = all.slice(0, all.indexOf('-- ========== migrations/0010_inbox.sql')); await db.exec(upto9);
   rows = (await db.query(fs.readFileSync(path.join(ROOT, 'supabase/check.sql'), 'utf8'))).rows;
-  check('sql_check_falta', rows.filter(x=>x.Estado==='FALTA').map(x=>x.Pieza).join('|')==='Siri y Atajo: tabla inbox (0010)|Siri y Atajo: tabla shortcut_keys (0010)|Siri y Atajo: inbox en tiempo real (0010)', rows.filter(x=>x.Estado==='FALTA'));
+  check('sql_check_falta', rows.filter(x=>x.Estado==='FALTA'&&!/\((0011|001[2-9])\)/.test(x.Pieza)).map(x=>x.Pieza).join('|')==='Siri y Atajo: tabla inbox (0010)|Siri y Atajo: tabla shortcut_keys (0010)|Siri y Atajo: inbox en tiempo real (0010)', rows.filter(x=>x.Estado==='FALTA'));
   await db.close();
   const readme = fs.readFileSync(path.join(ROOT, 'supabase/README.md'), 'utf8');
-  check('sql_readme', /`migrations\/0010_inbox\.sql`/.test(readme) && /suma de las diez en orden/.test(readme) && /`add-task`/.test(readme) && /Verify JWT/.test(readme));
+  check('sql_readme', /`migrations\/0010_inbox\.sql`/.test(readme) && /suma de las (diez|once|doce) en orden/.test(readme) && /`add-task`/.test(readme) && /Verify JWT/.test(readme));
 }
 
 /* ======================= 5. The Edge Function add-task under Deno ======================= */

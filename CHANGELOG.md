@@ -1,5 +1,13 @@
 # Registro de cambios
 
+## v0.32.0. Responsable, contactos y duración de los bloques (5 de noviembre de 2026)
+
+- Responsable: campo nuevo en la tarea, con sugerencias de los contactos; se ve en gris en la fila, se filtra con «Responsable: X» junto al filtro de proyecto y la búsqueda lo encuentra.
+- «Enviar recordatorio» a esa persona, con el mensaje editable: por WhatsApp si el contacto tiene teléfono, por correo si tiene correo, o por la hoja de compartir. Con varias tareas de la misma persona, un solo mensaje.
+- Contactos: se crean solos al escribir un nombre nuevo en Responsable o en «Esperando a»; en Ajustes se les añade correo y teléfono, se renombran (también en sus tareas) o se borran. Se sincronizan.
+- Vista por horas del ordenador: cada bloque mide su tiempo estimado (30 minutos sin estimación), se cambia arrastrando el borde inferior y los que se solapan van uno al lado del otro.
+- Supabase: columna `responsible` y tabla `contacts` (`0011_contacts.sql`), ya aplicadas. Prueba nueva `rm-RC`.
+
 ## v0.31.0. Siri y Atajo de iOS (4 de noviembre de 2026)
 
 - Atajo de iOS y Siri: «Oye Siri, añadir tarea» y la frase dictada llegan a una bandeja en Supabase; la app la recoge al sincronizar, con el aviso «N tareas recibidas desde Siri» y Deshacer.

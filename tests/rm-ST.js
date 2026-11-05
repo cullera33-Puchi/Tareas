@@ -337,7 +337,7 @@ async function desktop(browser){
 }
 
 /* ======================= 4. Sync ======================= */
-const TABLES = ['spaces','projects','tasks','voice_notes','attachments','subtasks','project_notes']; // decision 47: the app syncs the project notes too
+const TABLES = ['spaces','projects','tasks','voice_notes','attachments','subtasks','project_notes','contacts']; // decision 47: the app syncs the project notes too
 // rm-S's in-memory server (0001's trigger and RLS). noTable: a database where 0005 has not run: any request on subtasks fails as PostgREST does
 class Fake {
   constructor(noTable){ this.noTable=!!noTable; this.t={}; TABLES.forEach(x=>this.t[x]=new Map()); this.last=0; this.subs=new Map(); this.down=new Set(); this.calls=[]; this.ups=[]; }

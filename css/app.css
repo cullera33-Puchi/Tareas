@@ -1533,3 +1533,48 @@ body.desktop .sgopen svg{width:6px;height:11px;}
 .app.desktop .hoydone{font-size:13px;text-align:left;padding:12px 4px;}
 .app.desktop .dayclosed{font-size:13px;min-height:30px;}
 .app.desktop .dayclosed .gx{font-size:12px;height:26px;}
+/* Decision 48c: Responsable. Grey with a small person, on the iPhone in the line under the title and on the desktop as a tag in the title
+   cell, beside Esperando a; each tag gives way to the title when the cell is short */
+.i-person{flex:none;}
+.row-meta .resp{display:inline-flex;align-items:center;gap:3px;color:var(--ink2);}
+.row-meta .resp svg{width:11px;height:11px;}
+.app.desktop .row-text:has(.rtag){display:flex;align-items:center;gap:8px;}
+.app.desktop .row-text:has(.rtag) .row-title{flex:0 1 auto;min-width:0;}
+.rtag{flex:0 0 auto;min-width:0;max-width:40%;display:inline-flex;align-items:center;gap:3px;overflow:hidden;white-space:nowrap;font-size:11px;color:var(--ink2);background:var(--fill);border-radius:5px;padding:1px 6px;}
+.rtag svg{width:10px;height:10px;}
+.app.desktop .row-text:has(.wtag):has(.rtag) .wtag{max-width:35%;margin-left:0;}
+.app.desktop .row-text:has(.wtag) .rtag{margin-left:-2px;}
+/* The filter by responsible: the iPhone chip first in the row of project chips; the desktop pop-up button beside Proyecto */
+.pchips .chip.rchip{gap:4px;}
+.pchips .chip.rchip svg{width:13px;height:13px;}
+.pchips .chip.rchip.on{background:var(--blue);}
+.pfslot{gap:6px;}
+.pfdrop.rfdrop{max-width:200px;}
+/* The suggestions under Responsable and Esperando a, the reminder to send and the contact sheet */
+.wsheet .psug{flex-wrap:wrap;gap:6px;}
+.wsheet .psug.empty{display:none;}
+.wsheet .psug .chip{height:30px;font-size:0.824rem;}
+.pm-pop .wsheet .psug .chip{height:22px;font-size:12px;padding:0 8px;}
+.wsheet .wback.red{color:var(--red);}
+.wsheet .rmsg{height:auto;min-height:120px;padding:10px 12px;resize:none;line-height:1.35;font-family:inherit;}
+.wsheet .rto{font-size:0.882rem;color:var(--ink2);}
+.wsheet .rvia{margin:0;}
+.app.desktop .wsheet .rmsg{font-size:13px;min-height:110px;}
+.app.desktop .csheet .wfor,.app.desktop .remsheet .wfor:not(.rmsg){height:32px;font-size:13px;border-radius:7px;}
+.remcell svg{width:18px;height:18px;flex:none;}
+.iremind{justify-self:start;display:flex;align-items:center;gap:6px;height:24px;padding:0 4px;font-size:13px;color:var(--blue);border-radius:5px;}
+.iremind svg{width:14px;height:14px;}
+.iremind:hover{background:var(--dhov);}
+/* R20, owner 4 November: a block as long as its estimate; its bottom edge resizes it */
+.wcard.hb.tall{align-items:flex-start;padding-top:3px;}
+.wcard.hb.short{gap:2px;padding:0 3px;}
+.wcard.hb.short .t{font-size:9px;line-height:9px;}
+.wcard.hb.short .tm,.wcard.hb.short .check,.wcard.hb.short .cic{display:none;}
+.wcard.hb .hbr{position:absolute;left:0;right:0;bottom:-2px;height:6px;cursor:ns-resize;}
+.wcard.hb.short .hbr{height:4px;bottom:-2px;}
+.wcard.hb .hbd{display:none;}
+.wcard.hb.resizing{z-index:3;box-shadow:0 0 0 1.5px var(--blue);cursor:ns-resize;}
+.wcard.hb.resizing .hbd{display:block;position:absolute;right:4px;bottom:2px;font-size:10px;font-weight:600;color:var(--blue);background:var(--dmain);border-radius:4px;padding:0 3px;}
+body.hresizing,body.hresizing *{cursor:ns-resize !important;}
+/* While a card is dragged the hour blocks let it through to the half hours under them: a long block would otherwise hide its slots */
+#desk.carddrag .hcol .wcard.hb:not(.dragging){pointer-events:none;}

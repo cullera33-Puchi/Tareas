@@ -4,7 +4,8 @@
     "date": "2026-11-05",
     "items": [
       "«Recordar todo» te deja elegir qué tareas van en el mensaje, con una casilla por tarea y «Seleccionar todo».",
-      "Los recordatorios salen ordenados: una línea de saludo, una viñeta por tarea con su fecha y «Gracias» al final."
+      "Los recordatorios salen ordenados: una línea de saludo, una viñeta por tarea con su fecha y «Gracias» al final.",
+      "Si eliges una sola tarea, el mensaje dice «esta tarea»; con varias, «estas tareas»."
     ]
   },
   {

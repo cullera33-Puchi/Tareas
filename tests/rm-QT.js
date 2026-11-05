@@ -48,8 +48,14 @@ async function run(browser){
   check('photo_refused', await until(sp, ()=>document.getElementById('toastText').textContent==='No queda espacio. Borra adjuntos o pide más al administrador'&&!document.getElementById('attFile')), null);
   await sp.evaluate(()=>{ TM.me.used=TM.used0; });
   await sp.evaluate(()=>{ while(UI.stack.length) pop(); }); await toSettings(sp);
-  const st = await sp.evaluate(()=>{ const c=[...document.querySelectorAll('.team-acc .cell')].find(x=>/^Almacenamiento/.test(x.textContent)); c.scrollIntoView({block:'center'}); return {t:c.textContent, warn:!!c.querySelector('.val.warn')}; });
-  check('settings_storage', st.t==='Almacenamiento0,8 MB de 1 MB' && st.warn, st);
+  // The count is the larger of the server's and this device's uploads (an answer on its way never lowers it): wait for the real value
+  const stCell = ()=>{ const c=[...document.querySelectorAll('.team-acc .cell')].find(x=>/^Almacenamiento/.test(x.textContent)); if(!c) return null; c.scrollIntoView({block:'center'}); return {t:c.textContent, warn:!!c.querySelector('.val.warn')}; };
+  await until(sp, ()=>{ const c=[...document.querySelectorAll('.team-acc .cell')].find(x=>/^Almacenamiento/.test(x.textContent)); return !!c&&c.textContent==='Almacenamiento0,8 MB de 1 MB'; }, null, 8000);
+  const st = await sp.evaluate(stCell);
+  check('settings_storage', st && st.t==='Almacenamiento0,8 MB de 1 MB' && st.warn, st);
+  // A server answer that left before the last upload ended never lowers the count
+  const kept = await sp.evaluate(async()=>{ const real=SY.remote.teamMe; SY.remote.teamMe=async()=>{ const r=await real(); r.used=409600; TM.upAt=Date.now(); return r; }; try{ TM.force=true; await teamFetch(SY.user); } finally{ SY.remote.teamMe=real; } return TM.me.used; });
+  check('used_never_lowered_by_late_answer', kept===819200, kept);
   await sp.waitForTimeout(200); await shot(sp, 'qt-ip-light-almacenamiento');
   // The admin raises the quota: the file waiting goes up
   fake.members.find(m=>m.id==='m-s').quota=5*1048576; await sp.evaluate(()=>{ TM.force=true; return syncRun('prueba'); }); await sp.evaluate(()=>attFlushSoon(0));

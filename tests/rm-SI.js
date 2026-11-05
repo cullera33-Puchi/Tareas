@@ -405,6 +405,8 @@ async function fnTests(){
   const rest = http.createServer((req, res) => { let b=''; req.on('data', c=>b+=c); req.on('end', () => {
     const u = new URL(req.url, 'http://x'); DBF.log.push({method:req.method, path:u.pathname, search:u.search, apikey:req.headers['apikey'], auth:req.headers['authorization'], prefer:req.headers['prefer']});
     const send = (st, o, h) => { res.writeHead(st, Object.assign({'Content-Type':'application/json'}, h||{})); res.end(o===undefined?'':JSON.stringify(o)); };
+    // Decision 63b (0013_team.sql): who has access; without DBF.team the function is not there (a database before 0013)
+    if (u.pathname === '/rest/v1/rpc/tareas_team_allowed') { if (!DBF.team) return send(404, {code:'PGRST202', message:'Could not find the function public.tareas_team_allowed(p_ids) in the schema cache'}); return send(200, DBF.blocked ? [] : JSON.parse(b).p_ids); }
     if (u.pathname === '/rest/v1/shortcut_keys' && req.method === 'GET') { const h = (u.searchParams.get('key_hash')||'').replace(/^eq\./,''); return send(200, DBF.keys.filter(k=>k.key_hash===h).map(k=>({owner_id:k.owner_id, revoked:k.revoked}))); }
     if (u.pathname === '/rest/v1/inbox' && req.method === 'GET') { const o = (u.searchParams.get('owner_id')||'').replace(/^eq\./,''), since = Date.parse((u.searchParams.get('created')||'').replace(/^gte\./,''));
       const n = DBF.inbox.filter(x=>x.owner_id===o && Date.parse(x.created)>=since).length; return send(200, n?[{id:'x'}]:[], {'Content-Range':(n?'0-0':'*')+'/'+n}); }
@@ -444,6 +446,9 @@ async function fnTests(){
     c = await call(J({text:'x'}), {'Content-Type':'application/json'}); check('fn_no_key', c.status===401 && /Falta la clave/.test(c.text), c);
     c = await call(J({text:'x'}), auth('otra-clave')); check('fn_bad_key', c.status===401 && /Clave no válida/.test(c.text), c);
     c = await call(J({text:'x'}), auth(OLDKEY)); check('fn_revoked', c.status===401 && /Clave revocada/.test(c.text), c);
+    // Decision 63b: with 0013, a key whose account has access goes on (an empty text then fails as usual); one whose access was removed gets 403
+    DBF.team = true; const ca = await call(J({text:'   '}), auth(KEY)); DBF.blocked = true; const cb = await call(J({text:'Algo'}), auth(KEY)); DBF.blocked = false; DBF.team = false;
+    check('fn_team_access', ca.status===400 && cb.status===403 && /no tiene acceso/.test(cb.text), {ca, cb});
     c = await call(J({text:'   '}), auth(KEY)); check('fn_empty', c.status===400 && /Falta el texto/.test(c.text), c);
     c = await call(J({text:'a'.repeat(501)}), auth(KEY)); check('fn_too_long', c.status===400 && /demasiado largo/.test(c.text), c);
     c = await call(J({text:'a'.repeat(500)}), auth(KEY)); check('fn_500_ok', c.status===200, c.status);

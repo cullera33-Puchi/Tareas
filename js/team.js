@@ -42,7 +42,7 @@ function teamReset(user){ Object.assign(TM, {state:undefined, for:user?user.id:n
 // At start: an account known to have no access shows the full screen before anything else (the first pass reads it again)
 function teamBoot(){ if(!SY||!SY.user) return; teamReset(SY.user); teamDeniedPaint(); }
 // Decision 71.1: a member without the encryption key row sends nothing up, files included (the server refuses it too)
-const teamHold = () => !!(SY&&SY.user&&(SY.status==='needkey'||SY.status==='denied'||teamDenied()||(TM.for===SY.user.id&&TM.state==='member'&&!crKey())));
+const teamHold = () => !!(SY&&SY.user&&(SY.status==='needkey'||SY.status==='denied'||teamDenied()||syncOtherOwner()||(TM.for===SY.user.id&&TM.state==='member'&&!crKey())));
 
 /* ---------- The gate of each pass ---------- */
 // 'absent' (no 0013, or a test's adapter without it), 'admin', 'member' or 'denied'. Throws on a network error: the pass fails and is retried
@@ -50,15 +50,17 @@ async function teamGate(user){ const R=SY.remote; if(!R.teamMe) return 'absent';
   if(TM.for!==user.id) teamReset(user);
   if(TM.state===undefined||TM.force||TM.state==='denied'||Date.now()-TM.at>60e3) await teamFetch(user);
   return TM.state||'absent'; }
-async function teamFetch(user){ const me=await SY.remote.teamMe(); if(!SY.user||SY.user.id!==user.id) return;
+async function teamFetch(user){ const t0=Date.now(), me=await SY.remote.teamMe(); if(!SY.user||SY.user.id!==user.id) return;
   const was=TM.state; TM.at=Date.now(); TM.force=false;
   if(me&&me.absent){ TM.state='absent'; TM.me=null; teamDeniedPaint(); return; }
   if(!me){ TM.state='denied'; TM.me=null; TM.recv=[]; TM.dir=[]; if(!TM.deniedLogged){ TM.deniedLogged=true; log('warn','Esta cuenta no tiene acceso: no se sincroniza nada'); } teamCacheWrite(); teamDeniedPaint(); return; }
-  TM.me={id:me.id, role:me.role, name:me.name||'', email:me.email||'', quota:me.quota==null?null:+me.quota, used:+me.used||0}; TM.state=me.role==='admin'?'admin':'member'; TM.deniedLogged=false;
+  // An upload that ended while the answer was on its way is not in it yet: the larger of the two counts stays
+  const used=Math.max(+me.used||0, TM.me&&(TM.upAt||0)>=t0?+TM.me.used||0:0);
+  TM.me={id:me.id, role:me.role, name:me.name||'', email:me.email||'', quota:me.quota==null?null:+me.quota, used}; TM.state=me.role==='admin'?'admin':'member'; TM.deniedLogged=false;
   if(was!==TM.state) log('info', TM.state==='admin'?'Equipo: administrador':'Equipo: miembro');
   teamCacheWrite(); teamDeniedPaint(); }
 // After a pass that reached the server: the member's keys, the directory and what came for them. Never fails the pass
-async function teamAfter(){ if(!teamOn()||TM.busy) return; TM.busy=true;
+async function teamAfter(){ TM.refused=false; if(!teamOn()||TM.busy) return; TM.busy=true;
   try{ await teamKeys(); if(Date.now()-TM.dirAt>180e3||TM.dirForce) await teamDirFetch(); await teamRecvFetch(); }
   catch(e){ log('warn','Equipo: '+(e&&e.message||e)); }
   finally{ TM.busy=false; } }
@@ -71,8 +73,10 @@ const teamFirst = m => teamName(m).split(/\s+/)[0];
 const teamPeers = () => SY&&SY.user ? TM.dir.filter(m=>m.id!==SY.user.id) : [];
 
 // A pass refused by the rules of the server (row level security) while this account was a member: perhaps its access was just removed.
-// The next pass, soon, reads the account again (and shows the full screen if so)
+// Once: the next pass, soon, reads the account again (and shows the full screen if so). A second refusal while the account still has access
+// is an ordinary sync error (said in Ajustes and logged as an error), retried with the usual wait. A pass that works clears it (teamAfter)
 function teamRefused(e){ if(!teamOn()) return false; const m=String(e&&(e.message||e.code)||e)+' '+String(e&&e.code||''); if(!/row-level security|42501/i.test(m)) return false;
+  if(TM.refused) return false; TM.refused=true;
   TM.force=true; SY.status='syncing'; SY.error=''; log('warn','Equipo: el servidor ha rechazado un cambio; se comprueba el acceso'); return true; }
 
 /* ---------- The full screen of an account without access ---------- */
@@ -214,6 +218,7 @@ async function noticeSend(id, to, phrase){ const x=task(id), m=teamMember(to); i
   try{ const payload=await teamSeal(m.pub, copy, 'notice'); await SY.remote.noticeSend({recipient_id:to, task_ref:String(id), payload}); }
   catch(e){ const msg=String(e&&(e.message||e.code)||e);
     if(/tareas_notice_too_soon/.test(msg)){ const until=Date.parse(e.details||e.detail||'')||0; toast('Ya le avisaste de esta tarea hace poco.'+(until?' Podrás volver a avisarle a las '+fmtTime(new Date(until).toISOString())+'.':'')); log('info','Equipo: aviso demasiado pronto'); return 'soon'; }
+    if(/tareas_notice_too_many/.test(msg)){ toast('Has enviado muchos avisos seguidos. Prueba dentro de un rato'); log('info','Equipo: demasiados avisos en una hora'); return 'no'; }
     if(/bad_recipient/.test(msg)){ TM.dirForce=true; toast('Esa persona ya no puede recibir tareas'); log('info','Equipo: destinatario sin acceso'); return 'no'; }
     log('warn','Equipo: el aviso no se pudo enviar: '+msg); toast(syncOffline(e)?'Sin conexión':'No se pudo enviar'); return 'no'; }
   const at=new Date().toISOString(), cur=task(id); if(cur){ cur.sentTo=(cur.sentTo||[]).concat({to, name:teamName(m), at}).slice(-10); SY.quiet=true; try{ save(); } finally{ SY.quiet=false; } }
@@ -235,7 +240,7 @@ function teamFull(extra){ if(!teamOn()||!TM.me||TM.me.quota==null) return false;
 function teamRoomOk(){ if(!teamFull()) return true; toast(TEAM_NOSPACE); log('info','Equipo: sin espacio para adjuntos'); return false; }
 // The upload queue (attFlush): a file that does not fit waits on the device; said once a session
 function teamUploadFits(size){ if(!teamFull(size)) return true; if(!TM.noSpace){ TM.noSpace=true; toast(TEAM_NOSPACE); log('info','Equipo: sin espacio, los adjuntos esperan en el dispositivo'); } return false; }
-function teamUploaded(size){ if(TM.me&&TM.me.quota!=null){ TM.me.used=(TM.me.used||0)+(+size||0); teamCacheWrite(); } }
+function teamUploaded(size){ TM.upAt=Date.now(); if(TM.me){ TM.me.used=(TM.me.used||0)+(+size||0); teamCacheWrite(); } }
 // An upload refused by the server: perhaps the quota (re-read it)
 function teamUploadRefused(e, size){ if(!teamOn()) return false; const m=String(e&&(e.message||e.error||e.statusCode)||e); if(!/row-level security|403|Unauthorized/i.test(m)) return false;
   TM.force=true; if(SY&&SY.user) teamFetch(SY.user).then(()=>{ if(teamFull(size)&&!TM.noSpace){ TM.noSpace=true; toast(TEAM_NOSPACE); log('info','Equipo: el servidor no admite más adjuntos'); } if(onSettings()) render(); }).catch(()=>{}); return true; }
@@ -307,7 +312,7 @@ function inviteSheet(){ if(!teamAdmin()) return;
     const em=$('[data-role=ivmail]', s), nm=$('[data-role=ivname]', s), okb=$('.hbtn.ok', s);
     const go=async()=>{ const email=em.value.trim().toLowerCase(), name=nm.value.replace(/\s+/g,' ').trim(); if(!validEmail(email)){ em.focus(); toast('Escribe un correo válido'); return; }
       if(!navigator.onLine){ toast('Sin conexión'); return; } okb.disabled=true;
-      try{ await SY.remote.teamInvite(email, name||null); }catch(e){ okb.disabled=false; log('warn','Equipo: no se pudo invitar: '+(e&&e.message||e)); toast(syncOffline(e)?'Sin conexión':'No se pudo invitar'); return; }
+      try{ await SY.remote.teamInvite(email, name||null); }catch(e){ okb.disabled=false; log('warn','Equipo: no se pudo invitar: '+(e&&e.message||e)); toast(inviteErr(e)); return; }
       log('info','Equipo: persona invitada'); await teamListLoad(true); closeSheet(); setTimeout(()=>inviteShareSheet(email, name), 520); };
     [em,nm].forEach(i=>i.addEventListener('keydown', e=>{ if(e.key==='Enter'&&!e.isComposing){ e.preventDefault(); if(i===em) nm.focus(); else go(); } }));
     s.onclick=e=>{ const b=e.target.closest('[data-x]'); if(!b) return; if(b.dataset.x==='ok') go(); else closeSheet(); };
@@ -320,7 +325,8 @@ function memberSheet(id){ const m=(TM.list||[]).find(o=>o.id===id); if(!m) retur
     cell('Correo', esc(m.email))+cell('Último acceso', esc(m.last_access?syncAgo(m.last_access):m.joined?'Sin datos':'Todavía no ha entrado'))+
     (me?'':cell('Cifrado', m.has_key?'Activado':'Sin activar'))+cell('Almacenamiento', esc(m.quota==null?fmtMB(m.used)+', sin límite':fmtMB(m.used)+' de '+fmtMB(m.quota)), m.quota!=null&&m.used>=m.quota?'warn':'')+
     (me||m.revoked?'':'<button class="cell" data-mq><span class="lbl">Cupo</span><span class="val">'+esc(m.quota==null?'Sin límite':fmtMB(m.quota))+'</span>'+I.chev.replace('<svg','<svg class="chev"')+'</button>')+'</div>'+
-    (m.revoked?'<div class="footnote">Sin acceso desde el '+esc(crDay(m.revoked))+'. Sus datos se borran el '+esc(crDay(del))+'.</div><button class="wback" data-x="again">Invitar de nuevo</button>':
+    (m.revoked&&Date.parse(del)<=Date.now()?'<div class="footnote">Sin acceso desde el '+esc(crDay(m.revoked))+'. '+TEAM_REMOVING+'.</div>':
+     m.revoked?'<div class="footnote">Sin acceso desde el '+esc(crDay(m.revoked))+'. Sus datos se borran el '+esc(crDay(del))+'.</div><button class="wback" data-x="again">Invitar de nuevo</button>':
      me?'<div class="footnote">Eres el administrador. No tienes límite de almacenamiento salvo que lo cambies.</div><button class="wback" data-mq>Cupo: '+esc(m.quota==null?'sin límite':fmtMB(m.quota))+'</button>':
      '<button class="wback" data-x="resend">Enviar la invitación otra vez</button><button class="wback red" data-x="revoke">Quitar acceso</button>')+'</div>', s=>{
     s.onclick=e=>{ const q=e.target.closest('[data-mq]'); if(q){ quotaMenu(m, q.querySelector('.val')||q); return; }
@@ -338,7 +344,10 @@ function revokeAsk(m){ const n=m.name||m.email;
   confirmSheet('Quitar acceso', n+' dejará de poder entrar al momento, sin recibir ningún aviso. Sus datos se borran a los 30 días. No se puede deshacer; para devolverle el acceso tendrás que invitarle de nuevo.', async()=>{
     try{ await SY.remote.teamRevoke(m.id); }catch(e){ toast(syncOffline(e)?'Sin conexión':'No se pudo quitar el acceso'); log('warn','Equipo: acceso no quitado: '+(e&&e.message||e)); return; }
     log('info','Equipo: acceso quitado'); toast('Acceso quitado a '+n); TM.dirForce=true; await teamListLoad(true); }, 'Quitar acceso'); }
-async function teamReinvite(m){ try{ await SY.remote.teamInvite(m.email, null); }catch(e){ toast(syncOffline(e)?'Sin conexión':'No se pudo invitar'); return; }
+// The server refuses to give back the access of someone whose data are being deleted (removed more than 30 days ago): a new invitation once it ends
+const TEAM_REMOVING='Se está borrando. Invítale de nuevo cuando termine';
+const inviteErr = e => /tareas_team_removing/.test(String(e&&e.message||e))?TEAM_REMOVING:/bad_email/.test(String(e&&e.message||e))?'Escribe un correo válido':syncOffline(e)?'Sin conexión':'No se pudo invitar';
+async function teamReinvite(m){ try{ await SY.remote.teamInvite(m.email, null); }catch(e){ toast(inviteErr(e)); return; }
   log('info','Equipo: persona invitada de nuevo'); await teamListLoad(true); inviteShareSheet(m.email, m.name); }
 // The admin's inbox: the newest first; opening one marks it vista
 function inboxSheet(){ if(!teamAdmin()) return; const L=TM.inbox||[];

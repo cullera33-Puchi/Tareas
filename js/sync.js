@@ -312,7 +312,7 @@ async function syncPull(cursor){ const out={};
   return out; }
 
 /* ---------- Runs ---------- */
-function syncPaint(){ if(!SY) return; if(SY.user && !SY.running){ try{ SY.pending=syncCollect(true).count; }catch(e){} }
+function syncPaint(){ if(!SY) return; if(SY.user && !SY.running){ try{ SY.pending=syncOtherOwner()?0:syncCollect(true).count; }catch(e){} } // another account's data are never pending for this one
   if(onSettings() && !busyEditing() && !touchDrag) render(); }
 function syncStatus(s){ if(!SY||SY.status===s) return; SY.status=s; syncPaint(); }
 // Called by save(): the change goes up a moment after the last one
@@ -330,6 +330,9 @@ function syncRun(reason){
   const body=async()=>{ const t0=Date.now(); const user=SY.user;
     // Decision 63b: an account without access syncs nothing (js/team.js); the server would refuse it anyway
     const tg=await teamGate(user); if(tg==='denied') return 'denied';
+    // This device's data belong to another account (it synced with it before): nothing of them goes up to this one, and nothing of this one
+    // comes down into them. The person chooses: start this device again for this account, or sign out (syncOtherAsk)
+    if(syncOtherOwner()) return 'other';
     // Decision 63a: an account with encryption on and no key on this device neither pulls nor pushes (js/e2e.js)
     const cg=await cryptoGate(user); if(cg==='locked') return 'locked';
     if(cg==='off'&&tg==='member') return 'needkey'; // decision 71.1: a member creates the encryption password before anything syncs
@@ -356,6 +359,7 @@ function syncRun(reason){
   const locked=()=>(navigator.locks&&navigator.locks.request) ? navigator.locks.request('tareas-sync', body) : body();
   SY.runP=locked().then(ok=>{ SY.running=false;
     if(ok==='locked'){ SY.status='locked'; SY.error=''; syncPaint(); cryptoAskUnlock(); return false; }
+    if(ok==='other'){ SY.status='other'; SY.error=''; syncPaint(); syncOtherAsk(); return false; }
     if(ok==='denied'){ SY.status='denied'; SY.error=''; syncPaint(); teamDeniedPaint(); return false; } // decision 63b
     if(ok==='needkey'){ SY.status='needkey'; SY.error=''; syncPaint(); teamAskKey(); return false; } // decision 71.1
     if(ok){ SY.status='ok'; SY.error=''; pushFlush(); attFlushSoon(0); syncResubscribe(); cryptoResume(); teamAfter(); } syncPaint(); if(SY.again) syncChanged(); return !!ok; }, e=>{
@@ -427,6 +431,37 @@ async function syncSignOut(){ if(!SY||!SY.user) return; SY.signingOut=true; try{
   try{ await pushSignOut(); try{ await SY.remote.signOut(); }catch(e){ log('warn','Cerrar sesión: '+(e&&e.message||e)); } syncSetUser(null, 'user'); await cryptoSignedOut(); }
   finally{ SY.signingOut=false; } toast('Sesión cerrada'); }
 
+/* ---------- Another account's data on this device ----------
+   A device that synced with account A keeps A's data after A signs out (or its session ends). Signing in there with account B never merges
+   them (decision 5's merge is only for a device that never synced with an account): A's rows would go up into B, and their ids, which are
+   global, would be refused anyway. Instead, «Continuar»: a local backup (marked as A's, so it never restores into B), then this device is
+   emptied (data, files, the team's copy, the encryption state and keys of A) and the app starts again, and B's data come down. Or «Cerrar
+   sesión». The same happens when A signs in again after B */
+const syncOtherOwner = () => { if(!SY||!SY.user) return false; const o=syncState().owner; return !!o&&o!==SY.user.id; };
+// Nothing of the person's own: the device can start again without asking
+const syncLocalEmpty = () => !DB.tasks.length&&!DB.projects.length&&!DB.projectNotes.length&&!DB.contacts.length&&!DB.attachments.length&&!DB.voiceNotes.length;
+function syncOtherAsk(force){ if(!syncOtherOwner()||SY.switching) return; if(syncLocalEmpty()){ syncSwitchAccount(); return; }
+  if(SY.otherAsked&&!force) return; if(!force&&(sheet.classList.contains('on')||asheet.classList.contains('on')||menuOpen()||touchDrag)){ clearTimeout(SY.otherT); SY.otherT=setTimeout(()=>syncOtherAsk(), 1500); return; }
+  SY.otherAsked=true; const dev=UI.wide?'este dispositivo':'este iPhone', title='Este dispositivo tiene datos de otra cuenta';
+  const text='Para usar '+(SY.user.email||'esta cuenta')+' aquí, se guarda una copia local de lo que hay en '+dev+' y se vacía; después llegan los datos de esta cuenta. Lo de la otra cuenta sigue en ella.';
+  log('info','Datos de otra cuenta en este dispositivo: no se sincroniza');
+  if(UI.wide){ macAlert({title, text, ok:'Continuar', red:false, fn:syncSwitchAccount, more:[{label:'Cerrar sesión', fn:syncSignOut}]}); return; }
+  actionSheet(title+'. '+text, [{label:'Continuar', fn:syncSwitchAccount}, {label:'Cerrar sesión', red:true, fn:syncSignOut}]); }
+async function syncSwitchAccount(){ if(!syncOtherOwner()||SY.switching) return; SY.switching=true; const user=SY.user, prev=syncState().owner;
+  try{ flushHeld(true); flushEdits();
+    if(!syncLocalEmpty()){ try{ await BK.put(todayStr(), prev); }catch(e){ log('error','Copia local antes de cambiar de cuenta no disponible: '+(e&&e.message||e)); toast('No se pudo guardar la copia local. No se ha cambiado nada'); SY.switching=false; return; } }
+    const keep={}, s=DB.settings||{}; ['theme','tipsSeen','shakeUndo','colWidths','paneWidth','hap','weekMode','weekTray','calMode','pitFold'].forEach(k=>{ if(k in s) keep[k]=s[k]; });
+    const fresh=blank(); Object.assign(fresh.settings, keep);
+    try{ localStorage.setItem(KEY, JSON.stringify(fresh)); }catch(e){ throw e; }
+    // the account's sync state starts empty, as a first connection that has nothing to merge (and needs no backup: the device is empty)
+    syncWrite({user:{id:user.id, email:user.email||''}, firstFor:user.id, known:{}, cursor:{}, del:{}});
+    [TEAM_KEY, CR_FLAG, CR_FILES, 'tareas-inbox'].forEach(k=>{ try{ localStorage.removeItem(k); }catch(e){} });
+    try{ await FS.tx(['files','thumbs','meta'], 'readwrite', (f,t,m)=>{ f.clear(); t.clear(); m.clear(); }); }catch(e){ log('warn','Archivos del dispositivo no vaciados: '+(e&&e.message||e)); }
+    try{ await cryptoKeyForget(); }catch(e){} try{ await cryptoKdbDo('readwrite', st=>st.delete('ecdh')); }catch(e){}
+    log('info','Dispositivo vaciado para otra cuenta: se vuelve a empezar', {antes:!!prev}); }
+  catch(e){ log('error','No se pudo vaciar el dispositivo: '+(e&&e.message||e)); toast('No se pudo cambiar de cuenta'); SY.switching=false; return; }
+  location.reload(); }
+
 /* ---------- Ajustes, Cuenta ---------- */
 function syncAgo(iso){ const t=syncTime(iso); if(!t) return ''; const m=Math.floor((Date.now()-t)/6e4);
   if(m<1) return 'hace un momento'; if(m<60) return 'hace '+m+' min';
@@ -435,6 +470,7 @@ function syncAgo(iso){ const t=syncTime(iso); if(!t) return ''; const m=Math.flo
 function syncLine(){ if(!SY||!SY.user) return '';
   if(SY.status==='locked') return 'Falta la contraseña de cifrado'; // decision 63a
   if(SY.status==='denied') return 'Esta cuenta no tiene acceso'; // decision 63b
+  if(SY.status==='other') return 'Este dispositivo tiene datos de otra cuenta';
   if(SY.status==='needkey') return 'Falta crear la contraseña de cifrado'; // decision 71.1
   if(SY.status==='error'&&CRYPTO_REFUSED.test(SY.error)) return 'Actualiza la app: el cifrado está activado';
   if(SY.status==='offline') return 'Sin conexión. Se sincronizará al volver';
@@ -448,7 +484,8 @@ function syncAccountHTML(dev){
     '<div class="footnote">'+(SY.status==='offline'?'Sin conexión. ':'')+'Al iniciar sesión, tus tareas se guardan en tu cuenta y llegan a tus otros dispositivos. Lo que ya hay en '+dev+' se conserva.</div>';
   const n=SY.pending||0, line=syncLine();
   return '<div class="group-title">Cuenta</div><div class="group sync-acc"><div class="cell"><span class="lbl">Cuenta</span><span class="val">'+esc(SY.user.email||'Google')+'</span></div>'+
-    '<div class="cell"><span class="lbl sync-line'+(SY.status==='error'||SY.status==='offline'||SY.status==='locked'||SY.status==='denied'||SY.status==='needkey'?' warn':'')+'">'+esc(line)+'</span></div>'+
+    '<div class="cell"><span class="lbl sync-line'+(SY.status==='error'||SY.status==='offline'||SY.status==='locked'||SY.status==='denied'||SY.status==='needkey'||SY.status==='other'?' warn':'')+'">'+esc(line)+'</span></div>'+
+    (SY.status==='other'?'<button class="cell link" data-act="syncSwitch"><span class="lbl">Usar este dispositivo con esta cuenta</span></button>':'')+
     '<div class="cell"><span class="lbl">Cambios pendientes</span><span class="val">'+(n?n:'Ninguno')+'</span></div>'+
     '<button class="cell link" data-act="syncNow"'+(SY.status==='syncing'?' disabled':'')+'><span class="lbl">Sincronizar ahora</span></button>'+
     '<button class="cell" data-act="signOut"><span class="lbl" style="color:var(--red)">Cerrar sesión</span></button></div>'+

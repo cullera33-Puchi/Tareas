@@ -415,13 +415,14 @@ const BK = {
     r.onupgradeneeded=()=>{ const db=r.result, tx=r.transaction; const snaps=db.objectStoreNames.contains('snapshots')?tx.objectStore('snapshots'):db.createObjectStore('snapshots',{keyPath:'date'});
       if(!db.objectStoreNames.contains('meta')){ const meta=db.createObjectStore('meta',{keyPath:'date'}); snaps.openCursor().onsuccess=e=>{ const c=e.target.result; if(!c) return; meta.put(BK.metaOf(c.value)); c.continue(); }; } };
     r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }catch(e){ rej(e); } }); },
-  metaOf(x){ const d=x.data||{}; return {date:x.date, created:x.created, tasks:(d.tasks||[]).length, projects:(d.projects||[]).length}; },
+  metaOf(x){ const d=x.data||{}; return {date:x.date, created:x.created, tasks:(d.tasks||[]).length, projects:(d.projects||[]).length, owner:x.owner||null}; },
   async tx(mode, fn){ const db=await this.open(); return new Promise((res,rej)=>{ const t=db.transaction(['snapshots','meta'],mode); const out=fn(t.objectStore('snapshots'), t.objectStore('meta')); t.oncomplete=()=>{ db.close(); res(out&&out.result!==undefined?out.result:out); }; t.onerror=()=>{ db.close(); rej(t.error); }; }); },
   async list(){ const db=await this.open(); return new Promise((res,rej)=>{ const t=db.transaction('meta','readonly'); const r=t.objectStore('meta').getAll(); r.onsuccess=()=>{ db.close(); res((r.result||[]).sort((a,b)=>a.date<b.date?1:-1)); }; r.onerror=()=>{ db.close(); rej(r.error); }; }); },
   async get(date){ const db=await this.open(); return new Promise((res,rej)=>{ const t=db.transaction('snapshots','readonly'); const r=t.objectStore('snapshots').get(date); r.onsuccess=()=>{ db.close(); res(r.result); }; r.onerror=()=>{ db.close(); rej(r.error); }; }); },
   del(date){ return this.tx('readwrite', (st,meta)=>{ st.delete(date); meta.delete(date); }); }, // decision 34
   clear(){ return this.tx('readwrite', (st,meta)=>{ st.clear(); meta.clear(); }); },
-  async put(date){ const snap={date, created:new Date().toISOString(), data:exportData()}; await this.tx('readwrite', (st,meta)=>{ st.put(snap); meta.put(BK.metaOf(snap)); });
+  // owner: the account these data synced with (null when none), so a copy of one account never restores into another
+  async put(date, owner){ const snap={date, created:new Date().toISOString(), data:exportData(), owner:owner!==undefined?owner:(typeof SY!=='undefined'&&SY&&syncState().owner)||null}; await this.tx('readwrite', (st,meta)=>{ st.put(snap); meta.put(BK.metaOf(snap)); });
     const old=(await this.list()).slice(7); if(old.length) await this.tx('readwrite', (st,meta)=>{ old.forEach(b=>{ st.delete(b.date); meta.delete(b.date); }); }); }
 };
 let BACKUPS=[];
@@ -447,6 +448,7 @@ function deleteAllBackups(){ const n=BACKUPS.length; if(!n) return; const dev=UI
     render(); }, 'Borrar todas'); }
 async function dailyBackup(force){ try{ const t=todayStr(); let skip=null; try{ skip=localStorage.getItem(BK_SKIP); }catch(e){} if(!force&&skip===t) return; if(force || !BACKUPS.some(b=>b.date===t)){ await BK.put(t); await refreshBackups(); log('info', force?'Copia local creada':'Copia local diaria', {date:t, tasks:DB.tasks.length}); if(onSettings()) render(); } }catch(e){ log('warn','Copia local no disponible: '+(e&&e.message||e)); } }
 function restoreBackup(date){ const b=BACKUPS.find(x=>x.date===date); if(!b) return;
+  if(b.owner&&typeof SY!=='undefined'&&SY&&SY.user&&b.owner!==SY.user.id){ toast('Esta copia es de otra cuenta. Inicia sesión con ella para restaurarla'); log('info','Copia de otra cuenta: no se restaura'); return; } // never into another account
   const when = date===todayStr()?'de hoy':date===addDays(todayStr(),-1)?'de ayer':'del '+fmtDate(date);
   // Signed in, the copy applies to every device (agreed with Enric): restored records get a new modified so they win, and what the copy lacks is deleted everywhere by the next sync
   const synced=!!(typeof SY!=='undefined'&&SY&&SY.user);

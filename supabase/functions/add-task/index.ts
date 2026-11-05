@@ -17,6 +17,7 @@
 //   200 «Añadida: <text>»
 //   400 no text (a link alone is taken as the text), a text over 500 characters or a link over 2000
 //   401 no key, an unknown key or a revoked one
+//   403 the key's account has no access to the team any more (0013_team.sql; before it, everyone has)
 //   405 not a POST
 //   429 more than 60 phrases in the last hour for that owner
 //   500 anything else (logged)
@@ -59,6 +60,16 @@ async function rest(c: Conf, method: string, path: string, body?: unknown, prefe
   const t = await r.text();
   if (!r.ok) throw new Error(method + ' ' + path.split('?')[0] + ': ' + r.status + ' ' + t.slice(0, 300));
   return { data: t ? JSON.parse(t) : null, headers: r.headers };
+}
+// The owner has access (0013_team.sql); before 0013 (the function is not there) everyone has, as before
+async function teamAllowed(c: Conf, owner: string): Promise<boolean> {
+  try {
+    const rows = (await rest(c, 'POST', 'rpc/tareas_team_allowed', { p_ids: [owner] })).data as (string | Record<string, string>)[] | null;
+    return (rows || []).some(r => (typeof r === 'string' ? r : Object.values(r)[0]) === owner);
+  } catch (e) {
+    if (/ 404 |PGRST20[25]|42883|Could not find|does not exist/i.test(String((e as Error)?.message || e))) return true;
+    throw e;
+  }
 }
 const qs = (o: Record<string, string>) => Object.entries(o).map(([k, v]) => k + '=' + encodeURIComponent(v)).join('&');
 
@@ -114,6 +125,8 @@ export async function handler(req: Request): Promise<Response> {
     if (!rows.length) { console.log(JSON.stringify({ event: 'bad-key' })); return text('Clave no válida. Crea una nueva en Tareas, Ajustes, Atajo de iOS', 401); }
     if (rows[0].revoked) { console.log(JSON.stringify({ event: 'revoked-key' })); return text('Clave revocada. Crea una nueva en Tareas, Ajustes, Atajo de iOS', 401); }
     const owner = rows[0].owner_id;
+    // Decision 63b: an account whose access was removed adds nothing (its key is also revoked by tareas_team_revoke)
+    if (!(await teamAllowed(c, owner))) { console.log(JSON.stringify({ event: 'no-access' })); return text('Esta cuenta no tiene acceso a Tareas', 403); }
     const v = validate(await readBody(req));
     if (typeof v === 'string') return text(v, 400);
     // At most RATE_PER_HOUR phrases an hour per owner: a Shortcut stuck in a loop cannot fill the inbox

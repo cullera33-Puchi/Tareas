@@ -389,6 +389,10 @@ begin
   if em !~ '^[^\s@]+@[^\s@]+\.[^\s@]+$' or length(em) > 254 then
     raise exception 'tareas_team_bad_email' using errcode = '22023';
   end if;
+  -- Removed more than 30 days ago: its data are being deleted (tareas_team_remove); a new invitation once that ends
+  if exists (select 1 from public.team_members m where lower(m.email) = em and m.revoked < now() - interval '30 days') then
+    raise exception 'tareas_team_removing' using errcode = 'P0001';
+  end if;
   update public.team_members m set revoked = null, invited = now(), name = coalesce(nm, m.name)
     where lower(m.email) = em returning m.id into rid;
   if rid is null then
@@ -416,7 +420,7 @@ begin
 end;
 $$;
 
--- Admin only: removes a member's access at once (never the admin's). Their devices stop receiving notifications
+-- Admin only: removes a member's access at once (never the admin's). Their devices stop receiving notifications and their Siri key stops
 create or replace function public.tareas_team_revoke(p_id uuid)
 returns void
 language plpgsql
@@ -437,6 +441,8 @@ begin
   if m.user_id is not null then
     update public.push_subscriptions s set deleted = now(), modified = greatest(now(), s.modified + interval '1 millisecond')
       where s.owner_id = m.user_id and s.deleted is null;
+    -- and their Siri key stops working (the function add-task checks the access too); back with access, they make a new key
+    update public.shortcut_keys k set revoked = coalesce(k.revoked, now()) where k.owner_id = m.user_id;
   end if;
 end;
 $$;
@@ -453,6 +459,42 @@ grant execute on function public.tareas_team_list() to authenticated;
 grant execute on function public.tareas_team_invite(text, text) to authenticated;
 grant execute on function public.tareas_team_quota(uuid, bigint) to authenticated;
 grant execute on function public.tareas_team_revoke(uuid) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- push_subscriptions: only an account with access saves a device (the function of 0002_push.sql, now with the gate)
+-- ---------------------------------------------------------------------------
+
+create or replace function public.tareas_push_subscribe(p_id text, p_endpoint text, p_p256dh text, p_auth text, p_device text)
+returns text
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  me uuid := auth.uid();
+begin
+  if me is null then
+    raise exception 'not signed in';
+  end if;
+  if not public.tareas_team_ok() then
+    raise exception 'tareas_team_no_access' using errcode = '42501';
+  end if;
+  if coalesce(p_id, '') = '' or coalesce(p_endpoint, '') = '' or coalesce(p_p256dh, '') = '' or coalesce(p_auth, '') = '' then
+    raise exception 'incomplete subscription';
+  end if;
+  delete from public.push_subscriptions where endpoint = p_endpoint and id <> p_id;
+  delete from public.push_subscriptions where id = p_id and owner_id <> me;
+  insert into public.push_subscriptions as s (id, owner_id, endpoint, p256dh, auth, device, created, modified, deleted)
+  values (p_id, me, p_endpoint, p_p256dh, p_auth, p_device, now(), now(), null)
+  on conflict (id) do update
+    set endpoint = excluded.endpoint, p256dh = excluded.p256dh, auth = excluded.auth, device = excluded.device,
+        modified = greatest(excluded.modified, s.modified + interval '1 millisecond'), deleted = null;
+  return p_id;
+end;
+$$;
+
+revoke all on function public.tareas_push_subscribe(text, text, text, text, text) from public, anon;
+grant execute on function public.tareas_push_subscribe(text, text, text, text, text) to authenticated;
 
 -- ---------------------------------------------------------------------------
 -- team_notices: «Avisar a…»
@@ -474,8 +516,8 @@ create index if not exists team_notices_recipient on public.team_notices (recipi
 create index if not exists team_notices_limit on public.team_notices (sender_id, recipient_id, task_ref, created);
 create index if not exists team_notices_push on public.team_notices (created) where pushed is null;
 
--- What a client sends is checked here: the sender is the caller, the recipient an active member and not the caller, and the same task
--- to the same person waits 4 hours. created, pushed, taken and dismissed always start as the server says
+-- What a client sends is checked here: the sender is the caller, the recipient an active member and not the caller, the same task
+-- to the same person waits 4 hours, and nobody sends more than 20 an hour. created, pushed, taken and dismissed always start as the server says
 create or replace function public.tareas_notice_before()
 returns trigger
 language plpgsql
@@ -494,6 +536,11 @@ begin
   new.dismissed := null;
   if new.recipient_id = new.sender_id or public.tareas_team_role(new.recipient_id) is null then
     raise exception 'tareas_notice_bad_recipient' using errcode = '22023';
+  end if;
+  -- At most 20 notices an hour per sender, whatever the tasks (task_ref comes from the client)
+  perform pg_advisory_xact_lock(hashtext('tareas-notices-' || new.sender_id::text));
+  if (select count(*) from public.team_notices n where n.sender_id = new.sender_id and n.created > now() - interval '1 hour') >= 20 then
+    raise exception 'tareas_notice_too_many' using errcode = 'P0001', hint = 'At most 20 notices an hour';
   end if;
   perform pg_advisory_xact_lock(hashtext(new.sender_id::text || new.recipient_id::text || new.task_ref));
   select max(n.created) into last from public.team_notices n

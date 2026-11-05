@@ -137,8 +137,15 @@ async function sqlTests(){
   const qSet = await as(S, () => tryq(`select public.tareas_team_quota('${sid}', null)`)), qOk = await as(E, () => tryq(`select public.tareas_team_quota('${sid}', 100000000)`));
   const o6 = await as(S, () => tryq(obj(S, 't/a5.jpg', 19e6)));
   check('sql_quota', o1.rows && /row-level security/.test(o2.error||'') && o3.rows && o4.rows && /row-level security/.test(o5.error||'') && oE.rows && used===52428800 && /admin_only/.test(qSet.error||'') && qOk.rows && o6.rows, {o1, o2, o3, o4, o5, oE, used, qSet, o6});
-  // Removing the access: blocked at once (reads, writes, the directory, files), never the admin, and their devices stop
-  await db.exec(`insert into public.push_subscriptions (id, owner_id, endpoint, p256dh, auth, modified) values ('dS', '${S}', 'https://push/s', 'k', 'a', now())`);
+  // At most 20 notices an hour per sender, whatever the task: Susana sends to Enric with new task refs until the server says no
+  let capErr = null, capN = 0; for(let i=0;i<30&&!capErr;i++){ const rr = await as(S, () => tryq(note(E, 'cap'+i))); if(rr.error) capErr = rr.error; else capN++; }
+  const inHour = (await q(`select count(*)::int n from public.team_notices where sender_id = '${S}' and created > now() - interval '1 hour'`))[0].n;
+  check('sql_notice_cap', /tareas_notice_too_many/.test(capErr||'') && inHour===20 && capN>0, {capErr, capN, inHour});
+  // A device is saved only by an account with access (tareas_push_subscribe of 0002, gated in 0013)
+  const subX = await as(X, () => tryq(`select public.tareas_push_subscribe('dX', 'https://push/x', 'k', 'a', 'X')`)), subE = await as(E, () => tryq(`select public.tareas_push_subscribe('dE', 'https://push/e', 'k', 'a', 'E')`));
+  check('sql_push_gate', /tareas_team_no_access/.test(subX.error||'') && subE.rows && subE.rows.length===1, {subX, subE});
+  // Removing the access: blocked at once (reads, writes, the directory, files), never the admin, and their devices and Siri key stop
+  await db.exec(`insert into public.push_subscriptions (id, owner_id, endpoint, p256dh, auth, modified) values ('dS', '${S}', 'https://push/s', 'k', 'a', now()); insert into public.shortcut_keys (owner_id, key_hash, space_id) values ('${S}', 'hashS', 'sp')`);
   const sRev = await as(S, () => tryq(`select public.tareas_team_revoke('${sid}')`));
   const eid = (await q(`select id from public.team_members where user_id = '${E}'`))[0].id;
   const selfRev = await as(E, () => tryq(`select public.tareas_team_revoke('${eid}')`));
@@ -146,7 +153,14 @@ async function sqlTests(){
   const afterSel = await as(S, () => tryq(`select id from public.tasks`)), afterIns = await as(S, () => tryq(ins('ts9', 'e1:BBBB'))), afterMe = await me(S);
   const afterDir = await as(S, () => tryq(`select * from public.tareas_team_directory()`)), afterObj = await as(S, () => tryq(`select name from storage.objects`));
   const afterN = await as(S, () => tryq(note(E, 'ts8'))), dev = (await q(`select deleted is not null d from public.push_subscriptions where id = 'dS'`))[0].d;
-  const eStill = await as(E, () => tryq(`select id from public.tasks`));
+  const eStill = await as(E, () => tryq(`select id from public.tasks`)), skS = (await q(`select revoked is not null r from public.shortcut_keys where owner_id = '${S}'`))[0].r;
+  const subS = await as(S, () => tryq(`select public.tareas_push_subscribe('dS2', 'https://push/s2', 'k', 'a', 'S')`));
+  check('sql_revoke_stops_siri_push', skS && /tareas_team_no_access/.test(subS.error||''), {skS, subS});
+  // Invited again within 30 days: the access comes back (an invitation never accepted, here); revoked again for the rest
+  await as(E, () => q(`select public.tareas_team_invite('quique@example.com')`)); const qid = (await q(`select id from public.team_members where email = 'quique@example.com'`))[0].id;
+  await as(E, () => q(`select public.tareas_team_revoke('${qid}')`)); const reinv = await as(E, () => tryq(`select public.tareas_team_invite('quique@example.com') id`));
+  const qBack = (await q(`select revoked is null a from public.team_members where id = '${qid}'`))[0].a; await as(E, () => q(`select public.tareas_team_revoke('${qid}')`));
+  check('sql_reinvite_within_30', reinv.rows && reinv.rows[0].id===qid && qBack, {reinv, qBack});
   check('sql_revoke_blocks', /tareas_team_admin_only/.test(sRev.error||'') && /not_removable/.test(selfRev.error||'') && rev.rows && afterSel.rows.length===0 && /row-level security/.test(afterIns.error||'') && afterMe===null && afterDir.rows.length===0 && afterObj.rows.length===0 && !!afterN.error && dev && eStill.rows.length===1, {sRev, selfRev, afterSel, afterIns, afterMe, afterDir, afterObj, afterN, dev});
   const h3 = await hook('susana@example.com');
   check('sql_hook_removed', h3.error && h3.error.http_code===403, h3);
@@ -161,13 +175,20 @@ async function sqlTests(){
   await db.exec(`update public.team_members set revoked = now() - interval '31 days' where id = '${sid}'; update public.team_members set revoked = now() - interval '40 days' where id = '${pid}';
     insert into public.projects (id, owner_id, name, modified) values ('ps1', '${S}', 'e1:p', now()); insert into public.contacts (id, owner_id, name, modified) values ('cs1', '${S}', 'e1:c', now());`);
   const due = await q(`select member_id, user_id, files from public.tareas_team_to_remove() order by member_id = '${pid}' desc`);
+  // While their data are being deleted, an invitation is refused (a new one once it ends)
+  const removing = await as(E, () => tryq(`select public.tareas_team_invite('susana@example.com')`));
+  // and once deleted, the same email is a new invitation (checked after the removal below)
+  check('sql_invite_removing', /tareas_team_removing/.test(removing.error||'') && (await q(`select revoked is not null r from public.team_members where id = '${sid}'`))[0].r, removing);
+  const nS = (await q(`select count(*)::int n from public.team_notices where sender_id = '${S}' or recipient_id = '${S}'`))[0].n;
   const adminRm = (await q(`select public.tareas_team_remove('${eid}') r`))[0].r;
   const rmS = (await q(`select public.tareas_team_remove('${sid}') r`))[0].r, rmP = (await q(`select public.tareas_team_remove('${pid}') r`))[0].r;
   const left = (await q(`select (select count(*) from public.tasks where owner_id = '${S}')::int t, (select count(*) from public.crypto_keys where owner_id = '${S}')::int k, (select count(*) from public.team_notices where sender_id = '${S}' or recipient_id = '${S}')::int n,
     (select count(*) from public.team_feedback where sender_id = '${S}')::int f, (select count(*) from auth.users where id = '${S}')::int u, (select count(*) from public.team_members)::int m, (select count(*) from public.tasks where owner_id = '${E}')::int e, (select count(*) from public.team_log where event = 'removed')::int l`))[0];
   check('sql_removal', early.length===0 && earlyRm.skipped && due.length===2 && due[0].member_id===pid && due[0].files.length===0 && due[1].files.length===3 && adminRm.skipped
-    && rmS.tasks===1 && rmS.projects===1 && rmS.contacts===1 && rmS.crypto_keys===1 && rmS.team_notices===4 && rmS.account===1 && rmP && !rmP.skipped
-    && left.t===0 && left.k===0 && left.n===0 && left.f===0 && left.u===0 && left.m===1 && left.e===1 && left.l===2, {early, earlyRm, due, adminRm, rmS, rmP, left});
+    && rmS.tasks===1 && rmS.projects===1 && rmS.contacts===1 && rmS.crypto_keys===1 && rmS.team_notices===nS && nS>=20 && rmS.account===1 && rmP && !rmP.skipped
+    && left.t===0 && left.k===0 && left.n===0 && left.f===0 && left.u===0 && left.m===2 && left.e===1 && left.l===2, {early, earlyRm, due, adminRm, rmS, rmP, left});
+  const fresh = await as(E, () => tryq(`select public.tareas_team_invite('susana@example.com') id`));
+  check('sql_invite_after_removal', fresh.rows && fresh.rows[0].id!==sid && (await q(`select revoked is null and user_id is null a from public.team_members where lower(email) = 'susana@example.com'`))[0].a, fresh);
   await db.close();
   // A fresh project: no account when it runs; the first one to sign in is the admin, the hook lets only that first one in
   db = await pgSetup(); for(const f of MIGS) await db.exec(strip(rd(f))); await db.exec(mig);
@@ -177,7 +198,9 @@ async function sqlTests(){
   const hook1 = (await qf(`select public.tareas_before_user_created('{"user":{"email":"b@example.com"}}'::jsonb) r`))[0].r;
   await db.exec(`set test.uid = '${E}'; set role authenticated;`); const t0 = await db.query(`insert into public.tasks (id, title, modified) values ('t', 'x', now()) returning id`).then(x=>x.rows.length, e=>e.message);
   const m0 = (await db.query(`select public.tareas_team_me() m`)).rows[0].m; await db.exec(`reset role; reset test.uid;`);
+  const chk = (await qf(fs.readFileSync(path.join(ROOT, 'supabase/check.sql'), 'utf8'))).find(x=>x['N.º']===36);
   check('sql_fresh_project', JSON.stringify(hook0)==='{}' && hook1.error && t0===1 && m0 && m0.role==='admin', {hook0, hook1, t0, m0});
+  check('sql_check_admin_email', chk && /enric@example\.com/.test(chk.Pieza) && chk.Estado==='OK', chk);
   await db.close();
   // all.sql: every migration in order, twice, on a fresh database; check.sql says OK on every row
   db = await pgSetup(); const all = strip(fs.readFileSync(path.join(ROOT, 'supabase/all.sql'), 'utf8'));
@@ -333,6 +356,12 @@ async function appTests(browser){
   await toSettings(sp); const ss = await sec(sp);
   check('S_section', ss && ss.length===2 && ss[0]==='Almacenamiento0 MB de 50 MB' && ss[1]==='Enviar sugerencia o incidencia', ss);
   await shot(sp, 'ip-dark-equipo-miembro');
+  // The rules refuse a change while the account still has access: once it is read again quietly; the second time it is an ordinary
+  // sync error (Ajustes says so, the log has an error), never a silent loop
+  fake.failRls=2; await sp.evaluate(()=>updTask('s1', {title:'Revisar presupuesto final'}));
+  check('S_refused_reported', await until(sp, ()=>SY.status==='error'&&/row-level security/.test(SY.error)&&LOG.some(e=>e.l==='error'&&/Sincronización falló/.test(e.m))&&LOG.some(e=>/se comprueba el acceso/.test(e.m)), null, 20000) && fake.failRls===0,
+    await sp.evaluate(()=>({st:SY.status, err:SY.error, log:LOG.slice(-6).map(e=>e.l+' '+e.m)})));
+  await sp.evaluate(()=>{ SY.retry=0; return syncRun('prueba'); }); check('S_recovers', await synced(sp, 15000) && await sp.evaluate(()=>!TM.refused));
 
   /* ---------- Back to Enric: Susana in the list, her quota, her access removed ---------- */
   await ep.evaluate(()=>teamListLoad(true)); await until(ep, ()=>(TM.list||[]).some(m=>m.joined&&m.role==='member'));
@@ -363,6 +392,14 @@ async function appTests(browser){
   const rm = await ep.evaluate(()=>document.querySelector('#sheet .msheet').textContent);
   check('E_removed_sheet', /Sin acceso desde el \d+ de [a-z]+\. Sus datos se borran el \d+ de [a-z]+\./.test(rm) && /Invitar de nuevo/.test(rm), rm);
   await ep.evaluate(()=>closeSheet()); await settled(ep);
+  // More than 30 days later the data are being deleted: no Invitar de nuevo, and the server refuses an invitation meanwhile
+  fake.members.find(m=>m.id===sid).revoked=new Date(Date.now()-31*864e5).toISOString(); await ep.evaluate(()=>teamListLoad(true));
+  await ep.click('[data-act=tmMember][data-id="'+sid+'"]'); await sheetIn(ep);
+  const rm2 = await ep.evaluate(()=>document.querySelector('#sheet .msheet').textContent);
+  check('E_removing_sheet', /Se está borrando\. Invítale de nuevo cuando termine\./.test(rm2) && !/Invitar de nuevo/.test(rm2), rm2);
+  await ep.evaluate(()=>closeSheet()); await settled(ep);
+  await ep.evaluate(()=>{ toast(''); return teamReinvite({email:'susana@example.com'}); });
+  check('E_removing_invite', await ep.evaluate(()=>document.getElementById('toastText').textContent)==='Se está borrando. Invítale de nuevo cuando termine' && !!fake.members.find(m=>m.id===sid).revoked);
   // The admin cannot remove himself: no button, and the server says no
   const selfRm = await ep.evaluate(async id=>{ try{ await SY.remote.teamRevoke(id); return 'done'; }catch(e){ return e.message; } }, fake.members.find(m=>m.role==='admin').id);
   check('E_not_self', /not_removable/.test(selfRm), selfRm);
@@ -378,6 +415,48 @@ async function appTests(browser){
   check('absent_works', await until(ap, ()=>TM.state==='absent'&&SY.status!=='denied', null, 15000) && await ap.evaluate(()=>!document.getElementById('noaccess')&&!teamOn()&&teamSectionHTML('este iPhone')===''), await ap.evaluate(()=>({tm:TM.state, st:SY.status})));
   await A.ctx.close(); fake.team = true;
   await E.ctx.close();
+  await switchTests(browser);
+}
+
+/* ---------- Another account on the same device: never merged, emptied on «Continuar» ---------- */
+async function switchTests(browser){
+  const f2 = new TF.Fake(); f2.team = false; // the rule is the sync's, with or without 0013
+  const UA = f2.user('9b2f6d3e-0000-4000-8000-0000000000a1', 'ana@example.com', 'Ana'), UB = f2.user('9b2f6d3e-0000-4000-8000-0000000000b1', 'bruno@example.com', 'Bruno');
+  f2.put = (owner, table, row) => f2.t[table].set(row.id, Object.assign({owner_id:owner, created:row.modified, deleted:null}, row, {server_ts:f2.ts()}));
+  f2.put(UB.uid, 'tasks', {id:'b1', title:'De Bruno en el servidor', status:'pending', priority:'none', modified:'2026-11-05T09:00:00.000Z'});
+  const D = await TF.device(browser, f2, {tag:'D', user:UA, seed:seed([tk('a1', {title:'De Ana'}), tk('a2', {title:'Otra de Ana'})])}, PORT, errors); const dp=D.page;
+  await signIn(dp); check('A_first', await synced(dp) && f2.rows(UA.uid, 'tasks').length===2);
+  await dp.evaluate(()=>syncSignOut()); await until(dp, ()=>!SY.user);
+  // While nobody is signed in: a new task and a photo of Ana's, waiting to go up
+  await dp.evaluate(async()=>{ addTask({title:'Nueva de Ana sin enviar'}); const b=new Blob([new Uint8Array(2048).fill(3)], {type:'image/jpeg'}), now=new Date().toISOString();
+    await FS.putFile('pa1', b, {pending:true, thumb:b}); DB.attachments.push({id:'pa1', taskId:'a1', kind:'photo', path:null, mime:'image/jpeg', size:b.size, width:1, height:1, durationMs:null, created:now, modified:now}); save(); });
+  // Bruno signs in on Ana's device: nothing of Ana goes up, nothing of Bruno comes down, and the question appears
+  await dp.evaluate(u=>{ window.__fakeUser=u; }, UB); f2.calls.length=0; await signIn(dp);
+  check('B_other', await until(dp, ()=>SY.status==='other'&&!!document.querySelector('#asheet.on')&&performance.now()-sheetOpenedAt>500, null, 10000), await dp.evaluate(()=>({st:SY.status})));
+  const q1 = await dp.evaluate(()=>document.querySelector('#asheet').textContent);
+  check('B_question', /Este dispositivo tiene datos de otra cuenta/.test(q1) && /bruno@example\.com/.test(q1) && /Continuar/.test(q1) && /Cerrar sesión/.test(q1), q1);
+  await dp.waitForTimeout(500); await shot(dp, 'ip-light-otra-cuenta');
+  check('B_nothing_moved', f2.rows(UB.uid, 'tasks').length===1 && ![...f2.store.keys()].some(k=>k.startsWith(UB.uid+'/')) && !f2.calls.some(c=>/:(pull|upsert|markDeleted|byIds|upload)/.test(c)) && await dp.evaluate(()=>!DB.tasks.some(x=>x.id==='b1')&&!!task('a1')), f2.calls);
+  // Continuar: a backup of Ana's (marked as hers), the device emptied (data, files, team, encryption), then Bruno's data
+  await dp.evaluate(()=>{ const b=[...document.querySelectorAll('#asheet.on button')].find(x=>x.textContent.trim()==='Continuar'); b.click(); });
+  await dp.waitForLoadState('load'); await dp.waitForTimeout(800);
+  check('B_fresh', await synced(dp, 20000) && await dp.evaluate(()=>DB.tasks.map(x=>x.id).join()==='b1'&&!DB.attachments.length), await dp.evaluate(()=>({t:DB.tasks.map(x=>x.title), st:SY.status})));
+  const after = await dp.evaluate(async()=>({files:(await FS.allMeta()).length, team:localStorage.getItem('tareas-team'), cx:localStorage.getItem('tareas-crypto'), key:await cryptoKeyLoad().catch(()=>null), bk:(await BK.list()).map(b=>b.owner), owner:syncState().owner}));
+  check('B_emptied', after.files===0 && !after.team && !after.cx && !after.key && after.bk.includes(UA.uid) && after.owner===UB.uid && f2.rows(UB.uid, 'tasks').length===1 && f2.rows(UA.uid, 'tasks').length===2, after);
+  // Ana's backup never restores into Bruno's account
+  await dp.evaluate(()=>refreshBackups()); const rs = await dp.evaluate(async a=>{ const b=BACKUPS.find(x=>x.owner===a); restoreBackup(b.date); await new Promise(r=>setTimeout(r,100)); return {toast:document.getElementById('toastText').textContent, sheet:!!document.querySelector('#asheet.on, #sheet.on')}; }, UA.uid);
+  check('B_backup_not_restored', rs.toast==='Esta copia es de otra cuenta. Inicia sesión con ella para restaurarla' && !rs.sheet, rs);
+  // Back to Ana later: the same question; «Cerrar sesión» leaves both accounts as they were
+  await dp.evaluate(()=>{ updTask('b1', {title:'De Bruno, cambiada aquí'}); }); await synced(dp);
+  await dp.evaluate(()=>syncSignOut()); await until(dp, ()=>!SY.user); await dp.evaluate(u=>{ window.__fakeUser=u; }, UA); f2.calls.length=0; await signIn(dp);
+  check('A_other', await until(dp, ()=>SY.status==='other'&&!!document.querySelector('#asheet.on')&&performance.now()-sheetOpenedAt>500, null, 10000)); // a sheet ignores taps for its first 450 ms (sheetFresh)
+  await dp.evaluate(()=>{ const b=[...document.querySelectorAll('#asheet.on button')].find(x=>x.textContent.trim()==='Cerrar sesión'); b.click(); });
+  const outA = await until(dp, ()=>!SY.user);
+  check('A_signed_out', outA && f2.rows(UA.uid, 'tasks').length===2 && !f2.rows(UA.uid, 'tasks').some(r=>r.id==='b1') && !f2.calls.some(c=>/:(pull|upsert|markDeleted|upload)/.test(c)), {outA, rows:f2.rows(UA.uid, 'tasks').map(r=>r.id), calls:f2.calls, u:await dp.evaluate(()=>SY.user&&SY.user.email)});
+  // A device that never synced with an account still brings its data in (decision 5): unchanged
+  const N = await TF.device(browser, f2, {tag:'N', desk:true, user:UA, seed:seed([tk('n1', {title:'Antes de cualquier cuenta'})])}, PORT, errors); const np=N.page;
+  await signIn(np, true); check('new_device_merges', await synced(np) && f2.rows(UA.uid, 'tasks').some(r=>r.id==='n1') && await np.evaluate(()=>!!task('a1')&&!!task('n1')));
+  await D.ctx.close(); await N.ctx.close();
 }
 
 module.exports = { pgSetup, strip, MIGS };

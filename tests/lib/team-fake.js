@@ -28,7 +28,9 @@ class Fake {
   role(uid){ const m=this.member(uid); return m?m.role:null; }
   writeOk(uid){ const r=this.role(uid); return r==='admin'||(r==='member'&&this.keys.has(uid)); }
   used(uid, except){ let n=0; for(const [p,o] of this.store) if(p.startsWith(uid+'/')&&p!==except) n+=o.size; return n; }
-  write(owner, table, rows){ if(!owner) throw new Error('JWT required'); if(this.team&&!this.writeOk(owner)) throw RLS(table); const ts=this.ts(), out=[], changed=[], m=this.t[table];
+  write(owner, table, rows){ if(!owner) throw new Error('JWT required'); if(this.team&&!this.writeOk(owner)) throw RLS(table);
+    if(this.failRls>0){ this.failRls--; throw RLS(table); } // a refusal of the rules while the account still has access (a test's switch)
+    const ts=this.ts(), out=[], changed=[], m=this.t[table];
     rows.forEach(r=>{ if(!r.id) throw new Error('null id'); if(!r.modified) throw new Error('null value in column "modified"');
       const ex=m.get(r.id); if(ex && ex.owner_id!==owner) throw RLS(table);
       if(this.keys.has(owner) && ENC[table]) ENC[table].forEach(c=>{ const v=r[c]; if(v!=null && v!=='' && !isEnc(v)) throw new Error('tareas_plaintext_refused: '+table+'.'+c); }); });
@@ -67,11 +69,12 @@ class Fake {
       case 'teamDir': if(!ok()) return []; return this.members.filter(m=>!m.revoked&&m.user_id).map(m=>({user_id:m.user_id, name:m.name, email:m.email, pub:(this.keys.get(m.user_id)||{}).ecdh_pub||null, admin:m.role==='admin'}));
       case 'teamList': if(!admin()) return this.err('tareas_team_admin_only'); return this.members.map(m=>({id:m.id, email:m.email, name:m.name, role:m.role, quota:m.quota, used:m.user_id?this.used(m.user_id):0, invited:m.invited, revoked:m.revoked, last_access:m.last_access, joined:!!m.user_id, has_key:!!(m.user_id&&this.keys.has(m.user_id))}));
       case 'teamInvite': { if(!admin()) return this.err('tareas_team_admin_only'); const em=String(a.email).trim().toLowerCase(); if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) return this.err('tareas_team_bad_email');
-        let m=this.members.find(x=>x.email===em); if(m){ m.revoked=null; m.invited=this.ts(); if(a.name) m.name=a.name; } else { m={id:newId(), email:em, name:a.name||null, role:'member', quota:52428800, invited:this.ts(), revoked:null, last_access:null, user_id:null}; this.members.push(m); } return m.id; }
+        let m=this.members.find(x=>x.email===em); if(m&&m.revoked&&Date.parse(m.revoked)<Date.now()-30*864e5) return this.err('tareas_team_removing'); if(m){ m.revoked=null; m.invited=this.ts(); if(a.name) m.name=a.name; } else { m={id:newId(), email:em, name:a.name||null, role:'member', quota:52428800, invited:this.ts(), revoked:null, last_access:null, user_id:null}; this.members.push(m); } return m.id; }
       case 'teamQuota': { if(!admin()) return this.err('tareas_team_admin_only'); const m=this.members.find(x=>x.id===a.id); if(m) m.quota=a.quota; return true; }
       case 'teamRevoke': { if(!admin()) return this.err('tareas_team_admin_only'); const m=this.members.find(x=>x.id===a.id); if(!m||m.role==='admin'||m.user_id===own) return this.err('tareas_team_not_removable'); m.revoked=m.revoked||new Date().toISOString(); return true; }
       case 'noticeSend': { if(!ok()) return this.err(RLS('team_notices').message); const r=a.row, to=r.recipient_id; if(to===own||!this.role(to)) return this.err('tareas_notice_bad_recipient');
         const last=this.notices.filter(n=>n.sender_id===own&&n.recipient_id===to&&n.task_ref===r.task_ref).map(n=>Date.parse(n.created)).sort((x,y)=>y-x)[0];
+        if(this.notices.filter(n=>n.sender_id===own&&Date.parse(n.created)>Date.now()-3600e3).length>=20) return this.err('tareas_notice_too_many');
         if(last&&last>Date.now()-4*3600e3) return this.err('tareas_notice_too_soon', new Date(last+4*3600e3).toISOString().slice(0,19)+'Z');
         const n={id:newId(), sender_id:own, recipient_id:to, task_ref:r.task_ref, payload:r.payload, created:new Date().toISOString(), pushed:null, taken:null, dismissed:null}; this.notices.push(n);
         this.notify(to, 'team_notices', {id:n.id}); return true; }

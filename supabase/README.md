@@ -20,9 +20,12 @@ Desde la 0013, solo entran las cuentas invitadas en Ajustes, Equipo. Las reglas 
 2. Tipo **Postgres**, esquema `public`, función `tareas_before_user_created`. Guardar.
 3. Comprobar con una cuenta de Google no invitada: al entrar, la app dice «Esta cuenta no tiene acceso».
 
-Antes de invitar a nadie, Google Cloud, **Google Auth Platform**, **Público**: pasar la app de «Prueba» a «En producción» (sin coste).
+Antes de invitar a nadie:
+- En `check.sql`, la fila 36 dice «Equipo: el administrador es <correo>»: ese correo tiene que ser el tuyo.
+- Authentication, **Sign In / Providers**: solo Google activado. **Email**, **Phone** y **Anonymous sign-ins** desactivados (si alguna vez activas Email, deja «Confirm email» activado): así nadie entra con un correo que no es suyo.
+- Google Cloud, **Google Auth Platform**, **Público**: pasar la app de «Prueba» a «En producción» (sin coste).
 
-La función `send-reminders` también avisa de las tareas enviadas con «Avisar a…» y de las sugerencias, y borra los datos de quien perdió el acceso hace más de 30 días: hay que volver a pegarla y pulsar **Deploy** (paso 3).
+La función `send-reminders` también avisa de las tareas enviadas con «Avisar a…» y de las sugerencias, y borra los datos de quien perdió el acceso hace más de 30 días: hay que volver a pegarla y pulsar **Deploy** (paso 3). La función `add-task` (paso 4) también cambia: ya no acepta frases de quien perdió el acceso; vuelve a pegarla y pulsa **Deploy**.
 
 ## Qué hay en cada migración
 

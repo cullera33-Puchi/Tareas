@@ -159,6 +159,7 @@ function onClick(e){
     case 'news': newsSheet(); break;
     case 'signIn': syncSignIn(); break;
     case 'syncNow': syncRun('manual'); break;
+    case 'syncSwitch': syncOtherAsk(true); break; // another account's data on this device
     case 'signOut': syncSignOutSheet(); break;
     case 'pushEnable': pushEnable(); break; // block 9: inside the tap, so iOS shows the permission prompt
     case 'pushTest': pushTest(); break;

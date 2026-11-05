@@ -43,6 +43,9 @@ async function run(browser){
   const lp = await sp.evaluate(()=>[...document.querySelectorAll('.pm.open .pm-list *')].map(b=>b.textContent.trim()).filter(Boolean));
   check('S_longpress_item', lp.some(t=>t==='Avisar a…'), lp);
   await sp.waitForTimeout(500); await shot(sp, 'av-ip-dark-menu');
+  // The lifted row keeps the space between its items (Entrega martes  1 h)
+  const gap = await sp.evaluate(()=>{ const ss=[...document.querySelectorAll('.pm-lift .row-meta>span')]; return ss.length>1?parseFloat(getComputedStyle(ss[1]).marginLeft):-1; });
+  check('lift_meta_gap', gap>5, gap);
   await sp.evaluate(()=>closeMenu(true)); await settled(sp);
   await sp.evaluate(()=>openDetail('s1')); await sp.waitForTimeout(700);
   const cell = await sp.evaluate(()=>{ const b=document.querySelector('.pushed-screen [data-act=tmNotice]'); return b?b.textContent:null; });
@@ -69,6 +72,11 @@ async function run(browser){
   await sp.evaluate(()=>closeSheet()); await settled(sp);
   const srv = await sp.evaluate(async to=>{ task('s1').sentTo=[]; return noticeSend('s1', to, ''); }, UE.uid);
   check('S_too_soon_server', srv==='soon' && fake.notices.length===1 && await sp.evaluate(()=>/Ya le avisaste de esta tarea hace poco\. Podrás volver a avisarle a las \d\d:\d\d\./.test(document.getElementById('toastText').textContent)), srv);
+  // At most 20 notices an hour per sender (the server's rule): the app says so
+  const real = fake.notices.slice(); for(let i=0;i<20;i++) fake.notices.push({id:'cap'+i, sender_id:US.uid, recipient_id:UE.uid, task_ref:'c'+i, payload:'t1:x', created:new Date().toISOString(), taken:new Date().toISOString()});
+  const capR = await sp.evaluate(to=>{ task('s2').sentTo=[]; return noticeSend('s2', to, ''); }, UE.uid); const capT = await sp.evaluate(()=>document.getElementById('toastText').textContent);
+  fake.notices.length=0; fake.notices.push(...real);
+  check('S_cap', capR==='no' && capT==='Has enviado muchos avisos seguidos. Prueba dentro de un rato', {capR, capT});
   // Another task, to discard
   await sp.evaluate(to=>noticeSend('s2', to, ''), UE.uid); check('S_second', fake.notices.length===2);
 

@@ -237,7 +237,7 @@ body.desktop .toast{left:auto;right:28px;bottom:28px;width:360px;}
 .row.done.byday .row-title{text-decoration:none;} /* R3: the Completadas day groups already say they are done */
 .row-meta{display:block;font-size:0.765rem;color:var(--ink2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .row-meta .dot{display:inline-block;width:8px;height:8px;border-radius:50%;vertical-align:middle;margin-right:5px;position:relative;top:-1px;}
-.app:not(.desktop) .row-meta>span+span{margin-left:.75em;} /* decision 27d: the items are kept apart by space, with no middle dot */
+body:not(.desktop) .row-meta>span+span{margin-left:.75em;} /* decision 27d: the items are kept apart by space, with no middle dot */
 .tag{display:inline-block;padding:1px 7px;border-radius:6px;font-size:0.706rem;font-weight:500;color:var(--tagl,var(--pc));background:var(--tagbg);vertical-align:1px;max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 /* R3: text and background colours of a project capsule come from tagVars, above 4.4:1 in both themes */
 @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .tag{color:var(--tagd,var(--pc));background:var(--tagbgd,var(--tagbg));} }

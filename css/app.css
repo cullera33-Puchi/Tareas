@@ -609,8 +609,8 @@ body.pdragging,body.pdragging *{cursor:grabbing !important;user-select:none;-web
 .app.desktop .check::after{width:32px;height:32px;margin:-16px 0 0 -16px;}
 .app.desktop .row-text{display:flex;align-items:center;gap:8px;}
 .app.desktop .row-title{flex:0 1 auto;min-width:0;font-size:14px;line-height:18px;-webkit-line-clamp:2;} /* v0.33.1: a long title wraps to two lines instead of ending in an ellipsis */
-.app.desktop .row-text{padding:4px 0;} /* a one-line row keeps its 32 px; two lines get some air */
-.app.desktop .row-text{flex:1 1 auto;min-width:0;}
+.app.desktop .row-text{padding:4px 0;min-width:120px;} /* a one-line row keeps its 32 px; two lines get some air. The title never goes below 120 px: in a narrow list the right-hand columns are clipped (below) */
+.app.desktop .row-text{flex:1 1 auto;}
 .app.desktop .pcol{flex:none;width:var(--col-proj,132px);display:flex;align-items:center;min-width:0;}
 .app.desktop.has-pane .pcol{width:var(--col-proj,100px);}
 /* With the inspector open the list is narrow: the date column tightens and a reminder shows as its bell only (the time is in the tooltip and the inspector) */

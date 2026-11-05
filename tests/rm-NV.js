@@ -8,6 +8,11 @@ require('./lib/out.js'); // outputs (screenshots, downloads) go to tests/out
 //     closes without updating; Ajustes then marks them Nueva; Actualizar applies the update and novedades.json stays out of the caches.
 //  5. Fallbacks: the notes cannot be read (HTTP 500) or list nothing newer: «Actualizar» updates right away, no sheet.
 //  6. The sheet on the iPhone in dark mode and on the desktop (centred window), with its Actualizar reaching the waiting worker.
+//  7. The rest of v0.33.1 on a realistic Hoy (tests/lib/hoy-seed.js, the owner's screenshot of 5 November):
+//     - the head of Ahora: Modo foco and ¿Qué hago ahora? as icon buttons on the line of «Ahora N», centred on it, the last one ending
+//       with the rows' last column (2 px), the line no taller than its text; iPhone and desktop, light and dark;
+//     - the desktop columns: no Fecha in Hoy when only Completadas has times, Persona after Tarea, header labels over their cells (2 px);
+//     - the person picker: screenshots of the list on the iPhone (light and dark) and the desktop popover.
 const { chromium } = require('playwright');
 const http = require('http'); const fs = require('fs'); const path = require('path');
 const ROOT = path.resolve(__dirname, '..'), PORT = 8780, URL0 = 'http://localhost:'+PORT+'/';
@@ -135,6 +140,42 @@ const cell = (page, act) => page.$('.screen.root[data-root=ajustes] [data-act='+
     if(o.desk && !o.theme){ await page.evaluate(()=>{ pendingSW=null; render(); }); await until(page, ()=>!!document.querySelector('#desk [data-act=news]'));
       await page.click('#desk [data-act=news]'); await sheetOn(page); await shot(page, tag+'-ajustes'); x = await sheetInfo(page);
       check('desk_ajustes_list', x.vers.length===4 && x.btns.join()==='Cerrar', x); await page.keyboard.press('Escape'); }
+    await ctx.close(); }
+
+  /* ---------- 7. Ahora's head, the columns and the person picker on a realistic Hoy ---------- */
+  const { seed: HOY, NOW } = require('./lib/hoy-seed.js');
+  for(const o of [{}, {theme:'dark'}, {desk:true}, {desk:true, theme:'dark'}, {desk:true, theme:'dark', w:1700, pane:true}]){
+    const vp = o.desk ? {viewport:{width:o.w||1400,height:900}, deviceScaleFactor:1} : {viewport:{width:390,height:844}, deviceScaleFactor:2, isMobile:true, hasTouch:true};
+    const ctx = await browser.newContext(Object.assign(vp, {colorScheme:o.theme||'light', serviceWorkers:'block'})); const page = await ctx.newPage(); await page.clock.install({time:NOW});
+    const tag=(o.desk?'D':'M')+'-'+(o.theme||'light')+(o.pane?'-pane':''); page.on('pageerror', e=>errors.push(tag+' pageerror: '+e.message));
+    await page.addInitScript(s=>{ if(!localStorage.getItem('tareas-v1')) localStorage.setItem('tareas-v1', s); }, JSON.stringify(HOY()));
+    await page.goto(URL0); await until(page, ()=>typeof DB!=='undefined' && !!document.querySelector((UI.wide?'#desk .main':'.screen.root')+' .ahora'));
+    if(o.pane){ await page.evaluate(()=>{ UI.deskDetail='h1'; UI.dsel.cur='h1'; render(); }); await until(page, ()=>app.classList.contains('has-pane') && !document.querySelector('#desk .pane').getAnimations().some(a=>a.playState==='running')); }
+    x = await page.evaluate(()=>{ const a=document.querySelector((UI.wide?'#desk .main':'.screen.root')+' .ahora'), h=a.querySelector('.ahead'), al=h.querySelector('.al'), B=e=>e.getBoundingClientRect(), mid=e=>B(e).top+B(e).height/2;
+      const f=h.querySelector('[data-act=focusOn]'), s=h.querySelector('[data-act=suggest]'), row=a.querySelector('.row .row-content');
+      const last=[...row.children].filter(e=>B(e).width>0).pop(), cs=getComputedStyle(h);
+      return {fm:Math.abs(mid(f)-mid(al)), sm:Math.abs(mid(s)-mid(al)), right:Math.round(B(s).right-B(last).right), order:B(f).right<=B(s).left, w:Math.round(B(s).width), text:(f.textContent+s.textContent).trim(),
+        labels:[f.title, f.getAttribute('aria-label'), s.title, s.getAttribute('aria-label')].join('|'), svgs:!!f.querySelector('svg')&&!!s.querySelector('svg'),
+        tall:Math.round(B(h).height-parseFloat(cs.paddingTop)-parseFloat(cs.paddingBottom)-B(al).height)}; });
+    check('ahora_head_'+tag, x.fm<=2 && x.sm<=2 && Math.abs(x.right)<=2 && x.order && x.w===28 && !x.text && x.svgs && x.tall<=1 && x.labels==='Modo foco|Modo foco|¿Qué hago ahora?|¿Qué hago ahora?', x);
+    if(o.desk){
+      if(!o.pane){ await page.hover('#desk .ahora [data-act=suggest]'); }
+      x = await page.evaluate(()=>{ const h=document.querySelector('#desk .main .colhead'), seen=e=>e&&getComputedStyle(e).display!=='none'&&e.getBoundingClientRect().width>0, bad=[];
+        const labels=[...h.querySelectorAll('.chl')].filter(e=>seen(e.parentElement)).map(e=>e.textContent);
+        ['pcol','row-text','rc-per','rsteps','rc-date','rc-dl','rc-rem','rc-est'].forEach(k=>{ const a=h.querySelector('.'+k); if(!seen(a)) return; document.querySelectorAll('#desk .main .mbody .row[data-id]:not(.xs)').forEach(r=>{ const b=r.querySelector('.'+k), A=a.getBoundingClientRect(), Bb=b&&b.getBoundingClientRect(); if(!Bb||Math.abs(A.left-Bb.left)>2||Math.abs(A.right-Bb.right)>2) bad.push(r.dataset.id+' '+k); }); });
+        const cut=[...document.querySelectorAll('#desk .main .mbody .row[data-id] .row-title')].filter(t=>t.scrollHeight>t.clientHeight+1).map(t=>t.closest('.row').dataset.id);
+        const w=document.querySelector('#desk .main .row[data-id=w4]:not(.first .row) .rc-per');
+        return {labels, bad, cut, per:w&&w.textContent, tip:w&&w.querySelector('.wtag').title, done:(document.querySelector('#desk .main .row.xs[data-id=d1] .rc-date')||{}).textContent}; });
+      check('cols_'+tag, !x.labels.includes('Fecha') && x.labels.includes('Persona') && x.labels.indexOf('Persona')===x.labels.indexOf('Tarea')+1 && !x.bad.length && x.per==='Jorge Martínez de la Fuente' && x.tip==='Esperando a Jorge Martínez de la Fuente' && /^\d{1,2}:\d{2}$/.test(x.done||''), x);
+      await shot(page, tag+'-hoy');
+      if(o.theme==='dark' && !o.pane){ await page.evaluate(()=>{ UI.deskDetail='h5'; UI.dsel.cur='h5'; render(); }); await until(page, ()=>!!document.querySelector('#desk .pane [data-act=pickResp]'));
+        await page.click('#desk .pane [data-act=pickResp]'); await until(page, ()=>!!document.querySelector('#pmenu .pp-pop .pplist .pprow'));
+        await page.keyboard.press('ArrowDown'); await shot(page, tag+'-responsable'); await page.keyboard.press('Escape'); }
+    } else {
+      await shot(page, tag+'-hoy');
+      await page.evaluate(()=>responsibleSheet('h5')); await sheetOn(page); await shot(page, tag+'-responsable');
+      await page.evaluate(()=>closeSheet()); await sheetOff(page); await page.evaluate(()=>waitingSheet('w2')); await sheetOn(page); await shot(page, tag+'-esperando');
+    }
     await ctx.close(); }
 
   r.fails=fails; r.errors=errors; console.log(JSON.stringify(r,null,1)); await browser.close(); srv.close();

@@ -36,11 +36,11 @@ const rowSel = id => '#desk .main .group .row[data-id="'+id+'"]';
   r.dens = await page.evaluate(()=>{ const rows=[...document.querySelectorAll('#desk .main .group .row')]; const hs=rows.slice(0,30).map(x=>Math.round(x.getBoundingClientRect().height));
     const vis=[...document.querySelectorAll('#desk .row')].filter(x=>{ const b=x.getBoundingClientRect(); return b.height&&b.top>=0&&b.bottom<=innerHeight; }).length;
     const t=document.querySelector('#desk .main .row .row-title');
-    return {html:getComputedStyle(document.documentElement).fontSize, hs:[...new Set(hs)], vis, title:getComputedStyle(t).fontSize, nowrap:getComputedStyle(t).whiteSpace};
+    return {html:getComputedStyle(document.documentElement).fontSize, hs:[...new Set(hs)], vis, title:getComputedStyle(t).fontSize, clamp:getComputedStyle(t).webkitLineClamp};
   });
   check('R11_rem14', r.dens.html==='14px', r.dens.html);
   check('R11_rows32', r.dens.hs.every(h=>h>=32&&h<=36), r.dens.hs);
-  check('R11_oneLine', r.dens.nowrap==='nowrap' && r.dens.title==='14px', r.dens);
+  check('R11_oneLine', r.dens.clamp==='2' && r.dens.title==='14px', r.dens); // v0.33.1: one line of 32 px, a long title wraps to two
   check('R11_19rows', r.dens.vis>=18, r.dens.vis);
   // Columns: the date, reminder and priority columns end at the same x on every row
   r.cols = await page.evaluate(()=>{ const rows=[...document.querySelectorAll('#desk .main .group .row')].slice(0,25); const xs=sel=>[...new Set(rows.map(x=>Math.round(x.querySelector(sel).getBoundingClientRect().right)))];

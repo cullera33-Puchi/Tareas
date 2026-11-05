@@ -1,5 +1,16 @@
 # Registro de cambios
 
+## v0.34.0. Cifrado de extremo a extremo (5 de noviembre de 2026)
+
+- Cifrado (punto 63a): en Ajustes, sección «Cifrado», se activa con una contraseña de al menos 12 caracteres con letras, números y algún símbolo, escrita dos veces, tras confirmar que no hay recuperación. Antes de cifrar se hace una copia local. Después se cifra en el servidor todo lo existente (también lo borrado, las notas de voz antiguas y los archivos de fotos y audios), con barra de avance; si se interrumpe, lo termina cualquier dispositivo desbloqueado.
+- Se cifran en el dispositivo antes de subir: títulos, notas, «Esperando a», responsable, pasos, nombres de proyectos y espacios, notas de proyecto, contactos y archivos. Fechas, recordatorios, prioridad, estado y recuentos quedan en claro. Los datos del dispositivo, las copias locales y las exportaciones siguen en claro.
+- Otro dispositivo pide la contraseña una vez y la recuerda; mientras no se escribe, no sincroniza nada. Contraseña incorrecta no muestra nada. «Cambiar contraseña» no obliga a volver a cifrar. «Cerrar sesión» olvida la contraseña de ese dispositivo.
+- Supabase rechaza texto sin cifrar en cuanto el cifrado está activado, para que un dispositivo con una versión anterior no suba datos en claro: hay que actualizar todos los dispositivos antes de activarlo.
+- Siri: la frase llega en claro y la app la borra del servidor al convertirla en tarea. Los avisos de recordatorio llevan el título cifrado y lo descifra el service worker.
+- Sesión cerrada sin pedirlo (por ejemplo, desde otra app del mismo proyecto de Supabase): aviso «Se ha cerrado la sesión. Inicia sesión para sincronizar» y la contraseña se conserva.
+- Revisión independiente antes de publicar: corregidos ocho fallos (doble cifrado desde un dispositivo antiguo, migración incompleta, archivos subidos durante la activación, cambio de contraseña con la conexión cortada y otros menores).
+- Supabase: migración `0012_encryption.sql` (tabla `crypto_keys` con `migrated`, disparador `tareas_require_cipher` en siete tablas, permiso para vaciar frases de Siri) y nueva versión de `send-reminders` (no recorta títulos cifrados y envía el proyecto). Archivos nuevos `js/crypto.js` (también lo carga el service worker) y `js/e2e.js`. Prueba nueva `rm-E2E`.
+
 ## v0.33.1. Novedades al actualizar, columnas del escritorio y selector de personas (5 de noviembre de 2026)
 
 - Novedades al actualizar (punto 64): al tocar «Actualizar» se abre «Novedades de la X» con lo nuevo de cada versión que faltaba, con «Actualizar» y «Más tarde». En Ajustes, «Novedades» abre la lista completa. Archivo `novedades.json`, publicado con la app y leído siempre de la red; sin conexión, la actualización funciona como antes.

@@ -1,5 +1,16 @@
 [
   {
+    "version": "0.34.0",
+    "date": "2026-11-05",
+    "items": [
+      "Cifrado: en Ajustes, «Cifrado», eliges una contraseña y desde entonces tus tareas, notas, nombres y fotos se guardan cifrados en el servidor. Nadie más puede leerlos.",
+      "En cada dispositivo nuevo, después de entrar con Google, la app te pide la contraseña una vez y la recuerda.",
+      "No hay forma de recuperarla: si la olvidas y no te queda ningún dispositivo abierto, lo guardado en el servidor no se puede leer.",
+      "Los avisos de recordatorio siguen mostrando el título: lo descifra tu propio dispositivo.",
+      "Si la sesión se cierra sin que lo pidas, la app te avisa para volver a entrar."
+    ]
+  },
+  {
     "version": "0.33.1",
     "date": "2026-11-05",
     "items": [

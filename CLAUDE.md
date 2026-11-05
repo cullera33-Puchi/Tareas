@@ -8,7 +8,7 @@ App web personal de gestión de tareas para iPhone (PWA instalada en pantalla de
 
 ## 2. Estado actual (2 de noviembre de 2026)
 
-- Versión publicada: **v0.33.1**. El repositorio `tareas` está en GitHub y se publica con GitHub Pages desde la rama `main`. Enric la usa instalada en el iPhone (pantalla de inicio) y en el navegador del ordenador.
+- Versión publicada: **v0.34.0**. El repositorio `tareas` está en GitHub y se publica con GitHub Pages desde la rama `main`. Enric la usa instalada en el iPhone (pantalla de inicio) y en el navegador del ordenador.
 - Sigue sin build ni dependencias de interfaz: HTML, CSS y JavaScript que se publican tal cual. El antiguo `index.html` de un solo archivo está repartido en `css/app.css` y en scripts clásicos dentro de `js/`, con el mismo comportamiento y el mismo aspecto.
 - Hecho: bloques 1 a 7 (v0.1), roadmap R1 a R20 (v0.15.0), escritorio a partir de 900 px con barra lateral, inspector, Semana, Día, Mes y vista por horas (v0.13.0 y v0.15.0), sincronización con Supabase e inicio de sesión con Google (bloque 8, v0.16.0), recordatorios con Web Push y la función `send-reminders` (bloque 9, v0.17.0), fotos y audios adjuntos en Supabase Storage (v0.19.0) y el lote de v0.20.0 (puntos 31 a 36 de la sección 8).
 - Datos: `localStorage` del dispositivo (clave `tareas-v1`) como verdad para la interfaz; copias diarias y archivos adjuntos en IndexedDB; Supabase sincroniza cuando hay sesión.
@@ -37,7 +37,9 @@ tareas/
 │   ├── notes.js               notas de proyecto
 │   ├── status.js              resumen de estado para compartir
 │   ├── suggest.js             «¿Qué hago ahora?»: tres tareas sugeridas según el tiempo disponible
+│   ├── crypto.js              cifrado: claves, valores y archivos (punto 63a); también lo carga sw.js
 │   ├── sync.js                sincronización con Supabase (bloque 8)
+│   ├── e2e.js                 cifrado de la sincronización, activación, migración y sección Cifrado
 │   ├── push.js                notificaciones (bloque 9)
 │   ├── lifecycle.js           vida de la app: teclado, insignia, cambio de día, recarga entre ventanas
 │   ├── desktop.js             escritorio: vistas, selección, teclado, barra lateral y columna
@@ -51,7 +53,7 @@ tareas/
 ├── sw.js                      service worker: caché de la app (SHELL), aviso de actualización y notificaciones
 ├── icons/                     192, 512 y apple-touch-icon
 ├── vendor/                    supabase-js 2.117.3 (UMD), servida y cacheada con la app
-├── supabase/                  migraciones SQL (0001 a 0011), all.sql (todas seguidas), check.sql (comprobación), README.md y la función send-reminders
+├── supabase/                  migraciones SQL (0001 a 0012), all.sql (todas seguidas), check.sql (comprobación), README.md y la función send-reminders
 ├── tests/                     pruebas de regresión con Playwright (sección 7 bis)
 ├── package.json               solo para las pruebas; la app no tiene build
 ├── .github/workflows/pages.yml   pruebas y publicación
@@ -103,6 +105,8 @@ Los datos: `DB` es un objeto único en `localStorage` bajo la clave `tareas-v1` 
 - `js/status.js`: resumen de estado para compartir (M4): `statusText`, `spaceStatusText`, `stSections`, `stLine`, `stPeriod`, `statusSheet`, `statusShare`, `statusCopy`.
 - `js/suggest.js`: sugerencias del punto 56 (`suggestPool`, `sgFits`, `sgTier`, `sgReason`, `suggestFor`, `suggestSheet`).
 - `js/sync.js`: adaptador `supabaseRemote` (sustituible en pruebas con `SY.remote`); `syncMerge`, `syncPull`, `syncPush`, `syncRun`, `syncRealtime`; arranque `syncBoot`; sesión (`syncSignIn`, `syncSignOutSheet`); sección Cuenta (`syncAccountHTML`).
+- `js/crypto.js`: primitivas sin DOM, compartidas con el service worker (`cryptoDerive`, `cryptoSeal`, `cryptoOpen`, `cryptoEnc`, `cryptoDec`, `cryptoSealRow`, `cryptoDecRow`, `cryptoEncFile`, `cryptoDecFile`, `cryptoKeyLoad`, `cryptoKeySave`, `cryptoKeyForget`, `cryptoPushPayload`; columnas en `CRYPTO_COLS`).
+- `js/e2e.js`: envoltura `cryptoRemote` sobre `SY.remote` (cifra al subir y descifra al bajar, también archivos y tiempo real); `cryptoGate` al empezar cada pasada (off, on o bloqueado); `cryptoActivate`, `cryptoMigrate`, `cryptoUnlockSheet`, `cryptoChangePassword`, `cryptoSectionHTML`.
 - `js/push.js`: estado `PS` (clave `tareas-push`); `pushEnable`, `pushSubscribe`, `pushCheck`, `pushRevokeSheet`, `pushTest`, `pushSignOut`; sección Notificaciones (`pushSectionHTML`, `pushDevicesHTML`); apertura desde un aviso (`openTaskFromPush`).
 - `js/lifecycle.js`: tirar para sincronizar (`bindPullRefresh`); agitar para deshacer (`armShake`); teclado (`kbFallback`); insignia (`badge`); cambio de día (`checkDay`, envoltura de `render`); `tipsSheet`; vuelta a Hoy (`returnHome`); varias ventanas (`reloadFromStorage`, `reloadIfChanged`).
 - `js/desktop.js`: vistas (`setDeskView`, `applyWide`); fila seleccionada y teclado (`paintSel`, `deskRowClick`, `moveSel`, `deskShortcut`, `startRowEdit`); selección múltiple (`multiPaneHTML`, `bulkDateMenu`); soltar en grupos (`dropToDay`, `dropToProject`, `dropMany`); barra lateral y columna (`deskSide`, `deskMain`, `addBarHTML`).
@@ -201,6 +205,8 @@ Cambios acordados con Enric sobre el diseño de abajo. Mandan sobre el texto del
 
 68. **v0.33.1 (Enric, 5 de noviembre).** (a) Novedades al actualizar (punto 64): `novedades.json` en la raíz, lista `{version, date, items}` de la más reciente a la más antigua, fuera de `SHELL` y leída con `cache:'no-store'`; al detectar una versión nueva se leen las posteriores a `APP_VERSION` y «Actualizar» abre la hoja; si falla o no hay ninguna, actualiza como antes; en Ajustes, «Novedades» (`nvFetch`, `nvNewer`, `updateTap`, `nvSheet`, `newsSheet` en `js/lifecycle.js`). **Cada versión publicada añade sus 3 a 5 líneas a `novedades.json`, escritas para Enric.** (b) Datos de prueba fuera de Ajustes; solo «Eliminar datos de prueba» si quedan. (c) Lista del escritorio: columnas solo si alguna fila de esa lista las usa, cabeceras alineadas; Completadas y «Por confirmar más adelante» con sus propias columnas; columna «Persona» (`COL_LIMITS.per`, 150 px y 120 con el panel) con «Esperando a» (icono de reloj) y responsable; título en hasta dos líneas, mínimo 120 px. (d) Selector de personas en lista (`personPickHTML`, `bindPersonPick`, `pickNames` en `js/people.js`), también en «Esperando a», que conserva sus días de revisión y Guardar (lo escrito sin elegir vale como texto libre). (e) «Foco» y «Sugerir» como iconos en la línea de «Ahora». Prueba `rm-NV`.
 
+69. **v0.34.0, cifrado de extremo a extremo (punto 63a; detalles decididos por Claude y aceptados por Enric el 5 de noviembre).** PBKDF2-SHA256 de 600.000 iteraciones con sal de 16 bytes; la clave de datos AES-GCM de 256 bits va envuelta con AES-KW en `crypto_keys` (`kid`, `salt`, `iterations`, `wrapped`, `migrated`); en el dispositivo, como CryptoKey no extraíble en IndexedDB `tareas-keys`. Valor cifrado: `e1:` y base64url de IV y texto cifrado, con datos adicionales `tabla.columna.id`; archivos con la marca `TAREASE1` y la ruta como datos adicionales; un valor sin prefijo se lee como texto (anterior al cifrado). El disparador `tareas_require_cipher` rechaza texto en claro de un propietario con clave (`tareas_plaintext_refused`). Decisiones: (1) no se puede desactivar el cifrado, solo cambiar la contraseña; (2) «Cerrar sesión» olvida la clave del dispositivo; una sesión cerrada desde fuera la conserva y avisa; (3) la hoja de desbloqueo se abre sola una vez por sesión, después desde Ajustes; (4) bloqueado, no sincroniza nada (tampoco adjuntos ni Siri); (5) la hoja de avance se puede cerrar y el cifrado sigue; (6) la fila de la clave se relee cada 10 minutos con clave y cada minuto sin ella; (7) cualquier carácter que no sea letra, número ni espacio cuenta como símbolo. El fin de la migración se guarda en `crypto_keys.migrated` y lo completa cualquier dispositivo desbloqueado. Prueba `rm-E2E`.
+
 
 ## 9. Decisiones pendientes de Enric (revisión del 1 de noviembre)
 
@@ -293,7 +299,7 @@ Orden fijado por Enric el 2 de noviembre y revisado el 3 de noviembre: tras el r
 | 20 | Siri y Atajo de iOS (decisión pendiente 1; aplazado por Enric el 2 de noviembre) | hecho en v0.31.0 | alto |
 | 21 | Lista de contactos (nombre, correo, teléfono) para Responsable y «Esperando a» | hecho en v0.32.0 | medio |
 | 22 | Duración de los bloques en la vista por horas (campo nuevo, parte de R20) | hecho en v0.32.0 (con el tiempo estimado, sin campo nuevo) | alto |
-| 22b | Cifrado de extremo a extremo y equipo con acceso por invitación y «Avisar a…» (punto 63 de la sección 8) | 1,5 a 2 días el cifrado y 6 a 7 h el equipo | máximo |
+| 22b | Cifrado de extremo a extremo y equipo con acceso por invitación y «Avisar a…» (punto 63 de la sección 8) | cifrado hecho en v0.34.0; queda el equipo, 6 a 7 h | máximo |
 | 22c | Vista «Por persona», repetir desde que se completa, resumen de la mañana, modo foco y repeticiones con inicio, fin y sin acumular (punto 65 de la sección 8) | modo foco, repetir desde que se completa y repeticiones con fin hechos en v0.33.0; quedan «Por persona» (2 a 3 h) y resumen de la mañana (2 h) | medio |
 | 23 | Fase 2, tareas compartidas entre personas (punto 43, diseño cerrado; después del punto 63) | muy alto, 2 a 3 días | máximo |
 | 24 | App aparte o evolución para gestión de proyectos con el equipo (ver abajo) | muy alto, semanas | máximo, por fases |

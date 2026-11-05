@@ -1622,3 +1622,34 @@ body.hresizing,body.hresizing *{cursor:ns-resize !important;}
 .app.desktop .main .focuslist .pcol .tag{font-size:12px;line-height:18px;}
 .app.desktop .main .focuslist .row-meta .rc:empty,.app.desktop .main .focuslist .inds .is:empty,.app.desktop .main .focuslist .rsteps:empty{display:none;}
 .app.desktop .main .focuslist .row + .row .row-content::before{left:52px;}
+
+/* ======================= Decision 63a: Cifrado ======================= */
+.cx-acc .sync-line{white-space:normal;}
+.cx-acc .sync-line.warn{color:var(--orange);}
+.cxsheet .cx-rules{list-style:none;margin:2px 0 0;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;font-size:0.824rem;color:var(--ink2);}
+.cxsheet .cx-rules li{display:flex;align-items:center;gap:6px;min-width:0;}
+.cxsheet .cx-rules li[data-rule="len"]{grid-column:1/-1;}
+.cxsheet .cx-rules svg{width:14px;height:14px;flex:none;opacity:.25;}
+.cxsheet .cx-rules li.ok{color:var(--green);}
+.cxsheet .cx-rules li.ok svg{opacity:1;}
+.cxsheet .cx-warn{font-size:0.882rem;line-height:1.35;color:var(--red);margin-top:6px;}
+.cxsheet .cx-check{display:flex;align-items:center;gap:10px;min-height:44px;font-size:0.941rem;color:var(--ink);}
+.cxsheet .cx-check input{width:22px;height:22px;margin:0;flex:none;accent-color:var(--blue);}
+.cxsheet .cx-note{font-size:0.765rem;color:var(--ink2);line-height:1.35;}
+.cxsheet .cx-err{font-size:0.824rem;color:var(--red);min-height:1.2em;}
+.cxsheet .cx-err:empty{min-height:0;}
+.cxprog{text-align:center;padding:6px 0 4px;}
+.cxprog h2{font-size:1.06rem;font-weight:600;margin:4px 0 6px;}
+.cxprog .cx-line{font-size:0.941rem;font-variant-numeric:tabular-nums;}
+.cxprog .cx-bar{height:6px;border-radius:3px;background:var(--fill);overflow:hidden;}
+.cxprog .cx-bar i{display:block;height:100%;background:var(--blue);transform-origin:left center;transform:scaleX(0);transition:transform .3s cubic-bezier(.32,.72,0,1);}
+.cxprog .hint{margin:4px 0 0;}
+.cxprog .wback{width:100%;}
+body.desktop .cxsheet .wfor{height:32px;font-size:13px;border-radius:7px;}
+body.desktop .cxsheet .cx-rules{font-size:12px;}
+body.desktop .cxsheet .cx-warn,body.desktop .cxsheet .cx-check{font-size:13px;}
+body.desktop .cxsheet .cx-check{min-height:28px;}
+body.desktop .cxsheet .cx-check input{width:16px;height:16px;}
+body.desktop .cxsheet .cx-note,body.desktop .cxsheet .cx-err{font-size:12px;}
+body.desktop .cxprog .cx-line{font-size:13px;}
+@media (prefers-reduced-motion: reduce){.cxprog .cx-bar i{transition:none;}}

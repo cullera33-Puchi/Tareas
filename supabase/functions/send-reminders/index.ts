@@ -161,7 +161,9 @@ async function vapid(c: Conf): Promise<Vapid> {
   return cached;
 }
 
-const clip = (s: string, n: number) => (s.length > n ? s.slice(0, n - 1) + '…' : s);
+// Decision 63a: an encrypted value ('e1:...') goes whole, never clipped: the device opens it with its key (sw.js), and a cut one would not open.
+// One too long for a push (about 4 KB in all) is left out: the notification then says «Recordatorio»
+const clip = (s: string, n: number) => (s.startsWith('e1:') ? (s.length > 2400 ? 'Recordatorio' : s) : s.length > n ? s.slice(0, n - 1) + '…' : s);
 
 // Sends to the given devices; the ones that no longer exist are deleted. Returns the counts
 async function deliver(c: Conf, v: Vapid, jobs: { sub: Sub; msg: Message }[]) {
@@ -203,7 +205,7 @@ async function sendDue(c: Conf) {
       title: clip(t.title || 'Recordatorio', 180),
       body: clip((t.project_id && names.get(t.project_id)) || 'Recordatorio', 80),
       tag: t.id,
-      data: { taskId: t.id, url: './?task=' + encodeURIComponent(t.id) },
+      data: { taskId: t.id, projectId: t.project_id || null, url: './?task=' + encodeURIComponent(t.id) }, // projectId: the additional data of an encrypted project name
     };
     const b = badges.get(t.owner_id + '|' + t.date); if (b !== undefined) msg.badge = b;
     subs.filter(s => s.owner_id === t.owner_id).forEach(sub => jobs.push({ sub, msg }));

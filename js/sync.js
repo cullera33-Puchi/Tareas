@@ -74,7 +74,8 @@ const syncSkip = (table, rec) => syncDemoId(rec.id) || (table==='spaces'&&INITIA
 // A table the database does not have yet (attachments before 0003_attachments.sql ran, subtasks before 0005_subtasks.sql, project_notes before
 // 0006_project_notes.sql): left out of this session's sync
 const SYNC_LATE={attachments:['0003_attachments.sql','Los adjuntos se quedan en este dispositivo'], subtasks:['0005_subtasks.sql','Los pasos se quedan en este dispositivo'], project_notes:['0006_project_notes.sql','Las notas de proyecto se quedan en este dispositivo'], contacts:['0011_contacts.sql','Los contactos se quedan en este dispositivo'],
-  inbox:['0010_inbox.sql','Siri y el Atajo de iOS no están disponibles'], shortcut_keys:['0010_inbox.sql','Siri y el Atajo de iOS no están disponibles']}; // not synced tables: the Shortcut's inbox and key (js/inbox.js)
+  inbox:['0010_inbox.sql','Siri y el Atajo de iOS no están disponibles'], shortcut_keys:['0010_inbox.sql','Siri y el Atajo de iOS no están disponibles'], // not synced tables: the Shortcut's inbox and key (js/inbox.js)
+  crypto_keys:['0012_encryption.sql','El cifrado no se puede activar']}; // decision 63a: the account's wrapped data key (js/e2e.js)
 // Whether a request failed because the table is not there (PostgREST's PGRST205, PostgreSQL's 42P01). The first time it is noted in missing and logged
 function syncAbsent(missing, table, error){ if(!SYNC_LATE[table]||!error) return false; const m=String(error.message||'')+' '+String(error.code||'');
   if(!/42P01|PGRST20[0-9]|does not exist|could not find the table|schema cache/i.test(m)) return false;
@@ -146,10 +147,20 @@ function supabaseRemote(cfg){
       const {error}=await db().storage.from(ATT_BUCKET).upload(path, b, {contentType:type, upsert:true, cacheControl:'31536000'}); if(error) throw error; },
     // Siri and the iOS Shortcut (0010_inbox.sql): the rows not taken yet, oldest first, and marking them taken; the account's key row
     async inboxList(){ const res=await db().from('inbox').select('id,text,url,source,created').is('taken', null).order('created', {ascending:true}).limit(100); if(absent('inbox', res.error)) return []; return rows(res); },
-    async inboxTake(ids, ts){ return rows(await db().from('inbox').update({taken:ts}).in('id', ids).select('id')); },
+    // o.clear (decision 63a, encryption on): the phrase leaves the server in the same update, the task goes up encrypted (0012_encryption.sql)
+    async inboxTake(ids, ts, o){ return rows(await db().from('inbox').update(Object.assign({taken:ts}, o&&o.clear?{text:'', url:null}:{})).in('id', ids).select('id')); },
+    // Activating encryption: the phrases already taken leave the server
+    async inboxClear(){ const res=await db().from('inbox').update({text:'', url:null}).not('taken', 'is', null).neq('text', '').select('id'); if(absent('inbox', res.error)) return []; return rows(res); },
+    // Decision 63a (0012_encryption.sql): the account's data key, wrapped by the encryption password. One row per user; insert fails if
+    // another device activated first. A database without the table answers null (absent: logged once, Ajustes says it cannot be activated)
+    async cryptoGet(){ const res=await db().from('crypto_keys').select('kid,salt,iterations,wrapped,created,modified').maybeSingle(); if(absent('crypto_keys', res.error)) return null; if(res.error) throw res.error; return res.data||null; },
+    async cryptoPut(row){ const {error}=await db().from('crypto_keys').insert(row); if(error) throw error; },
+    async cryptoPatch(owner, kid, patch){ return rows(await db().from('crypto_keys').update(patch).eq('owner_id', owner).eq('kid', kid).select('kid')); },
     async keyGet(){ const res=await db().from('shortcut_keys').select('space_id,created,revoked').maybeSingle(); if(absent('shortcut_keys', res.error)) return null; if(res.error) throw res.error; return res.data||null; },
     async keyPut(row){ const res=await db().from('shortcut_keys').upsert(row, {onConflict:'owner_id'}); if(absent('shortcut_keys', res.error)) throw new Error('Falta 0010_inbox.sql'); if(res.error) throw res.error; },
     async keyPatch(owner, patch){ return rows(await db().from('shortcut_keys').update(patch).eq('owner_id', owner).select('owner_id')); },
+    // A file as it is in Storage (cryptoRemote opens an encrypted one)
+    async fileDownload(path, ttl){ const url=await this.fileUrl(path, ttl); const r=await fetch(url, {cache:'no-store'}); if(!r.ok) throw new Error('HTTP '+r.status); return r.blob(); },
     async fileUrl(path, ttl){ const {data, error}=await db().storage.from(ATT_BUCKET).createSignedUrl(path, ttl||SIGN_TTL); if(error) throw error; if(!data||!data.signedUrl) throw new Error('Sin enlace firmado'); return data.signedUrl; }
   };
 }
@@ -285,11 +296,15 @@ function syncRetry(){ clearTimeout(SY.timer); const ms=Math.min(300e3, 2000*Math
 function syncRun(reason){
   if(!SY||!SY.user||!SY.remote) return Promise.resolve(false);
   if(SY.running){ SY.again=true; return SY.runP; }
+  if(CR.busy){ SY.again=true; return Promise.resolve(false); } // decision 63a: activating encryption or encrypting the server copy; a run follows
   clearTimeout(SY.timer);
   if(!SY.ready){ syncInit(); return Promise.resolve(false); }
   if(!navigator.onLine){ SY.status='offline'; syncPaint(); return Promise.resolve(false); }
   SY.running=true; SY.again=false; syncStatus('syncing');
-  const body=async()=>{ const t0=Date.now(); const user=SY.user; let st=syncState(); const first=st.owner!==user.id;
+  const body=async()=>{ const t0=Date.now(); const user=SY.user;
+    // Decision 63a: an account with encryption on and no key on this device neither pulls nor pushes (js/e2e.js)
+    if(await cryptoGate(user)==='locked') return 'locked';
+    let st=syncState(); const first=st.owner!==user.id;
     if(first && st.firstFor!==user.id){ // decision 5: a local copy before anything comes in; the account's known state starts empty
       try{ flushEdits(); await BK.put(todayStr()); await refreshBackups(); log('info','Copia local antes de la primera sincronización', {tasks:DB.tasks.length, projects:DB.projects.length}); }
       catch(e){ log('warn','Copia local antes de sincronizar no disponible: '+(e&&e.message||e)); }
@@ -309,8 +324,12 @@ function syncRun(reason){
     log('info','Sincronización ('+reason+')', {recibidas:a.added+a.updated, eliminadas:a.removed, conflictos:a.conflicts.length, enviadas:p.pushed, borradas:p.deleted, mantenidas:p.kept, ms:Date.now()-t0});
     return true; };
   const locked=()=>(navigator.locks&&navigator.locks.request) ? navigator.locks.request('tareas-sync', body) : body();
-  SY.runP=locked().then(ok=>{ SY.running=false; if(ok){ SY.status='ok'; SY.error=''; pushFlush(); attFlushSoon(0); syncResubscribe(); } syncPaint(); if(SY.again) syncChanged(); return !!ok; }, e=>{
-    SY.running=false; const off=syncOffline(e); SY.status=off?'offline':'error'; SY.error=String(e&&(e.message||e.code)||e);
+  SY.runP=locked().then(ok=>{ SY.running=false;
+    if(ok==='locked'){ SY.status='locked'; SY.error=''; syncPaint(); cryptoAskUnlock(); return false; }
+    if(ok){ SY.status='ok'; SY.error=''; pushFlush(); attFlushSoon(0); syncResubscribe(); cryptoResume(); } syncPaint(); if(SY.again) syncChanged(); return !!ok; }, e=>{
+    SY.running=false;
+    if(cryptoFailed(e)){ syncRetry(); syncPaint(); return false; } // decision 63a: encrypted rows and no key, or plain text refused by the server
+    const off=syncOffline(e); SY.status=off?'offline':'error'; SY.error=String(e&&(e.message||e.code)||e);
     log(off?'warn':'error', 'Sincronización falló ('+reason+'): '+SY.error); syncRetry(); syncPaint(); return false; });
   return SY.runP; }
 // The realtime channel leaves out a table the database lacks (attachments before 0003): once a run finds it missing, the channel is made again
@@ -322,22 +341,28 @@ function syncSubscribe(){ if(SY.unsub||!SY.user||!SY.remote.subscribe) return; S
     else if(st==='CHANNEL_ERROR'||st==='TIMED_OUT') log('warn','Tiempo real: '+st+(err?' '+(err.message||err):'')); }); }
 // Changes from another device, a few at a time, through the same merge
 function syncRealtime(){ const ev=SY.rt.splice(0); if(!ev.length||!SY.user) return;
+  if(cryptoLocked()) return; // decision 63a: nothing from the server is merged without the key; the run after unlocking pulls it
   if(syncState().owner!==SY.user.id){ SY.again=true; return; } // the first connection is still matching the spaces: a run afterwards picks these up
   const pulled={}; ev.forEach(([t,row])=>{ (pulled[t]=pulled[t]||[]).push(row); });
   try{ const a=syncApply(pulled, {}); const n=a.added+a.updated+a.removed; if(n) log('info','Cambios recibidos en tiempo real', {recibidas:a.added+a.updated, eliminadas:a.removed, conflictos:a.conflicts.length}); if(n||a.conflicts.length||a.folded) syncChanged(); }
   catch(e){ log('error','Tiempo real: '+(e&&e.message||e)); } }
 function syncSetUser(user, why){
   const st=syncState();
-  if(user){ const changed=!SY.user||SY.user.id!==user.id; SY.user={id:user.id, email:user.email||''}; st.user=SY.user; syncWrite(st);
+  if(user){ const changed=!SY.user||SY.user.id!==user.id; SY.user={id:user.id, email:user.email||''}; st.user=SY.user; st.lost=null; syncWrite(st); SY.lostShown=false;
     if(changed) log('info','Sesión iniciada', SY.user.email);
     syncSubscribe(); if(changed || why==='inicio') syncRun(why==='inicio'?'inicio':'sesión'); }
-  else if(SY.user){ log('info', why==='SIGNED_OUT'?'Sesión cerrada':'Sesión no válida: se deja de sincronizar'); SY.user=null; st.user=null; syncWrite(st);
-    if(SY.unsub){ SY.unsub(); SY.unsub=null; } clearTimeout(SY.timer); SY.status='idle'; }
+  else if(SY.user){ const asked=SY.signingOut||why==='user'; SY.user=null; st.user=null;
+    // A session that ends without «Cerrar sesión» (revoked or expired elsewhere, such as a global sign-out from another app of the project):
+    // said in the log, in a notice and in Ajustes until the next sign-in. The encryption key stays; the next sign-in checks it against the account
+    if(asked) log('info','Sesión cerrada'); else { st.lost=new Date().toISOString(); CR.force=true; log('warn','La sesión se ha cerrado sin pedirlo: se deja de sincronizar', why); }
+    syncWrite(st); if(SY.unsub){ SY.unsub(); SY.unsub=null; } clearTimeout(SY.timer); SY.status='idle'; if(!asked) syncLostNotice(); }
   syncPaint(); }
+// The notice of a session ended without asking: once per app session (Ajustes keeps saying it until the next sign-in)
+function syncLostNotice(){ if(!SY||SY.user||SY.lostShown||!syncState().lost) return; SY.lostShown=true; toast('Se ha cerrado la sesión. Inicia sesión para sincronizar'); }
 // Loads the client and reads the session. Offline at start a known session is kept: it is checked when the connection returns
 function syncInit(){ if(!SY||!SY.remote||SY.initP) return; SY.initP=SY.remote.init().then(user=>{ SY.ready=true;
     if(!SY.authBound){ SY.authBound=true; SY.remote.onAuth((u, ev)=>syncSetUser(u, ev)); }
-    if(user) syncSetUser(user, 'inicio'); else if(SY.user && !navigator.onLine) syncStatus('offline'); else syncSetUser(null, 'inicio'); }, e=>{
+    if(user) syncSetUser(user, 'inicio'); else if(SY.user && !navigator.onLine) syncStatus('offline'); else { syncSetUser(null, 'inicio'); syncLostNotice(); } }, e=>{
     log('warn','Sincronización no disponible: '+(e&&e.message||e)); SY.status=syncOffline(e)?'offline':'error'; syncPaint(); })
   .finally(()=>{ SY.initP=null; }); }
 // The project URL as stored in the repository secret, written in any usual form: the full URL, without https://, with a path
@@ -349,19 +374,23 @@ function syncBoot(){
   const cfg=window.TAREAS_CONFIG, fake=window.__tareasRemote; // __tareasRemote: a test's stand-in for the server
   const url=cfg&&normSupabaseUrl(cfg.url), key=cfg&&cfg.anonKey&&String(cfg.anonKey).trim().replace(/^["']|["']$/g,'');
   if(cfg&&cfg.url&&!url) log('warn','La dirección de Supabase guardada no es válida', {length:String(cfg.url).length});
-  const remote=fake||(url&&key?supabaseRemote({url, anonKey:key}):null); if(!remote) return; // no config: local only, as before
+  const raw=fake||(url&&key?supabaseRemote({url, anonKey:key}):null); if(!raw) return; // no config: local only, as before
+  const remote=window.__noCrypto?raw:cryptoRemote(raw); // decision 63a: every adapter goes through the encryption layer (__noCrypto: a test's device on an older version)
   const st=syncState();
   SY={remote, user:st.user||null, status:'idle', error:'', ready:false, running:false, again:false, runP:null, timer:0, retry:0, pending:0, unsub:null, rt:[], rtT:0, quiet:false, lastSync:st.lastSync||null, initP:null, authBound:false};
   window.addEventListener('online', ()=>{ SY.retry=0; UQ.retry=0; if(!SY.ready) syncInit(); else syncRun('conexión'); }); // the run uploads the attachments waiting (attFlush) once it reaches the server
   window.addEventListener('offline', ()=>syncStatus('offline'));
   document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible' && SY.user) syncRun('vuelta'); });
   setInterval(()=>{ if(onSettings() && SY.user && !busyEditing()) render(); }, 6e4); // "hace 3 min" stays true
-  syncInit(); if(onSettings()) render(); }
+  cryptoBoot(); syncInit(); if(onSettings()) render(); }
 async function syncSignIn(){ if(!SY) return; if(!navigator.onLine){ toast('Sin conexión'); return; }
   try{ if(!SY.ready){ syncInit(); await SY.initP; } flushHeld(true); flushEdits(); log('info','Inicio de sesión con Google'); await SY.remote.signIn(); }
   catch(e){ log('error','Inicio de sesión falló: '+(e&&e.message||e)); toast('No se pudo iniciar sesión'); } }
 function syncSignOutSheet(){ const dev=UI.wide?'este dispositivo':'este iPhone';
-  confirmSheet('Cerrar sesión', 'Los datos se quedan en '+dev+' y dejan de sincronizarse.', async()=>{ await pushSignOut(); try{ await SY.remote.signOut(); }catch(e){ log('warn','Cerrar sesión: '+(e&&e.message||e)); } syncSetUser(null, 'SIGNED_OUT'); toast('Sesión cerrada'); }); }
+  // signingOut: the SIGNED_OUT event this causes is the user's own, not a session lost. Only this sign-out forgets the encryption key (decision 63a)
+  confirmSheet('Cerrar sesión', 'Los datos se quedan en '+dev+' y dejan de sincronizarse.', async()=>{ SY.signingOut=true;
+    try{ await pushSignOut(); try{ await SY.remote.signOut(); }catch(e){ log('warn','Cerrar sesión: '+(e&&e.message||e)); } syncSetUser(null, 'user'); await cryptoSignedOut(); }
+    finally{ SY.signingOut=false; } toast('Sesión cerrada'); }); }
 
 /* ---------- Ajustes, Cuenta ---------- */
 function syncAgo(iso){ const t=syncTime(iso); if(!t) return ''; const m=Math.floor((Date.now()-t)/6e4);
@@ -369,6 +398,8 @@ function syncAgo(iso){ const t=syncTime(iso); if(!t) return ''; const m=Math.flo
   const d=localDay(iso); if(d===todayStr()) return 'hoy a las '+fmtTime(iso); if(d===addDays(todayStr(),-1)) return 'ayer a las '+fmtTime(iso);
   const x=new Date(iso); return 'el '+x.getDate()+' '+MESES[x.getMonth()]+' a las '+fmtTime(iso); }
 function syncLine(){ if(!SY||!SY.user) return '';
+  if(SY.status==='locked') return 'Falta la contraseña de cifrado'; // decision 63a
+  if(SY.status==='error'&&CRYPTO_REFUSED.test(SY.error)) return 'Actualiza la app: el cifrado está activado';
   if(SY.status==='offline') return 'Sin conexión. Se sincronizará al volver';
   if(SY.status==='syncing') return 'Sincronizando';
   if(SY.status==='error') return 'No se pudo sincronizar. Se volverá a intentar';
@@ -376,11 +407,11 @@ function syncLine(){ if(!SY||!SY.user) return '';
 function syncAccountHTML(dev){
   if(!SY) return '<div class="group-title">Cuenta</div><div class="group"><div class="cell"><span class="lbl">Sincronización</span><span class="val">Solo en '+dev+'</span></div></div>'+
     '<div class="footnote">Sincronización no disponible en esta versión.</div>';
-  if(!SY.user) return '<div class="group-title">Cuenta</div><div class="group"><button class="cell link" data-act="signIn"><span class="lbl">Iniciar sesión con Google</span></button></div>'+
+  if(!SY.user) return '<div class="group-title">Cuenta</div><div class="group sync-acc">'+(syncState().lost?'<div class="cell"><span class="lbl sync-line warn">Se ha cerrado la sesión. Inicia sesión para sincronizar</span></div>':'')+'<button class="cell link" data-act="signIn"><span class="lbl">Iniciar sesión con Google</span></button></div>'+
     '<div class="footnote">'+(SY.status==='offline'?'Sin conexión. ':'')+'Al iniciar sesión, tus tareas se guardan en tu cuenta y llegan a tus otros dispositivos. Lo que ya hay en '+dev+' se conserva.</div>';
   const n=SY.pending||0, line=syncLine();
   return '<div class="group-title">Cuenta</div><div class="group sync-acc"><div class="cell"><span class="lbl">Cuenta</span><span class="val">'+esc(SY.user.email||'Google')+'</span></div>'+
-    '<div class="cell"><span class="lbl sync-line'+(SY.status==='error'||SY.status==='offline'?' warn':'')+'">'+esc(line)+'</span></div>'+
+    '<div class="cell"><span class="lbl sync-line'+(SY.status==='error'||SY.status==='offline'||SY.status==='locked'?' warn':'')+'">'+esc(line)+'</span></div>'+
     '<div class="cell"><span class="lbl">Cambios pendientes</span><span class="val">'+(n?n:'Ninguno')+'</span></div>'+
     '<button class="cell link" data-act="syncNow"'+(SY.status==='syncing'?' disabled':'')+'><span class="lbl">Sincronizar ahora</span></button>'+
     '<button class="cell" data-act="signOut"><span class="lbl" style="color:var(--red)">Cerrar sesión</span></button></div>'+

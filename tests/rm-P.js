@@ -202,6 +202,13 @@ async function fnTests(st){
   store.t.tasks.push(T('w1', { status:'waiting', reminder:iso(-20e3), title:'Esperando la firma' }), T('w2', { status:'waiting', date:null }), T('w3', { status:'waiting', date:'2099-01-01' }));
   const nW = PUSHES.length, r4 = await fnCall('POST', '', {}); const pw = PUSHES.slice(nW).filter(p => p.url==='/push/a1').map(p => decrypt(p.body, dA1));
   check('fn_waiting_notifies', r4.json && r4.json.due===1 && r4.json.sent===1 && pw.length===1 && pw[0].tag==='w1' && pw[0].title==='Esperando la firma' && pw[0].badge===7 && !!store.t.tasks.find(t=>t.id==='w1').reminder_sent, {json:r4.json, pw}); // the badge of t1 was 6, plus w1
+  // Decision 63a: an encrypted title or project name ('e1:...') goes whole, never clipped (a cut one would not open on the device); a plain
+  // one is still clipped; data carries projectId, the additional data of an encrypted project name
+  store.t.projects.push({ id:'p2', name:'e1:'+'B'.repeat(120), deleted:null });
+  store.t.tasks.push(T('e1t', { project_id:'p2', reminder:iso(-10e3), title:'e1:'+'A'.repeat(300) }), T('lng', { reminder:iso(-10e3), title:'X'.repeat(300) }));
+  const nE = PUSHES.length, r5 = await fnCall('POST', '', {}); const pe = PUSHES.slice(nE).filter(p => p.url==='/push/a1').map(p => decrypt(p.body, dA1));
+  const pE = pe.find(p => p.tag==='e1t'), pL = pe.find(p => p.tag==='lng');
+  check('fn_cipher_not_clipped', r5.json && r5.json.sent===2 && pE && pE.title==='e1:'+'A'.repeat(300) && pE.body==='e1:'+'B'.repeat(120) && pE.data.projectId==='p2' && pL && pL.title.length===180 && pL.title.endsWith('…') && pL.data.projectId===null && m1.pt.data.projectId==='p1', {json:r5.json, pE, pL});
   GONE.clear(); store.t.push_subscriptions.push({ id:'sA3', owner_id:'user-A', endpoint:EP('a3'), p256dh:dA2.p256dh, auth:dA2.authB64, deleted:null });
   const n0 = PUSHES.length; const tNo = await fnCall('POST', '', {test:true}), tBad = await fnCall('POST', '', {test:true}, {Authorization:'Bearer nope'});
   check('fn_test_needs_session', tNo.status===401 && tBad.status===401 && PUSHES.length===n0, [tNo.status, tBad.status]);

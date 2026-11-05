@@ -128,7 +128,8 @@ async function cards(browser){
   await page.setViewportSize({width:1440, height:1300}); // the resize handler refits on the next frame; on a slow runner that can take a while
   for(let t0=Date.now(); Date.now()-t0<5000; await sleep(100)){ c = await col(page); if(c.cards.length>fewer) break; } await calm(page);
   c = await col(page); check('c_fit_resize', c.cards.length>fewer && c.lastBottom<=c.listBottom, {now:c.cards.length, before:fewer});
-  await page.setViewportSize({width:1440, height:900}); await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
+  await page.setViewportSize({width:1440, height:900}); // the same wait as above: the refit can take a while on a busy runner
+  for(let t0=Date.now(); Date.now()-t0<5000; await sleep(100)){ c = await col(page); if(c.cards.length===fewer) break; }
   c = await col(page); check('c_fit_back', c.cards.length===fewer, {now:c.cards.length, fewer});
   await page.click('#desk .pitall'); await calm(page);
   x = await ev(page, ()=>({tab:projTab('p1'), view:UI.deskView, list:!!document.querySelector('#desk .nsplit')}));

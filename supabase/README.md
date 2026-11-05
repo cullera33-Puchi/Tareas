@@ -29,5 +29,6 @@ Edge Functions, `add-task` (el nombre exacto). Pega `functions/add-task/index.ts
 | `migrations/0009_closed_day.sql` | Día cerrado en todos los dispositivos (Cerrar el día) | v0.30.0 |
 | `migrations/0010_inbox.sql` | Siri y el Atajo de iOS: bandeja de entrada y clave personal del atajo | v0.31.0 |
 | `migrations/0011_contacts.sql` | Responsable de una tarea y lista de contactos | v0.32.0 |
+| `migrations/0012_encryption.sql` | Cifrado de extremo a extremo: clave de la cuenta y regla que rechaza texto sin cifrar | v0.34.0 |
 
-`all.sql` es la suma de las once en orden. Las claves de la app (URL y clave pública) no van aquí: están en los secretos del repositorio de GitHub.
+`all.sql` es la suma de las doce en orden. Las claves de la app (URL y clave pública) no van aquí: están en los secretos del repositorio de GitHub.

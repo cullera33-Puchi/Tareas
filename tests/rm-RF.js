@@ -105,6 +105,7 @@ const ev = (page, fn, arg) => page.evaluate(fn, arg);
 const toastText = page => ev(page, ()=>document.querySelector('#toast').classList.contains('on')?document.querySelector('#toastText').textContent:'');
 // A menu item by its label (the iPhone menu, or a Mac menu whose key follows the label)
 const menuItem = (page, label) => page.locator('#pmenu .pm-it').filter({has: page.locator('.pm-l', {hasText: new RegExp('^'+label.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'$')})}).first();
+const serOf = s => ((s||'').split('#')[1]||'').split(';')[0]; // decision 65e: the series id, before any flag
 const series = (page, id) => ev(page, id=>{ const s=repSeries(task(id).repeat); return DB.tasks.filter(x=>repSeries(x.repeat)===s).map(x=>({id:x.id, status:x.status, date:x.date, title:x.title, projectId:x.projectId, priority:x.priority, notes:x.notes, reminder:x.reminder, reminderSent:x.reminderSent||null, vn:DB.attachments.filter(a=>a.taskId===x.id&&a.kind==='audio').length, repeat:x.repeat})); }, id);
 
 /* ======================= 2 and 3. Engine and iPhone ======================= */
@@ -138,10 +139,10 @@ async function iphone(browser){
   check('detail_repeat_row', d0==='RepetirNunca', d0);
   await page.tap('.pushed-screen.detail [data-act=pickRepeat]'); await sleep(550); await shot(page, 'm1-repeat-menu');
   const items = await ev(page, ()=>[...document.querySelectorAll('#pmenu .pm-it .pm-l')].map(e=>e.textContent));
-  check('repeat_menu_items', items.join('|')==='Nunca|Cada día|Cada día laborable|Cada semana|Cada 2 semanas|Cada mes|Cada año|Personalizada', items);
+  check('repeat_menu_items', items.join('|')==='Nunca|Cada día|Cada día laborable|Cada semana|Cada 2 semanas|Cada mes|Cada año|Cada semana desde que la hice|Personalizada', items);
   await menuItem(page, 'Cada semana').tap(); await sleep(500);
   let x = await ev(page, ()=>({rep:task('r1').repeat, val:document.querySelector('.pushed-screen.detail [data-act=pickRepeat] .val').textContent}));
-  check('repeat_weekly', /^W1:WE@2026-11-04#[\w-]+$/.test(x.rep) && x.val==='Cada semana, miércoles' && /^Se repite: cada semana, miércoles$/.test(await toastText(page)), x);
+  check('repeat_weekly', /^W1:WE@2026-11-04#[\w-]+;s$/.test(x.rep) && x.val==='Cada semana, miércoles' && /^Se repite: cada semana, miércoles$/.test(await toastText(page)), x);
   const ser1 = x.rep.split('#')[1];
   // Personalizada: every 2 weeks on Monday and Thursday
   await page.tap('.pushed-screen.detail [data-act=pickRepeat]'); await sleep(550); await menuItem(page, 'Personalizada').tap(); await sleep(700);
@@ -528,15 +529,15 @@ async function syncTests(browser){
   const ups0 = fake.ups.filter(u=>u.page===B.page).length;
   await ev(A.page, ()=>completeTask('s2')); check('sync_A_complete', await synced(A.page));
   const ser = await ev(A.page, ()=>repSeries(task('s2').repeat));
-  const onServer = [...fake.t.tasks.values()].filter(x=>(x.repeat||'').endsWith('#'+ser));
+  const onServer = [...fake.t.tasks.values()].filter(x=>serOf(x.repeat)===ser);
   check('sync_server_series', onServer.length===2 && onServer.filter(x=>x.status==='pending').length===1, onServer.map(x=>x.id+':'+x.status));
   check('sync_B_series', await until(B.page, s=>{ const xs=DB.tasks.filter(x=>repSeries(x.repeat)===s); return xs.length===2 && xs.filter(x=>x.status==='pending').length===1; }, ser), await ev(B.page, s=>DB.tasks.filter(x=>repSeries(x.repeat)===s).map(x=>x.id+':'+x.status), ser));
   await sleep(2500); await synced(B.page);
   const bRows = fake.ups.filter(u=>u.page===B.page).slice(ups0).flatMap(u=>u.rows);
-  check('sync_B_creates_nothing', ![...fake.t.tasks.values()].some(x=>(x.repeat||'').endsWith('#'+ser)&&!onServer.some(o=>o.id===x.id)) && !bRows.some(x=>(x.repeat||'').endsWith('#'+ser)&&!onServer.some(o=>o.id===x.id)), bRows.map(x=>x.id));
+  check('sync_B_creates_nothing', ![...fake.t.tasks.values()].some(x=>serOf(x.repeat)===ser&&!onServer.some(o=>o.id===x.id)) && !bRows.some(x=>serOf(x.repeat)===ser&&!onServer.some(o=>o.id===x.id)), bRows.map(x=>x.id));
   // Deshacer on A after the sync: the next one is deleted everywhere
   await ev(A.page, ()=>undoDone({id:'s2', status:'pending', completed:null})); // the Deshacer of the completion, after it went up check('sync_A_undo', await synced(A.page));
-  check('sync_undo_everywhere', await until(B.page, s=>DB.tasks.filter(x=>repSeries(x.repeat)===s).length===1 && task('s2').status==='pending', ser) && [...fake.t.tasks.values()].filter(x=>(x.repeat||'').endsWith('#'+ser)&&!x.deleted).length===1);
+  check('sync_undo_everywhere', await until(B.page, s=>DB.tasks.filter(x=>repSeries(x.repeat)===s).length===1 && task('s2').status==='pending', ser) && [...fake.t.tasks.values()].filter(x=>serOf(x.repeat)===ser&&!x.deleted).length===1);
   // Both devices complete the same task of a series offline: each makes the next one; once both are back, one stays, on both and on the server
   await ev(A.page, ()=>{ setRepeat('s1', 'D1'); }); check('sync_dup_ready', await synced(A.page) && await until(B.page, ()=>!!repParse(task('s1').repeat)));
   await synced(B.page); const ser2 = await ev(A.page, ()=>repSeries(task('s1').repeat));
@@ -550,8 +551,8 @@ async function syncTests(browser){
   check('sync_dup_one_left', nextA.length===1 && nextB.length===1 && nextA[0]!==nextB[0] && nextA[0].split('|')[1]===nextB[0].split('|')[1]
     && await until(A.page, ([s,k])=>{ const xs=DB.tasks.filter(x=>repSeries(x.repeat)===s&&x.status==='pending'); return xs.length===1&&xs[0].id===k; }, [ser2, keep])
     && await until(B.page, ([s,k])=>{ const xs=DB.tasks.filter(x=>repSeries(x.repeat)===s&&x.status==='pending'); return xs.length===1&&xs[0].id===k; }, [ser2, keep])
-    && [...fake.t.tasks.values()].filter(x=>(x.repeat||'').endsWith('#'+ser2)&&x.status==='pending'&&!x.deleted).map(x=>x.id).join()===keep,
-    {nextA, nextB, keep, A:await pendOn(A.page), B:await pendOn(B.page), server:[...fake.t.tasks.values()].filter(x=>(x.repeat||'').endsWith('#'+ser2)).map(x=>x.id+':'+x.status+':'+!!x.deleted)});
+    && [...fake.t.tasks.values()].filter(x=>serOf(x.repeat)===ser2&&x.status==='pending'&&!x.deleted).map(x=>x.id).join()===keep,
+    {nextA, nextB, keep, A:await pendOn(A.page), B:await pendOn(B.page), server:[...fake.t.tasks.values()].filter(x=>serOf(x.repeat)===ser2).map(x=>x.id+':'+x.status+':'+!!x.deleted)});
   check('sync_dup_logged', await ev(B.page, ()=>LOG.some(e=>/^Tarea repetida de una serie retirada/.test(e.m))) || await ev(A.page, ()=>LOG.some(e=>/^Tarea repetida de una serie retirada/.test(e.m))));
   await A.ctx.close(); await B.ctx.close();
 

@@ -495,7 +495,7 @@ const repSeriesId = () => uid().replace(/-/g,'').slice(0,8);
    A count starts at this task (;n1) unless the series already counted; changing only the end keeps the anchor and the rhythm */
 function setRepeat(id, freq, end){ const x=task(id); if(!x) return; const cur=repParse(x.repeat), old={repeat:x.repeat||null, date:x.date, carried:x.carried};
   if(!freq){ if(!x.repeat) return; updTask(id,{repeat:null}); haptic(6); render(); log('info','Repetición quitada'); toast('Ya no se repite', ()=>updTask(id,{repeat:old.repeat})); return; }
-  const r=repParse(freq); if(!r) return; const e=end||(cur?{until:cur.until, count:cur.count, skip:cur.skip}:{skip:true});
+  const r=repParse(freq); if(!r) return; const e=end||(cur?{until:cur.until, count:cur.count, skip:cur.f==='A'||cur.skip}:{skip:true}); // an A rule has no flag of its own: back on the calendar it takes the default
   r.until=e.until||null; r.count=e.count||null; r.skip=!!e.skip&&r.f!=='A'; r.idx=r.count?(cur&&cur.count&&cur.idx||1):null;
   const same=cur&&repFreq(cur)===repFreq(r); if(same&&repFlags(cur)===repFlags(r)) return;
   const t=todayStr(); let date=x.date;

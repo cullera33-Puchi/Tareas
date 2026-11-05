@@ -290,6 +290,16 @@ async function focusDesk(browser, theme){ let x;
   await ev(page, ()=>setDeskView('todas')); await calm(page); x = await look();
   check('desk_other_view', !x.focus && !x.mode && x.view==='todas', x);
   await ev(page, ()=>setDeskView('hoy')); await calm(page); x = await look(); check('desk_back_hoy_normal', !x.focus, x);
+  // Personalizada as a Mac popover: Desde que la hice, Termina after 4 times
+  await page.click('#desk .main .row[data-id=h1] .row-title'); await until(page, ()=>!!document.querySelector('#desk .pane [data-act=pickRepeat]'));
+  await page.click('#desk .pane [data-act=pickRepeat]'); await menuSettled(page); await menuItem(page, 'Personalizada…').click();
+  await until(page, ()=>!!document.querySelector('#pmenu .pm-pop .rp'));
+  for(const k of ['after','e:count']){ await page.click('#pmenu .pm-pop [data-rp="'+k+'"]'); await sleep(60); }
+  for(let i=0;i<6;i++){ await page.click('#pmenu .pm-pop [data-rp="c-"]'); await sleep(40); }
+  x = await ev(page, ()=>document.querySelector('#pmenu .pm-pop .rpsum').textContent); await shot(page, 'd3-custom-popover');
+  await page.click('#pmenu .pm-pop [data-rp=ok]'); await until(page, ()=>!!(task('h1').repeat));
+  const rep = await ev(page, ()=>task('h1').repeat);
+  check('desk_custom', x==='Cada semana desde que se hace, 4 veces' && /^A1W@2026-11-05#[\w-]+;x4$/.test(rep), {x, rep});
   await ctx.close();
 }
 

@@ -1,5 +1,11 @@
 # Registro de cambios
 
+## v0.35.2. Recordatorios con proyecto y canal a elegir (5 de noviembre de 2026)
+
+- Formato (punto 74): «Hola X,» en su propia línea, una línea en blanco, «Te recuerdo esta tarea» o «estas tareas», las viñetas y «Gracias.». Cada viñeta lleva el proyecto y, si la hay, la fecha o la entrega: «Preparar SteerCo (OCA, para hoy)».
+- Canal a elegir en la hoja del recordatorio: WhatsApp si el contacto tiene teléfono; Correo y Teams si tiene correo (Teams abre un chat con esa persona y el mensaje escrito); Otras apps con la hoja de compartir. Por defecto, el de siempre.
+- Sin cambios de datos. Pruebas `rm-PP` y `rm-RC` actualizadas.
+
 ## v0.35.1. Recordatorios más claros (5 de noviembre de 2026)
 
 - Recordar todo (punto 73a): la hoja muestra las tareas de la persona con una casilla cada una, todas marcadas al abrir, y «Seleccionar todo» o «Quitar todas»; el mensaje sigue a la selección hasta que se edita a mano; sin ninguna marcada no se envía.

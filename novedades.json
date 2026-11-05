@@ -1,5 +1,14 @@
 [
   {
+    "version": "0.35.2",
+    "date": "2026-11-05",
+    "items": [
+      "El recordatorio empieza como un correo: «Hola Susana,» en su línea y el texto debajo.",
+      "Cada tarea del recordatorio lleva su proyecto, además de la fecha o la entrega.",
+      "Puedes elegir por dónde enviarlo: WhatsApp, correo, Teams u otras apps, según los datos del contacto."
+    ]
+  },
+  {
     "version": "0.35.1",
     "date": "2026-11-05",
     "items": [

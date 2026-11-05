@@ -320,7 +320,7 @@ function rowHTML(x, opts={}){
     if(respShown(x)) meta.push(respMetaHTML(x)); // decision 48c: who does it, in grey
     if(x.reminder) meta.push('<span class="bell">'+I.bell+(x.date&&localDay(x.reminder)===x.date?fmtTime(x.reminder):fmtDateTime(x.reminder))+'</span>'); // the reminder's own day when it is not the task's date (moved task, no date)
     if(x.estimate) meta.push('<span class="est">'+estLabel(x.estimate)+'</span>'); } // decision 56a
-  const ind=opts.compact?'':(x.focus&&!done&&!opts.simple?'<span class="ist" title="En Ahora">'+I.starF+'</span>':'')+(x.notes&&x.notes.trim()?I.note:'')+(hasAtt(x.id)?I.clip:'')+(x.repeat&&repParse(x.repeat)?'<span class="irp" title="'+esc(repSummary(x.repeat))+'">'+I.repeat+'</span>':''); // decision 29: a paperclip when it has photos or audio
+  const ind=opts.compact?'':(x.focus&&!done&&!opts.simple&&!opts.inFocus?'<span class="ist" title="En Ahora">'+I.starF+'</span>':'')+(x.notes&&x.notes.trim()?I.note:'')+(hasAtt(x.id)?I.clip:'')+(x.repeat&&repParse(x.repeat)?'<span class="irp" title="'+esc(repSummary(x.repeat))+'">'+I.repeat+'</span>':''); // decision 29: a paperclip when it has photos or audio
   const pri = done?'':x.priority==='high'?'<span class="pri high">!!!</span>':x.priority==='mid'?'<span class="pri mid">!!</span>':'';
   const prog=opts.compact?'':stepProgHTML(x); // decision 46: "3/4" and its ring, next to the indicators; on the desktop a column of its own
   const pc=p?p.color:null;
@@ -338,7 +338,7 @@ function rowHTML(x, opts={}){
 const IND_SLOTS=['st','nt','cl','rp'];
 const indSlotsHTML = f => IND_SLOTS.map(k=>'<span class="is is-'+k+'">'+(f?f(k):'')+'</span>').join('');
 function deskIndHTML(x, v, opts){ if(opts.compact) return '';
-  return indSlotsHTML(k=> k==='st'?(x.focus&&!v.done&&!opts.simple?'<span class="ist" title="En Ahora">'+I.starF+'</span>':'')
+  return indSlotsHTML(k=> k==='st'?(x.focus&&!v.done&&!opts.simple&&!opts.inFocus?'<span class="ist" title="En Ahora">'+I.starF+'</span>':'')
     : k==='nt'?(x.notes&&x.notes.trim()?I.note:'') : k==='cl'?(hasAtt(x.id)?I.clip:'')
     : (x.repeat&&repParse(x.repeat)?'<span class="irp" title="'+esc(repSummary(x.repeat))+'">'+I.repeat+'</span>':'')); }
 function deskRowHTML(x, opts, v){ const t=v.t; let date='', dcls='', rem=''; const dl=x.deadline?dlText(x.deadline):'', dlc=dlLevel(x); // decision 48a: a column of its own
@@ -363,7 +363,14 @@ function deskRowHTML(x, opts, v){ const t=v.t; let date='', dcls='', rem=''; con
 /* Decision 39: the Ahora block. iPhone: at the top of Hoy, above the search, compact rows (circle, title, project, priority) that open the
    detail and complete; hidden when empty. Desktop: above the list of Hoy and Todas, a drop zone for rows. Order: when each was put there */
 function ahoraHTML(){ const xs=ahoraTasks(); if(!xs.length) return '';
-  return '<section class="ahora"'+(UI.wide?' data-drop-ahora=""':'')+' aria-label="Ahora"><div class="ahead">'+I.starF+'<span class="al">Ahora</span><span class="gn">'+xs.length+'</span><span class="grow"></span><button class="asug" data-act="suggest">Sugerir</button></div><div class="first">'+xs.map(x=>rowHTML(x,{simple:true, compact:!UI.wide, noToday:true})).join('')+'</div></section>'; }
+  return '<section class="ahora"'+(UI.wide?' data-drop-ahora=""':'')+' aria-label="Ahora"><div class="ahead">'+I.starF+'<span class="al">Ahora</span><span class="gn">'+xs.length+'</span><span class="grow"></span><button class="asug afoco" data-act="focusOn" title="Solo las tareas de Ahora">Foco</button><button class="asug" data-act="suggest">Sugerir</button></div><div class="first">'+xs.map(x=>rowHTML(x,{simple:true, compact:!UI.wide, noToday:true})).join('')+'</div></section>'; }
+/* Decision 65d: focus mode, the Ahora tasks alone, large, with their usual gestures and completing; nothing else of Hoy. iPhone: the whole
+   Tareas tab with Salir del foco in its bar. Desktop: the list area of Hoy (focusMainHTML), the sidebar stays */
+const focusRowsHTML = () => '<div class="group focuslist">'+ahoraTasks().map(x=>rowHTML(x, {noToday:true, inFocus:true})).join('')+'</div>'+
+  '<div class="footnote focusnote">Solo lo que tienes en Ahora. Al completarlas todas, vuelves a Hoy.</div>';
+function focusViewHTML(){ const n=ahoraTasks().length;
+  return '<header class="nav focusnav"><div class="nav-row"><div class="title">'+I.starF.replace('class="i-star on"','class="i-star on fstar"')+'Ahora<span class="fn">'+n+'</span></div><button class="action strong" data-act="focusOff">Salir del foco</button></div></header>'+
+    '<div class="scroll focusview">'+focusRowsHTML()+'</div>'; }
 // The desktop view Ahora (sidebar): its tasks as a list of their own, with the selection and the keys of the other lists
 function ahoraViewHTML(){ let xs=ahoraTasks(); if(UI.query) xs=xs.filter(queryMatcher(UI.query));
   if(!xs.length) return '<div class="empty" data-drop-ahora="">'+I.star.replace('<svg','<svg style="width:44px;height:44px"')+'<b>'+(UI.query?'Sin resultados':'Nada en Ahora')+'</b>'+(UI.query?'Prueba con otra palabra':'Arrastra aquí las tareas que vas a hacer ya, o pulsa A en una tarea. Caben '+AHORA_MAX+'.')+'</div>';
@@ -474,6 +481,7 @@ function hoyLoadHTML(){ const l=hoyShown(), m=estSum(l); if(!m) return ''; const
 function viewTareas(){
   const f=DB.settings.filter; const nHoy=UI.query?0:hoyShown().length, nTodas=UI.query?0:pendingFor('todas').filter(x=>x.status!=='waiting').length; // a search hides the segment that shows them; decision 51: Todas lists its waiting tasks in the block at the foot, outside the count
   if(UI.select && UI.select.scope==='root') return selectNav()+'<div class="scroll">'+listHTML(UI.query?'todas':f)+'</div>';
+  focusCheck(); if(focusOn()) return focusViewHTML(); // decision 65d
   return '<header class="nav"><div class="nav-row"><button class="title" data-act="spaceMenu" aria-label="Cambiar espacio">'+esc(space().name)+I.chevD+'</button>'+'<button class="action vopts" data-act="viewMenu" aria-label="Opciones de vista">'+I.more+'</button>'+'</div></header>'+
    '<div class="scroll">'+(f==='hoy'&&!UI.query&&!isClosed()?ahoraHTML():'')+
    '<div class="searchbar"><div class="search">'+I.search+'<input type="search" placeholder="Buscar" value="'+esc(UI.query)+'" data-role="search" autocomplete="off"></div>'+(UI.query?'<button class="cancel" data-act="clearSearch">Cancelar</button>':'')+'</div>'+

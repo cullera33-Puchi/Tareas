@@ -134,6 +134,7 @@ function onClick(e){
     case 'pickDeadline': if(detailId) deadlineSheet(detailId, act); break; // decision 48a
     case 'pickEstimate': if(detailId) estimatePick(detailId, UI.wide?act:act.querySelector('.val')||act); break; // decision 56a
     case 'suggest': suggestSheet(act); break; // decision 56c: Sugerir, in the head of Ahora
+    case 'focusOn': setFocusMode(true); break; case 'focusOff': setFocusMode(false); break; // decision 65d: Foco in the head of Ahora, Salir del foco in its bar
     case 'pickWaiting': if(detailId) waitingMenu(detailId, UI.wide?act:act.querySelector('.val')||act); break; // decision 41
     case 'toggleWaiting': UI.waitOpen=!UI.waitOpen; render(); break;
     case 'pickRepeat': if(detailId) repeatMenu(detailId, UI.wide?act:act.querySelector('.val')||act); break; // decision 38

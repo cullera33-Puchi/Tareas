@@ -2,7 +2,7 @@
 /* Tareas. Core: version, log, utilities, data (DB in localStorage), UI state, Deshacer toast and the task actions.
    A classic script: index.html loads every file of js/ in order and they share their global names. Only declarations and
    listeners run at load; the start itself (first screen, timers, sync, service worker) is in boot.js, the last file. */
-const APP_VERSION = '0.32.0';
+const APP_VERSION = '0.33.0';
 let pendingSW = null; // service worker installed and waiting to take over
 let updateRequested = false; // the user asked for the waiting worker to take over
 
@@ -406,21 +406,37 @@ $('#toastBtn').addEventListener('click',()=>{ if(undoFn){ undoFn(); undoFn=null;
      Y<n>:<MM>-<DD>   every n years on that day; 29 February is the 28th in other years  'Y1:11-03'
    anchor (YYYY-MM-DD): the day the series counts from, so 'every 2 weeks' and 'every 3 days' keep their rhythm.
    series: an id every task of the series shares (one pending at a time); it stays when the rule changes. No other column is needed.
-   Example: 'W2:MO,TH@2026-11-02#k3f9a2c1'. Days are worked out on calendar dates, never on times, so a time zone or summer time cannot shift them */
+   Example: 'W2:MO,TH@2026-11-02#k3f9a2c1'. Days are worked out on calendar dates, never on times, so a time zone or summer time cannot shift them.
+   Decision 65 adds, all optional, so a rule written before it reads and writes back exactly as it was:
+     A<n>D, A<n>W     every n days or weeks after it is done (65b): the next one is dated the day it is completed plus n   'A2W'
+   and after the series, flags each after a semicolon (65e):
+     ;u<YYYY-MM-DD>   the series ends on that day: no occurrence after it
+     ;x<N>            the series ends after N occurrences; ;n<k> says which one this task is (1 when left out)
+     ;s               it does not pile up: a task not done moves to its next occurrence instead of being carried as Aplazada
+   Example: 'W1:MO,TH@2026-11-02#k3f9a2c1;x10;n3;s'. A flag this version does not know makes the whole rule unreadable (repParse null, so
+   the task is treated as not repeating and nothing breaks); a device on a version before decision 65 reads every rule with a flag or an
+   A rule the same way, as no repeat. The count is kept on the task (;n) rather than counted from the completed ones, so a skipped or
+   deleted occurrence, a sync from another device or a completed task removed long after cannot change it */
 const REP_DAYS=['SU','MO','TU','WE','TH','FR','SA'], DIAS_L=['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
-const REP_RE=/^(?:D(\d{1,3})|(WD)|W(\d{1,2}):((?:SU|MO|TU|WE|TH|FR|SA)(?:,(?:SU|MO|TU|WE|TH|FR|SA))*)|M(\d{1,2}):(?:(\d{1,2})|([1-4L])(SU|MO|TU|WE|TH|FR|SA))|Y(\d{1,2}):(\d\d)-(\d\d))(?:@(\d{4}-\d\d-\d\d))?(?:#([\w-]{1,40}))?$/;
+const REP_RE=/^(?:D(\d{1,3})|(WD)|W(\d{1,2}):((?:SU|MO|TU|WE|TH|FR|SA)(?:,(?:SU|MO|TU|WE|TH|FR|SA))*)|M(\d{1,2}):(?:(\d{1,2})|([1-4L])(SU|MO|TU|WE|TH|FR|SA))|Y(\d{1,2}):(\d\d)-(\d\d)|A(\d{1,3})([DW]))(?:@(\d{4}-\d\d-\d\d))?(?:#([\w-]{1,40}))?((?:;[^;]*)*)$/;
 const monFirst = d => (d+6)%7; // Monday 0 ... Sunday 6
-function repParse(s){ const m=REP_RE.exec(String(s||'')); if(!m) return null; const r={anchor:m[12]||null, series:m[13]||null};
-  if(m[1]){ r.f='D'; r.n=+m[1]; } else if(m[2]){ r.f='WD'; r.n=1; }
+function repParse(s){ const m=REP_RE.exec(String(s||'')); if(!m) return null; const r={anchor:m[14]||null, series:m[15]||null, until:null, count:null, idx:null, skip:false};
+  for(const k of (m[16]||'').split(';').slice(1)){ let f; // decision 65e: the flags; one unknown, the rule is not read at all
+    if((f=/^u(\d{4}-\d\d-\d\d)$/.exec(k))) r.until=f[1]; else if((f=/^x(\d{1,3})$/.exec(k))&&+f[1]>0) r.count=+f[1]; else if((f=/^n(\d{1,4})$/.exec(k))&&+f[1]>0) r.idx=+f[1]; else if(k==='s') r.skip=true; else return null; }
+  if(r.idx&&!r.count) r.idx=null;
+  if(m[12]){ r.f='A'; r.n=+m[12]; r.u=m[13]; r.skip=false; } // decision 65b: from the day it is done; a task not done stays and is carried as any other
+  else if(m[1]){ r.f='D'; r.n=+m[1]; } else if(m[2]){ r.f='WD'; r.n=1; }
   else if(m[3]){ r.f='W'; r.n=+m[3]; r.days=[...new Set(m[4].split(',').map(d=>REP_DAYS.indexOf(d)))].sort((a,b)=>monFirst(a)-monFirst(b)); }
   else if(m[5]){ r.f='M'; r.n=+m[5]; if(m[6]) r.day=+m[6]; else { r.nth=m[7]==='L'?-1:+m[7]; r.wd=REP_DAYS.indexOf(m[8]); } }
   else { r.f='Y'; r.n=+m[9]; r.mo=+m[10]; r.day=+m[11]; }
   if(r.n<1||(r.day!==undefined&&(r.day<1||r.day>31))||(r.f==='Y'&&(r.mo<1||r.mo>12))) return null;
   return r; }
 const pad2 = n => String(n).padStart(2,'0');
-function repFreq(r){ if(r.f==='D') return 'D'+r.n; if(r.f==='WD') return 'WD'; if(r.f==='W') return 'W'+r.n+':'+r.days.map(d=>REP_DAYS[d]).join(',');
+function repFreq(r){ if(r.f==='A') return 'A'+r.n+r.u; if(r.f==='D') return 'D'+r.n; if(r.f==='WD') return 'WD'; if(r.f==='W') return 'W'+r.n+':'+r.days.map(d=>REP_DAYS[d]).join(',');
   if(r.f==='M') return 'M'+r.n+':'+(r.day?r.day:(r.nth<0?'L':r.nth)+REP_DAYS[r.wd]); return 'Y'+r.n+':'+pad2(r.mo)+'-'+pad2(r.day); }
-const repString = r => repFreq(r)+(r.anchor?'@'+r.anchor:'')+(r.series?'#'+r.series:'');
+// Decision 65e: the flags, in a fixed order; nothing for a rule without them, so older rules are written back unchanged
+const repFlags = r => (r.until?';u'+r.until:'')+(r.count?';x'+r.count+(r.idx>1?';n'+r.idx:''):'')+(r.skip&&r.f!=='A'?';s':'');
+const repString = r => repFreq(r)+(r.anchor?'@'+r.anchor:'')+(r.series?'#'+r.series:'')+repFlags(r);
 const repSeries = s => { const r=repParse(s); return r&&r.series; };
 // Days since 1970-01-01 of a calendar date, with no time zone in between
 const dayNum = s => Math.round(Date.UTC(+s.slice(0,4), +s.slice(5,7)-1, +s.slice(8,10))/864e5);
@@ -428,6 +444,7 @@ const dimOf = (y, m) => new Date(Date.UTC(y, m, 0)).getUTCDate();
 // Whether a date belongs to the series (r parsed); before its anchor too, so a task dated earlier still finds its next date
 function repHas(r, d){ const y=+d.slice(0,4), mo=+d.slice(5,7), dd=+d.slice(8,10), dow=new Date(Date.UTC(y,mo-1,dd)).getUTCDay(), a=r.anchor||d, mod=(x,n)=>((x%n)+n)%n;
   switch(r.f){
+    case 'A': return true; // decision 65b: no calendar of its own; its next date comes from the day it is done (repNext)
     case 'D': return mod(dayNum(d)-dayNum(a), r.n)===0;
     case 'WD': return dow>=1&&dow<=5;
     case 'W': { if(!r.days.includes(dow)) return false; const wk=s=>Math.floor((dayNum(s)-4)/7); return mod(wk(d)-wk(a), r.n)===0; } // 1970-01-05 (day 4) was a Monday
@@ -437,11 +454,26 @@ function repHas(r, d){ const y=+d.slice(0,4), mo=+d.slice(5,7), dd=+d.slice(8,10
   return false; }
 // The first date of the series on or after 'from' (repFirst) or after 'after' (repNext); null for a rule that never matches
 function repFirst(s, from){ const r=typeof s==='string'?repParse(s):s; if(!r) return null; let d=from; for(let i=0;i<4000;i++){ if(repHas(r, d)) return d; d=addDays(d,1); } return null; }
-const repNext = (s, after) => repFirst(s, addDays(after,1));
+const repStep = r => r.n*(r.u==='W'?7:1);
+// For an A rule (decision 65b), 'after' is the day it was done and the next date is that day plus n days or weeks
+const repNext = (s, after) => { const r=typeof s==='string'?repParse(s):s; if(!r) return null; return r.f==='A' ? addDays(after, repStep(r)) : repFirst(r, addDays(after,1)); };
+/* Decision 65e: how many occurrences of the series fall after a and up to b (a < d <= b), to keep the count of ;x;n; one per step for an A rule
+   (each one is a time it was done). Bounded, as repFirst */
+function repCount(r, a, b){ if(!a||!b||b<=a) return 0; if(r.f==='A') return 1; let n=0; for(let d=addDays(a,1), i=0; d<=b&&i<4000; d=addDays(d,1), i++) if(repHas(r, d)) n++; return n; }
+// Whether an occurrence on 'date', number 'idx' of the series, is past its end (;u or ;x)
+const repEnds = (r, date, idx) => !!(r.until&&date>r.until) || !!(r.count&&idx>r.count);
+// The rule a task takes when it moves to 'date' as a later occurrence: the same text, with ;n moved on when the series counts its occurrences
+function repMoved(r, x, date){ if(!r.count) return {repeat:x.repeat, idx:null}; const idx=(r.idx||1)+Math.max(1, repCount(r, repOn(x)||x.date||date, date));
+  return {repeat:repString(Object.assign({}, r, {idx})), idx}; }
 const listY = a => a.length<2 ? a.join('') : a.slice(0,-1).join(', ')+' y '+a[a.length-1];
 const ORDS={'1':'primer','2':'segundo','3':'tercer','4':'cuarto','-1':'último'};
 // The rule in words: "Cada semana, lunes y jueves", "El primer lunes de cada mes"
-function repSummary(s){ const r=typeof s==='string'?repParse(s):s; if(!r) return ''; const n=r.n;
+function repSummary(s){ const r=typeof s==='string'?repParse(s):s; if(!r) return ''; return repFreqWords(r)+repEndWords(r); }
+// Decision 65e: the end of the series in words: ", hasta el 31 de diciembre", ", 10 veces"
+function repEndWords(r){ if(r.until){ const d=new Date(r.until+'T00:00:00'); return ', hasta el '+d.getDate()+' de '+MESES_FULL[d.getMonth()]+(r.until.slice(0,4)!==todayStr().slice(0,4)?' de '+r.until.slice(0,4):''); }
+  return r.count ? ', '+(r.count===1?'una vez':r.count+' veces') : ''; }
+function repFreqWords(r){ const n=r.n;
+  if(r.f==='A') return (n===1?(r.u==='W'?'Cada semana':'Cada día'):'Cada '+n+(r.u==='W'?' semanas':' días'))+' desde que se hace'; // decision 65b
   if(r.f==='D') return n===1?'Cada día':'Cada '+n+' días';
   if(r.f==='WD') return 'Cada día laborable';
   if(r.f==='W') return (n===1?'Cada semana':'Cada '+n+' semanas')+', '+(r.days.length===7?'todos los días':listY(r.days.map(d=>DIAS_L[d])));
@@ -449,32 +481,40 @@ function repSummary(s){ const r=typeof s==='string'?repParse(s):s; if(!r) return
   return (n===1?'Cada año':'Cada '+n+' años')+', el '+r.day+' de '+MESES_FULL[r.mo-1]; }
 // The quick choices of the Repetir menu, from the task's date (or today): the week, the month and the year take its weekday and day
 function repPreset(k, b){ const d=new Date(b+'T00:00:00'), dow=REP_DAYS[d.getDay()];
-  return {daily:'D1', work:'WD', week:'W1:'+dow, week2:'W2:'+dow, month:'M1:'+d.getDate(), year:'Y1:'+b.slice(5)}[k]||null; }
-function repPresetOf(s){ const r=repParse(s); if(!r) return 'none'; if(r.f==='D'&&r.n===1) return 'daily'; if(r.f==='WD') return 'work';
+  return {daily:'D1', work:'WD', week:'W1:'+dow, week2:'W2:'+dow, month:'M1:'+d.getDate(), year:'Y1:'+b.slice(5), aweek:'A1W'}[k]||null; }
+function repPresetOf(s){ const r=repParse(s); if(!r) return 'none'; if(r.f==='A') return r.n===1&&r.u==='W'?'aweek':'custom'; if(r.f==='D'&&r.n===1) return 'daily'; if(r.f==='WD') return 'work';
   if(r.f==='W'&&r.days.length===1&&r.n<=2) return r.n===1?'week':'week2'; if(r.f==='M'&&r.n===1&&r.day) return 'month'; if(r.f==='Y'&&r.n===1) return 'year'; return 'custom'; }
 // "mañana", "el lunes 9", "el martes 1 de diciembre": a date said in a sentence
 function dayWords(d){ const t=todayStr(); if(d===t) return 'hoy'; if(d===addDays(t,1)) return 'mañana'; const x=new Date(d+'T00:00:00');
   return 'el '+DIAS_L[x.getDay()]+' '+x.getDate()+(d.slice(0,7)!==t.slice(0,7)?' de '+MESES_FULL[x.getMonth()]:'')+(d.slice(0,4)!==t.slice(0,4)?' de '+d.slice(0,4):''); }
 const repSeriesId = () => uid().replace(/-/g,'').slice(0,8);
 /* Sets or clears the rule (freq: the rule without anchor or series). An undated task gets the first date of the series, today if it matches;
-   the anchor is the task's date, so 'every 2 weeks' counts from its week. With Deshacer */
-function setRepeat(id, freq){ const x=task(id); if(!x) return; const cur=repParse(x.repeat), old={repeat:x.repeat||null, date:x.date, carried:x.carried};
+   the anchor is the task's date, so 'every 2 weeks' counts from its week. With Deshacer.
+   Decision 65e: 'end' ({until, count, skip}, from Personalizada) sets how the series ends and whether it piles up. Without it (the quick
+   choices) a series keeps the end and the flag it had, and a new one does not pile up (skip), the default from decision 65 on.
+   A count starts at this task (;n1) unless the series already counted; changing only the end keeps the anchor and the rhythm */
+function setRepeat(id, freq, end){ const x=task(id); if(!x) return; const cur=repParse(x.repeat), old={repeat:x.repeat||null, date:x.date, carried:x.carried};
   if(!freq){ if(!x.repeat) return; updTask(id,{repeat:null}); haptic(6); render(); log('info','Repetición quitada'); toast('Ya no se repite', ()=>updTask(id,{repeat:old.repeat})); return; }
-  const r=repParse(freq); if(!r) return; if(cur&&repFreq(cur)===repFreq(r)) return;
+  const r=repParse(freq); if(!r) return; const e=end||(cur?{until:cur.until, count:cur.count, skip:cur.f==='A'||cur.skip}:{skip:true}); // an A rule has no flag of its own: back on the calendar it takes the default
+  r.until=e.until||null; r.count=e.count||null; r.skip=!!e.skip&&r.f!=='A'; r.idx=r.count?(cur&&cur.count&&cur.idx||1):null;
+  const same=cur&&repFreq(cur)===repFreq(r); if(same&&repFlags(cur)===repFlags(r)) return;
   const t=todayStr(); let date=x.date;
   if(!date) date=repFirst(Object.assign({}, r, {n:1, anchor:t}), t); // the first matching day from today; the rhythm then counts from it
-  if(!date) return; r.anchor=date; r.series=cur&&cur.series||repSeriesId(); const dated=!x.date;
-  updTask(id, Object.assign({repeat:repString(r)}, dated?{date, carried:false}:{})); haptic(8); render(); log('info','Repetición', {rule:repFreq(r)});
+  if(!date) return; r.anchor=same&&cur.anchor||date; r.series=cur&&cur.series||repSeriesId(); const dated=!x.date;
+  updTask(id, Object.assign({repeat:repString(r)}, dated?{date, carried:false}:{})); haptic(8); render(); log('info','Repetición', {rule:repFreq(r)+repFlags(r)});
   toast('Se repite: '+repSummary(r).replace(/^./, c=>c.toLowerCase())+(dated?', desde '+dayWords(date):''), ()=>updTask(id, old)); }
 /* Completing a task of a series creates the next one: the first date of the series after today (after its own date when that is later),
    with its title, project, priority, notes and the reminder's time on the new date; voice notes and attachments stay with the completed one.
    Only the device that completes it does this (a completion that arrives by sync creates nothing), and never a second pending one */
+/* Decision 65b: for an A rule the next one is dated the day it is completed plus n days or weeks, whatever its own date was.
+   Decision 65e: past the series' end (;u or ;x) nothing is created and it returns {ended:true}, so the toast says it was the last one */
 function spawnNext(x){ const r=repParse(x.repeat); if(!r) return null;
   if(r.series&&DB.tasks.some(o=>o!==x&&isOpen(o)&&repSeries(o.repeat)===r.series)) return null; // pending or waiting (decision 41)
-  const t=todayStr(), date=repNext(r, x.date&&x.date>t?x.date:t); if(!date) return null;
+  const t=todayStr(), date=repNext(r, r.f==='A'||!(x.date&&x.date>t)?t:x.date); if(!date) return null;
+  const mv=repMoved(r, x, date); if(repEnds(r, date, mv.idx)){ log('info','Serie terminada', {series:r.series}); return {ended:true}; }
   let reminder=null; if(x.reminder){ const a=new Date(x.reminder), d=new Date(date+'T00:00:00'); d.setHours(a.getHours(), a.getMinutes(), 0, 0); reminder=d.toISOString(); }
   const dl=dlShift(x, date); // decision 48a: its deadline as far from its date as the completed one's; none when that one had no date
-  const n=addTask(Object.assign({title:x.title, spaceId:x.spaceId, projectId:x.projectId, priority:x.priority, notes:x.notes||'', date, reminder, repeat:x.repeat}, dl?{deadline:dl}:{}, x.estimate?{estimate:x.estimate}:{}, x.responsible?{responsible:x.responsible}:{})); // decision 56: the estimate too, never the counters; decision 48c: who does it
+  const n=addTask(Object.assign({title:x.title, spaceId:x.spaceId, projectId:x.projectId, priority:x.priority, notes:x.notes||'', date, reminder, repeat:mv.repeat}, dl?{deadline:dl}:{}, x.estimate?{estimate:x.estimate}:{}, x.responsible?{responsible:x.responsible}:{})); // decision 56: the estimate too, never the counters; decision 48c: who does it
   copySteps(x.id, n.id); // decision 46: its steps, unchecked
   log('info','Siguiente tarea de la serie', {date}); return n; }
 // Reopening a completed task of a series (Deshacer, or marking it pending again) takes back the next one it created, while nobody has touched it
@@ -483,9 +523,13 @@ function dropNext(x){ const s=repSeries(x.repeat); if(!s||!x.completed) return [
   if(out.length){ const ids=new Set(out.map(o=>o.id)); DB.tasks=DB.tasks.filter(o=>!ids.has(o.id)); cutSteps(ids); ids.forEach(i=>HELD.delete(i)); save(); log('info','Siguiente de la serie retirada'); }
   return out; }
 // "Eliminar solo esta": the task moves to the next date of its series, with Deshacer (it also leaves Ahora). quiet: the caller gives the feedback
-function skipOccurrence(id, quiet){ const x=task(id); if(!x) return null; const r=repParse(x.repeat); if(!r) return null; const t=todayStr(), d=repNext(r, x.date&&x.date>t?x.date:t); if(!d) return null;
-  const old=Object.assign(daySnap(x), {focus:x.focus||null, deadline:x.deadline||null}), dl=dlShift(x, d); releaseHold(id); updTask(id, dayPatch(x, d, Object.assign({carried:false, focus:null}, dl?{deadline:dl}:{}), true)); log('info','Eliminada solo esta de una serie', {to:d}); // decision 48a: the deadline goes along, as for the next one
-  const undo=()=>updTask(id, Object.assign({date:old.date, carried:old.carried, reminder:old.reminder, focus:old.focus}, dl?{deadline:old.deadline}:{}));
+// Decision 65: an A rule moves it n days or weeks from today; past the series' end there is no next date (repGoesOn false, the callers delete it)
+function skipTarget(x){ const r=repParse(x&&x.repeat); if(!r) return null; const t=todayStr(), d=repNext(r, r.f==='A'||!(x.date&&x.date>t)?t:x.date); if(!d) return null;
+  const mv=repMoved(r, x, d); return repEnds(r, d, mv.idx) ? null : {date:d, repeat:mv.repeat}; }
+const repGoesOn = x => !!skipTarget(x);
+function skipOccurrence(id, quiet){ const x=task(id); if(!x) return null; const sk=skipTarget(x); if(!sk) return null; const d=sk.date;
+  const old=Object.assign(daySnap(x), {focus:x.focus||null, deadline:x.deadline||null, repeat:x.repeat}), dl=dlShift(x, d); releaseHold(id); updTask(id, dayPatch(x, d, Object.assign({carried:false, focus:null}, dl?{deadline:dl}:{}, sk.repeat!==x.repeat?{repeat:sk.repeat}:{}), true)); log('info','Eliminada solo esta de una serie', {to:d}); // decision 48a: the deadline goes along, as for the next one
+  const undo=()=>updTask(id, Object.assign({date:old.date, carried:old.carried, reminder:old.reminder, focus:old.focus}, dl?{deadline:old.deadline}:{}, sk.repeat!==old.repeat?{repeat:old.repeat}:{}));
   if(!quiet){ haptic(14); toast('Eliminada solo esta, la siguiente '+dayWords(d), undo); } return undo; }
 /* Two devices that complete the same task of a series while offline each create its next one. When their data meets (a sync, or the
    start), two pending tasks of the same series on the same date are one: the one with the lowest id stays (the same choice on every
@@ -516,7 +560,7 @@ function foldVoiceNotes(W){ const list=W.voiceNotes||[]; if(!list.length) return
   const out=new Set(go); W.voiceNotes=list.filter(v=>!out.has(v));
   log('info','Notas de voz pasadas a Notas: '+go.length); return go.length; }
 // After a completion: the toast says when the next one of the series comes
-const doneText = (n, nx) => n===1&&nx ? 'Tarea completada, la siguiente '+dayWords(nx.date) : n===1?'Tarea completada':n+' tareas completadas';
+const doneText = (n, nx) => n===1&&nx ? (nx.ended?'Tarea completada, era la última de la serie':'Tarea completada, la siguiente '+dayWords(nx.date)) : n===1?'Tarea completada':n+' tareas completadas'; // decision 65e: the end of a series
 
 /* ---------- Decision 39: Ahora ----------
    Task.focus (Supabase tasks.focus) is when the task was put in Ahora, null otherwise. Up to five pending tasks per space, in the order
@@ -528,6 +572,15 @@ function toggleFocus(id){ const x=task(id); if(!x) return false;
   if(x.status!=='pending') return false;
   if(ahoraTasks(x.spaceId).length>=AHORA_MAX){ haptic(10); toast(AHORA_FULL); return false; }
   updTask(id,{focus:new Date().toISOString()}); haptic(8); renderAnimated(); log('info','Añadida a Ahora'); toast('Añadida a Ahora', ()=>updTask(id,{focus:null})); return true; }
+/* Decision 65d: focus mode. The button Foco in the head of Ahora leaves only the Ahora tasks on Hoy, large, until Salir del foco, the last
+   of them completed (or taken out of Ahora), the day closed or a new day. A setting of this device, the day it was turned on (so it ends by
+   itself with the day, as Ahora empties); no data changes. focusOn: whether Hoy shows it now */
+const focusOn = () => DB.settings.focusMode===todayStr() && !isClosed() && ahoraTasks().length>0;
+// Ends it once nothing is left to show (the views call it before drawing): the usual Hoy comes back with its usual empty state
+function focusCheck(){ if(DB.settings.focusMode&&!focusOn()){ delete DB.settings.focusMode; save(); log('info','Modo foco terminado'); } }
+function setFocusMode(on){ flushHeld(true); if(on){ if(!ahoraTasks().length||isClosed()) return; UI.query=''; if(UI.wide&&UI.deskView!=='hoy') setDeskView('hoy'); DB.settings.filter='hoy'; DB.settings.focusMode=todayStr(); }
+  else { if(!DB.settings.focusMode) return; delete DB.settings.focusMode; }
+  save(); haptic(6); log('info', on?'Modo foco':'Salir del foco'); render(); }
 // Several at once (rows dropped on Ahora, A with a selection on the desktop): all of them or, past five, none
 function addToAhora(ids){ const xs=ids.map(task).filter(x=>x&&x.status==='pending'&&!x.focus); if(!xs.length){ render(); return false; }
   if(ahoraTasks(xs[0].spaceId).length+xs.length>AHORA_MAX){ haptic(10); render(); toast(AHORA_FULL); return false; }
@@ -575,6 +628,16 @@ function dayPatch(x, date, extra, still){ const p=Object.assign({date}, extra||{
 // and the counters of decision 56b
 const daySnap = x => ({id:x.id, date:x.date, carried:x.carried, reminder:x.reminder||null, postponed:x.postponed||null, carriedSince:x.carriedSince||null});
 const undoDay = o => updTask(o.id, {date:o.date, carried:o.carried, reminder:o.reminder, postponed:o.postponed||null, carriedSince:o.carriedSince||null});
+/* Decision 65e: where a task of a series that does not pile up (;s) goes when its day has passed (from: today) or when the day is closed
+   (from: tomorrow): its first occurrence on or after 'from', as that occurrence (;n moved on), with no Aplazada mark and no postponing counted
+   (decision 56b: it is not put off, the occurrence is gone), its reminder at the same time on the new day and its deadline as far from it as
+   before (dlShift, as Eliminar solo esta). Null when it is not such a task or the series has ended: then it is carried as usual */
+function rollTarget(x, from){ const r=repParse(x&&x.repeat); if(!r||!r.skip||r.f==='A'||!x.date) return null; const d=repFirst(r, from); if(!d) return null;
+  const mv=repMoved(r, x, d); return repEnds(r, d, mv.idx) ? null : {date:d, repeat:mv.repeat}; }
+function skipPatch(x, s){ const dl=dlShift(x, s.date);
+  return dayPatch(x, s.date, Object.assign({carried:false}, s.repeat!==x.repeat?{repeat:s.repeat}:{}, dl?{deadline:dl}:{}), true); } // the counters of decision 56b are left as they are: nothing is added
+// The patch of rollOver (and of a sync that brings an earlier day) for a pending task dated before today
+function rollPatch(x, t){ const s=rollTarget(x, t); return s ? skipPatch(x, s) : dayPatch(x, t, {carried:true}); }
 /* Roll over: pending tasks dated before today move to today and are flagged as carried.
    Runs at start and whenever the app comes back to the foreground (the day may have changed). */
 // It leaves 'modified' alone: every device repeats it, so it must not beat a real edit in an import ('newer wins').
@@ -582,7 +645,9 @@ const undoDay = o => updTask(o.id, {date:o.date, carried:o.carried, reminder:o.r
 // server accepts (equal times win, 0001_init.sql), as the carried mark and the new date always did; every device counts the same move once
 // Decision 39: Ahora empties with the day; a task put there before today goes back to its usual place (focus cleared, modified untouched)
 // Decision 38: a carried task of a series stays one task: no copies for the days it missed
-function rollOver(){ const t=todayStr(); let n=0, f=0; if(DB.settings.summaryDay!==t){ DB.settings.summaryDay=t; save(); } /* the day this device last rolled over (checkDay); the name is older than decision 52 */ DB.tasks.forEach(x=>{ if(x.status==='pending'&&x.date&&x.date<t){ Object.assign(x, dayPatch(x, t, {carried:true})); n++; } if(x.focus&&localDay(x.focus)<t){ x.focus=null; f++; } });
+// Decision 65e: a task of a series that does not pile up goes to its next occurrence instead (rollPatch). Decision 65d: focus mode ends with the day
+function rollOver(){ const t=todayStr(); let n=0, f=0; if(DB.settings.summaryDay!==t){ DB.settings.summaryDay=t; save(); } /* the day this device last rolled over (checkDay); the name is older than decision 52 */ DB.tasks.forEach(x=>{ if(x.status==='pending'&&x.date&&x.date<t){ Object.assign(x, rollPatch(x, t)); n++; } if(x.focus&&localDay(x.focus)<t){ x.focus=null; f++; } });
+  if(DB.settings.focusMode&&DB.settings.focusMode!==t){ delete DB.settings.focusMode; f++; }
   if(f) log('info','Ahora vaciada con el cambio de día', {n:f}); const dd=dedupeSeries(DB); if(n||f||dd) save(); return n; } // decision 38: duplicates of a series, at the start too
 /* The data side of completing or reopening, with no feedback. Completing takes the task out of Ahora (decision 39) and, in a series,
    creates the next one (decision 38), which it returns; reopening takes that next one back */

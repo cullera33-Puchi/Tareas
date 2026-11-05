@@ -16,7 +16,7 @@ function selectedTasks(){ const s=selSet(); return s ? [...s].map(task).filter(B
 function bulkComplete(){ const xs=selectedTasks(); if(!xs.length) return; const prev=xs.filter(isOpen).map(doneSnap); let nx=null; batch(()=>xs.forEach(x=>{ const r=applyDone(x.id, true); if(r) nx=r; })); const n=prev.length; log('info','Completadas en bloque: '+n); endSelect(); toast(doneText(n, nx), ()=>batch(()=>prev.forEach(undoDone))); } // decision 38: applyDone makes the next task of each series
 /* Decision 38: deleting tasks that repeat asks first (askRepeatDelete): "solo estas" move each one to the next date of its series and delete
    the others; "las series" delete them all. One Deshacer for everything */
-function bulkDelete(){ const xs=selectedTasks(); if(!xs.length) return; const rep=xs.filter(x=>isOpen(x)&&repParse(x.repeat));
+function bulkDelete(){ const xs=selectedTasks(); if(!xs.length) return; const rep=xs.filter(x=>isOpen(x)&&repGoesOn(x)); // decision 65e: the last one of a series that ends is deleted as any other
   const run=only=>{ const skip=only?rep:[], ids=new Set(xs.filter(x=>!skip.includes(x)).map(x=>x.id)); let undoS=[], removedT=[], removedV=[], removedA=[], removedS=[];
     batch(()=>{ undoS=skip.map(x=>skipOccurrence(x.id, true)).filter(Boolean); removedT=DB.tasks.filter(x=>ids.has(x.id)); removedV=DB.voiceNotes.filter(v=>ids.has(v.taskId)); DB.tasks=DB.tasks.filter(x=>!ids.has(x.id)); DB.voiceNotes=DB.voiceNotes.filter(v=>!ids.has(v.taskId)); removedA=cutAttachments(ids); removedS=cutSteps(ids); save(); });
     log('info','Eliminadas en bloque: '+removedT.length+(undoS.length?', '+undoS.length+' pasadas a su siguiente fecha':'')); endSelect(); haptic(14);
@@ -38,9 +38,13 @@ function tomorrowLine(){ const tm=addDays(todayStr(),1), xs=spaceTasks().filter(
    or one by one (the review walk). Each bulk move has its Deshacer (rescheduleMany); the foot says what tomorrow starts with */
 /* Closing the day on every device (owner, 3 November): each way out also sets the space's closedDay (setClosedDay), so Hoy turns to tomorrow
    here and on the other devices once they sync; with nothing left the sheet offers just Cerrar el día. Deshacer opens it again */
-function closeDayMove(xs, how){ const tm=addDays(todayStr(),1), prev=xs.map(daySnap);
-  batch(()=>{ xs.forEach(x=>updTask(x.id, dayPatch(x, tm))); setClosedDay(true, how); }); renderAnimated(); haptic(8); if(xs.length) log('info','Aplazadas en bloque: '+xs.length+' a '+tm);
-  toast((xs.length?xs.length+(xs.length===1?' tarea pasada':' tareas pasadas')+' a mañana, día cerrado':'Día cerrado'), ()=>batch(()=>{ prev.forEach(undoDay); setClosedDay(false, 'Deshacer'); })); }
+/* Decision 65e: a task of a series that does not pile up goes to its next occurrence from tomorrow on (rollTarget), not to tomorrow when
+   tomorrow is not one, and that is no postponing; Deshacer puts back its rule too (its count of occurrences) */
+function closeDayMove(xs, how){ const tm=addDays(todayStr(),1), prev=xs.map(x=>Object.assign(daySnap(x), {repeat:x.repeat||null, deadline:x.deadline||null})); let nk=0;
+  batch(()=>{ xs.forEach(x=>{ const s=rollTarget(x, tm); if(s){ updTask(x.id, skipPatch(x, s)); if(s.date!==tm) nk++; } else updTask(x.id, dayPatch(x, tm)); }); setClosedDay(true, how); }); renderAnimated(); haptic(8); if(xs.length) log('info','Aplazadas en bloque: '+xs.length+' a '+tm+(nk?', '+nk+' a su siguiente fecha':''));
+  const nt=xs.length-nk, parts=[]; if(nt) parts.push(nt+(nt===1?' tarea pasada':' tareas pasadas')+' a mañana'); if(nk) parts.push(nk+(nk===1?' a su siguiente fecha':' a su siguiente fecha'));
+  if(nk&&!nt) parts[0]=nk+(nk===1?' tarea pasada':' tareas pasadas')+' a su siguiente fecha';
+  toast((parts.length?parts.join(', ')+', día cerrado':'Día cerrado'), ()=>batch(()=>{ prev.forEach(o=>{ const x=task(o.id); undoDay(o); if(x&&(x.repeat||null)!==o.repeat) updTask(o.id, {repeat:o.repeat}); if(x&&(x.deadline||null)!==o.deadline) updTask(o.id, {deadline:o.deadline}); }); setClosedDay(false, 'Deshacer'); })); }
 function reopenDay(){ if(!isClosed()) return; setClosedDay(false, 'Reabrir hoy'); haptic(6); renderAnimated(); toast('Día reabierto', ()=>setClosedDay(true, 'Deshacer')); }
 function closeDaySheet(){ flushHeld(true); const t=todayStr(), tm=addDays(t,1); const hoy=pendingFor('hoy'); if(isClosed()) return;
   const due=hoy.filter(dlDue), mov=hoy.filter(x=>!dlDue(x)); // decision 48a: a task whose deadline has come stays in Hoy; moving its work date would only pull it earlier
@@ -54,6 +58,7 @@ function closeDaySheet(){ flushHeld(true); const t=todayStr(), tm=addDays(t,1); 
     '<div class="list cdacts">'+(mov.length?'<button class="cell" data-cd="all"><span class="lbl">Todo a mañana</span><span class="val">'+n(mov.length)+'</span></button>':'')+
     (movHigh.length&&rest.length?'<button class="cell" data-cd="rest"><span class="lbl">Solo las no prioritarias</span><span class="val">'+n(rest.length)+'</span></button>':'')+
     (hoy.length?'<button class="cell" data-cd="one"><span class="lbl">Decidir una a una</span>'+I.chev.replace('<svg','<svg class="chev"')+'</button>':'')+(mov.length?'':'<button class="cell" data-cd="close"><span class="lbl">Cerrar el día</span></button>')+'</div>'+
+    (mov.some(x=>{ const r=rollTarget(x, tm); return r&&r.date!==tm; })?'<div class="hint cdfoot">Las que se repiten sin acumularse pasan a su siguiente fecha.</div>':'')+ // decision 65e
     (due.length?'<div class="hint cdfoot">'+(due.length===1?'La tarea con entrega hoy o vencida se queda en Hoy.':'Las '+due.length+' tareas con entrega hoy o vencida se quedan en Hoy.')+'</div>':'')+'<div class="hint cdfoot">'+tomorrowLine()+'</div>', s=>{
     s.onclick=e=>{ const b=e.target.closest('[data-cd]'); if(!b) return; const k=b.dataset.cd;
       if(k==='one'){ reviewStart('close'); return; }
@@ -76,7 +81,7 @@ function reviewStep(ids, i, st){
   const t=todayStr(), fg=st.kind==='forgot'; const opts=uniqueBy([['hoy',t,'Hoy'],['man',addDays(t,1),'Mañana'],['vie',nextWeekday(5,true),'Viernes'],['nsem',nextWeekday(1,true),'Próxima semana']], o=>o[1]).concat(fg?[]:[['none',null,'Sin fecha']]);
   let ym=t.slice(0,7); // decision 60b: the forgotten ones may take any day of the calendar too
   const p=x.projectId?proj(x.projectId):null; const tally=k=>{ st.tally[k]=(st.tally[k]||0)+1; };
-  const keep=()=>{ if(!st.prev.has(x.id)) st.prev.set(x.id, Object.assign({date:x.date, carried:x.carried, reminder:x.reminder||null, status:x.status, completed:x.completed, postponed:x.postponed||null, carriedSince:x.carriedSince||null}, x.focus?{focus:x.focus}:{})); }; // decision 56b: the counters too
+  const keep=()=>{ if(!st.prev.has(x.id)) st.prev.set(x.id, Object.assign({date:x.date, carried:x.carried, reminder:x.reminder||null, status:x.status, completed:x.completed, postponed:x.postponed||null, carriedSince:x.carriedSince||null}, x.focus?{focus:x.focus}:{}, x.repeat?{repeat:x.repeat}:{})); }; // decision 65e: Eliminar solo esta moves the count of a series on; // decision 56b: the counters too
   const next=()=>{ haptic(6); render(); reviewStep(ids, i+1, st); };
   const dg=dragText(x);
   openSheet('<h2>'+(st.kind==='close'?'Cerrar el día':fg?'Repasar olvidadas':'Repasar aplazadas')+'</h2><div class="hint" style="margin-top:-6px">'+(i+1)+' de '+ids.length+(p?', '+esc(p.name):'')+'</div><div class="plan-title">'+esc(x.title||'Sin título')+'</div>'+(dg?'<div class="rvdrag">'+esc(dg)+'</div>':'')+
@@ -92,7 +97,7 @@ function reviewStep(ids, i, st){
       const b=e.target.closest('[data-x]'); if(!b) return; const k=b.dataset.x;
       if(k==='done'){ keep(); applyDone(x.id, true); tally('done'); next(); }
       else if(k==='del'){ const go=()=>{ const j=DB.tasks.indexOf(x); if(j>=0){ DB.tasks.splice(j,1); const vn=DB.voiceNotes.filter(v=>v.taskId===x.id); DB.voiceNotes=DB.voiceNotes.filter(v=>v.taskId!==x.id); st.removed.push({x, vn, at:cutAttachments(new Set([x.id])), ss:cutSteps(new Set([x.id]))}); save(); } tally('del'); haptic(10); next(); };
-        if(repParse(x.repeat)) askRepeatDelete({n:1, title:x.title}, ()=>{ keep(); skipOccurrence(x.id, true); tally('del'); haptic(10); next(); }, go); else go(); } // decision 38: only this one, or the series
+        if(repGoesOn(x)) askRepeatDelete({n:1, title:x.title}, ()=>{ keep(); skipOccurrence(x.id, true); tally('del'); haptic(10); next(); }, go); else go(); } // decision 38: only this one, or the series
       else if(k==='skip'){ tally('skip'); reviewStep(ids, i+1, st); }
       else if(k==='split'){ st.tally.skip=(st.tally.skip||0)+ids.length-i-1; sheetOnClose=null; closeSheet(); reviewEnd(st, false); log('info','Partir en pasos desde el repaso'); openStepAdd(x.id); }
       else { st.tally.skip=(st.tally.skip||0)+ids.length-i; sheetOnClose=null; reviewEnd(st, true); } }; });

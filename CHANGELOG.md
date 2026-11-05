@@ -1,5 +1,13 @@
 # Registro de cambios
 
+## v0.33.0. Modo foco y repeticiones más completas (5 de noviembre de 2026)
+
+- Modo foco: el botón «Foco» del bloque «Ahora» deja a la vista solo esas tareas, en iPhone y ordenador. «Salir del foco» vuelve a Hoy, y al completar la última termina solo.
+- Repetir desde que la hice: cada N días o semanas contando desde el día en que se completa, no por calendario.
+- Fin de una serie: nunca, un día concreto o después de N veces. Al completar la última, la app avisa «era la última de la serie».
+- Las series nuevas no se acumulan: si un día no se hace, la tarea pasa sola a su siguiente fecha, sin marcarse como aplazada ni contar como procrastinación, y su recordatorio se mueve con ella.
+- Sin cambios en Supabase. Prueba nueva `rm-FR`.
+
 ## v0.32.0. Responsable, contactos y duración de los bloques (5 de noviembre de 2026)
 
 - Responsable: campo nuevo en la tarea, con sugerencias de los contactos; se ve en gris en la fila, se filtra con «Responsable: X» junto al filtro de proyecto y la búsqueda lo encuentra.

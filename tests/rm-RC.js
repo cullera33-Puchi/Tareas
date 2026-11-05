@@ -218,7 +218,7 @@ async function iphone(browser){
   await ev(page, ()=>openDetail('a1')); await calm(page);
   await page.tap('.pushed-screen.detail [data-act=sendRemind]'); await sheetUp(page);
   x = await ev(page, ()=>({h:document.querySelector('#sheet h2').textContent, msg:document.querySelector('#sheet [data-role=rmsg]').value, via:document.querySelector('#sheet .rvia').textContent, to:(document.querySelector('#sheet .rto')||{}).textContent}));
-  check('i_remind_sheet', x.h==='Enviar recordatorio' && x.msg==='Hola Marta, te recuerdo: Preparar comité (entrega mañana). Gracias.' && x.via==='Por WhatsApp a 612 345 678' && x.to==='Para Marta Ruiz', x);
+  check('i_remind_sheet', x.h==='Enviar recordatorio' && x.msg==='Hola Marta, te recuerdo esta tarea:\n\n• Preparar comité (entrega mañana)\n\nGracias.' && x.via==='Por WhatsApp a 612 345 678' && x.to==='Para Marta Ruiz', x);
   await shot(page, 'i5-remind');
   await page.fill('#sheet [data-role=rmsg]', 'Hola Marta, ¿cómo va el comité?');
   await page.tap('#sheet [data-x=ok]'); await sheetGone(page);
@@ -228,18 +228,18 @@ async function iphone(browser){
   // Two people: whom to send it to; mail with the email (subject and body)
   await ev(page, ()=>remindSheet(['a3'])); await sheetUp(page);
   x = await ev(page, ()=>({who:[...document.querySelectorAll('#sheet [data-who]')].map(b=>b.textContent+(b.classList.contains('on')?'*':'')).join(), msg:document.querySelector('#sheet [data-role=rmsg]').value}));
-  check('i_remind_two', x.who==='Marta Ruiz*,Luis' && x.msg==='Hola Marta, te recuerdo: Enviar acta. Gracias.', x); // a waiting task's date is its review day: not said
+  check('i_remind_two', x.who==='Marta Ruiz*,Luis' && x.msg==='Hola Marta, te recuerdo esta tarea:\n\n• Enviar acta\n\nGracias.', x); // a waiting task's date is its review day: not said
   await page.tap('#sheet [data-who="Luis"]');
   x = await ev(page, ()=>({msg:document.querySelector('#sheet [data-role=rmsg]').value, via:document.querySelector('#sheet .rvia').textContent}));
-  check('i_remind_switch', x.msg==='Hola Luis, te recuerdo: Enviar acta. Gracias.' && x.via==='Por correo a luis@example.com', x);
+  check('i_remind_switch', x.msg==='Hola Luis, te recuerdo esta tarea:\n\n• Enviar acta\n\nGracias.' && x.via==='Por correo a luis@example.com', x);
   await page.tap('#sheet [data-x=ok]'); await sheetGone(page);
-  x = await sent(page); check('i_remind_mail', x.length===1 && x[0].via==='mailto' && x[0].u==='mailto:luis@example.com?subject='+encodeURIComponent('Recordatorio: Enviar acta')+'&body='+encodeURIComponent('Hola Luis, te recuerdo: Enviar acta. Gracias.'), x);
+  x = await sent(page); check('i_remind_mail', x.length===1 && x[0].via==='mailto' && x[0].u==='mailto:luis@example.com?subject='+encodeURIComponent('Recordatorio: Enviar acta')+'&body='+encodeURIComponent('Hola Luis, te recuerdo esta tarea:\n\n• Enviar acta\n\nGracias.'), x);
   // No phone or email: the share sheet
   await ev(page, ()=>remindSheet(['a5'])); await sheetUp(page);
   x = await ev(page, ()=>({msg:document.querySelector('#sheet [data-role=rmsg]').value, via:document.querySelector('#sheet .rvia').textContent}));
-  check('i_remind_share_sheet', x.msg==='Hola Ana, te recuerdo: Firma del contrato (para el viernes 6). Gracias.' && x.via==='Con la hoja de compartir', x);
+  check('i_remind_share_sheet', x.msg==='Hola Ana, te recuerdo esta tarea:\n\n• Firma del contrato (para el viernes 6)\n\nGracias.' && x.via==='Con la hoja de compartir', x);
   await page.tap('#sheet [data-x=ok]'); await sheetGone(page);
-  x = await sent(page); check('i_remind_share', x.length===1 && x[0].via==='share' && x[0].text==='Hola Ana, te recuerdo: Firma del contrato (para el viernes 6). Gracias.', x);
+  x = await sent(page); check('i_remind_share', x.length===1 && x[0].via==='share' && x[0].text==='Hola Ana, te recuerdo esta tarea:\n\n• Firma del contrato (para el viernes 6)\n\nGracias.', x);
   // --- The selection: Recordar only when every task has the same person, one message for all
   await ev(page, ()=>startSelect('a1')); await calm(page);
   check('i_sel_one', await ev(page, ()=>!!document.querySelector('#selbar [data-act=bulkRemind]')));
@@ -249,7 +249,7 @@ async function iphone(browser){
   await shot(page, 'i6-select');
   await page.tap('#selbar [data-act=bulkRemind]'); await sheetUp(page);
   x = await ev(page, ()=>document.querySelector('#sheet [data-role=rmsg]').value);
-  check('i_sel_text', x==='Hola Marta, te recuerdo:\n- Preparar comité (entrega mañana)\n- Revisar SOW (para hoy)\nGracias.', x);
+  check('i_sel_text', x==='Hola Marta, te recuerdo estas tareas:\n\n• Preparar comité (entrega mañana)\n• Revisar SOW (para hoy)\n\nGracias.', x);
   await page.tap('#sheet [data-x=ok]'); await sheetGone(page); await calm(page);
   x = await sent(page); check('i_sel_sent', x.length===1 && x[0].u.startsWith('https://wa.me/34612345678?text=') && await ev(page, ()=>UI.select===null), x);
   // --- Esperando a: the suggestions, a new name becomes a contact, a reason does not
@@ -334,7 +334,7 @@ async function desktop(browser){
   await page.click('#desk .main .row[data-id=a1]:not(.first .row) .row-title', {button:'right'}); await menuSettled(page);
   x = await menuLabels(page); check('d_menu', x.includes('Responsable…') && x.includes('Enviar recordatorio…'), x);
   await menuItem(page, 'Enviar recordatorio…').click(); await sheetUp(page);
-  check('d_menu_remind', await ev(page, ()=>document.querySelector('#sheet [data-role=rmsg]').value==='Hola Marta, te recuerdo: Preparar comité (entrega mañana). Gracias.'));
+  check('d_menu_remind', await ev(page, ()=>document.querySelector('#sheet [data-role=rmsg]').value==='Hola Marta, te recuerdo esta tarea:\n\n• Preparar comité (entrega mañana)\n\nGracias.'));
   await shot(page, 'd4-remind');
   await page.click('#sheet [data-x=cancel]'); await sheetGone(page);
   await page.click('#desk .main .row[data-id=a4]:not(.first .row) .row-title', {button:'right'}); await menuSettled(page);
@@ -384,7 +384,7 @@ async function desktop(browser){
   await ev(page, ()=>{ UI.dsel.ids=new Set(['a1','a2']); UI.dsel.cur=null; render(); }); await calm(page);
   check('d_multi', await ev(page, ()=>!!document.querySelector('#desk .pane.multi [data-act=bulkRemind]')));
   await page.click('#desk .pane.multi [data-act=bulkRemind]'); await sheetUp(page);
-  check('d_multi_text', await ev(page, ()=>document.querySelector('#sheet [data-role=rmsg]').value.startsWith('Hola Marta, te recuerdo:\n- Preparar comité')));
+  check('d_multi_text', await ev(page, ()=>document.querySelector('#sheet [data-role=rmsg]').value.startsWith('Hola Marta, te recuerdo estas tareas:\n\n• Preparar comité')));
   await page.click('#sheet [data-x=ok]'); await sheetGone(page); await calm(page);
   x = await sent(page); check('d_multi_sent', x.length===1 && x[0].via==='open' && await ev(page, ()=>!deskMulti()), x);
   await ev(page, ()=>{ UI.dsel.ids=new Set(['a1','a4']); render(); }); await calm(page);

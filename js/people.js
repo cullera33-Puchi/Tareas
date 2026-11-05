@@ -115,8 +115,8 @@ function sharedPerson(xs){ if(!xs.length||!xs.every(canRemind)) return null; ret
 function remindWhen(x){ if(x.deadline) return 'entrega '+dayWords(x.deadline); if(x.date&&x.status==='pending') return 'para '+dayWords(x.date); return ''; }
 const remindItem = x => (x.title||'Sin título')+(remindWhen(x)?' ('+remindWhen(x)+')':'');
 function remindText(xs, name){ const first=String(name||'').trim().split(' ')[0];
-  if(xs.length===1) return 'Hola '+first+', te recuerdo: '+remindItem(xs[0])+'. Gracias.';
-  return 'Hola '+first+', te recuerdo:\n'+xs.map(x=>'- '+remindItem(x)).join('\n')+'\nGracias.'; }
+  // Decision 73: an opening line, one bullet per task and the thanks, each on its own line
+  return 'Hola '+first+', te recuerdo '+(xs.length===1?'esta tarea':'estas tareas')+':\n\n'+xs.map(x=>'• '+remindItem(x)).join('\n')+'\n\nGracias.'; }
 // How it goes: WhatsApp with a phone, mail with an email, the share sheet otherwise. A Spanish number without its country code gets +34
 function waDigits(phone){ let d=String(phone||'').replace(/[^\d+]/g,''); if(d.startsWith('+')) d=d.slice(1); else if(d.startsWith('00')) d=d.slice(2); else if(/^[6-9]\d{8}$/.test(d)) d='34'+d; d=d.replace(/\D/g,''); return d.length>=8?d:''; }
 const validEmail = e => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(e||'').trim());
@@ -131,15 +131,22 @@ function sendRemind(name, text, xs){ const via=remindVia(name); log('info','Reco
 /* The sheet: whom (when the task has two people), the message to edit and how it will go. Enviar opens WhatsApp, mail or the share sheet
    inside the tap, as browsers ask. after: run once it is sent (the end of a multiple selection). to: whom, when the caller knows (the
    person's view: its tasks may share another person too) */
-function remindSheet(ids, after, to){ const xs=ids.map(task).filter(canRemind); if(!xs.length) return; flushEdits();
+function remindSheet(ids, after, to, pick){ const all=ids.map(task).filter(canRemind); if(!all.length) return; flushEdits();
+  // Decision 73: from a person's view, which tasks go in (all ticked at first); the message follows the ticks until it is edited
+  pick=!!pick&&all.length>1; const on=new Set(all.map(x=>x.id)); let xs=all;
   const names=to?[to]:xs.length===1?taskPeople(xs[0]):[sharedPerson(xs)].filter(Boolean); if(!names.length) return; let who=names[0], edited=false; // to: the person of Recordar todo (decision 65a)
   const whoHTML=()=>names.length>1?'<label class="wlbl">Para</label><div class="chips wchips rwho">'+names.map(n=>'<button class="chip'+(n===who?' on':'')+'" data-who="'+esc(n)+'">'+esc(n)+'</button>').join('')+'</div>':'<div class="rto">Para '+esc(who)+'</div>';
-  const body='<div class="wsheet remsheet">'+'<div class="rwhowrap">'+whoHTML()+'</div><textarea class="wfor rmsg" data-role="rmsg" rows="4">'+esc(remindText(xs, who))+'</textarea><div class="hint rvia">'+esc(remindVia(who).label)+'</div>'+
+  const pickHTML=()=>!pick?'':'<div class="rpick"><div class="rpickh"><span>'+on.size+' de '+all.length+' tareas</span><button class="rall" data-rall>'+(on.size===all.length?'Quitar todas':'Seleccionar todo')+'</button></div>'+
+    all.map(x=>'<button class="rpi'+(on.has(x.id)?' on':'')+'" data-rpick="'+esc(x.id)+'"><span class="rbox">'+I.check+'</span><span class="rpt">'+esc(remindItem(x))+'</span></button>').join('')+'</div>';
+  const body='<div class="wsheet remsheet">'+'<div class="rwhowrap">'+whoHTML()+'</div>'+pickHTML()+'<textarea class="wfor rmsg" data-role="rmsg" rows="4">'+esc(remindText(xs, who))+'</textarea><div class="hint rvia">'+esc(remindVia(who).label)+'</div>'+
     (remindVia(who).kind==='share'?'<div class="hint">Añade su teléfono o su correo en Ajustes, Contactos, para enviarlo directamente.</div>':'')+'</div>';
   openSheet(sheadHTML('Enviar recordatorio', 'Cancelar', 'Enviar')+body, s=>{ const ta=$('[data-role=rmsg]', s);
     ta.addEventListener('input', ()=>{ edited=true; });
     s.onclick=e=>{ const w=e.target.closest('[data-who]'); if(w){ who=w.dataset.who; $('.rwhowrap', s).innerHTML=whoHTML(); if(!edited) ta.value=remindText(xs, who); $('.rvia', s).textContent=remindVia(who).label; haptic(4); return; }
+      const rp=e.target.closest('[data-rpick],[data-rall]'); if(rp){ if(rp.hasAttribute('data-rall')){ if(on.size===all.length) on.clear(); else all.forEach(x=>on.add(x.id)); } else { const id=rp.dataset.rpick; if(on.has(id)) on.delete(id); else on.add(id); }
+        xs=all.filter(x=>on.has(x.id)); $('.rpick', s).outerHTML=pickHTML(); if(!edited&&xs.length) ta.value=remindText(xs, who); haptic(4); return; }
       const b=e.target.closest('[data-x]'); if(!b) return; if(b.dataset.x!=='ok'){ closeSheet(); return; }
+      if(!xs.length){ toast('Elige al menos una tarea'); return; }
       const text=ta.value.trim(); if(!text){ ta.focus(); return; } closeSheet(); sendRemind(who, text, xs); if(after) after(); }; }); }
 // A multiple selection whose tasks share one person (iPhone selection bar, desktop pane)
 function bulkRemind(){ const xs=selectedTasks(); if(!sharedPerson(xs)) return; remindSheet(xs.map(x=>x.id), ()=>endSelect()); }
@@ -205,7 +212,7 @@ const personFirst = name => String(name||'').trim().split(' ')[0];
 // The tasks Recordar todo sends: the whole list, Le toca a first
 function personRemindable(name){ const g=personGroups(name); return g.mine.concat(g.wait).filter(canRemind); }
 function remindAll(name){ const q=UI.query; UI.query=''; let xs; try{ xs=personRemindable(name); } finally{ UI.query=q; } if(!xs.length) return; // a search never shortens the message
-  log('info','Recordar todo', {n:xs.length}); remindSheet(xs.map(x=>x.id), null, personLabel(name)); }
+  log('info','Recordar todo', {n:xs.length}); remindSheet(xs.map(x=>x.id), null, personLabel(name), true); }
 // The contact's phone and mail, for the view's head
 function personContactLine(name){ const c=contactByName(name); return c?[c.phone, c.email].map(v=>String(v||'').trim()).filter(Boolean):[]; }
 // The two groups (or the empty state), shared by the iPhone screen and the desktop column

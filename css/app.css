@@ -85,7 +85,7 @@ input,textarea,select{font-size:max(16px,1rem);} /* under 16px Safari zooms on f
 .desktop .rowmore svg{width:18px;height:18px;}
 .desktop .fab{display:none;}
 .desktop .check,.desktop .cell,.desktop .chip,.desktop button{cursor:pointer;}
-.desktop .row-title{-webkit-line-clamp:1;}
+.desktop .row-title{-webkit-line-clamp:2;}
 /* Closed sheets sit invisible at the centre: hidden and without hit area, so they never take clicks */
 body.desktop .sheet{left:50%;right:auto;bottom:auto;top:50%;width:440px;max-height:80%;border-radius:16px;transform:translate(-50%,-50%) scale(.96);opacity:0;visibility:hidden;pointer-events:none;transition:transform .28s cubic-bezier(.32,.72,0,1),opacity .22s,visibility 0s linear .28s;padding:10px 20px 20px;}
 body.desktop .sheet.on{transform:translate(-50%,-50%) scale(1);opacity:1;visibility:visible;pointer-events:auto;transition-delay:0s;}
@@ -426,6 +426,20 @@ body.desktop .toast{left:auto;right:28px;bottom:28px;width:360px;}
 .sheet .list .cell:active{background:var(--fill);}
 .sheet .hint{text-align:center;color:var(--ink2);font-size:0.765rem;margin:4px 0 10px;}
 .sheet .hint.warn{color:var(--red);margin:8px 0 0;}
+/* Decision 64: release notes. The list scrolls inside the sheet; the title and the actions stay in view */
+.sheet.nvsheet{display:flex;flex-direction:column;}
+.nvsheet .handle,.nvsheet h2,.nvsheet .sheet-actions{flex:none;}
+.nv-list{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;background:var(--card);border-radius:12px;padding:0 16px;}
+.nv-ver{padding:12px 0 14px;}
+.nv-ver+.nv-ver{border-top:0.5px solid var(--sep);}
+.nv-head{display:flex;align-items:baseline;gap:8px;margin-bottom:6px;}
+.nv-v{font-weight:600;font-size:0.941rem;}
+.nv-tag{font-size:0.706rem;font-weight:600;color:var(--blue);}
+.nv-d{margin-left:auto;color:var(--ink2);font-size:0.765rem;white-space:nowrap;}
+.nv-items{margin:0;padding:0 0 0 18px;font-size:0.882rem;line-height:1.38;}
+.nv-items li+li{margin-top:6px;}
+.nv-items li::marker{color:var(--ink2);}
+body.desktop .sheet.nvsheet{width:480px;}
 .sheet textarea{width:100%;min-height:110px;background:var(--bg);border:0;border-radius:10px;padding:10px 12px;outline:0;resize:none;line-height:1.4;}
 .sheet input[type=date],.sheet input[type=datetime-local]{width:100%;height:44px;background:var(--bg);border:0;border-radius:10px;padding:0 12px;outline:0;color:var(--ink);}
 .cal{padding:6px 0 0;}
@@ -594,8 +608,9 @@ body.pdragging,body.pdragging *{cursor:grabbing !important;user-select:none;-web
 .app.desktop .check svg{width:9px;height:9px;}
 .app.desktop .check::after{width:32px;height:32px;margin:-16px 0 0 -16px;}
 .app.desktop .row-text{display:flex;align-items:center;gap:8px;}
-.app.desktop .row-title{display:block;flex:0 1 auto;min-width:0;font-size:14px;white-space:nowrap;text-overflow:ellipsis;}
-.app.desktop .row-text{flex:1 1 auto;min-width:0;}
+.app.desktop .row-title{flex:0 1 auto;min-width:0;font-size:14px;line-height:18px;-webkit-line-clamp:2;} /* v0.33.1: a long title wraps to two lines instead of ending in an ellipsis */
+.app.desktop .row-text{padding:4px 0;min-width:120px;} /* a one-line row keeps its 32 px; two lines get some air. The title never goes below 120 px: in a narrow list the right-hand columns are clipped (below) */
+.app.desktop .row-text{flex:1 1 auto;}
 .app.desktop .pcol{flex:none;width:var(--col-proj,132px);display:flex;align-items:center;min-width:0;}
 .app.desktop.has-pane .pcol{width:var(--col-proj,100px);}
 /* With the inspector open the list is narrow: the date column tightens and a reminder shows as its bell only (the time is in the tooltip and the inspector) */
@@ -604,12 +619,32 @@ body.pdragging,body.pdragging *{cursor:grabbing !important;user-select:none;-web
 .app.desktop.has-pane .desk:not(.colw-rem) .rc-rem{font-size:0;}
 .app.desktop.has-pane .desk:not(.colw-rem) .rc-rem svg{margin:0;}
 .app.desktop .pcol .tag{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;line-height:16px;padding:0 6px;border-radius:5px;margin:0;}
-/* Date, reminder and notes columns only take room when some row of the list uses them */
-.app.desktop .main:not(:has(.row .rc-date:not(:empty))) .rc-date{display:none;}
-.app.desktop .main:not(:has(.row .rc-rem:not(:empty))) .rc-rem{display:none;}
-.app.desktop .main:not(:has(.row .inds .is:not(:empty))) .inds{display:none;}
-.app.desktop .main:not(:has(.row .is-st:not(:empty))) .is-st,.app.desktop .main:not(:has(.row .is-nt:not(:empty))) .is-nt,
-.app.desktop .main:not(:has(.row .is-cl:not(:empty))) .is-cl,.app.desktop .main:not(:has(.row .is-rp:not(:empty))) .is-rp{display:none;}
+/* v0.33.1: every column right of the title (Persona, indicators and each of their slots, Pasos, Fecha, Entrega, Recordatorio, Tiempo,
+   priority) takes room only when some row of the list uses it, and the header cell shows and hides with it. The rows of the blocks at the
+   foot (.xs: Completadas, Por confirmar más adelante) never open a column in the list or its header; they get the list's columns plus
+   their own (deskRowHTML). Each pair: the list's rows and the header, then the foot rows */
+.app.desktop .main:not(:has(.row:not(.xs) .rc-per:not(:empty))) :is(.colhead,.row:not(.xs)) .rc-per,.app.desktop .main:not(:has(.row .rc-per:not(:empty))) .row.xs .rc-per,
+.app.desktop .main:not(:has(.row:not(.xs) .inds .is:not(:empty))) :is(.colhead,.row:not(.xs)) .inds,.app.desktop .main:not(:has(.row .inds .is:not(:empty))) .row.xs .inds,
+.app.desktop .main:not(:has(.row:not(.xs) .is-st:not(:empty))) :is(.colhead,.row:not(.xs)) .is-st,.app.desktop .main:not(:has(.row .is-st:not(:empty))) .row.xs .is-st,
+.app.desktop .main:not(:has(.row:not(.xs) .is-nt:not(:empty))) :is(.colhead,.row:not(.xs)) .is-nt,.app.desktop .main:not(:has(.row .is-nt:not(:empty))) .row.xs .is-nt,
+.app.desktop .main:not(:has(.row:not(.xs) .is-cl:not(:empty))) :is(.colhead,.row:not(.xs)) .is-cl,.app.desktop .main:not(:has(.row .is-cl:not(:empty))) .row.xs .is-cl,
+.app.desktop .main:not(:has(.row:not(.xs) .is-rp:not(:empty))) :is(.colhead,.row:not(.xs)) .is-rp,.app.desktop .main:not(:has(.row .is-rp:not(:empty))) .row.xs .is-rp,
+.app.desktop .main:not(:has(.row:not(.xs) .rsteps:not(:empty))) :is(.colhead,.row:not(.xs)) .rsteps,.app.desktop .main:not(:has(.row .rsteps:not(:empty))) .row.xs .rsteps,
+.app.desktop .main:not(:has(.row:not(.xs) .rc-date:not(:empty))) :is(.colhead,.row:not(.xs)) .rc-date,.app.desktop .main:not(:has(.row .rc-date:not(:empty))) .row.xs .rc-date,
+.app.desktop .main:not(:has(.row:not(.xs) .rc-dl:not(:empty))) :is(.colhead,.row:not(.xs)) .rc-dl,.app.desktop .main:not(:has(.row .rc-dl:not(:empty))) .row.xs .rc-dl,
+.app.desktop .main:not(:has(.row:not(.xs) .rc-rem:not(:empty))) :is(.colhead,.row:not(.xs)) .rc-rem,.app.desktop .main:not(:has(.row .rc-rem:not(:empty))) .row.xs .rc-rem,
+.app.desktop .main:not(:has(.row:not(.xs) .rc-est:not(:empty))) :is(.colhead,.row:not(.xs)) .rc-est,.app.desktop .main:not(:has(.row .rc-est:not(:empty))) .row.xs .rc-est,
+.app.desktop .main:not(:has(.row:not(.xs) .pri:not(:empty))) :is(.colhead,.row:not(.xs)) .pri,.app.desktop .main:not(:has(.row .pri:not(:empty))) .row.xs .pri{display:none;}
+/* Persona: Esperando a first, then the responsible, each clipped to the column (the full name in its tooltip) */
+.app.desktop .rc-per{flex:none;width:var(--col-per,150px);display:flex;align-items:center;justify-content:flex-start;gap:4px;min-width:0;text-align:left;}
+.app.desktop.has-pane .rc-per{width:var(--col-per,120px);}
+.app.desktop .rc-per .wtag,.app.desktop .rc-per .rtag{flex:0 1 auto;min-width:0;max-width:100%;}
+.app.desktop .rc-per .wtag + .rtag{flex-shrink:2;}
+.app.desktop .rc-per .rtag,.app.desktop .rc-per .wtag{display:block;text-overflow:ellipsis;}
+.app.desktop .rc-per .wtag::before{content:none;} /* the column says Persona: a clock marks Esperando a (as Por confirmar in the sidebar), the tooltip says it in full */
+.app.desktop .rc-per svg{display:inline-block;width:10px;height:10px;vertical-align:-1px;margin-right:3px;}
+.app.desktop .colhead .rc.rc-per{justify-content:flex-start;}
+.app.desktop .rsteps .chl{font-size:11px;}
 .app.desktop .row-meta{flex:none;display:flex;margin:0;font-size:12px;font-variant-numeric:tabular-nums;}
 .rc{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right;}
 .rc-date{width:var(--col-date,84px);}
@@ -622,7 +657,7 @@ body.pdragging,body.pdragging *{cursor:grabbing !important;user-select:none;-web
 .app.desktop .rowmore{width:24px;height:24px;border-radius:5px;}
 .app.desktop .rowmore svg{width:15px;height:15px;}
 .app.desktop .rowmore:hover{background:var(--dhov);}
-.app.desktop .row.held .row-meta{opacity:.4;transition:opacity .2s;}
+.app.desktop .row.held .row-meta,.app.desktop .row.held .rc-per{opacity:.4;transition:opacity .2s;}
 .app.desktop .row.cv{contain-intrinsic-size:auto 32px;}
 .app.desktop .rph{height:32px;}
 /* R15, R16: the selected row in the accent tint (apart from the hover gray), the multiple selection, the keyboard's focus ring,
@@ -1182,8 +1217,6 @@ body.resizing,body.resizing *{cursor:col-resize !important;-webkit-user-select:n
 .row-meta .review{color:var(--orange);font-weight:500;}
 .row-meta .waitfor{color:var(--ink2);}
 .app.desktop .rc-date.review{color:var(--orange);font-weight:500;}
-.app.desktop .row-text:has(.wtag){display:flex;align-items:center;gap:8px;}
-.app.desktop .row-text:has(.wtag) .row-title{flex:0 1 auto;min-width:0;}
 .wtag{flex:0 0 auto;min-width:0;max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:var(--ink2);background:var(--fill);border-radius:5px;padding:1px 6px;}
 .wtag::before{content:"Esperando a ";}
 .wsheet{display:flex;flex-direction:column;gap:8px;}
@@ -1234,7 +1267,6 @@ body.resizing,body.resizing *{cursor:col-resize !important;-webkit-user-select:n
 /* Desktop: a column of its own, only when some row of the list has steps (point 22); the handle and the menu show on hover */
 .rsteps{display:none;}
 .app.desktop .rsteps{display:flex;flex:none;width:48px;justify-content:flex-end;align-items:center;}
-.app.desktop .main:not(:has(.row .rsteps:not(:empty))) .rsteps{display:none;}
 .app.desktop .rsteps .sprog{font-size:11px;}
 .app.desktop .rsteps .sprog svg,.app.desktop .inds .sprog svg{width:11px;height:11px;}
 .wcard .cic .sprog{font-size:10px;gap:2px;}
@@ -1351,7 +1383,6 @@ body.sdragging,body.sdragging *{cursor:grabbing !important;-webkit-user-select:n
 .dl-due,.row-meta .dl.dl-due,.cell .val.dl-due{color:var(--red);font-weight:500;}
 .rc-dl{width:var(--col-dl,108px);}
 .app.desktop.has-pane .rc-dl{width:var(--col-dl,100px);}
-.app.desktop .main:not(:has(.row .rc-dl:not(:empty))) .rc-dl{display:none;}
 .app.desktop .row.done .rc-dl{color:inherit;font-weight:400;}
 .wcard .cic.cdl svg{width:11px;height:11px;}
 .wcard .cic.cdl.dl-soon{color:var(--orange);}
@@ -1361,7 +1392,6 @@ body.sdragging,body.sdragging *{cursor:grabbing !important;-webkit-user-select:n
 .row-meta .est{color:var(--ink2);}
 .rc-est{width:var(--col-est,64px);}
 .app.desktop.has-pane .rc-est{width:var(--col-est,54px);}
-.app.desktop .main:not(:has(.row .rc-est:not(:empty))) .rc-est{display:none;}
 /* Decision 56b: a task put off again and again says it in orange where Aplazada goes; the desktop date column widens for it */
 .row-meta .drag{color:var(--orange);font-weight:500;}
 .app.desktop .main:has(.row .rc-date.drag) .rc-date{width:var(--col-date,124px);}
@@ -1369,11 +1399,21 @@ body.sdragging,body.sdragging *{cursor:grabbing !important;-webkit-user-select:n
 .rvdrag{text-align:center;color:var(--orange);font-weight:500;font-size:0.824rem;margin:-6px 0 8px;}
 /* Decision 56c: Sugerir in the head of Ahora, and the sheet (iPhone) or popover (desktop) ¿Qué hago ahora? */
 .ahead .grow{flex:1;}
-.ahead .asug{position:relative;flex:none;color:var(--blue);font-weight:600;font-size:0.765rem;height:28px;padding:0 2px;}
-.ahead .asug::after{content:"";position:absolute;left:-8px;right:-8px;top:-8px;bottom:-8px;} /* 44 pt to the finger */
-.app.desktop .ahead .asug{font-size:11px;height:18px;padding:0;letter-spacing:0;}
-.app.desktop .ahead .asug::after{display:none;}
-.app.desktop .ahead .asug:hover{text-decoration:underline;}
+/* v0.33.1: Modo foco and ¿Qué hago ahora? as two icon buttons on the line of «Ahora N», at the right edge of the rows. Negative margins keep the
+   line as tall as its text; iPhone: 28 pt drawn, 44 pt to the finger; desktop: 28 px with a toolbar hover, the last one ending where the rows'
+   «más» button ends */
+.ahead .aib{position:relative;flex:none;width:28px;height:28px;margin:-6px 0;display:flex;align-items:center;justify-content:center;border-radius:7px;color:var(--blue);}
+.ahead .aib svg{width:19px;height:19px;color:inherit;}
+.ahead .aib::after{content:"";position:absolute;inset:-8px;} /* 44 pt to the finger */
+.ahead .aib + .aib{margin-left:8px;}
+.ahead .aib:active{opacity:.4;}
+.app.desktop .ahead{padding-right:8px;}
+.app.desktop .ahead .aib{margin:-8px 0;border-radius:6px;}
+.app.desktop .ahead .aib + .aib{margin-left:2px;}
+.app.desktop .ahead .aib::after{display:none;}
+.app.desktop .ahead .aib svg{width:15px;height:15px;}
+.app.desktop .ahead .aib:hover{background:var(--dhov);}
+.app.desktop .ahead .aib:active{opacity:1;background:var(--dsel);}
 .sg .sgchips{justify-content:center;margin:0 0 12px;}
 .sgwarn{margin:0 0 10px;padding:9px 12px;border-radius:10px;background:color-mix(in srgb,var(--orange) 14%,transparent);color:var(--ink);font-size:0.824rem;line-height:1.3;}
 .sgempty{text-align:center;color:var(--ink2);font-size:0.882rem;padding:22px 0 18px;}
@@ -1538,23 +1578,48 @@ body.desktop .sgopen svg{width:6px;height:11px;}
 .i-person{flex:none;}
 .row-meta .resp{display:inline-flex;align-items:center;gap:3px;color:var(--ink2);}
 .row-meta .resp svg{width:11px;height:11px;}
-.app.desktop .row-text:has(.rtag){display:flex;align-items:center;gap:8px;}
-.app.desktop .row-text:has(.rtag) .row-title{flex:0 1 auto;min-width:0;}
 .rtag{flex:0 0 auto;min-width:0;max-width:40%;display:inline-flex;align-items:center;gap:3px;overflow:hidden;white-space:nowrap;font-size:11px;color:var(--ink2);background:var(--fill);border-radius:5px;padding:1px 6px;}
 .rtag svg{width:10px;height:10px;}
-.app.desktop .row-text:has(.wtag):has(.rtag) .wtag{max-width:35%;margin-left:0;}
-.app.desktop .row-text:has(.wtag) .rtag{margin-left:-2px;}
 /* The filter by responsible: the iPhone chip first in the row of project chips; the desktop pop-up button beside Proyecto */
 .pchips .chip.rchip{gap:4px;}
 .pchips .chip.rchip svg{width:13px;height:13px;}
 .pchips .chip.rchip.on{background:var(--blue);}
 .pfslot{gap:6px;}
 .pfdrop.rfdrop{max-width:200px;}
-/* The suggestions under Responsable and Esperando a, the reminder to send and the contact sheet */
-.wsheet .psug{flex-wrap:wrap;gap:6px;}
-.wsheet .psug.empty{display:none;}
-.wsheet .psug .chip{height:30px;font-size:0.824rem;}
-.pm-pop .wsheet .psug .chip{height:22px;font-size:12px;padding:0 8px;}
+/* v0.33.1: the person picker of Responsable and Esperando a, a search field over a list (bindPersonPick). iPhone: an inset grouped list of
+   44 pt rows with the check mark on the left; desktop: a popover of 280 px with Mac list rows, the one under the keys or the mouse in blue */
+.ppick{display:flex;flex-direction:column;gap:8px;min-height:0;}
+.ppsearch{position:relative;display:flex;align-items:center;}
+.ppsearch svg{position:absolute;left:10px;width:16px;height:16px;color:var(--ink2);pointer-events:none;}
+.ppsearch input{width:100%;height:36px;border:0;border-radius:10px;background:var(--fill);color:var(--ink);padding:0 10px 0 32px;font-size:max(16px,1rem);outline:0;-webkit-appearance:none;appearance:none;}
+.pplist{background:var(--card);border-radius:10px;overflow-y:auto;overscroll-behavior:contain;max-height:264px;}
+.wsheet .pplist{max-height:178px;}
+.pprow{position:relative;display:flex;align-items:center;gap:8px;width:100%;min-height:44px;padding:4px 14px 4px 8px;text-align:left;color:var(--ink);}
+.pprow + .pprow::before{content:"";position:absolute;left:36px;right:0;top:0;height:.5px;background:var(--sep);}
+.pprow:active{background:var(--press);}
+.ppck{flex:none;width:20px;display:flex;justify-content:center;color:var(--blue);}
+.ppck svg{width:14px;height:14px;}
+.ppl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:1rem;}
+.ppl small{display:block;font-size:0.765rem;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;}
+.ppadd .ppl,.ppadd .ppic{color:var(--blue);}
+.ppic{flex:none;display:flex;color:var(--ink3);}
+.ppic svg{width:15px;height:15px;}
+.ppsheet .ppick{margin-bottom:6px;}
+.pm.mac .pm-menu.pm-pop.pp-pop{width:280px;padding:6px;}
+.app.desktop .ppick,.pm-pop .ppick{gap:6px;}
+.pm-pop .ppsearch svg{left:8px;width:13px;height:13px;}
+.pm-pop .ppsearch input{height:26px;border-radius:6px;font-size:13px;padding:0 8px 0 26px;}
+.pm-pop .pplist{background:transparent;border-radius:0;max-height:212px;}
+.pm-pop .wsheet .pplist{max-height:134px;background:var(--fill);border-radius:6px;padding:2px;}
+.pm-pop .pprow{min-height:26px;padding:3px 8px 3px 2px;gap:4px;border-radius:5px;cursor:default;}
+.pm-pop .pprow + .pprow::before{display:none;}
+.pm-pop .pprow:active{background:transparent;}
+.pm-pop .ppck svg{width:11px;height:11px;}
+.pm-pop .ppl{font-size:13px;}
+.pm-pop .ppl small{font-size:11px;}
+.pm-pop .ppic svg{width:12px;height:12px;}
+.pm-pop .pprow.hl{background:var(--blue);color:#fff;}
+.pm-pop .pprow.hl .ppck,.pm-pop .pprow.hl .ppl,.pm-pop .pprow.hl .ppl small,.pm-pop .pprow.hl .ppic{color:#fff;}
 .wsheet .wback.red{color:var(--red);}
 .wsheet .rmsg{height:auto;min-height:120px;padding:10px 12px;resize:none;line-height:1.35;font-family:inherit;}
 .wsheet .rto{font-size:0.882rem;color:var(--ink2);}
@@ -1579,8 +1644,6 @@ body.hresizing,body.hresizing *{cursor:ns-resize !important;}
 /* While a card is dragged the hour blocks let it through to the half hours under them: a long block would otherwise hide its slots */
 #desk.carddrag .hcol .wcard.hb:not(.dragging){pointer-events:none;}
 /* ---------- Decision 65d: focus mode, the Ahora tasks alone, large and calm ---------- */
-.ahead .afoco{margin-right:14px;}
-.app.desktop .ahead .afoco{margin-right:10px;}
 .focusnav .title .fstar,.main .mhead h1 .fstar{width:18px;height:18px;color:var(--orange);margin-right:2px;}
 .focusnav .title .fn,.main .mhead h1 .fn{font-size:0.882rem;font-weight:500;color:var(--ink2);margin-left:6px;letter-spacing:0;}
 .focusnav .action.strong{font-weight:600;}
@@ -1620,7 +1683,8 @@ body.hresizing,body.hresizing *{cursor:ns-resize !important;}
 .app.desktop .main .focuslist .row-text{order:1;flex:0 1 auto;}
 .app.desktop .main .focuslist .pcol{order:2;width:auto;margin-right:auto;padding-left:2px;}
 .app.desktop .main .focuslist .pcol .tag{font-size:12px;line-height:18px;}
-.app.desktop .main .focuslist .row-meta .rc:empty,.app.desktop .main .focuslist .inds .is:empty,.app.desktop .main .focuslist .rsteps:empty{display:none;}
+.app.desktop .main .focuslist .rc-per{width:auto;}
+.app.desktop .main .focuslist .rc-per:empty,.app.desktop .main .focuslist .row-meta .rc:empty,.app.desktop .main .focuslist .inds .is:empty,.app.desktop .main .focuslist .rsteps:empty{display:none;}
 .app.desktop .main .focuslist .row + .row .row-content::before{left:52px;}
 
 /* ======================= Decision 63a: Cifrado ======================= */

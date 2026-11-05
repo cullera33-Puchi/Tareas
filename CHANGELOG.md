@@ -1,5 +1,14 @@
 # Registro de cambios
 
+## v0.33.1. Novedades al actualizar, columnas del escritorio y selector de personas (5 de noviembre de 2026)
+
+- Novedades al actualizar (punto 64): al tocar «Actualizar» se abre «Novedades de la X» con lo nuevo de cada versión que faltaba, con «Actualizar» y «Más tarde». En Ajustes, «Novedades» abre la lista completa. Archivo `novedades.json`, publicado con la app y leído siempre de la red; sin conexión, la actualización funciona como antes.
+- Ajustes ya no ofrece generar datos de prueba (el código se queda); si quedan datos de prueba en el dispositivo, solo aparece «Eliminar datos de prueba».
+- Lista del escritorio: cada columna ocupa sitio solo si alguna tarea de esa lista la usa y su cabecera queda alineada encima; Completadas y «Por confirmar más adelante» no abren columnas en la lista. Columna nueva «Persona», ajustable, con «Esperando a» y el responsable. El título se queda con el ancho libre y pasa a dos líneas en lugar de cortarse.
+- Responsable y «Esperando a» se eligen en una lista con buscador: «Sin responsable» primero, contactos por orden alfabético con icono de teléfono o correo, «Añadir «Nombre»» y marca en el actual. En el ordenador, ventana anclada con flechas, Intro y Esc; en el iPhone, lista de iOS.
+- «Foco» y «Sugerir» pasan a ser dos iconos en la línea de «Ahora», alineados con las columnas.
+- Sin cambios en Supabase. Prueba nueva `rm-NV`.
+
 ## v0.33.0. Modo foco y repeticiones más completas (5 de noviembre de 2026)
 
 - Modo foco: el botón «Foco» del bloque «Ahora» deja a la vista solo esas tareas, en iPhone y ordenador. «Salir del foco» vuelve a Hoy, y al completar la última termina solo.

@@ -153,7 +153,8 @@ function onClick(e){
     case 'log': logSheet(); break;
     case 'logCopy': copyText(logText(),'Registro copiado'); break;
     case 'logClear': logClearAsk(); break;
-    case 'update': applyUpdate(); break;
+    case 'update': updateTap(); break;
+    case 'news': newsSheet(); break;
     case 'signIn': syncSignIn(); break;
     case 'syncNow': syncRun('manual'); break;
     case 'signOut': syncSignOutSheet(); break;
@@ -318,7 +319,7 @@ const ghostClick = e => UI.wide ? e.detail>1&&menuFresh() : menuFresh();
 const pickFresh = e => UI.wide ? e.detail>1&&menuFresh() : sheetFresh();
 const ghostSheet = e => UI.wide ? !!e&&e.detail>1&&sheetFresh() : sheetFresh(); // the sheets' own guard follows the same rule on the desktop (centred dialogs)
 function noteEarlyClose(kind){ const ms=Math.round(performance.now()-sheetOpenedAt); if(sheetOpenedAt&&ms<800) log('warn','Hoja cerrada a los '+ms+' ms ('+kind+')', String((new Error()).stack||'').split('\n').slice(2,5).map(l=>l.trim().slice(0,90)).join(' | ')); }
-function openSheet(html, onOpen){ sheetOpenedAt=performance.now(); sheetOnClose=null; sheetGuard=null; sheet.classList.remove('addsheet','keysheet'); sheet.innerHTML='<div class="handle"></div>'+html; sheet.classList.add('on'); scrim.classList.add('on'); dimApp(true); bindSheetDrag(); onOpen&&onOpen(sheet); }
+function openSheet(html, onOpen){ sheetOpenedAt=performance.now(); sheetOnClose=null; sheetGuard=null; sheet.classList.remove('addsheet','keysheet','nvsheet'); sheet.innerHTML='<div class="handle"></div>'+html; sheet.classList.add('on'); scrim.classList.add('on'); dimApp(true); bindSheetDrag(); onOpen&&onOpen(sheet); }
 function closeSheet(){ if(sheet.classList.contains('on')||asheet.classList.contains('on')) noteEarlyClose('cerrar'); sheetGuard=null; closeMenu(true); sheet.classList.remove('on','drag','top'); sheet.style.transform=''; const al=asheet.classList.contains('on')&&asheet.classList.contains('alert'); asheet.classList.remove('on'); asheet.onclick=null; scrim.classList.remove('on','light'); dimApp(false); if(al) alertBack(); try{ stopRec&&stopRec(); }catch(e){} setTimeout(()=>{ if(!sheet.classList.contains('on')) sheet.innerHTML=''; if(!asheet.classList.contains('on')){ asheet.innerHTML=''; asheet.classList.remove('alert'); } },520); const oc=sheetOnClose; sheetOnClose=null; if(oc) oc(); if(staleView) setTimeout(flushStale, 0); } // a closed menu keeps no buttons or handler that a stray click could fire; data reloaded meanwhile is drawn now, unless the caller already redrew
 function requestCloseSheet(){ const g=sheet.classList.contains('on')&&sheetGuard&&sheetGuard(); if(!g){ closeSheet(); return; }
   const back=()=>{ const f=g.field; if(f&&f.isConnected){ f.focus(); if(f.setSelectionRange){ const l=f.value.length; f.setSelectionRange(l,l); } } }; // inside the tap that chose it: iOS opens the keyboard again

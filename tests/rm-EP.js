@@ -158,7 +158,7 @@ async function iphone(browser){
   await shot(page, 'i1-hoy');
 
   // --- C. Sugerir in the head of Ahora, a sheet with the chips (30 min by default)
-  check('sugerir_link', await ev(page, ()=>{ const b=document.querySelector('.screen.root .ahora .ahead [data-act=suggest]'); return !!b&&b.textContent==='Sugerir'; }));
+  check('sugerir_link', await ev(page, ()=>{ const b=document.querySelector('.screen.root .ahora .ahead [data-act=suggest]'); return !!b&&b.getAttribute('aria-label')==='¿Qué hago ahora?'&&!!b.querySelector('svg'); })); // v0.33.1: an icon button
   await page.tap('.screen.root .ahora [data-act=suggest]'); await sheetUp(page);
   x = await ev(page, ()=>({h:document.querySelector('#sheet h2').textContent, chips:[...document.querySelectorAll('#sheet .sgchips .chip')].map(c=>c.textContent+(c.classList.contains('on')?'*':'')).join(), warn:(document.querySelector('#sheet .sgwarn')||{}).textContent||''}));
   check('sg_sheet', x.h==='¿Qué hago ahora?' && x.chips==='15 min,30 min*,1 h,Medio día' && x.warn==='Ojo: a las 10:20 tienes "Reunión SteerCo"', x);

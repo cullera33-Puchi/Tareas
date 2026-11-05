@@ -1,6 +1,6 @@
 /* Service worker: app shell cache and update notice.
    Bump CACHE on every release so installed devices pick up the new version. */
-const CACHE = 'tareas-v0.33.0';
+const CACHE = 'tareas-v0.33.1';
 // Every file the app loads: a missing one would leave the installed app unable to start offline (index.html lists the scripts in order)
 const SHELL = ['./', './index.html', './css/app.css',
   './js/core.js', './js/render.js', './js/events.js', './js/menus.js', './js/sheets.js', './js/attachments.js', './js/steps.js', './js/notes.js', './js/status.js', './js/suggest.js', './js/crypto.js', './js/sync.js', './js/e2e.js', './js/push.js', './js/inbox.js', './js/people.js', './js/lifecycle.js', './js/desktop.js', './js/desktop-calendar.js', './js/desktop-render.js', './js/desktop-add.js', './js/boot.js',
@@ -29,6 +29,9 @@ self.addEventListener('message', e => {
 self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
+  // novedades.json (decision 64): network only, never cached, so the notes of a new version are read before installing it.
+  // Without respondWith the browser fetches it itself; offline it fails and the page falls back to the usual update notice.
+  if (new URL(req.url).pathname.endsWith('/novedades.json')) return;
   // config.js (Supabase URL and public key, written at deploy) goes network first, so corrected keys reach installed
   // phones on the next deploy without a new version; offline, the cached copy is used.
   if (new URL(req.url).pathname.endsWith('/config.js')) {

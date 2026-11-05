@@ -201,18 +201,18 @@ function pfDropHTML(){ if(UI.query||!activeProjects().length) return ''; const f
 function projFilterMenu(src){ const dot=c=>'<span class="pm-dot" style="background:'+c+'"></span>', set=v=>{ UI.projFilter=v; render(); };
   popMenu({anchor:src, align:'right', groups:[[{label:'Todos', on:UI.projFilter===null, fn:()=>set(null)}], activeProjects().map(p=>({label:p.name, icon:dot(p.color), on:UI.projFilter===p.id, fn:()=>set(p.id)})), [{label:'Sin proyecto', icon:dot('var(--ink3)'), on:UI.projFilter==='none', fn:()=>set('none')}]]}); }
 /* Decision 58: the column header above a desktop list (Proyecto, Tarea and the right-hand columns some row of the list uses, by the same
-   :has rules as the rows) and its resize handles. The widths are CSS custom properties on #desk (--col-proj, --col-date, --col-dl,
+   :has rules as the rows) and its resize handles. The widths are CSS custom properties on #desk (--col-proj, --col-per, --col-date, --col-dl,
    --col-rem, --col-est): rows and header read them, so a drag moves both with no redraw. A column the user never resized has no property
    and takes its default from the stylesheet, which differs with the inspector open (the narrower widths of point 22); a resized one keeps
    its width in both states. Kept in DB.settings.colWidths, a device setting that is not synced */
-const COL_LIMITS={proj:[60,300], date:[60,200], dl:[70,200], rem:[60,200], est:[44,140]};
+const COL_LIMITS={proj:[60,300], per:[70,320], date:[60,200], dl:[70,200], rem:[60,200], est:[44,140]}; // per: Persona (v0.33.1)
 // The saved widths, with anything unknown or out of range dropped (an old or hand-edited setting)
 function colWidths(){ const c=DB.settings.colWidths; if(!c||typeof c!=='object'||Array.isArray(c)){ if(c!==undefined) delete DB.settings.colWidths; return {}; }
   Object.keys(c).forEach(k=>{ const l=COL_LIMITS[k], w=c[k]; if(!l||typeof w!=='number'||!isFinite(w)||w<l[0]||w>l[1]) delete c[k]; else c[k]=Math.round(w); }); return c; }
 function applyColWidths(d){ const c=colWidths(); Object.keys(COL_LIMITS).forEach(k=>{ if(c[k]) d.style.setProperty('--col-'+k, c[k]+'px'); else d.style.removeProperty('--col-'+k); });
   d.classList.toggle('colw-rem', !!c.rem); } // a resized reminder column shows its time with the inspector open too
 function colHeadHTML(){ const g=k=>'<i class="colgrip" data-col="'+k+'" title="Arrastra para cambiar el ancho. Doble clic: ancho inicial"></i>', c=(k,l)=>'<span class="rc rc-'+k+'">'+g(k)+(k==='rem'?I.bell:'')+'<span class="chl">'+l+'</span></span>';
-  return '<div class="colhead" aria-hidden="true"><span class="ch-check"></span><span class="pcol"><span class="chl">Proyecto</span>'+g('proj')+'</span><span class="row-text"><span class="chl">Tarea</span></span><span class="inds">'+indSlotsHTML()+'</span><span class="rsteps"></span><span class="row-meta">'+c('date','Fecha')+c('dl','Entrega')+c('rem','Recordatorio')+c('est','Tiempo')+'</span><span class="pri"></span><span class="rowmore"></span></div>'; }
+  return '<div class="colhead" aria-hidden="true"><span class="ch-check"></span><span class="pcol"><span class="chl">Proyecto</span>'+g('proj')+'</span><span class="row-text"><span class="chl">Tarea</span></span>'+c('per','Persona')+'<span class="inds">'+indSlotsHTML()+'</span><span class="rsteps"><span class="chl">Pasos</span></span><span class="row-meta">'+c('date','Fecha')+c('dl','Entrega')+c('rem','Recordatorio')+c('est','Tiempo')+'</span><span class="pri"></span><span class="rowmore"></span></div>'; }
 /* A handle drags the width of its column: Proyecto's sits on its right edge (the title takes the rest); a right-hand column's on its left
    edge, so dragging left widens it. Limits in COL_LIMITS; the width is written once per frame and saved on the drop; a double click resets */
 function bindColResize(d){

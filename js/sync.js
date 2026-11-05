@@ -353,7 +353,8 @@ function syncRun(reason){
     const p=await syncPush(syncCollect(false));
     await cryptoAfterPush(); // decision 63a: the Siri phrases taken leave the server once their tasks are up encrypted
     st=syncState(); st.fields=fsig; if(first){ st.owner=user.id; log('info','Primera conexión completada', {spaces:DB.spaces.length, projects:DB.projects.length, tasks:DB.tasks.length, remaps:a.remaps.length}); }
-    st.lastSync=new Date().toISOString(); syncWrite(st); SY.lastSync=st.lastSync; SY.retry=0;
+    st.lastSync=new Date().toISOString(); st.missing=SY.remote.missing?[...SY.remote.missing]:[]; // the tables this database lacks, for the unsent count of another account's sign-in (syncOtherPending)
+    syncWrite(st); SY.lastSync=st.lastSync; SY.retry=0;
     log('info','Sincronización ('+reason+')', {recibidas:a.added+a.updated, eliminadas:a.removed, conflictos:a.conflicts.length, enviadas:p.pushed, borradas:p.deleted, mantenidas:p.kept, ms:Date.now()-t0});
     return true; };
   const locked=()=>(navigator.locks&&navigator.locks.request) ? navigator.locks.request('tareas-sync', body) : body();
@@ -438,53 +439,95 @@ async function syncSignOut(){ if(!SY||!SY.user) return; SY.signingOut=true; try{
    global, would be refused anyway. Instead, «Continuar»: a local backup (marked as A's, so it never restores into B), then this device is
    emptied (data, files, the team's copy, the encryption state and keys of A) and the app starts again, and B's data come down. Or «Cerrar
    sesión». The same happens when A signs in again after B */
-const syncOtherOwner = () => { if(!SY||!SY.user) return false; const o=syncState().owner; return !!o&&o!==SY.user.id; };
-// What of the old account this device has not sent yet: changes and deletions its sync state does not know (still the old account's), and
-// photos or recordings whose file has not reached its account. Such a device is never emptied for another account
-async function syncOtherPending(){ let n=0; try{ n=syncCollect(true).count; }catch(e){ n=1; }
-  const ids=new Set(DB.attachments.filter(a=>a&&!a.path).map(a=>a.id)); try{ (await FS.allMeta()).forEach(m=>{ if(m&&m.pending) ids.add(m.id); }); }catch(e){}
-  return n+ids.size; }
+// The account this device's data belong to: the one it synced with, or the one whose first pass began here and never ended (its pulled rows
+// are already merged in). Null: a device that never synced, whose data go into the first account that signs in (decision 5)
+const syncPrevOwner = () => { const st=syncState(); return st.owner||st.firstFor||null; };
+const syncOtherOwner = () => { if(!SY||!SY.user) return false; const o=syncPrevOwner(); return !!o&&o!==SY.user.id; };
+// A promise that gives up: IndexedDB can hang (Safari); null then means «unknown»
+const syncWithin = (p, ms) => Promise.race([p, new Promise(r=>setTimeout(()=>r(null), ms))]);
+/* What of the old account this device has not sent: rows the server never saw, rows changed (modified) after its last pass, deletions not sent,
+   and the photos or recordings of its live tasks whose file is waiting here. Not counted: what rollOver changes without touching modified,
+   demo data, attachments of tasks that are gone, files of attachments that are gone, and tables its database lacks (st.missing, kept by its
+   last pass). Returns the number, or -1 when the files cannot be read (unknown: treated as unsent) */
+async function syncOtherPending(){ const st=syncState(), since=syncTime(st.lastSync), missing=new Set(st.missing||[]), firstOnly=!st.owner; let n=0;
+  SYNC_TABLES.forEach(({list, table})=>{ if(missing.has(table)) return; const known=(st.known||{})[table]||{}, here=new Set();
+    DB[list].forEach(rec=>{ if(!rec||rec.id==null) return; here.add(rec.id); if(syncSkip(table, rec)) return; const k=known[rec.id];
+      if(k===undefined||k==='x'){ n++; return; } // never seen by the server, or back after its deletion went up
+      if(firstOnly||syncTime(rec.modified)>since){ if(syncSig(syncToRow(table, rec))!==k) n++; } });
+    Object.keys(known).forEach(id=>{ if(known[id]!=='x'&&!here.has(id)&&!syncDemoId(id)) n++; }); }); // deleted here, not sent
+  const waiting=new Set(DB.attachments.filter(a=>a&&!a.path&&!syncDemoId(a.id)&&!syncDemoId(a.taskId)&&task(a.taskId)).map(a=>a.id));
+  if(waiting.size){ const metas=await syncWithin(FS.allMeta().catch(()=>null), 3000); if(!metas) return -1;
+    metas.forEach(m=>{ if(m&&m.pending&&waiting.has(m.id)) n++; }); }
+  return n; }
 // Nothing of the person's own: the device can start again without asking (when in doubt, it asks)
 const syncLocalEmpty = () => !DB.tasks.length&&!DB.projects.length&&!DB.projectNotes.length&&!DB.contacts.length&&!DB.attachments.length&&!DB.voiceNotes.length&&!DB.subtasks.length
   && DB.spaces.length<=2 && DB.spaces.every(sp=>['trabajo','personal'].includes(norm(sp.name||'').trim()));
-/* The question. Something unsent (N): only «Cerrar sesión» (the old account sends it first). Nothing unsent: «Continuar» or «Cerrar sesión»;
-   on the desktop Intro is «Cerrar sesión», Continuar takes a click */
-async function syncOtherAsk(force){ if(!syncOtherOwner()||SY.switching||SY.otherBusy) return; SY.otherBusy=true; let n=0;
-  try{ n=await syncOtherPending(); } finally{ SY.otherBusy=false; } if(!syncOtherOwner()||SY.switching) return;
+/* The question. Something unsent (N, or unknown): «Cerrar sesión» (the old account sends it first; the default, Intro on the desktop) or, behind
+   a confirmation, «Vaciar de todos modos» (what was unsent stays only in this device's copy). Nothing unsent: «Continuar» or «Cerrar
+   sesión»; on the desktop Intro is «Cerrar sesión», Continuar takes a click */
+async function syncOtherAsk(force){ if(!syncOtherOwner()||SY.switching||SY.otherBusy) return; SY.otherBusy=true; let n=-1;
+  try{ n=await syncOtherPending(); }catch(e){ n=-1; } finally{ SY.otherBusy=false; } if(!syncOtherOwner()||SY.switching) return;
   if(!n&&syncLocalEmpty()){ syncSwitchAccount(); return; }
   if(SY.otherAsked&&!force) return; if(!force&&(sheet.classList.contains('on')||asheet.classList.contains('on')||menuOpen()||touchDrag)){ clearTimeout(SY.otherT); SY.otherT=setTimeout(()=>syncOtherAsk(), 1500); return; }
   SY.otherAsked=true; const dev=UI.wide?'este dispositivo':'este iPhone';
-  if(n){ const title='Este dispositivo tiene cambios sin enviar de otra cuenta ('+n+')', text='Entra con esa cuenta para enviarlos antes de usar aquí otra.';
+  if(n){ const title='Este dispositivo tiene cambios sin enviar de otra cuenta'+(n>0?' ('+n+')':''), text='Entra con esa cuenta para enviarlos antes de usar aquí otra.';
     log('info','Cambios sin enviar de otra cuenta: no se puede usar aquí esta cuenta', {n});
-    if(UI.wide){ macAlert({title, text, ok:'Cerrar sesión', red:false, fn:syncSignOut}); return; }
-    actionSheet(title+'. '+text, [{label:'Cerrar sesión', red:true, fn:syncSignOut}]); return; }
+    if(UI.wide){ macAlert({title, text, ok:'Cerrar sesión', red:false, fn:syncSignOut, more:[{label:'Vaciar de todos modos', red:true, fn:()=>setTimeout(()=>syncEmptyAnyway(n), 50)}]}); return; }
+    actionSheet(title+'. '+text, [{label:'Cerrar sesión', fn:syncSignOut}, {label:'Vaciar de todos modos', red:true, fn:()=>setTimeout(()=>syncEmptyAnyway(n), 50)}]); return; }
   const title='Este dispositivo tiene datos de otra cuenta';
   const text='Ya están todos en esa cuenta. Para usar '+(SY.user.email||'esta cuenta')+' aquí, se guarda una copia local de lo que hay en '+dev+' y se vacía; después llegan los datos de esta cuenta.';
   log('info','Datos de otra cuenta en este dispositivo: no se sincroniza');
-  if(UI.wide){ macAlert({title, text, ok:'Cerrar sesión', red:false, fn:syncSignOut, more:[{label:'Continuar', fn:syncSwitchAccount}]}); return; }
-  actionSheet(title+'. '+text, [{label:'Continuar', fn:syncSwitchAccount}, {label:'Cerrar sesión', red:true, fn:syncSignOut}]); }
-/* «Continuar». From its first line nothing syncs or saves (SY.switching: syncRun and save() do nothing, the timer is cleared); pending typing
-   and marked rows are written first and the unsent check is made again; then the backup (its own key, never over another copy), the data in
-   memory and on the device replaced by a blank copy, the old account's files, team copy, encryption state and keys gone, and a reload */
-async function syncSwitchAccount(){ if(!syncOtherOwner()||SY.switching) return; const user=SY.user, prev=syncState().owner;
+  if(UI.wide){ macAlert({title, text, ok:'Cerrar sesión', red:false, fn:syncSignOut, more:[{label:'Continuar', fn:()=>syncSwitchAccount()}]}); return; }
+  actionSheet(title+'. '+text, [{label:'Continuar', fn:()=>syncSwitchAccount()}, {label:'Cerrar sesión', red:true, fn:syncSignOut}]); }
+// «Vaciar de todos modos»: confirmed apart; Intro and the first button stay on the safe side
+function syncEmptyAnyway(n){ if(!syncOtherOwner()||SY.switching) return;
+  const text='Los cambios sin enviar de la otra cuenta'+(n>0?' ('+n+')':'')+' solo quedarán en una copia de este dispositivo. Las fotos y audios sin subir se perderán.';
+  if(UI.wide){ macAlert({title:'Vaciar este dispositivo', text, ok:'Cerrar sesión', red:false, fn:syncSignOut, more:[{label:'Vaciar', red:true, fn:()=>syncSwitchAccount(true)}]}); return; }
+  actionSheet(text, [{label:'Vaciar', red:true, fn:()=>syncSwitchAccount(true)}]); }
+/* «Continuar» (and «Vaciar de todos modos», force). From the start nothing syncs or saves here (SY.switching) or in another window (the
+   marker SWITCH_KEY, which save() checks and which makes the other windows start again), and a screen covers the app; pending typing and
+   marked rows are written first and, without force, the unsent check is made again. Then the backup (its own key, never over another copy),
+   the sync state for the new account (written first: if that fails nothing is touched; if the data cannot be blanked after it, the old
+   account's state comes back), the blank data in memory and on the device, the old account's files, team copy, encryption state and keys,
+   push subscription and log gone, and a reload, which checks the data are still blank (syncSwitchBoot) */
+const SWITCH_KEY='tareas-switching';
+async function syncSwitchAccount(force){ if(!syncOtherOwner()||SY.switching) return; const user=SY.user, prev=syncPrevOwner();
   clearTimeout(SY.timer); try{ flushHeld(true); flushEdits(); }catch(e){}
-  if(await syncOtherPending()){ SY.otherAsked=false; syncOtherAsk(true); return; } // something arrived meanwhile: the old account sends it first
-  if(SY.switching||!syncOtherOwner()) return; SY.switching=true; clearTimeout(SY.timer);
-  try{
-    try{ await BK.tagOwnerless(prev); }catch(e){ log('warn','Copias locales sin marcar: '+(e&&e.message||e)); }
-    if(!syncLocalEmpty()){ try{ await BK.put(todayStr(), prev, true); await refreshBackups(); }catch(e){ log('error','Copia local antes de cambiar de cuenta no disponible: '+(e&&e.message||e)); toast('No se pudo guardar la copia local. No se ha cambiado nada'); SY.switching=false; return; } }
-    const keep={}, s=DB.settings||{}; ['theme','tipsSeen','shakeUndo','colWidths','paneWidth','hap','weekMode','weekTray','calMode','pitFold'].forEach(k=>{ if(k in s) keep[k]=s[k]; });
-    const fresh=blank(); Object.assign(fresh.settings, keep); DB=fresh; // nothing of the old account stays in memory either
-    localStorage.setItem(KEY, JSON.stringify(fresh));
-    // the account's sync state starts empty, as a first connection that has nothing to merge (and needs no backup: the device is empty)
-    syncWrite({user:{id:user.id, email:user.email||''}, firstFor:user.id, known:{}, cursor:{}, del:{}});
-    [TEAM_KEY, CR_FLAG, CR_FILES, 'tareas-inbox'].forEach(k=>{ try{ localStorage.removeItem(k); }catch(e){} });
-    try{ localStorage.setItem(BK_SKIP, todayStr()); }catch(e){} // no daily copy of the empty device today: the account's data are on the server
-    try{ await FS.tx(['files','thumbs','meta'], 'readwrite', (f,t,m)=>{ f.clear(); t.clear(); m.clear(); }); }catch(e){ log('warn','Archivos del dispositivo no vaciados: '+(e&&e.message||e)); }
-    try{ await cryptoKeyForget(); }catch(e){} try{ await cryptoKdbDo('readwrite', st=>st.delete('ecdh')); }catch(e){}
-    log('info','Dispositivo vaciado para otra cuenta: se vuelve a empezar', {antes:!!prev}); }
-  catch(e){ log('error','No se pudo vaciar el dispositivo: '+(e&&e.message||e)); toast('No se pudo cambiar de cuenta'); location.reload(); return; } // half done: start again from what is stored
+  if(!force){ const n=await syncOtherPending().catch(()=>-1); if(n){ SY.otherAsked=false; syncOtherAsk(true); return; } } // something arrived meanwhile: the old account sends it first
+  if(SY.switching||!syncOtherOwner()) return; SY.switching=true; clearTimeout(SY.timer); syncCover(true);
+  const fail=msg=>{ try{ localStorage.removeItem(SWITCH_KEY); }catch(e){} SY.switching=false; syncCover(false); toast(msg); };
+  try{ await BK.tagOwnerless(prev); }catch(e){ log('warn','Copias locales sin marcar: '+(e&&e.message||e)); }
+  if(!syncLocalEmpty()){ try{ await BK.put(todayStr(), prev, true); await refreshBackups(); }catch(e){ log('error','Copia local antes de cambiar de cuenta no disponible: '+(e&&e.message||e)); fail('No se pudo guardar la copia local. No se ha cambiado nada'); return; } }
+  try{ localStorage.setItem(SWITCH_KEY, JSON.stringify({to:user.id, at:new Date().toISOString()})); }catch(e){ fail('No se pudo cambiar de cuenta. No se ha cambiado nada'); return; }
+  const prevSync=localStorage.getItem(SYNC_KEY);
+  // the account's sync state starts empty, as a first connection that has nothing to merge (and needs no backup: the device will be empty)
+  if(!syncWrite({user:{id:user.id, email:user.email||''}, firstFor:user.id, known:{}, cursor:{}, del:{}})){ fail('No se pudo cambiar de cuenta. No se ha cambiado nada'); return; }
+  const keep={}, s=DB.settings||{}; ['theme','tipsSeen','shakeUndo','colWidths','paneWidth','hap','weekMode','weekTray','calMode','pitFold'].forEach(k=>{ if(k in s) keep[k]=s[k]; });
+  const fresh=blank(); Object.assign(fresh.settings, keep);
+  try{ localStorage.setItem(KEY, JSON.stringify(fresh)); }
+  catch(e){ // the data stay the old account's: so does its sync state (or one that only knows the owner: its next pass then only sends)
+    let back=false; try{ localStorage.setItem(SYNC_KEY, prevSync||'{}'); back=true; }catch(x){} if(!back) try{ localStorage.setItem(SYNC_KEY, JSON.stringify({owner:prev, firstFor:prev})); }catch(x){}
+    log('error','No se pudo vaciar el dispositivo: '+(e&&e.message||e)); fail('No se pudo cambiar de cuenta. No se ha cambiado nada'); return; }
+  DB=fresh; // nothing of the old account stays in memory either
+  [TEAM_KEY, CR_FLAG, CR_FILES, 'tareas-inbox'].forEach(k=>{ try{ localStorage.removeItem(k); }catch(e){} });
+  try{ localStorage.setItem(BK_SKIP, todayStr()); }catch(e){} // no daily copy of the empty device today: the account's data are on the server
+  try{ pushDrop(); localStorage.removeItem(PUSH_KEY); }catch(e){} // the old account's notifications stop reaching this device
+  await syncWithin(FS.tx(['files','thumbs','meta'], 'readwrite', (f,t,m)=>{ f.clear(); t.clear(); m.clear(); }).catch(()=>{}), 5000);
+  await syncWithin(Promise.all([cryptoKeyForget().catch(()=>{}), cryptoKdbDo('readwrite', st=>st.delete('ecdh')).catch(()=>{})]), 5000);
+  LOG=[]; try{ localStorage.removeItem(LOGKEY); }catch(e){} log('info','Dispositivo vaciado para otra cuenta'); // the old account's log (with its email) goes too
   location.reload(); }
+// The screen over the app while the device is emptied
+function syncCover(on){ let el=document.getElementById('switching'); app.inert=!!on||teamDenied();
+  if(!on){ if(el) el.remove(); return; } if(el) return; el=document.createElement('div'); el.id='switching'; el.className='noaccess'; el.setAttribute('role','alert');
+  el.innerHTML='<div class="na-box"><h1>Vaciando este dispositivo</h1><p>Un momento.</p></div>'; document.body.appendChild(el); if(sheet.classList.contains('on')) closeSheet(); }
+// At start: a switch was under way. Its sync state already for the new account: the data must be blank (a window that wrote the old data back
+// meanwhile is undone). Otherwise it never got that far: nothing to do. Then the marker goes
+function syncSwitchBoot(){ let m=null; try{ m=JSON.parse(localStorage.getItem(SWITCH_KEY)||'null'); }catch(e){} if(!m) return;
+  const st=syncState(); if(st.firstFor===m.to&&!st.owner&&!syncLocalEmpty()){ const s=DB.settings||{}, fresh=blank(); ['theme','tipsSeen'].forEach(k=>{ if(k in s) fresh.settings[k]=s[k]; });
+    try{ localStorage.setItem(KEY, JSON.stringify(fresh)); DB=fresh; log('warn','Datos de otra cuenta escritos durante el cambio: se vacía de nuevo'); }catch(e){} }
+  try{ localStorage.removeItem(SWITCH_KEY); }catch(e){} }
+// Another window started emptying the device: this one starts again too, so it never writes the old account's data back
+window.addEventListener('storage', e=>{ if(e.key===SWITCH_KEY&&e.newValue) location.reload(); });
 
 /* ---------- Ajustes, Cuenta ---------- */
 function syncAgo(iso){ const t=syncTime(iso); if(!t) return ''; const m=Math.floor((Date.now()-t)/6e4);

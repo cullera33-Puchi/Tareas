@@ -245,6 +245,7 @@ function saveEdit(x, patch){ Object.assign(x, patch, {modified:new Date().toISOS
 function flushEdits(){ if(editSaveT) save(); }
 function save(){
   if(typeof SY!=='undefined'&&SY&&SY.switching) return true; // the device is being emptied for another account (syncSwitchAccount): nothing is written
+  try{ if(localStorage.getItem('tareas-switching')) return true; }catch(e){} // nor by another window of the app meanwhile (SWITCH_KEY, cleared by syncSwitchBoot)
   if(saveHold){ saveDirty=true; return true; }
   dataVer++; clearTimeout(editSaveT); editSaveT=null; editPatch=null; // this write carries any typing still waiting for its save
   const raw=JSON.stringify(DB);

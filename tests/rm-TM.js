@@ -447,19 +447,36 @@ async function switchTests(browser){
   await dp.evaluate(()=>updTask('a2', {title:'Otra de Ana, cambiada sin conexión'})); f2.calls.length=0; await as(UB);
   check('task_blocks', await asked() && /cambios sin enviar de otra cuenta \(1\)/.test(await dp.evaluate(()=>document.querySelector('#asheet').textContent)) && !(await btns()).includes('Continuar') && noData());
   await tap('Cerrar sesión'); await until(dp, ()=>!SY.user);
-  await as(UA); await synced(dp); check('A_sent_all', f2.rows(UA.uid, 'tasks').some(r=>r.id==='a2'&&r.title==='Otra de Ana, cambiada sin conexión')); await out();
+  // Ana's last pass keeps the tables her database lacks (here contacts, as before 0011): a contact made here later is not «unsent»
+  await dp.evaluate(()=>{ window.__tareasRemote.missing=new Set(['contacts']); });
+  await as(UA); await synced(dp); check('A_sent_all', f2.rows(UA.uid, 'tasks').some(r=>r.id==='a2'&&r.title==='Otra de Ana, cambiada sin conexión'));
+  check('missing_kept', await dp.evaluate(()=>(syncState().missing||[]).includes('contacts'))); await dp.evaluate(()=>{ delete window.__tareasRemote.missing; }); await out();
+  // 3. Not unsent: rollOver's changes (synced fields, modified untouched), demo data, an attachment whose task is gone, a file whose attachment is
+  // gone, and a table the database lacks
+  await dp.evaluate(async()=>{ const x=task('a1'); x.date='2026-01-01'; x.carried=true; const b=new Blob([new Uint8Array(64)], {type:'image/jpeg'}), now=new Date().toISOString();
+    DB.attachments.push({id:'demo-att', taskId:'demo-t1', kind:'photo', path:null, mime:'image/jpeg', size:64, created:now, modified:now}); await FS.putFile('demo-att', b, {pending:true});
+    DB.attachments.push({id:'orphan', taskId:'gone-task', kind:'photo', path:null, mime:'image/jpeg', size:64, created:now, modified:now}); await FS.putFile('orphan', b, {pending:true});
+    await FS.putFile('ghost', b, {pending:true}); DB.contacts.push({id:'c-new', name:'Contacto sin tabla', created:now, modified:now}); save(); });
+  const np0 = await dp.evaluate(()=>syncOtherPending()); check('pending_precise', np0===0, np0);
   // 2. Nothing unsent: Continuar. From its start nothing is saved or synced (a change and a pass tried in the middle leave no trace)
   f2.calls.length=0; await as(UB); check('B_other', await asked());
   const q2 = await dp.evaluate(()=>document.querySelector('#asheet').textContent), b2 = await btns();
   check('B_question', /Este dispositivo tiene datos de otra cuenta\. Ya están todos en esa cuenta\./.test(q2) && /bruno@example\.com/.test(q2) && b2.includes('Continuar') && b2.includes('Cerrar sesión') && noData(), {q2, b2});
   await shot(dp, 'ip-light-otra-cuenta');
+  // Another window of the app with Ana's data, and Ana's push subscription on this browser
+  const P2 = await D.ctx.newPage(); await P2.goto('http://localhost:'+PORT+'/'); await until(P2, ()=>!!task('a1'));
+  await dp.evaluate(a=>{ PS.sub={endpoint:'https://push.example/ana', keys:{}}; PS.savedFor=a; pushWrite(); }, UA.uid);
   await dp.evaluate(()=>{ const put=BK.put.bind(BK); BK.put=async(...a)=>{ const r=await put(...a); if(SY.switching){ const k='tareas-v1', before=localStorage.getItem(k); addTask({title:'Durante el cambio'}); const ran=syncRun('prueba');
-      localStorage.setItem('__probe', JSON.stringify({unchanged:localStorage.getItem(k)===before, timer:!SY.timer||true, ran:String(ran)})); ran.then(v=>{ const p=JSON.parse(localStorage.getItem('__probe')); p.ranValue=v; localStorage.setItem('__probe', JSON.stringify(p)); }); } return r; }; });
+      localStorage.setItem('__probe', JSON.stringify({unchanged:localStorage.getItem(k)===before, cover:!!document.getElementById('switching')&&app.inert, ran:String(ran)})); ran.then(v=>{ const p=JSON.parse(localStorage.getItem('__probe')); p.ranValue=v; localStorage.setItem('__probe', JSON.stringify(p)); }); } return r; }; });
   await tap('Continuar'); await dp.waitForLoadState('load');
   check('B_fresh', await synced(dp, 20000) && await dp.evaluate(()=>DB.tasks.map(x=>x.id).join()==='b1'&&!DB.attachments.length&&!DB.tasks.some(x=>x.title==='Durante el cambio')), await dp.evaluate(()=>({t:DB.tasks.map(x=>x.title), st:SY.status})));
   const probe = await dp.evaluate(()=>JSON.parse(localStorage.getItem('__probe')||'null'));
-  check('no_save_or_sync_during_switch', probe && probe.unchanged && probe.ranValue===false && !f2.rows(UB.uid, 'tasks').some(r=>r.title==='Durante el cambio') && !f2.rows(UA.uid, 'tasks').some(r=>r.title==='Durante el cambio'), probe);
+  check('no_save_or_sync_during_switch', probe && probe.unchanged && probe.cover && probe.ranValue===false && !f2.rows(UB.uid, 'tasks').some(r=>r.title==='Durante el cambio') && !f2.rows(UA.uid, 'tasks').some(r=>r.title==='Durante el cambio'), probe);
   const after = await dp.evaluate(async()=>({files:(await FS.allMeta()).length, team:localStorage.getItem('tareas-team'), cx:localStorage.getItem('tareas-crypto'), key:await cryptoKeyLoad().catch(()=>null), bk:(await BK.list()).map(b=>({k:b.date, o:b.owner})), owner:syncState().owner}));
+  const tail = await dp.evaluate(()=>({log:logText(), line:LOG.some(e=>e.m==='Dispositivo vaciado para otra cuenta'), push:localStorage.getItem('tareas-push'), sub:!!PS.sub, marker:localStorage.getItem('tareas-switching')}));
+  check('switch_clears_log_push', !/ana@example\.com/.test(tail.log) && tail.line && !tail.sub && !(tail.push&&JSON.parse(tail.push).sub) && !tail.marker, tail);
+  check('other_window_blank', await until(P2, ()=>!task('a1')&&!localStorage.getItem('tareas-switching'), null, 15000) && await dp.evaluate(()=>!task('a1')&&!!task('b1')), await P2.evaluate(()=>DB.tasks.map(x=>x.id)));
+  await P2.close();
   check('B_emptied', after.files===0 && !after.team && !after.cx && !after.key && after.owner===UB.uid && after.bk.every(b=>b.o===UA.uid) && after.bk.some(b=>/#/.test(b.k)) && f2.rows(UA.uid, 'tasks').length===2, after);
   // Ana's copies never restore into Bruno's account
   await dp.evaluate(()=>refreshBackups()); const rs = await dp.evaluate(async a=>{ const b=BACKUPS.find(x=>x.owner===a); restoreBackup(b.date); await new Promise(r=>setTimeout(r,100)); return {toast:document.getElementById('toastText').textContent, sheet:!!document.querySelector('#asheet.on, #sheet.on')}; }, UA.uid);
@@ -479,10 +496,60 @@ async function switchTests(browser){
   check('K_alert', await until(kp, ()=>SY.status==='other'&&!!document.querySelector('#asheet.on .al')&&performance.now()-sheetOpenedAt>500, null, 10000));
   await kp.keyboard.press('Enter');
   check('K_enter_signs_out', await until(kp, ()=>!SY.user) && await kp.evaluate(()=>!!task('k1')&&syncState().owner!==null));
+  await K.ctx.close();
+  await switchMore(browser);
   // A device that never synced with an account still brings its data in (decision 5): unchanged
   const N = await TF.device(browser, f2, {tag:'N', desk:true, user:UA, seed:seed([tk('n1', {title:'Antes de cualquier cuenta'})])}, PORT, errors); const np=N.page;
   await signIn(np, true); check('new_device_merges', await synced(np) && f2.rows(UA.uid, 'tasks').some(r=>r.id==='n1') && await np.evaluate(()=>!!task('a1')&&!!task('n1')));
-  await D.ctx.close(); await K.ctx.close(); await N.ctx.close();
+  await D.ctx.close(); await N.ctx.close();
+}
+/* A first pass that never ended, a hung file store, «Vaciar de todos modos», the desktop's blocked alert, failed writes, the daily copy and
+   the marker of another window */
+async function switchMore(browser){
+  const f3 = new TF.Fake(); f3.team = false;
+  const A3 = f3.user('9b2f6d3e-0000-4000-8000-0000000000a3', 'alba@example.com', 'Alba'), B3 = f3.user('9b2f6d3e-0000-4000-8000-0000000000b3', 'blas@example.com', 'Blas');
+  const F = await TF.device(browser, f3, {tag:'F', user:A3, seed:seed([tk('f1', {title:'De Alba sin enviar'}), tk('f2', {title:'Otra de Alba'})])}, PORT, errors); const fp=F.page;
+  // 1. Alba's first pass pulls but its upload fails: no owner yet, but the device is hers (firstFor)
+  f3.failRls=99; await signIn(fp); check('F_first_failed', await until(fp, ()=>SY.status==='error', null, 15000) && await fp.evaluate(a=>!syncState().owner&&syncState().firstFor===a, A3.uid));
+  f3.failRls=0; await fp.evaluate(()=>syncSignOut()); await until(fp, ()=>!SY.user);
+  await fp.evaluate(async()=>{ const b=new Blob([new Uint8Array(512)], {type:'image/jpeg'}), now=new Date().toISOString(); await FS.putFile('fp1', b, {pending:true});
+    DB.attachments.push({id:'fp1', taskId:'f1', kind:'photo', path:null, mime:'image/jpeg', size:512, created:now, modified:now}); save(); FS.allMeta=()=>new Promise(()=>{}); }); // 8. the file store hangs
+  await fp.evaluate(u=>{ window.__fakeUser=u; }, B3); f3.calls.length=0; await signIn(fp);
+  check('F_other', await until(fp, ()=>SY.status==='other'&&!!document.querySelector('#asheet.on')&&performance.now()-sheetOpenedAt>500, null, 15000) && await fp.evaluate(a=>syncPrevOwner()===a&&syncOtherOwner(), A3.uid));
+  const fq = await fp.evaluate(()=>({t:document.querySelector('#asheet').textContent, b:[...document.querySelectorAll('#asheet.on button')].map(x=>x.textContent.trim())}));
+  check('F_blocked_unknown', /^Este dispositivo tiene cambios sin enviar de otra cuenta\. Entra con esa cuenta/.test(fq.t) && fq.b.join()==='Cerrar sesión,Vaciar de todos modos,Cancelar' && f3.rows(B3.uid, 'tasks').length===0 && !f3.calls.some(c=>/:(pull|upsert|markDeleted|upload)/.test(c)), {fq, calls:f3.calls});
+  await shot(fp, 'ip-light-sin-enviar-vaciar');
+  await fp.evaluate(()=>{ [...document.querySelectorAll('#asheet.on button')].find(x=>x.textContent.trim()==='Vaciar de todos modos').click(); });
+  check('F_confirm', await until(fp, ()=>!!document.querySelector('#asheet.on')&&/solo quedarán en una copia de este dispositivo\. Las fotos y audios sin subir se perderán\./.test(document.querySelector('#asheet').textContent)&&performance.now()-sheetOpenedAt>500, null, 5000));
+  await shot(fp, 'ip-light-vaciar-confirmar');
+  await fp.evaluate(()=>{ [...document.querySelectorAll('#asheet.on button')].find(x=>x.textContent.trim()==='Vaciar').click(); }); await fp.waitForLoadState('load');
+  check('F_emptied', await synced(fp, 20000) && await fp.evaluate(()=>!DB.tasks.length&&!DB.attachments.length) && f3.rows(B3.uid, 'tasks').length===0 && f3.rows(A3.uid, 'tasks').length===0
+    && await fp.evaluate(async a=>{ const b=(await BK.list()).find(x=>x.owner===a&&/#/.test(x.date)); if(!b) return false; const sn=await BK.get(b.date); return sn.data.tasks.some(x=>x.id==='f1'); }, A3.uid));
+  await F.ctx.close();
+  // The desktop's blocked alert: Intro signs out; the destructive way takes a click and a confirmation
+  const G = await TF.device(browser, f3, {tag:'G', desk:true, user:A3, seed:seed([tk('g1', {title:'De Alba en el ordenador'})])}, PORT, errors); const gp=G.page;
+  await signIn(gp, true); await synced(gp); await gp.evaluate(()=>syncSignOut()); await until(gp, ()=>!SY.user); await gp.evaluate(()=>updTask('g1', {title:'Cambiada sin enviar'}));
+  const bIn = async () => { await gp.evaluate(u=>{ window.__fakeUser=u; }, B3); await signIn(gp, true); return until(gp, ()=>SY.status==='other'&&!!document.querySelector('#asheet.on .al')&&performance.now()-sheetOpenedAt>500, null, 10000); };
+  check('G_alert', await bIn() && await gp.evaluate(()=>[...document.querySelectorAll('#asheet.on .al-btn')].map(b=>b.textContent).join()==='Cerrar sesión,Vaciar de todos modos,Cancelar'&&/\(1\)/.test(document.querySelector('#asheet .al-t').textContent)));
+  await shot(gp, 'desk-sin-enviar-vaciar');
+  await gp.keyboard.press('Enter'); check('G_enter_signs_out', await until(gp, ()=>!SY.user) && await gp.evaluate(()=>task('g1').title==='Cambiada sin enviar'));
+  // 6. The sync state cannot be written: nothing changes. The data cannot be blanked: the old state comes back as it was
+  await bIn(); await gp.evaluate(()=>closeSheet()); const st0 = await gp.evaluate(()=>localStorage.getItem('tareas-sync'));
+  const w1 = await gp.evaluate(async()=>{ const real=syncWrite; syncWrite=()=>false; try{ await syncSwitchAccount(true); } finally{ syncWrite=real; } return {t:document.getElementById('toastText').textContent, sync:localStorage.getItem('tareas-sync'), g1:!!task('g1'), stored:/g1/.test(localStorage.getItem('tareas-v1')), sw:SY.switching, cover:!!document.getElementById('switching'), marker:localStorage.getItem('tareas-switching')}; });
+  check('write_sync_fails', w1.t==='No se pudo cambiar de cuenta. No se ha cambiado nada' && w1.sync===st0 && w1.g1 && w1.stored && !w1.sw && !w1.cover && !w1.marker, w1);
+  const w2 = await gp.evaluate(async()=>{ const real=Storage.prototype.setItem; Storage.prototype.setItem=function(k,v){ if(k==='tareas-v1') throw new Error('QuotaExceededError'); return real.call(this,k,v); };
+    try{ await syncSwitchAccount(true); } finally{ Storage.prototype.setItem=real; } return {sync:localStorage.getItem('tareas-sync'), g1:!!task('g1'), stored:/g1/.test(localStorage.getItem('tareas-v1')), sw:SY.switching, other:syncOtherOwner()}; });
+  check('write_data_fails', w2.sync===st0 && w2.g1 && w2.stored && !w2.sw && w2.other, w2);
+  // 9. Today's own-key copy of this account counts as today's daily copy
+  const d9 = await gp.evaluate(async()=>{ await BK.clear(); localStorage.removeItem('tareas-bk-skip'); await BK.put(todayStr(), syncPrevOwner(), true); await refreshBackups(); const n=BACKUPS.length; await dailyBackup(false); await refreshBackups(); return [n, BACKUPS.length]; });
+  check('daily_counts_own_key', d9[0]===1 && d9[1]===1, d9);
+  // 5. With the marker of a switch, no window saves; at the next start a sync state already for the new account means blank data
+  const m5 = await gp.evaluate(()=>{ localStorage.setItem('tareas-switching', '{"to":"x"}'); const before=localStorage.getItem('tareas-v1'); addTask({title:'Desde otra ventana'}); const same=localStorage.getItem('tareas-v1')===before; localStorage.removeItem('tareas-switching'); return same; });
+  check('marker_blocks_save', m5);
+  await gp.evaluate(b=>{ localStorage.setItem('tareas-switching', JSON.stringify({to:b.uid})); localStorage.setItem('tareas-sync', JSON.stringify({user:{id:b.uid, email:b.email}, firstFor:b.uid, known:{}, cursor:{}, del:{}})); }, B3);
+  await gp.reload(); await gp.waitForTimeout(500);
+  check('boot_reblanks', await gp.evaluate(()=>!DB.tasks.length&&!/g1/.test(localStorage.getItem('tareas-v1'))&&!localStorage.getItem('tareas-switching')));
+  await G.ctx.close();
 }
 
 module.exports = { pgSetup, strip, MIGS };

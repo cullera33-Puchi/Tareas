@@ -4,6 +4,7 @@
    listeners run at load; the start itself (first screen, timers, sync, service worker) is in boot.js, the last file. */
 // The start, in the order it had at the end of the single script: the first screen and what follows it need every other file
 (function(){ let st='?'; try{ st=(navigator.standalone===true||matchMedia('(display-mode: standalone)').matches)?'instalada':'navegador'; }catch(e){} log('info','Inicio v'+APP_VERSION+' ('+st+')', {spaces:DB.spaces.length, projects:DB.projects.length, tasks:DB.tasks.length}); })();
+syncSwitchBoot(); // a switch to another account under way: its data must be blank, then saving works again (js/sync.js)
 DB.settings.filter='hoy'; // the app always opens on Hoy; the filter is kept only while it runs
 // Voice notes saved without a task (an old desktop pane bug) never show anywhere: drop them
 { const n=DB.voiceNotes.length; DB.voiceNotes=DB.voiceNotes.filter(v=>v.taskId&&task(v.taskId)); if(DB.voiceNotes.length!==n){ save(); log('info','Notas de voz sin tarea eliminadas: '+(n-DB.voiceNotes.length)); } }

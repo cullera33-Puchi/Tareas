@@ -1717,3 +1717,20 @@ body.desktop .cxsheet .cx-check input{width:16px;height:16px;}
 body.desktop .cxsheet .cx-note,body.desktop .cxsheet .cx-err{font-size:12px;}
 body.desktop .cxprog .cx-line{font-size:13px;}
 @media (prefers-reduced-motion: reduce){.cxprog .cx-bar i{transition:none;}}
+/* Decision 65a: Por persona. iPhone: Personas in the Proyectos tab (a grey avatar, as in Contactos) and the person's screen with
+   Recordar todo on top. Desktop: Personas in the sidebar, and the column head with the name, the phone or mail under it and Recordar todo */
+.picon.pperson{background:linear-gradient(180deg,#A7ACB7,#858A95);}
+.picon.pperson svg{width:18px;height:18px;}
+.group.premind .cell.link svg{width:20px;height:20px;flex:none;}
+.group.premind .cell .val{color:var(--ink2);}
+.pempty svg{color:var(--ink3);}
+.app.desktop .main .mhead.phead{align-items:center;}
+.app.desktop .main .mhead .ptitle{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px;}
+.app.desktop .main .mhead .ptitle h1{flex:none;}
+.app.desktop .main .mhead .psub{font-size:12px;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.app.desktop .main .mhead .psub span+span{margin-left:12px;}
+.app.desktop .premindb{flex:none;display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 12px;font-size:13px;font-weight:600;border-radius:7px;background:var(--fill);color:var(--blue);}
+.app.desktop .premindb:hover{background:var(--fill2);}
+.app.desktop .premindb svg{width:15px;height:15px;}
+.app.desktop .side .it.iperson svg{color:var(--ink2);}
+.app.desktop .side .it.iperson.on svg{color:var(--blue);}

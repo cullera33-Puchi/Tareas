@@ -12,7 +12,7 @@ function setDeskView(v){ if(v==='project:none') v='project:none'; if(UI.pitOpen)
    order and idx remember the list as last drawn, so a row that leaves it (done, moved, deleted) hands the selection to its neighbour.
    The iPhone keeps its own selection mode (UI.select) */
 function deskMulti(){ return UI.wide && (UI.dsel.mode || UI.dsel.ids.size>1); }
-function deskListView(){ const v=UI.deskView; return v==='hoy'||v==='todas'||v==='ahora'||v==='waiting'||(v.startsWith('project:')&&!deskNotesOn()); } // decision 47: a project's Notas is not a list of tasks // decisions 39 and 41: Ahora and Por confirmar are lists too
+function deskListView(){ const v=UI.deskView; return v==='hoy'||v==='todas'||v==='ahora'||v==='waiting'||v.startsWith('person:')||(v.startsWith('project:')&&!deskNotesOn()); } // decision 65a: a person's view // decision 47: a project's Notas is not a list of tasks // decisions 39 and 41: Ahora and Por confirmar are lists too
 // The rows of the visible list in order, with the placeholders of a long one; Ahora repeats rows and is left out
 function deskOrder(){ return [...document.querySelectorAll('#desk .main .mbody .row[data-id], #desk .main .mbody .rph[data-id]')].filter(r=>!r.closest('.first')).map(r=>r.dataset.id); }
 function deskRow(id){ return id?document.querySelector('#desk .main .mbody .row[data-id="'+CSS.escape(id)+'"]:not(.first .row)'):null; }
@@ -160,16 +160,17 @@ function dropMany(ids, z){ if(ids.length===1) return dropTask(ids[0], z); const 
   toast(bulkN(xs.length)+msg, ()=>batch(()=>prev.forEach(undoDay))); }
 function applyWide(){ const w=wideMQ.matches; if(w===UI.wide) return; closeMenu(true); UI.wide=w; document.documentElement.classList.toggle('wide', w); document.body.classList.toggle('desktop', w); app.classList.toggle('desktop', w);
   if(w){ // the pushed iPhone screens map onto the desktop: a project becomes the view and the last detail the pane
-    let pr=null; UI.deskDetail=null; UI.stack.forEach(s=>{ if(s.kind==='project') pr=s.id; else if(s.kind==='note'){ const n=noteRec(s.id); if(n){ pr=n.projectId; UI.projTab[pr]='notes'; UI.noteOpen=n.id; } } else UI.deskDetail=s.id; s.el.remove(); }); UI.stack=[]; // decision 47: a note opens in its project's Notas
+    let pr=null; UI.deskDetail=null; UI.stack.forEach(s=>{ if(s.kind==='project') pr=s.id; else if(s.kind==='person') pr={person:s.id}; else if(s.kind==='note'){ const n=noteRec(s.id); if(n){ pr=n.projectId; UI.projTab[pr]='notes'; UI.noteOpen=n.id; } } else UI.deskDetail=s.id; s.el.remove(); }); UI.stack=[]; // decision 47: a note opens in its project's Notas
     if(UI.select){ UI.select=null; app.classList.remove('selecting'); closeSheet(); } // an open bulk menu would act on nothing
     Object.assign(UI.dsel, {ids:new Set(), mode:false, edit:null, follow:false});
-    if(pr) UI.deskView='project:'+pr; else if(UI.tab==='ajustes') UI.deskView='settings';
+    if(pr&&pr.person) UI.deskView='person:'+pr.person; else if(pr) UI.deskView='project:'+pr; else if(UI.tab==='ajustes') UI.deskView='settings';
     else if(!isCalView(UI.deskView)) UI.deskView=DB.settings.filter; // the list the iPhone showed; the calendar has no iPhone screen, so it is kept
     app.querySelectorAll('.screen.root').forEach(s=>s.remove()); } // hidden on the desktop; render() rebuilds them on the way back
   else { const d=$('#desk'); if(d) d.remove(); app.classList.remove('has-pane'); Object.assign(UI.dsel, {ids:new Set(), mode:false, edit:null, follow:false}); // the iPhone has its own selection mode
-    const v=UI.deskView; UI.tab = v==='settings'?'ajustes' : v.startsWith('project:')?'proyectos' : 'tareas';
+    const v=UI.deskView; UI.tab = v==='settings'?'ajustes' : v.startsWith('project:')||v.startsWith('person:')?'proyectos' : 'tareas';
     // The desktop project view and pane become pushed screens, already in place (no slide-in)
     const put=(kind,id)=>{ const el=document.createElement('div'); el.className='screen pushed-screen shown '+kind; el.dataset.kind=kind; app.appendChild(el); UI.stack.push({kind,id,el}); };
+    if(v.startsWith('person:')) put('person', v.slice(7)); // decision 65a
     if(v.startsWith('project:')){ const id=v.slice(8); if(id==='none'||proj(id)) put('project', id); const n=projTab(id)==='notes'&&noteRec(UI.noteOpen); if(n&&n.projectId===id&&proj(id)) put('note', n.id); } // decision 47: the open note stays open
     if(UI.deskDetail&&task(UI.deskDetail)) put('detail', UI.deskDetail);
     UI.deskDetail=null; } // the stack holds it now; a later widen maps it back
@@ -183,7 +184,7 @@ function deskSide(){
     it('hoy',I.list,isClosed()?'Mañana':'Hoy',hoyShown().length,v==='hoy',' data-day="'+(isClosed()?addDays(todayStr(),1):todayStr())+'"')+it('todas',I.inbox.replace('viewBox="0 0 48 48"','viewBox="0 0 48 48" stroke-width="3"'),'Todas',pendingFor('todas').filter(x=>x.status!=='waiting').length,v==='todas')+it('waiting',MI.wait,'Por confirmar',spaceTasks().filter(x=>x.status==='waiting').length,v==='waiting')+it('week',I.cal,'Semana',undefined,isCalView(v))+miniMonthHTML()+ // decision 41
     '<div class="sec">Proyectos</div>'+ps.map(p=>'<button class="it'+(v==='project:'+p.id?' on':'')+'" data-view="project:'+p.id+'" data-drop-project="'+p.id+'" aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown"><span class="dot" style="background:'+p.color+'"></span><span>'+esc(p.name)+'</span><span class="n">'+cnt(p.id)+'</span></button>').join('')+
     '<button class="it'+(v==='project:none'?' on':'')+'" data-view="project:none" data-drop-project=""><span class="dot" style="background:var(--ink3)"></span><span>Sin proyecto</span><span class="n">'+cnt(null)+'</span></button>'+
-    '<button class="it add" data-act="newProject">'+I.plus+'<span>Nuevo proyecto</span></button>'+
+    '<button class="it add" data-act="newProject">'+I.plus+'<span>Nuevo proyecto</span></button>'+peopleSideHTML()+ // decision 65a: Personas, under Proyectos
     '<div class="grow"></div>'+it('settings',I.gear,'Ajustes',undefined,v==='settings')+'</aside>';
 }
 function addBarHTML(projectId){ return '<div class="addx'+(AX.open?' open':'')+'"><div class="addbar">'+I.plus+qinHTML('<input type="text" placeholder="Nueva tarea… mañana, a las 9, !! o #proyecto" data-role="addbar"'+(projectId?' data-project="'+projectId+'"':'')+' value="'+esc(UI.addDraft||'')+'" autocomplete="off" spellcheck="false">')+'<span class="kbd">N</span></div>'+(AX.open?addxPanelHTML(projectId):'<div class="addhint" id="deskSaid"></div>')+'</div>'+pasteBoxHTML(projectId); } // decision 31: open, the composer under the bar
@@ -229,7 +230,7 @@ function bindColResize(d){
     delete c[g.dataset.col]; DB.settings.colWidths=c; save(); applyColWidths(d); });
   d.addEventListener('click', e=>{ if(e.target.closest('.colhead')) e.stopPropagation(); }, true); } // the header is not a row: a click on it does nothing
 function deskMain(){
-  const v=UI.deskView; let title='', body='', search=true, pf=false, seg='', notes=false, pit=null, pitProj=false;
+  const v=UI.deskView; let title='', body='', search=true, pf=false, seg='', notes=false, pit=null, pitProj=false, ph=null;
   if(v==='hoy') focusCheck(); const foco=v==='hoy'&&focusOn(); // decision 65d: focus mode, the list area shows only Ahora
   if(foco){ title='Ahora'; search=false; body=focusRowsHTML(); }
   else if(v==='hoy'||v==='todas'){ const f=v; title=f==='hoy'?(isClosed()?'Mañana':'Hoy'):'Todas'; pf=true; // the day closed: Hoy shows tomorrow
@@ -237,6 +238,7 @@ function deskMain(){
       listHTML(UI.query?'todas':f); }
   else if(v==='ahora'){ title='Ahora'; body=colHeadHTML()+ahoraViewHTML(); } // decision 39
   else if(v==='waiting'){ title='Por confirmar'; body=colHeadHTML()+waitingViewHTML(); } // decision 41
+  else if(v.startsWith('person:')){ ph=personHeadHTML(v.slice(7)); title=personLabel(v.slice(7)); body=colHeadHTML()+personListHTML(v.slice(7)); } // decision 65a
   else if(isCalView(v)){ title={day:'Día',week:'Semana',month:'Mes'}[v]; pf=true; body=weekHTML(); } // the project filter applies here too, so it stays visible and clearable
   else if(v.startsWith('project:')){ const id=v.slice(8); const p=id==='none'?null:proj(id); if(id!=='none'&&(!p||p.archived||p.spaceId!==space().id)){ UI.deskView=DB.settings.filter||'hoy'; return deskMain(); } /* gone, archived or in another space */ title=p?p.name:'Sin proyecto';
     if(p){ notes=projTab(p.id)==='notes'; seg=projSegHTML(p)+(notes?pitBackHTML(p):''); pitProj=true; } body=notes?deskNotesHTML(p):addBarHTML(p?p.id:null)+colHeadHTML()+listHTML('todas', p?p.id:null); // decision 47: Tareas or Notas
@@ -245,5 +247,5 @@ function deskMain(){
   const cal=isCalView(v);
   const pitOn=pit&&!pitFolded();
   if(foco) return '<main class="main focusmain"><div class="mhead"><h1>'+I.starF.replace('class="i-star on"','class="i-star on fstar"')+'Ahora<span class="fn">'+ahoraTasks().length+'</span></h1><button class="btn focusoff" data-act="focusOff">Salir del foco</button></div><div class="mbody"><div class="inner focusinner">'+body+'</div></div></main>';
-  return '<main class="main'+(v==='hoy'?' with-agenda':'')+(pitOn?' with-pit':'')+(pitProj?' pit-proj':'')+'"><div class="mhead'+(cal?' wide-head':'')+'"><h1>'+esc(title)+(v==='hoy'&&!UI.query?hoyLoadHTML():'')+'</h1>'+seg+(pf?'<span class="pfslot">'+pfDropHTML()+rfDropHTML()+'</span>':'')+(search?'<div class="searchbar"><div class="search">'+I.search+'<input type="search" placeholder="Buscar" value="'+esc(UI.query)+'" data-role="search" autocomplete="off"></div>'+(UI.query?'<button class="cancel" data-act="clearSearch">Cancelar</button>':'')+'</div>':'')+(pit?pitOpenBtnHTML(pit):'')+(v==='hoy'||v==='todas'||(v.startsWith('project:')&&!notes)?'<button class="mopts" data-act="viewMenu" aria-label="Opciones de vista" title="Opciones de vista">'+I.more+'</button>':'')+'</div><div class="mbody'+(cal?' calbody':notes?' notesbody':'')+'"><div class="inner'+(cal?' week-inner':v==='settings'?' settings':notes?' notes-inner':'')+'">'+body+'</div></div>'+(v==='hoy'?agendaHTML():'')+(pitOn?pitColHTML(pit):'')+'</main>';
+  return '<main class="main'+(v==='hoy'?' with-agenda':'')+(pitOn?' with-pit':'')+(pitProj?' pit-proj':'')+'"><div class="mhead'+(cal?' wide-head':'')+(ph?' phead':'')+'">'+(ph?ph.title:'<h1>'+esc(title)+(v==='hoy'&&!UI.query?hoyLoadHTML():'')+'</h1>')+seg+(pf?'<span class="pfslot">'+pfDropHTML()+rfDropHTML()+'</span>':'')+(search?'<div class="searchbar"><div class="search">'+I.search+'<input type="search" placeholder="Buscar" value="'+esc(UI.query)+'" data-role="search" autocomplete="off"></div>'+(UI.query?'<button class="cancel" data-act="clearSearch">Cancelar</button>':'')+'</div>':'')+(pit?pitOpenBtnHTML(pit):'')+(ph?ph.btn:'')+(v==='hoy'||v==='todas'||(v.startsWith('project:')&&!notes)?'<button class="mopts" data-act="viewMenu" aria-label="Opciones de vista" title="Opciones de vista">'+I.more+'</button>':'')+'</div><div class="mbody'+(cal?' calbody':notes?' notesbody':'')+'"><div class="inner'+(cal?' week-inner':v==='settings'?' settings':notes?' notes-inner':'')+'">'+body+'</div></div>'+(v==='hoy'?agendaHTML():'')+(pitOn?pitColHTML(pit):'')+'</main>';
 }

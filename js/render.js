@@ -195,7 +195,7 @@ function renderNow(){
   if(UI.stack.length) scheduleRefresh();
 }
 function renderPushed(s){ drawing(()=>renderPushedNow(s)); }
-function renderPushedNow(s){ const osc=s.el.querySelector('.scroll'), ost=osc?osc.scrollTop:0; swapHTML(s.el, s.kind==='detail'?viewDetail(s.id):s.kind==='note'?viewNote(s.id):viewProject(s.id), s.kind==='project');
+function renderPushedNow(s){ const osc=s.el.querySelector('.scroll'), ost=osc?osc.scrollTop:0; swapHTML(s.el, s.kind==='detail'?viewDetail(s.id):s.kind==='note'?viewNote(s.id):s.kind==='person'?viewPerson(s.id):viewProject(s.id), s.kind==='project'||s.kind==='person'); // decision 65a: a person's screen
   if(s.kind==='note'){ bindNote(s.el); const sc=s.el.querySelector('.scroll'); if(sc) sc.scrollTop=ost; return; } // decision 47
   if(s.kind==='detail'){ bindDetail(s.el, s.id); const sc=s.el.querySelector('.scroll'); if(sc) sc.scrollTop=ost; attHydrate(s.el); } } // restored once the text areas have their full height, or a long note would clamp it to the top
 // A root put away keeps its scroll in UI.scroll; it is drawn anew when it comes back and gets it back there
@@ -316,8 +316,8 @@ function rowHTML(x, opts={}){
     else if(x.date){ if(x.carried&&x.date<=t){ if(!opts.hideCarried) meta.push('<span class="carried">Aplazada</span>'); }
       else if(!(opts.noToday&&x.date===t) && x.date!==opts.day && x.date!==x.deadline) meta.push('<span class="'+(x.date<t?'over':'')+'">'+fmtDate(x.date)+'</span>'); } // a date that is the deadline says it once
     if(dl) meta.push(dl);
-    if(x.status==='waiting'&&x.waitingFor) meta.push('<span class="waitfor">Esperando a '+esc(x.waitingFor)+'</span>');
-    if(respShown(x)) meta.push(respMetaHTML(x)); // decision 48c: who does it, in grey
+    if(x.status==='waiting'&&x.waitingFor&&!isViewPerson(x.waitingFor, opts)) meta.push('<span class="waitfor">Esperando a '+esc(x.waitingFor)+'</span>');
+    if(respShown(x)&&!isViewPerson(x.responsible, opts)) meta.push(respMetaHTML(x)); // decision 48c: who does it, in grey; decision 65a: not the person whose view it is
     if(x.reminder) meta.push('<span class="bell">'+I.bell+(x.date&&localDay(x.reminder)===x.date?fmtTime(x.reminder):fmtDateTime(x.reminder))+'</span>'); // the reminder's own day when it is not the task's date (moved task, no date)
     if(x.estimate) meta.push('<span class="est">'+estLabel(x.estimate)+'</span>'); } // decision 56a
   const ind=opts.compact?'':(x.focus&&!done&&!opts.simple&&!opts.inFocus?'<span class="ist" title="En Ahora">'+I.starF+'</span>':'')+(x.notes&&x.notes.trim()?I.note:'')+(hasAtt(x.id)?I.clip:'')+(x.repeat&&repParse(x.repeat)?'<span class="irp" title="'+esc(repSummary(x.repeat))+'">'+I.repeat+'</span>':''); // decision 29: a paperclip when it has photos or audio
@@ -361,7 +361,7 @@ function deskRowHTML(x, opts, v){ const t=v.t; let date='', dcls='', rem=''; con
     '<div class="row-content">'+(v.selecting?'<span class="selbox">'+I.check+'</span>':'<button class="check'+(v.shownDone?' done':x.status==='waiting'?' waiting':'')+'" data-act="check" aria-label="Completar" tabindex="-1">'+I.check+'</button>')+pcol+
     '<div class="row-text">'+(edit?'<input class="rowedit" data-role="rowedit" type="text" value="'+esc(ds.edit.text)+'" aria-label="Título" autocomplete="off" spellcheck="false">':'<div class="row-title" title="'+esc(x.title||'')+'">'+esc(x.title||'Sin título')+'</div>')+'</div>'+
     // v0.33.1: Esperando a and the responsible in a column of their own, Persona, right after the title (decisions 41 and 48c)
-    '<span class="rc rc-per">'+(x.status==='waiting'&&x.waitingFor&&!v.done?'<span class="wtag" title="Esperando a '+esc(x.waitingFor)+'">'+MI.wait+esc(x.waitingFor)+'</span>':'')+(v.done?'':respTagHTML(x))+'</span>'+
+    '<span class="rc rc-per">'+(x.status==='waiting'&&x.waitingFor&&!v.done&&!isViewPerson(x.waitingFor, opts)?'<span class="wtag" title="Esperando a '+esc(x.waitingFor)+'">'+MI.wait+esc(x.waitingFor)+'</span>':'')+(v.done||isViewPerson(x.responsible, opts)?'':respTagHTML(x))+'</span>'+
     '<span class="inds">'+deskIndHTML(x, v, opts)+'</span><span class="rsteps">'+v.prog+'</span><span class="row-meta"><span class="rc rc-date'+dcls+'"'+(date?' title="'+esc(date)+'"':'')+'>'+date+'</span><span class="rc rc-dl'+(dlc?' dl-'+dlc:'')+'"'+(dl?' title="Fecha límite: '+esc(fmtDate(x.deadline))+'"':'')+'>'+dl+'</span><span class="rc rc-rem"'+(rem?' title="Recordatorio: '+esc(rem)+'"':'')+'>'+(rem?I.bell+rem:'')+'</span><span class="rc rc-est"'+(x.estimate&&!v.done?' title="Tiempo estimado: '+esc(estLabel(x.estimate).toLowerCase())+'"':'')+'>'+(x.estimate&&!v.done?estLabel(x.estimate):'')+'</span></span>'+ // decision 56a: a column of its own
     '<span class="pri'+(v.pri?(x.priority==='high'?' high':' mid'):'')+'">'+(v.pri?(x.priority==='high'?'!!!':'!!'):'')+'</span>'+
     (v.selecting?'':opts.simple?'<span class="rowmore" aria-hidden="true"></span>':'<button class="rowmore" data-act="rowMenu" aria-label="Más" title="Más" tabindex="-1">'+I.more+'</button>')+'</div></div>'; } // Ahora keeps the columns aligned with the list
@@ -505,7 +505,7 @@ function viewProyectos(){
    ps.map(p=>'<button class="cell" data-open-project="'+p.id+'"><span class="picon" style="background:'+p.color+'">'+I.list+'</span><span class="lbl">'+esc(p.name)+'</span><span class="count">'+cnt(p.id)+'</span>'+I.chev.replace('<svg','<svg class="chev"')+'</button>').join('')+
    '<button class="cell" data-open-project="none"><span class="picon" style="background:var(--ink3)">'+I.inbox.replace('stroke-width="2.2"','stroke-width="3"')+'</span><span class="lbl">Sin proyecto</span><span class="count">'+cnt(null)+'</span>'+I.chev.replace('<svg','<svg class="chev"')+'</button>'+
    '</div><div class="group"><button class="cell link" data-act="newProject">'+I.plus.replace('<svg','<svg style="width:18px;height:18px"')+'<span class="lbl">Nuevo proyecto</span></button></div>'+
-   (ps.length?'<div class="footnote">Mantén pulsado un proyecto para renombrarlo, cambiar el color o archivarlo.</div>':'')+'</div>';
+   (ps.length?'<div class="footnote">Mantén pulsado un proyecto para renombrarlo, cambiar el color o archivarlo.</div>':'')+peopleSectionHTML()+'</div>'; // decision 65a: Personas, under the projects
 }
 function viewProject(id){
   const p = id==='none'?null:proj(id); const title=p?p.name:'Sin proyecto';

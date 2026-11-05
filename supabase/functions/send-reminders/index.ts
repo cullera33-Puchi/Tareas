@@ -161,9 +161,16 @@ async function vapid(c: Conf): Promise<Vapid> {
   return cached;
 }
 
+const clip = (s: string, n: number) => (s.length > n ? s.slice(0, n - 1) + '…' : s);
 // Decision 63a: an encrypted value ('e1:...') goes whole, never clipped: the device opens it with its key (sw.js), and a cut one would not open.
-// One too long for a push (about 4 KB in all) is left out: the notification then says «Recordatorio»
-const clip = (s: string, n: number) => (s.startsWith('e1:') ? (s.length > 2400 ? 'Recordatorio' : s) : s.length > n ? s.slice(0, n - 1) + '…' : s);
+// Title and project share the push's room (about 4 KB in all): up to 2400 characters for an encrypted title and 600 for an encrypted project
+// name; past either, the notification says only «Recordatorio», with no project
+const E_TITLE = 2400, E_PROJECT = 600;
+function pushText(title: string, project: string) {
+  const et = title.startsWith('e1:'), ep = project.startsWith('e1:');
+  if ((et && title.length > E_TITLE) || (ep && project.length > E_PROJECT)) return { title: 'Recordatorio', body: '' };
+  return { title: et ? title : clip(title, 180), body: ep ? project : clip(project, 80) };
+}
 
 // Sends to the given devices; the ones that no longer exist are deleted. Returns the counts
 async function deliver(c: Conf, v: Vapid, jobs: { sub: Sub; msg: Message }[]) {
@@ -202,8 +209,7 @@ async function sendDue(c: Conf) {
   const jobs: { sub: Sub; msg: Message }[] = [];
   for (const t of fresh) {
     const msg: Message = {
-      title: clip(t.title || 'Recordatorio', 180),
-      body: clip((t.project_id && names.get(t.project_id)) || 'Recordatorio', 80),
+      ...pushText(t.title || 'Recordatorio', (t.project_id && names.get(t.project_id)) || 'Recordatorio'),
       tag: t.id,
       data: { taskId: t.id, projectId: t.project_id || null, url: './?task=' + encodeURIComponent(t.id) }, // projectId: which project the name belongs to
     };

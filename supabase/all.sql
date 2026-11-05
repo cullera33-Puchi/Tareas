@@ -942,7 +942,9 @@ notify pgrst, 'reload schema';
 --   * crypto_keys: one row per user with the account's data key, wrapped (AES-KW) by a key derived from the encryption password
 --     (PBKDF2-SHA256): kid (the key id, random), salt, iterations and wrapped, all base64url. A device unwraps it with the password
 --     and keeps the key; changing the password updates salt and wrapped (the data key, and so the data, stay the same). The row
---     existing means "encryption on" for that user. Each user reads, inserts and updates only their own row; nobody deletes it.
+--     existing means "encryption on" for that user. migrated is set once every row, file and Siri phrase the account held before was
+--     encrypted; until then any device with the key goes on with that work (it is idempotent), so a cut or a lost device never leaves it
+--     half done. Each user reads, inserts and updates only their own row; nobody deletes it.
 --   * tareas_require_cipher(): a trigger on the synced tables. When the row's owner has a crypto_keys row, a value of an encrypted
 --     column that is new (an insert, or an update that changes it) must be empty or start with 'e1:'; anything else raises
 --     'tareas_plaintext_refused'. This stops a device still on an older version from writing plain text after encryption was turned
@@ -967,8 +969,12 @@ create table if not exists public.crypto_keys (
   iterations  int not null,
   wrapped     text not null,
   created     timestamptz default now(),
-  modified    timestamptz default now()
+  modified    timestamptz default now(),
+  migrated    timestamptz
 );
+
+-- A table made by an earlier draft of this file gains the column
+alter table public.crypto_keys add column if not exists migrated timestamptz;
 
 comment on table public.crypto_keys is 'Decision 63a: each user''s data key, wrapped by the encryption password; the row means encryption on';
 

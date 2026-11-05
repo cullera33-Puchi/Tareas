@@ -41,7 +41,7 @@ async function cryptoSeal(password, dataKey){ const salt=cryptoB64(cryptoRandom(
 async function cryptoOpen(password, row, extractable){ const kek=await cryptoDerive(password, row.salt, row.iterations); return cryptoUnwrap(row.wrapped, kek, extractable); }
 
 /* ---------- Values ---------- */
-// Always encrypts, even a text that happens to start with 'e1:' (what the device holds is plain text, whatever it says)
+// Always encrypts what it is given (cryptoSealRow decides what needs it)
 async function cryptoEnc(key, value, aad){ if(value==null||value==='') return value; const v=String(value);
   const iv=cryptoRandom(12), ct=new Uint8Array(await cryptoSubtle().encrypt({name:'AES-GCM', iv, additionalData:aad}, key, cryptoTE.encode(v)));
   const out=new Uint8Array(12+ct.length); out.set(iv); out.set(ct, 12); return CRYPTO_PREFIX+cryptoB64(out); }
@@ -49,9 +49,12 @@ async function cryptoEnc(key, value, aad){ if(value==null||value==='') return va
 async function cryptoDec(key, value, aad){ if(!cryptoIsEnc(value)) return value; const b=cryptoUnb64(value.slice(CRYPTO_PREFIX.length));
   if(b.length<12+16) throw new Error('Valor cifrado incompleto');
   return cryptoTD.decode(await cryptoSubtle().decrypt({name:'AES-GCM', iv:b.subarray(0,12), additionalData:aad}, key, b.subarray(12))); }
-// A plain row as the server will hold it: every listed column that is not empty encrypted; the other columns copied as they are
-async function cryptoEncRow(key, table, row){ const cols=CRYPTO_COLS[table]; if(!cols||!row) return row; let out=row;
-  for(const c of cols){ if(!(c in row)||row[c]==null||row[c]==='') continue; if(out===row) out=Object.assign({}, row); out[c]=await cryptoEnc(key, row[c], cryptoAad(table, c, row.id)); }
+/* A row as the server will hold it: every listed column that is not empty encrypted, except a value that already opens with this key and
+   its additional data, which goes as it is (never encrypted twice). Returns the same object when nothing changes */
+async function cryptoSealRow(key, table, row){ const cols=CRYPTO_COLS[table]; if(!cols||!row) return row; let out=row;
+  for(const c of cols){ const v=row[c]; if(!(c in row)||v==null||v==='') continue; const aad=cryptoAad(table, c, row.id);
+    if(cryptoIsEnc(v)){ try{ await cryptoDec(key, v, aad); continue; }catch(e){} } // 'e1:...' that does not open is someone's text: encrypted
+    if(out===row) out=Object.assign({}, row); out[c]=await cryptoEnc(key, v, aad); }
   return out; }
 // The server's row opened: each listed column that starts with 'e1:' decrypted; throws if one does not open
 async function cryptoDecRow(key, table, row){ const cols=CRYPTO_COLS[table]; if(!cols||!row) return row; let out=row;

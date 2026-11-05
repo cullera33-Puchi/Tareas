@@ -79,6 +79,7 @@ const SYNC_LATE={attachments:['0003_attachments.sql','Los adjuntos se quedan en 
 // Whether a request failed because the table is not there (PostgREST's PGRST205, PostgreSQL's 42P01). The first time it is noted in missing and logged
 function syncAbsent(missing, table, error){ if(!SYNC_LATE[table]||!error) return false; const m=String(error.message||'')+' '+String(error.code||'');
   if(!/42P01|PGRST20[0-9]|does not exist|could not find the table|schema cache/i.test(m)) return false;
+  if(table==='crypto_keys'&&!/42P01|PGRST205/.test(m)) return false; // decision 63a: only a table truly missing (PGRST002, a schema cache still loading, is not)
   if(!missing.has(table)){ missing.add(table); log('warn','La base de datos no tiene todavía la tabla '+table+': falta '+SYNC_LATE[table][0]+'. '+SYNC_LATE[table][1]); } return true; }
 const syncMissing = table => !!(SY&&SY.remote&&SY.remote.missing&&SY.remote.missing.has(table));
 // The columns this version syncs, per table: a change makes the next run pull that table whole (see syncRun)
@@ -153,9 +154,10 @@ function supabaseRemote(cfg){
     async inboxClear(){ const res=await db().from('inbox').update({text:'', url:null}).not('taken', 'is', null).neq('text', '').select('id'); if(absent('inbox', res.error)) return []; return rows(res); },
     // Decision 63a (0012_encryption.sql): the account's data key, wrapped by the encryption password. One row per user; insert fails if
     // another device activated first. A database without the table answers null (absent: logged once, Ajustes says it cannot be activated)
-    async cryptoGet(){ const res=await db().from('crypto_keys').select('kid,salt,iterations,wrapped,created,modified').maybeSingle(); if(absent('crypto_keys', res.error)) return null; if(res.error) throw res.error; return res.data||null; },
+    async cryptoGet(){ const res=await db().from('crypto_keys').select('kid,salt,iterations,wrapped,created,modified,migrated').maybeSingle(); if(absent('crypto_keys', res.error)) return null; if(res.error) throw res.error; return res.data||null; },
     async cryptoPut(row){ const {error}=await db().from('crypto_keys').insert(row); if(error) throw error; },
-    async cryptoPatch(owner, kid, patch){ return rows(await db().from('crypto_keys').update(patch).eq('owner_id', owner).eq('kid', kid).select('kid')); },
+    // Only when the row still matches (null: still null), so a change made meanwhile by another device is never overwritten
+    async cryptoPatch(owner, match, patch){ let q=db().from('crypto_keys').update(patch).eq('owner_id', owner); Object.keys(match).forEach(c=>{ q=match[c]===null?q.is(c, null):q.eq(c, match[c]); }); return rows(await q.select('kid')); },
     async keyGet(){ const res=await db().from('shortcut_keys').select('space_id,created,revoked').maybeSingle(); if(absent('shortcut_keys', res.error)) return null; if(res.error) throw res.error; return res.data||null; },
     async keyPut(row){ const res=await db().from('shortcut_keys').upsert(row, {onConflict:'owner_id'}); if(absent('shortcut_keys', res.error)) throw new Error('Falta 0010_inbox.sql'); if(res.error) throw res.error; },
     async keyPatch(owner, patch){ return rows(await db().from('shortcut_keys').update(patch).eq('owner_id', owner).select('owner_id')); },
@@ -351,7 +353,7 @@ function syncSetUser(user, why){
   if(user){ const changed=!SY.user||SY.user.id!==user.id; SY.user={id:user.id, email:user.email||''}; st.user=SY.user; st.lost=null; syncWrite(st); SY.lostShown=false;
     if(changed) log('info','Sesión iniciada', SY.user.email);
     syncSubscribe(); if(changed || why==='inicio') syncRun(why==='inicio'?'inicio':'sesión'); }
-  else if(SY.user){ const asked=SY.signingOut||why==='user'; SY.user=null; st.user=null;
+  else if(SY.user){ const asked=SY.signingOut||why==='user'||cryptoSignOutRecent(); SY.user=null; st.user=null; // cryptoSignOutRecent: «Cerrar sesión» in another window
     // A session that ends without «Cerrar sesión» (revoked or expired elsewhere, such as a global sign-out from another app of the project):
     // said in the log, in a notice and in Ajustes until the next sign-in. The encryption key stays; the next sign-in checks it against the account
     if(asked) log('info','Sesión cerrada'); else { st.lost=new Date().toISOString(); CR.force=true; log('warn','La sesión se ha cerrado sin pedirlo: se deja de sincronizar', why); }
@@ -388,7 +390,7 @@ async function syncSignIn(){ if(!SY) return; if(!navigator.onLine){ toast('Sin c
   catch(e){ log('error','Inicio de sesión falló: '+(e&&e.message||e)); toast('No se pudo iniciar sesión'); } }
 function syncSignOutSheet(){ const dev=UI.wide?'este dispositivo':'este iPhone';
   // signingOut: the SIGNED_OUT event this causes is the user's own, not a session lost. Only this sign-out forgets the encryption key (decision 63a)
-  confirmSheet('Cerrar sesión', 'Los datos se quedan en '+dev+' y dejan de sincronizarse.', async()=>{ SY.signingOut=true;
+  confirmSheet('Cerrar sesión', 'Los datos se quedan en '+dev+' y dejan de sincronizarse.', async()=>{ SY.signingOut=true; try{ localStorage.setItem(CR_OUT, String(Date.now())); }catch(e){}
     try{ await pushSignOut(); try{ await SY.remote.signOut(); }catch(e){ log('warn','Cerrar sesión: '+(e&&e.message||e)); } syncSetUser(null, 'user'); await cryptoSignedOut(); }
     finally{ SY.signingOut=false; } toast('Sesión cerrada'); }); }
 

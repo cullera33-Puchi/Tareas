@@ -9,7 +9,11 @@ require('./lib/out.js'); // outputs (screenshots, downloads) go to tests/out
 //     device A (iPhone, light) signs in with plain data, then activates: rules, warning, checkbox, progress; a file upload cut midway
 //     leaves the flag 'migrating' and the next pass finishes; the server then holds only 'e1:' in the encrypted columns (a deleted row and
 //     a voice note made before activation included), files with the magic, the taken Siri phrase emptied; A stays plain (data, search,
-//     export, backup); a new Siri phrase becomes a task, its row emptied in the same update.
+//     export, backup); a new Siri phrase becomes a task, its row emptied in the same update. The end is marked on the server (migrated).
+//     Review fixes: a device that kept ciphertext as text on an older version repairs it on unlock and never encrypts it twice; the pull
+//     uses the stored key and never merges ciphertext as text; uploads wait during activation and re-read the key row; a lost answer to the
+//     key row keeps key and flag until the next pass decides; another device finishes the migration; password change answers lost or raced;
+//     «Cerrar sesión» reaches the other windows.
 //     Device B (desktop): signs in, sync paused (no pull, nothing merged, realtime ignored), unlock sheet by itself; wrong password
 //     refused; the right one shows A's tasks in clear, its own task goes up encrypted, an encrypted photo opens.
 //     A changes the password (wrong current refused); B keeps syncing both ways; device C (iPhone, dark) unlocks with the new password and
@@ -62,7 +66,7 @@ async function sqlTests(){
   const q = async (sql, params) => (await db.query(sql, params)).rows;
   const tryq = async (sql, params) => { try { return {rows: await q(sql, params)}; } catch(e){ return {error: e.message}; } };
   const cols = await q(`select column_name, data_type, is_nullable from information_schema.columns where table_schema='public' and table_name='crypto_keys' order by ordinal_position`);
-  check('sql_columns', cols.map(c=>c.column_name+':'+c.data_type).join()==='owner_id:uuid,kid:text,salt:text,iterations:integer,wrapped:text,created:timestamp with time zone,modified:timestamp with time zone', cols);
+  check('sql_columns', cols.map(c=>c.column_name+':'+c.data_type).join()==='owner_id:uuid,kid:text,salt:text,iterations:integer,wrapped:text,created:timestamp with time zone,modified:timestamp with time zone,migrated:timestamp with time zone', cols);
   const pol = await q(`select policyname from pg_policies where tablename='crypto_keys' order by policyname`);
   const trg = await q(`select tgrelid::regclass::text t from pg_trigger where tgname='tareas_require_cipher' order by 1`);
   check('sql_objects', pol.map(p=>p.policyname).join()==='crypto_keys_insert_own,crypto_keys_select_own,crypto_keys_update_own' && trg.map(x=>x.t).join()==='contacts,project_notes,projects,spaces,subtasks,tasks,voice_notes', {pol, trg});
@@ -101,6 +105,10 @@ async function sqlTests(){
   const anon = await as(A, () => tryq(`select kid from public.crypto_keys`), 'anon');
   const upd = await as(A, () => tryq(`update public.crypto_keys set salt = 's2', wrapped = 'w2', modified = now() where owner_id = '${A}' and kid = 'k1' returning kid`));
   const del = await as(A, () => tryq(`delete from public.crypto_keys where owner_id = '${A}'`));
+  // The end of the encryption of the server copy: marked once, only while still unmarked (the app's conditional update)
+  const m1 = await as(A, () => tryq(`update public.crypto_keys set migrated = now() where owner_id = '${A}' and kid = 'k1' and migrated is null returning kid`));
+  const m2 = await as(A, () => tryq(`update public.crypto_keys set migrated = now() where owner_id = '${A}' and kid = 'k1' and migrated is null returning kid`));
+  check('sql_migrated_once', m1.rows && m1.rows.length===1 && m2.rows && m2.rows.length===0, {m1, m2});
   check('sql_key_rls', seenB.rows && seenB.rows.length===0 && !!anon.error && upd.rows && upd.rows.length===1 && !!del.error && (await q(`select count(*)::int n from public.crypto_keys`))[0].n===1, {seenB, anon, upd, del});
   // The inbox: the owner empties text and url, and still cannot change anything else
   await db.exec(`insert into public.inbox (id, owner_id, text, url, source, taken) values ('00000000-0000-4000-8000-0000000000f1', '${A}', 'Llamar a Marta', 'https://x', 'share', now())`);
@@ -112,7 +120,7 @@ async function sqlTests(){
   err = null; try { await db.exec(all); await db.exec(all); } catch(e){ err = e.message; }
   check('sql_all_twice', !err && /0001 a 0012/.test(all.split('\n')[0]) && /migrations\/0012_encryption\.sql/.test(all) && (all.match(/^-- ========== migrations\//mg)||[]).length===fs.readdirSync(path.join(ROOT,'supabase/migrations')).filter(f=>f.endsWith('.sql')).length, err);
   let rows = []; try { rows = (await db.query(fs.readFileSync(path.join(ROOT, 'supabase/check.sql'), 'utf8'))).rows; } catch(e){ err = e.message; }
-  check('sql_check_all_ok', rows.length>=33 && rows.every(x=>x.Estado==='OK') && rows.filter(x=>/\(0012\)/.test(x.Pieza)).length===3, {err, bad:rows.filter(x=>x.Estado!=='OK'), n:rows.length});
+  check('sql_check_all_ok', rows.length>=34 && rows.every(x=>x.Estado==='OK') && rows.filter(x=>/\(0012\)/.test(x.Pieza)).length===4, {err, bad:rows.filter(x=>x.Estado!=='OK'), n:rows.length});
   await db.close();
 }
 
@@ -121,7 +129,7 @@ const TABLES = ['spaces','projects','tasks','voice_notes','attachments','subtask
 const ENC = { tasks:['title','notes','waiting_for','responsible'], projects:['name'], spaces:['name'], subtasks:['title'], project_notes:['title','body'], contacts:['name','email','phone'], voice_notes:['text'] };
 const isEnc = v => typeof v==='string' && v.startsWith('e1:');
 class Fake {
-  constructor(){ this.t={}; TABLES.forEach(x=>this.t[x]=new Map()); this.last=0; this.subs=new Map(); this.tags=new Map(); this.calls=[]; this.keys=new Map(); this.inbox=[]; this.store=new Map(); this.failUpload=0; this.refused=0; }
+  constructor(){ this.t={}; TABLES.forEach(x=>this.t[x]=new Map()); this.last=0; this.subs=new Map(); this.tags=new Map(); this.calls=[]; this.keys=new Map(); this.inbox=[]; this.store=new Map(); this.failUpload=0; this.refused=0; this.lose={}; }
   ts(){ this.last=Math.max(Date.now(), this.last+1); return new Date(this.last).toISOString(); }
   // The trigger's stand-in: PostgREST's upsert is an insert first, so with a key row any plain value is refused
   write(owner, table, rows){ if(!owner) throw new Error('JWT required'); const ts=this.ts(), out=[], changed=[], m=this.t[table];
@@ -147,9 +155,13 @@ class Fake {
       case 'markDeleted': return this.write(own, a.table, a.items.map(x=>({id:x.id, deleted:x.ts, modified:x.ts})));
       case 'subscribe': this.subs.set(page, a.uid); return true;
       case 'unsubscribe': this.subs.delete(page); return true;
-      case 'cryptoGet': { const k=this.keys.get(own); return k?JSON.parse(JSON.stringify(k)):null; }
-      case 'cryptoPut': if(this.keys.has(own)) throw new Error('duplicate key value violates unique constraint "crypto_keys_pkey"'); this.keys.set(own, Object.assign({}, a.row, {owner_id:undefined})); return true;
-      case 'cryptoPatch': { const k=this.keys.get(own); if(!k||k.kid!==a.kid) return []; Object.assign(k, a.patch); return [{kid:k.kid}]; }
+      // lose.get / lose.put / lose.patch: the request fails (put and patch after storing, as an answer lost on the way back); hide: the row is not seen
+      case 'cryptoGet': { if(this.lose.get){ this.lose.get--; throw new Error('Failed to fetch'); } const k=this.keys.get(own); return k&&!this.hide?JSON.parse(JSON.stringify(k)):null; }
+      case 'cryptoPut': if(this.keys.has(own)) throw new Error('duplicate key value violates unique constraint "crypto_keys_pkey"'); this.keys.set(own, Object.assign({migrated:null}, a.row, {owner_id:undefined}));
+        if(this.lose.put){ this.lose.put--; this.lose.get=this.lose.afterPut||0; throw new Error('Failed to fetch'); } return true;
+      case 'cryptoPatch': { const k=this.keys.get(own); if(this.racePatch){ this.racePatch=false; if(k) k.wrapped='cambiada-en-otro-dispositivo'; }
+        if(!k||Object.keys(a.match).some(c=>a.match[c]===null?k[c]!=null:k[c]!==a.match[c])) return []; Object.assign(k, a.patch);
+        if(this.lose.patch){ this.lose.patch--; throw new Error('Failed to fetch'); } return [{kid:k.kid}]; }
       case 'upload': if(this.failUpload>0){ this.failUpload--; throw new Error('Failed to fetch'); } if(!a.path.startsWith(own+'/')) throw new Error('row-level security'); this.store.set(a.path, {b64:a.b64, mime:a.mime}); return true;
       case 'download': { const o=this.store.get(a.path); if(!o) throw new Error('HTTP 400'); return o; }
       case 'inboxList': return this.inbox.filter(x=>x.owner_id===own&&!x.taken).map(x=>({id:x.id, text:x.text, url:x.url, source:x.source, created:x.created}));
@@ -180,7 +192,7 @@ function fakeAdapter(){
     inboxClear:()=>call('inboxClear', {owner:owner()}),
     cryptoGet:()=>call('cryptoGet', {owner:owner()}),
     cryptoPut:row=>call('cryptoPut', {owner:owner(), row}),
-    cryptoPatch:(own, kid, patch)=>call('cryptoPatch', {owner:owner(), kid, patch})
+    cryptoPatch:(own, match, patch)=>call('cryptoPatch', {owner:owner(), match, patch})
   };
 }
 
@@ -205,7 +217,7 @@ async function device(browser, o){
   const page = await ctx.newPage(); fake.tags.set(page, o.tag);
   page.on('pageerror', e=>errors.push(o.tag+' pageerror: '+e.message)); page.on('console', m=>{ if(m.type()==='error'&&!/Failed to fetch/.test(m.text())) errors.push(o.tag+' console: '+m.text()); });
   await page.exposeBinding('fakeServer', (src, op, a)=>fake.handle(src.page, op, a)); await page.addInitScript(fakeAdapter); await page.addInitScript(u=>{ window.__fakeUser=u; }, USER);
-  if(o.old) await page.addInitScript(()=>{ window.__noCrypto=true; });
+  if(o.old) await page.addInitScript(()=>{ if(!localStorage.getItem('__updated')) window.__noCrypto=true; }); // until it «updates»
   if(o.user) await page.addInitScript(u=>{ window.__fakeUser=u; }, o.user);
   // A database without 0012_encryption.sql: the adapter answers as supabaseRemote does (absent, logged once)
   if(o.absent) await page.addInitScript(()=>{ const R=window.__tareasRemote; R.missing=new Set(); R.cryptoGet=async()=>{ syncAbsent(R.missing, 'crypto_keys', {code:'PGRST205', message:"Could not find the table 'public.crypto_keys' in the schema cache"}); return null; }; });
@@ -260,13 +272,13 @@ async function appTests(browser){
   await ap.click('#sheet .hbtn.ok');
   check('act_progress_sheet', await until(ap, ()=>!!document.querySelector('#sheet.on .cxprog'), null, 3000));
   await shot(ap, 'ip-light-progress');
-  check('act_interrupted', await until(ap, ()=>!CR.migrating&&!CR.busy&&crFlag()&&crFlag().state==='migrating'&&LOG.some(e=>/^Cifrado interrumpido/.test(e.m)), null, 30000), await ap.evaluate(()=>({f:crFlag(), log:LOG.slice(-6).map(e=>e.m)})));
+  check('act_interrupted', await until(ap, ()=>!CR.migrating&&!CR.busy&&CR.row&&!CR.row.migrated&&!crFlag()&&LOG.some(e=>/^Cifrado interrumpido/.test(e.m)), null, 30000) && fake.keys.get(U).migrated===null, await ap.evaluate(()=>({row:CR.row, f:crFlag(), log:LOG.slice(-6).map(e=>e.m)})));
   const mid = {left:plainLeft(), key:fake.keys.get(U)};
   check('act_key_row', mid.key && /^[A-Za-z0-9_-]{16}$/.test(mid.key.kid) && mid.key.iterations===600000 && /^[A-Za-z0-9_-]{20,}$/.test(mid.key.salt) && /^[A-Za-z0-9_-]{50,}$/.test(mid.key.wrapped), mid.key);
   // The next pass goes on from where it stopped
   check('act_waits', await ap.evaluate(()=>CR.resumeAt>Date.now()+20e3));
   await ap.evaluate(()=>{ CR.resumeAt=0; SY.retry=0; syncRun('prueba'); });
-  check('act_resumed', await until(ap, ()=>crFlag()&&crFlag().state==='on'&&!CR.migrating, null, 30000), await ap.evaluate(()=>({f:crFlag(), log:LOG.slice(-6).map(e=>e.m)})));
+  check('act_resumed', await until(ap, ()=>CR.row&&!!CR.row.migrated&&!CR.migrating, null, 30000) && !!fake.keys.get(U).migrated, await ap.evaluate(()=>({row:CR.row, log:LOG.slice(-6).map(e=>e.m)})));
   check('A_synced_after', await synced(ap));
   const left = plainLeft(), files=[...fake.store.entries()].map(([p,o])=>({p, magic:Buffer.from(o.b64,'base64').slice(0,8).toString()}));
   const tdel=fake.t.tasks.get('tdel'), vn1=fake.t.voice_notes.get('vn1');
@@ -277,9 +289,9 @@ async function appTests(browser){
   check('server_files', files.length===1 && files[0].magic==='TAREASE1', files);
   check('server_inbox_cleared', fake.inbox[0].text==='' && fake.inbox[0].url===null, fake.inbox[0]);
   const Ax = await ap.evaluate(async()=>{ const b=await BK.list(); return {t:task('a1').title, n:task('a1').notes, r:task('a1').responsible, w:task('a2').waitingFor, p:proj('p1').name, raw:/e1:[A-Za-z0-9_-]{30}/.test(localStorage.getItem('tareas-v1')),
-    exp:/e1:[A-Za-z0-9_-]{30}/.test(JSON.stringify(exportData())), search:pendingFor('todas', undefined, 'comité').map(x=>x.id), backups:b.length, log:LOG.map(e=>e.m), flag:crFlag(), key:!!CR.key, idb:!!(await cryptoKeyLoad())}; });
+    exp:/e1:[A-Za-z0-9_-]{30}/.test(JSON.stringify(exportData())), search:pendingFor('todas', undefined, 'comité').map(x=>x.id), backups:b.length, log:LOG.map(e=>e.m), key:!!CR.key, idb:!!(await cryptoKeyLoad())}; });
   check('A_stays_plain', Ax.t==='Preparar comité de seguimiento' && Ax.n==='Orden del día con riesgos' && Ax.r==='Marta Ruiz' && Ax.w==='Luis' && Ax.p==='FLC' && !Ax.raw && !Ax.exp && Ax.search.join()==='a1' && Ax.backups>=1, Ax);
-  check('A_log', ['Activación del cifrado: inicio','Copia local antes de cifrar','Cifrado activado en la cuenta: clave creada','Cifrado: datos del servidor por cifrar','Cifrado completado'].every(m=>Ax.log.includes(m)) && !Ax.log.some(m=>m.includes(PW1)) && Ax.key && Ax.idb, Ax.log.slice(-15));
+  check('A_log', ['Activación del cifrado: inicio','Copia local antes de cifrar','Cifrado activado en la cuenta: clave creada','Cifrado: cifrando los datos del servidor','Cifrado completado'].every(m=>Ax.log.includes(m)) && !Ax.log.some(m=>m.includes(PW1)) && Ax.key && Ax.idb, Ax.log.slice(-15));
   // A sheet left open by the activation is closed for the next steps
   await ap.evaluate(()=>{ if(document.querySelector('#sheet.on')) closeSheet(); }); await settled(ap);
   s = await section(ap); check('A_section_on', s && /^Cifrado activado el \d+ de [a-z]+/.test(s.cells[0]) && s.cells[1]==='Cambiar contraseña', s);
@@ -373,9 +385,14 @@ async function appTests(browser){
   await sheetShot(cp, 'ip-dark-progress', ()=>{ CR.prog={n:120, of:840}; crProgSheet(); });
   await sheetShot(ap, 'ip-light-unlock-sheet', ()=>cryptoUnlockSheet());
   await sheetShot(ap, 'ip-light-progress-sim', ()=>{ CR.prog={n:120, of:840}; crProgSheet(); });
-  // Signing out forgets the key of this device
+  // Signing out forgets the key of this device, in every window of the app, and the others do not call it a lost session
+  const cp2 = await C.ctx.newPage(); fake.tags.set(cp2, 'C2'); cp2.on('pageerror', e=>errors.push('C2 pageerror: '+e.message));
+  await cp2.exposeBinding('fakeServer', (src, op, a)=>fake.handle(src.page, op, a)); await cp2.addInitScript(fakeAdapter); await cp2.addInitScript(u=>{ window.__fakeUser=u; }, USER); await cp2.goto(URL0); await synced(cp2); await until(cp2, ()=>!!CR.key);
   await cp.click('[data-act=signOut]'); await cp.waitForTimeout(600); await cp.click('#asheet .it[data-i="0"]');
   check('C_signout_forgets', await until(cp, async()=>!SY.user&&!CR.key&&!(await cryptoKeyLoad())) , await cp.evaluate(()=>LOG.slice(-4).map(e=>e.m)));
+  await cp2.evaluate(()=>window.__fakeAuth(null, 'SIGNED_OUT')); await cp2.waitForTimeout(300);
+  const c2 = await cp2.evaluate(()=>({key:!!CR.key, user:!!SY.user, lost:!!syncState().lost, toast:document.getElementById('toast').classList.contains('on')&&document.getElementById('toastText').textContent}));
+  check('C_other_window', !c2.key && !c2.user && !c2.lost && !/Se ha cerrado la sesión/.test(c2.toast||''), c2);
 
   /* ---------- A device on an older version: refused, and it says so ---------- */
   const O = await device(browser, {tag:'O', seed:SEED_B(), old:true}); const op=O.page;
@@ -383,6 +400,28 @@ async function appTests(browser){
   check('old_refused', await until(op, ()=>SY.status==='error'&&syncLine()==='Actualiza la app: el cifrado está activado'&&LOG.some(e=>/^Actualiza la app: el cifrado está activado/.test(e.m)), null, 15000) && fake.refused>0 && plainLeft().length===0,
     {st:await op.evaluate(()=>({s:SY.status, e:SY.error, line:syncLine()})), refused:fake.refused, left:plainLeft()});
   await op.waitForTimeout(300); await shot(op, 'ip-light-old-device');
+  // That older version kept the server's ciphertext as text and moved its cursors past it; say its pass had finished (owner set)
+  const oldKept = await op.evaluate(()=>{ const st=syncState(); st.owner=SY.user.id; syncWrite(st); const x=task('a1'); return {t:x&&x.title, cur:!!st.cursor.tasks}; });
+  check('old_kept_cipher', /^e1:[A-Za-z0-9_-]{30}/.test(oldKept.t||'') && oldKept.cur, oldKept);
+  // Updated to this version: the password, then the encrypted tables come again and the ciphertext kept here goes back to text
+  await op.evaluate(()=>localStorage.setItem('__updated','1')); await op.reload(); await op.waitForTimeout(600);
+  check('old_updated_locked', await until(op, ()=>SY.status==='locked'&&!!document.querySelector('#sheet.on [data-role=cxpw]')));
+  await op.fill('#sheet [data-role=cxpw]', PW2); await op.click('#sheet .hbtn.ok');
+  check('old_updated_unlocked', await until(op, ()=>!!CR.key&&!document.querySelector('#sheet.on'), null, 15000) && await synced(op));
+  const Ox = await op.evaluate(()=>({t:task('a1')&&task('a1').title, p:proj('p1')&&proj('p1').name, any:/e1:[A-Za-z0-9_-]{30}/.test(JSON.stringify(DB)), log:LOG.map(e=>e.m).filter(m=>/^Cifrado:/.test(m))}));
+  const a1now = fake.t.tasks.get('a1').title, a1dec = await ap.evaluate(async([v])=>cryptoDec(CR.key, v, cryptoAad('tasks','title','a1')), [a1now]);
+  check('old_repaired', Ox.t==='Preparar comité de dirección' && Ox.p==='FLC' && !Ox.any && Ox.log.includes('Cifrado: las tablas cifradas se descargan enteras una vez') && Ox.log.includes('Cifrado: textos guardados cifrados en este dispositivo vuelven a ser texto'), Ox);
+  check('old_never_double', a1dec==='Preparar comité de dirección' && plainLeft().length===0, {a1dec});
+  // The upload layer keeps a value that already opens as it is (never encrypted twice), and encrypts one that does not
+  const seal = await op.evaluate(async([v])=>{ const o=await cryptoSealRow(CR.key, 'tasks', {id:'a1', title:v, notes:'e1:nota que no abre'}); return {same:o.title===v, notes:o.notes!=='e1:nota que no abre'&&o.notes.startsWith('e1:')&&(await cryptoDec(CR.key, o.notes, cryptoAad('tasks','notes','a1')))==='e1:nota que no abre'}; }, [a1now]);
+  check('seal_keeps_cipher', seal.same && seal.notes, seal);
+  // The pull opens with the key kept on the device even when this window has lost it from memory (7), and with a key of this user when the
+  // account looks off; never as text (5)
+  const pk = await op.evaluate(async()=>{ CR.key=null; CR.kid=null; CR.owner=null; const a=await SY.remote.pull('tasks', null, 1000); const one=!!CR.key;
+    return {one, a:a.some(r=>r.id==='a1'&&r.title==='Preparar comité de dirección')&&!a.some(r=>/^e1:[A-Za-z0-9_-]{30}/.test(r.title||''))}; });
+  fake.hide=true; const pk2 = await op.evaluate(async()=>{ CR.force=true; const a=await SY.remote.pull('tasks', null, 1000); return a.some(r=>r.id==='a1'&&r.title==='Preparar comité de dirección')&&!a.some(r=>/^e1:[A-Za-z0-9_-]{30}/.test(r.title||'')); }); fake.hide=false;
+  await op.evaluate(()=>{ CR.force=true; return crFetch(SY.user); });
+  check('pull_stored_and_off_key', pk.one && pk.a && pk2, {pk, pk2});
 
   /* ---------- A database without the migration: the rest syncs, Cifrado cannot be activated ---------- */
   const D = await device(browser, {tag:'D', seed:{spaces:[{id:'trabajo',name:'Trabajo',order:0,created:T0}], projects:[], tasks:[tk('d1', {title:'Tarea de D'})], voiceNotes:[], settings:{tipsSeen:true}}, absent:true, user:{uid:'9b2f6d3e-0000-4000-8000-00000000d001', email:'d@example.com'}}); const dp=D.page;
@@ -390,15 +429,45 @@ async function appTests(browser){
   await toSettings(dp); s = await section(dp);
   check('D_absent', s && s.cells.join('|')==='CifradoNo disponible' && /Falta poner al día Supabase con 0012_encryption\.sql/.test(s.foot) && await dp.evaluate(()=>LOG.filter(e=>/crypto_keys: falta 0012_encryption\.sql/.test(e.m)).length===1)
     && fake.t.tasks.get('d1').title==='Tarea de D', s);
+  const DU='9b2f6d3e-0000-4000-8000-00000000d001';
+  fake.put(DU, 'tasks', {id:'dx', title:'e1:'+'C'.repeat(60), notes:'', status:'pending', priority:'none', date:today, modified:new Date().toISOString(), created:new Date().toISOString()});
+  await dp.evaluate(()=>syncRun('prueba')); await synced(dp);
+  check('D_cipher_not_merged', await dp.evaluate(()=>!task('dx')&&LOG.some(e=>/filas cifradas y sin clave/.test(e.m))));
+  const busyUp = await dp.evaluate(async()=>{ CR.busy=true; try{ await SY.remote.fileUpload(SY.user.id+'/d1/x.jpg', new Blob(['abc'], {type:'image/jpeg'}), 'image/jpeg'); return 'sent'; }catch(e){ return e.code; } finally{ CR.busy=false; } });
+  check('D_busy_upload_waits', busyUp==='tareas_wait' && !fake.store.has(DU+'/d1/x.jpg'), busyUp);
   await D.ctx.close();
   /* ---------- Turned on elsewhere while this device thought it was off: the refusal makes it look again ---------- */
   const V='9b2f6d3e-0000-4000-8000-00000000e001', E = await device(browser, {tag:'E', seed:{spaces:[{id:'trabajo',name:'Trabajo',order:0,created:T0}], projects:[], tasks:[tk('e1', {title:'Tarea de E'})], voiceNotes:[], settings:{tipsSeen:true}}, user:{uid:V, email:'e@example.com'}}); const ep=E.page;
   await signIn(ep); check('E_off_synced', await synced(ep) && fake.t.tasks.get('e1').title==='Tarea de E');
   fake.keys.set(V, Object.assign({}, fake.keys.get(U))); // another device of this account has just turned encryption on
-  await ep.evaluate(()=>updTask('e1', {title:'Tarea de E cambiada'}));
+   await ep.evaluate(()=>updTask('e1', {title:'Tarea de E cambiada'}));
   check('E_refused_then_locked', await until(ep, ()=>SY.status==='locked'&&syncLine()==='Falta la contraseña de cifrado'&&!!document.querySelector('#sheet.on [data-role=cxpw]')&&LOG.some(e=>/El servidor pide texto cifrado/.test(e.m)), null, 15000)
     && fake.t.tasks.get('e1').title==='Tarea de E', await ep.evaluate(()=>({s:SY.status, e:SY.error, log:LOG.slice(-5).map(x=>x.m)})));
+  // A file never goes up plain on a cached «off»: the upload layer reads the key row first
+  const eUp = await ep.evaluate(async()=>{ CR.row=null; CR.at=Date.now(); try{ await SY.remote.fileUpload(SY.user.id+'/e1/x.jpg', new Blob(['abc'], {type:'image/jpeg'}), 'image/jpeg'); return 'sent'; }catch(e){ return e.code; } });
+  check('E_plain_upload_rechecks', eUp==='tareas_locked' && !fake.store.has(V+'/e1/x.jpg'), eUp);
   await E.ctx.close();
+
+  /* ---------- G: the server's answer to the key row is lost and the row cannot be read either: key and flag stay, the next pass decides ---------- */
+  const W='9b2f6d3e-0000-4000-8000-00000000f001', G = await device(browser, {tag:'G', seed:{spaces:[{id:'trabajo',name:'Trabajo',order:0,created:T0}], projects:[], tasks:[tk('g1', {title:'Tarea de G'})], voiceNotes:[], settings:{tipsSeen:true}}, user:{uid:W, email:'g@example.com'}}); const gp=G.page;
+  await signIn(gp); check('G_synced', await synced(gp));
+  fake.lose={put:1, afterPut:2};
+  await gp.evaluate(pw=>cryptoActivate(pw), PW1);
+  const g1 = await gp.evaluate(async()=>({f:crFlag(), idb:!!(await cryptoKeyLoad()), key:!!CR.key, toast:document.getElementById('toastText').textContent}));
+  check('G_unknown_kept', !!g1.f && g1.idb && !g1.key && g1.toast==='No se pudo confirmar el cifrado. Se comprobará al sincronizar' && fake.keys.has(W) && fake.keys.get(W).kid===g1.f.kid, g1);
+  fake.lose={}; await gp.evaluate(()=>syncRun('prueba'));
+  check('G_confirmed_and_migrated', await until(gp, ()=>!crFlag()&&!!CR.key&&CR.row&&!!CR.row.migrated, null, 30000) && !!fake.keys.get(W).migrated && isEnc(fake.t.tasks.get('g1').title), await gp.evaluate(()=>({f:crFlag(), row:CR.row, log:LOG.slice(-8).map(e=>e.m)})));
+  // The work of a device lost midway: any device with the key finishes it while the row says it is not done
+  fake.keys.get(W).migrated=null; fake.put(W, 'tasks', {id:'g2', title:'Dejada en claro', notes:'', status:'pending', priority:'none', date:today, modified:new Date().toISOString(), created:new Date().toISOString()});
+  await gp.evaluate(()=>{ CR.force=true; CR.resumeAt=0; return syncRun('prueba'); });
+  check('G_other_device_finishes', await until(gp, ()=>CR.row&&!!CR.row.migrated&&!CR.migrating, null, 20000) && isEnc(fake.t.tasks.get('g2').title) && !!fake.keys.get(W).migrated);
+  // Password change: the answer lost (the row tells it went through); another device changed it meanwhile (nothing overwritten)
+  fake.lose={patch:1}; const pc1 = await gp.evaluate(([a,b])=>cryptoChangePassword(a,b), [PW1, PW2]); const w1=fake.keys.get(W).wrapped;
+  fake.racePatch=true; const pc2 = await gp.evaluate(([a,b])=>cryptoChangePassword(a,b), [PW2, PW1]);
+  check('G_password_answers', pc1==='ok' && pc2==='other' && fake.keys.get(W).wrapped==='cambiada-en-otro-dispositivo' && w1!=='cambiada-en-otro-dispositivo', {pc1, pc2});
+  // A schema cache still loading (PGRST002) is not a missing table; PGRST205 is
+  check('absent_codes', await gp.evaluate(()=>!syncAbsent(new Set(), 'crypto_keys', {code:'PGRST002', message:'Could not query the database for the schema cache. Retrying.'}) && syncAbsent(new Set(), 'crypto_keys', {code:'PGRST205', message:"Could not find the table 'public.crypto_keys' in the schema cache"})));
+  await G.ctx.close();
 
   /* ---------- The service worker: an encrypted reminder shows in clear ---------- */
   const pay = {title:fake.t.tasks.get('a1').title, body:fake.t.projects.get('p1').name, tag:'a1', data:{taskId:'a1', projectId:'p1', url:'./?task=a1'}};

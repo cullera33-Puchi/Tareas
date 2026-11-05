@@ -174,7 +174,8 @@ async function attFlush(){ if(UQ.running||!SY||!SY.user||!SY.remote.fileUpload||
       const cur=att(id); if(cur&&!cur.path){ cur.path=path; cur.modified=new Date().toISOString(); save(); } done++;
       log('info', a.kind==='photo'?'Foto subida':'Audio subido', {size:blob.size, ms:Date.now()-t0}); }
     UQ.retry=0; }
-  catch(e){ const off=syncOffline(e), ms=Math.min(300e3, 3000*Math.pow(2, UQ.retry++)); log(off?'warn':'error','Subida de adjunto falló: '+(e&&(e.message||e.error)||e), {reintento:Math.round(ms/1000)+' s'}); attFlushSoon(ms); }
+  catch(e){ const off=syncOffline(e), ms=Math.min(300e3, 3000*Math.pow(2, UQ.retry++)), wait=e&&(e.code==='tareas_wait'||e.code==='tareas_locked'); // decision 63a: waiting for the encryption, not a failure
+    log(wait?'info':off?'warn':'error', (wait?'Subida de adjunto en espera: ':'Subida de adjunto falló: ')+(e&&(e.message||e.error)||e), {reintento:Math.round(ms/1000)+' s'}); attFlushSoon(ms); }
   finally{ UQ.running=false; if(done){ const id=detailTaskId(); if(id&&hasAtt(id)) attPaint(id); } } }
 // Under the group: where the files are while they have not reached the account
 function attNote(taskId){ const all=attOf(taskId); if(!all.length) return ''; const dev=UI.wide?'este dispositivo':'este iPhone';

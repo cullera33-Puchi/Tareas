@@ -1,5 +1,11 @@
 # Registro de cambios
 
+## v0.35.1. Recordatorios más claros (5 de noviembre de 2026)
+
+- Recordar todo (punto 73a): la hoja muestra las tareas de la persona con una casilla cada una, todas marcadas al abrir, y «Seleccionar todo» o «Quitar todas»; el mensaje sigue a la selección hasta que se edita a mano; sin ninguna marcada no se envía.
+- Formato del mensaje (punto 73b): «Hola X, te recuerdo esta tarea» o «estas tareas», una línea en blanco, una viñeta por tarea con su fecha o entrega, otra línea en blanco y «Gracias.». Igual por WhatsApp, correo y la hoja de compartir.
+- Sin cambios de datos. Pruebas `rm-PP` y `rm-RC` actualizadas.
+
 ## v0.35.0. Vista «Por persona» (5 de noviembre de 2026)
 
 - Personas (punto 65a): sección «Personas» en la pestaña Proyectos del iPhone y en la barra lateral del escritorio, con las personas que tienen alguna tarea abierta en el espacio activo, ordenadas por número de tareas.

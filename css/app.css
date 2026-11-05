@@ -1734,3 +1734,15 @@ body.desktop .cxprog .cx-line{font-size:13px;}
 .app.desktop .premindb svg{width:15px;height:15px;}
 .app.desktop .side .it.iperson svg{color:var(--ink2);}
 .app.desktop .side .it.iperson.on svg{color:var(--blue);}
+
+/* Decision 73: choosing which tasks go in a person's reminder */
+.rpick{margin:0 0 10px;border-radius:10px;background:var(--card);overflow:hidden;}
+.rpickh{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;font-size:.8125rem;color:var(--ink2);}
+.rpickh .rall{color:var(--blue);font-size:.8125rem;background:none;border:0;padding:4px 0;}
+.rpi{display:flex;align-items:center;gap:10px;width:100%;min-height:44px;padding:6px 12px;background:none;border:0;border-top:.5px solid var(--sep);text-align:left;color:var(--ink);font-size:.9375rem;}
+.rpi .rbox{flex:none;width:22px;height:22px;border-radius:50%;border:1.5px solid var(--ink3);display:flex;align-items:center;justify-content:center;}
+.rpi .rbox svg{width:13px;height:13px;opacity:0;color:#fff;}
+.rpi.on .rbox{background:var(--blue);border-color:var(--blue);}
+.rpi.on .rbox svg{opacity:1;}
+.rpi .rpt{flex:1;min-width:0;}
+.app.desktop .rpi{min-height:32px;font-size:13px;}

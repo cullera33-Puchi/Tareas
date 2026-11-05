@@ -114,9 +114,19 @@ async function iphone(browser, theme){
   // --- Recordar todo: WhatsApp, one message with all six
   await page.tap(top+' [data-act=remindAll]'); await sheetUp(page);
   x = await ev(page, ()=>({to:(document.querySelector('#sheet .rto')||{}).textContent, msg:document.querySelector('#sheet [data-role=rmsg]').value, via:document.querySelector('#sheet .rvia').textContent}));
-  const msgS = 'Hola Susana, te recuerdo:\n- Preparar SteerCo (para hoy)\n- Acta del comité (para hoy)\n- Revisar SOW (para el martes 10)\n- Plan de pruebas\n- Firma del anexo\n- Datos de cierre\nGracias.';
+  const msgS = 'Hola Susana, te recuerdo estas tareas:\n\n• Preparar SteerCo (para hoy)\n• Acta del comité (para hoy)\n• Revisar SOW (para el martes 10)\n• Plan de pruebas\n• Firma del anexo\n• Datos de cierre\n\nGracias.';
   check('i_remind_text', x.to==='Para Susana Pérez' && x.msg===msgS && x.via==='Por WhatsApp a 612 111 222', x);
   await shot(page, 'i3-remind');
+  // --- Decision 73: untick two tasks, the message follows; Seleccionar todo brings them back
+  x = await ev(page, ()=>{ const b=[...document.querySelectorAll('#sheet [data-rpick]')]; return {n:b.length, on:b.filter(e=>e.classList.contains('on')).length, h:document.querySelector('#sheet .rpickh span').textContent}; });
+  check('i_pick_all', x.n===6 && x.on===6 && x.h==='6 de 6 tareas', x);
+  await page.tap('#sheet [data-rpick]:nth-of-type(1)'); await page.tap('#sheet .rpi:nth-of-type(2)');
+  x = await ev(page, ()=>({h:document.querySelector('#sheet .rpickh span').textContent, all:document.querySelector('#sheet [data-rall]').textContent, msg:document.querySelector('#sheet [data-role=rmsg]').value}));
+  check('i_pick_two_off', x.h==='4 de 6 tareas' && x.all==='Seleccionar todo' && x.msg.startsWith('Hola Susana, te recuerdo estas tareas:\n\n• ') && x.msg.split('• ').length===5 && x.msg.endsWith('\n\nGracias.'), x);
+  await page.tap('#sheet [data-rall]');
+  x = await ev(page, ()=>({h:document.querySelector('#sheet .rpickh span').textContent, msg:document.querySelector('#sheet [data-role=rmsg]').value}));
+  check('i_pick_back', x.h==='6 de 6 tareas' && x.msg===msgS, x);
+  await shot(page, 'i3-remind-pick');
   await page.tap('#sheet [data-x=ok]'); await sheetGone(page);
   x = await sent(page); check('i_remind_wa', x.length===1 && x[0].via==='open' && x[0].u==='https://wa.me/34612111222?text='+encodeURIComponent(msgS), x);
   // --- Completing from the screen: the counts follow
@@ -130,9 +140,9 @@ async function iphone(browser, theme){
   check('i_luis_via', await ev(page, sel=>document.querySelector(sel+' .premind+.footnote').textContent==='Con la hoja de compartir', top));
   await page.tap(top+' [data-act=remindAll]'); await sheetUp(page);
   x = await ev(page, ()=>({to:(document.querySelector('#sheet .rto')||{}).textContent, who:document.querySelectorAll('#sheet [data-who]').length, msg:document.querySelector('#sheet [data-role=rmsg]').value}));
-  check('i_luis_sheet', x.to==='Para Luis' && !x.who && x.msg==='Hola Luis, te recuerdo: Factura de octubre. Gracias.', x);
+  check('i_luis_sheet', x.to==='Para Luis' && !x.who && x.msg==='Hola Luis, te recuerdo esta tarea:\n\n• Factura de octubre\n\nGracias.', x);
   await page.tap('#sheet [data-x=ok]'); await sheetGone(page);
-  x = await sent(page); check('i_luis_share', x.length===1 && x[0].via==='share' && x[0].text==='Hola Luis, te recuerdo: Factura de octubre. Gracias.', x);
+  x = await sent(page); check('i_luis_share', x.length===1 && x[0].via==='share' && x[0].text==='Hola Luis, te recuerdo esta tarea:\n\n• Factura de octubre\n\nGracias.', x);
   // The last task done: the empty state, no Recordar todo, and Luis leaves the list
   await page.tap(top+' .row[data-id=t14] [data-act=check]'); await calm(page); await hideToast(page);
   x = await ev(page, sel=>{ const s=document.querySelector(sel); return {b:(s.querySelector('.empty b')||{}).textContent, rem:!!s.querySelector('[data-act=remindAll]'), rows:s.querySelectorAll('.row').length}; }, top);
@@ -144,7 +154,7 @@ async function iphone(browser, theme){
   await page.tap('[data-open-person="Ángel Martín"]'); await calm(page);
   await page.tap(top+' [data-act=remindAll]'); await sheetUp(page);
   x = await ev(page, ()=>({msg:document.querySelector('#sheet [data-role=rmsg]').value, via:document.querySelector('#sheet .rvia').textContent}));
-  const msgA = 'Hola Ángel, te recuerdo:\n- Llamar al banco (para hoy)\n- Contrato marco\nGracias.';
+  const msgA = 'Hola Ángel, te recuerdo estas tareas:\n\n• Llamar al banco (para hoy)\n• Contrato marco\n\nGracias.';
   check('i_angel_text', x.msg===msgA && x.via==='Por correo a angel@example.com', x);
   await page.tap('#sheet [data-x=ok]'); await sheetGone(page);
   x = await sent(page); check('i_angel_mail', x.length===1 && x[0].via==='mailto' && x[0].u==='mailto:angel@example.com?subject='+encodeURIComponent('Recordatorio: 2 tareas')+'&body='+encodeURIComponent(msgA), x);
@@ -194,7 +204,7 @@ async function desktop(browser, theme){
   // Recordar todo from the head: WhatsApp
   await page.click('#desk .main .mhead [data-act=remindAll]'); await sheetUp(page);
   x = await ev(page, ()=>document.querySelector('#sheet [data-role=rmsg]').value.split('\n').length);
-  check('d_remind', x===8, x);
+  check('d_remind', x===10, x); // intro, blank line, six bullets, blank line, thanks (decision 73)
   await page.click('#sheet [data-x=ok]'); await sheetGone(page);
   x = await sent(page); check('d_remind_wa', x.length===1 && x[0].u.startsWith('https://wa.me/34612111222?text='), x);
   // The search filters the groups

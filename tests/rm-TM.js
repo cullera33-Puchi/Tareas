@@ -418,45 +418,71 @@ async function appTests(browser){
   await switchTests(browser);
 }
 
-/* ---------- Another account on the same device: never merged, emptied on «Continuar» ---------- */
+/* ---------- Another account on the same device: never merged; emptied on «Continuar» only when nothing of the other account is unsent ---------- */
 async function switchTests(browser){
   const f2 = new TF.Fake(); f2.team = false; // the rule is the sync's, with or without 0013
   const UA = f2.user('9b2f6d3e-0000-4000-8000-0000000000a1', 'ana@example.com', 'Ana'), UB = f2.user('9b2f6d3e-0000-4000-8000-0000000000b1', 'bruno@example.com', 'Bruno');
   f2.put = (owner, table, row) => f2.t[table].set(row.id, Object.assign({owner_id:owner, created:row.modified, deleted:null}, row, {server_ts:f2.ts()}));
   f2.put(UB.uid, 'tasks', {id:'b1', title:'De Bruno en el servidor', status:'pending', priority:'none', modified:'2026-11-05T09:00:00.000Z'});
   const D = await TF.device(browser, f2, {tag:'D', user:UA, seed:seed([tk('a1', {title:'De Ana'}), tk('a2', {title:'Otra de Ana'})])}, PORT, errors); const dp=D.page;
-  await signIn(dp); check('A_first', await synced(dp) && f2.rows(UA.uid, 'tasks').length===2);
-  await dp.evaluate(()=>syncSignOut()); await until(dp, ()=>!SY.user);
-  // While nobody is signed in: a new task and a photo of Ana's, waiting to go up
-  await dp.evaluate(async()=>{ addTask({title:'Nueva de Ana sin enviar'}); const b=new Blob([new Uint8Array(2048).fill(3)], {type:'image/jpeg'}), now=new Date().toISOString();
+  const as = async u => { await dp.evaluate(u=>{ window.__fakeUser=u; }, u); await signIn(dp); };
+  const out = async () => { await dp.evaluate(()=>syncSignOut()); await until(dp, ()=>!SY.user); };
+  const asked = () => until(dp, ()=>SY.status==='other'&&!!document.querySelector('#asheet.on')&&performance.now()-sheetOpenedAt>500, null, 10000); // a sheet ignores taps for 450 ms
+  const btns = () => dp.evaluate(()=>[...document.querySelectorAll('#asheet.on button')].map(b=>b.textContent.trim()));
+  const tap = label => dp.evaluate(l=>{ [...document.querySelectorAll('#asheet.on button')].find(x=>x.textContent.trim()===l).click(); }, label);
+  const noData = () => f2.rows(UB.uid, 'tasks').length===1 && ![...f2.store.keys()].some(k=>k.startsWith(UB.uid+'/')) && !f2.calls.some(c=>/^D:(pull|upsert|markDeleted|byIds|upload)/.test(c));
+  await as(UA); check('A_first', await synced(dp) && f2.rows(UA.uid, 'tasks').length===2); await out();
+  // 1. A photo of Ana's not uploaded yet: Bruno cannot empty the device; only «Cerrar sesión»; no restore meanwhile
+  await dp.evaluate(async()=>{ const b=new Blob([new Uint8Array(2048).fill(3)], {type:'image/jpeg'}), now=new Date().toISOString();
     await FS.putFile('pa1', b, {pending:true, thumb:b}); DB.attachments.push({id:'pa1', taskId:'a1', kind:'photo', path:null, mime:'image/jpeg', size:b.size, width:1, height:1, durationMs:null, created:now, modified:now}); save(); });
-  // Bruno signs in on Ana's device: nothing of Ana goes up, nothing of Bruno comes down, and the question appears
-  await dp.evaluate(u=>{ window.__fakeUser=u; }, UB); f2.calls.length=0; await signIn(dp);
-  check('B_other', await until(dp, ()=>SY.status==='other'&&!!document.querySelector('#asheet.on')&&performance.now()-sheetOpenedAt>500, null, 10000), await dp.evaluate(()=>({st:SY.status})));
-  const q1 = await dp.evaluate(()=>document.querySelector('#asheet').textContent);
-  check('B_question', /Este dispositivo tiene datos de otra cuenta/.test(q1) && /bruno@example\.com/.test(q1) && /Continuar/.test(q1) && /Cerrar sesión/.test(q1), q1);
-  await dp.waitForTimeout(500); await shot(dp, 'ip-light-otra-cuenta');
-  check('B_nothing_moved', f2.rows(UB.uid, 'tasks').length===1 && ![...f2.store.keys()].some(k=>k.startsWith(UB.uid+'/')) && !f2.calls.some(c=>/:(pull|upsert|markDeleted|byIds|upload)/.test(c)) && await dp.evaluate(()=>!DB.tasks.some(x=>x.id==='b1')&&!!task('a1')), f2.calls);
-  // Continuar: a backup of Ana's (marked as hers), the device emptied (data, files, team, encryption), then Bruno's data
-  await dp.evaluate(()=>{ const b=[...document.querySelectorAll('#asheet.on button')].find(x=>x.textContent.trim()==='Continuar'); b.click(); });
-  await dp.waitForLoadState('load'); await dp.waitForTimeout(800);
-  check('B_fresh', await synced(dp, 20000) && await dp.evaluate(()=>DB.tasks.map(x=>x.id).join()==='b1'&&!DB.attachments.length), await dp.evaluate(()=>({t:DB.tasks.map(x=>x.title), st:SY.status})));
-  const after = await dp.evaluate(async()=>({files:(await FS.allMeta()).length, team:localStorage.getItem('tareas-team'), cx:localStorage.getItem('tareas-crypto'), key:await cryptoKeyLoad().catch(()=>null), bk:(await BK.list()).map(b=>b.owner), owner:syncState().owner}));
-  check('B_emptied', after.files===0 && !after.team && !after.cx && !after.key && after.bk.includes(UA.uid) && after.owner===UB.uid && f2.rows(UB.uid, 'tasks').length===1 && f2.rows(UA.uid, 'tasks').length===2, after);
-  // Ana's backup never restores into Bruno's account
+  f2.calls.length=0; await as(UB); check('photo_blocks', await asked());
+  const q1 = await dp.evaluate(()=>document.querySelector('#asheet').textContent), b1 = await btns();
+  check('photo_blocks_text', /Este dispositivo tiene cambios sin enviar de otra cuenta \(\d+\)\. Entra con esa cuenta para enviarlos antes de usar aquí otra\./.test(q1) && !b1.includes('Continuar') && b1.includes('Cerrar sesión') && noData(), {q1, b1, calls:f2.calls});
+  await shot(dp, 'ip-light-otra-cuenta-sin-enviar');
+  const rsOther = await dp.evaluate(async()=>{ await BK.put(todayStr()); await refreshBackups(); restoreBackup(BACKUPS[0].date); return document.getElementById('toastText').textContent; });
+  check('restore_refused_other_state', rsOther==='Este dispositivo tiene datos de otra cuenta. No se puede restaurar ahora', rsOther);
+  await tap('Cerrar sesión'); check('B_out1', await until(dp, ()=>!SY.user) && noData());
+  // Ana sends it, then leaves a change unsent: blocked again
+  await as(UA); check('A_sends_photo', await synced(dp) && await until(dp, ()=>!!att('pa1').path, null, 10000) && [...f2.store.keys()].some(k=>k.startsWith(UA.uid+'/'))); await out();
+  await dp.evaluate(()=>updTask('a2', {title:'Otra de Ana, cambiada sin conexión'})); f2.calls.length=0; await as(UB);
+  check('task_blocks', await asked() && /cambios sin enviar de otra cuenta \(1\)/.test(await dp.evaluate(()=>document.querySelector('#asheet').textContent)) && !(await btns()).includes('Continuar') && noData());
+  await tap('Cerrar sesión'); await until(dp, ()=>!SY.user);
+  await as(UA); await synced(dp); check('A_sent_all', f2.rows(UA.uid, 'tasks').some(r=>r.id==='a2'&&r.title==='Otra de Ana, cambiada sin conexión')); await out();
+  // 2. Nothing unsent: Continuar. From its start nothing is saved or synced (a change and a pass tried in the middle leave no trace)
+  f2.calls.length=0; await as(UB); check('B_other', await asked());
+  const q2 = await dp.evaluate(()=>document.querySelector('#asheet').textContent), b2 = await btns();
+  check('B_question', /Este dispositivo tiene datos de otra cuenta\. Ya están todos en esa cuenta\./.test(q2) && /bruno@example\.com/.test(q2) && b2.includes('Continuar') && b2.includes('Cerrar sesión') && noData(), {q2, b2});
+  await shot(dp, 'ip-light-otra-cuenta');
+  await dp.evaluate(()=>{ const put=BK.put.bind(BK); BK.put=async(...a)=>{ const r=await put(...a); if(SY.switching){ const k='tareas-v1', before=localStorage.getItem(k); addTask({title:'Durante el cambio'}); const ran=syncRun('prueba');
+      localStorage.setItem('__probe', JSON.stringify({unchanged:localStorage.getItem(k)===before, timer:!SY.timer||true, ran:String(ran)})); ran.then(v=>{ const p=JSON.parse(localStorage.getItem('__probe')); p.ranValue=v; localStorage.setItem('__probe', JSON.stringify(p)); }); } return r; }; });
+  await tap('Continuar'); await dp.waitForLoadState('load');
+  check('B_fresh', await synced(dp, 20000) && await dp.evaluate(()=>DB.tasks.map(x=>x.id).join()==='b1'&&!DB.attachments.length&&!DB.tasks.some(x=>x.title==='Durante el cambio')), await dp.evaluate(()=>({t:DB.tasks.map(x=>x.title), st:SY.status})));
+  const probe = await dp.evaluate(()=>JSON.parse(localStorage.getItem('__probe')||'null'));
+  check('no_save_or_sync_during_switch', probe && probe.unchanged && probe.ranValue===false && !f2.rows(UB.uid, 'tasks').some(r=>r.title==='Durante el cambio') && !f2.rows(UA.uid, 'tasks').some(r=>r.title==='Durante el cambio'), probe);
+  const after = await dp.evaluate(async()=>({files:(await FS.allMeta()).length, team:localStorage.getItem('tareas-team'), cx:localStorage.getItem('tareas-crypto'), key:await cryptoKeyLoad().catch(()=>null), bk:(await BK.list()).map(b=>({k:b.date, o:b.owner})), owner:syncState().owner}));
+  check('B_emptied', after.files===0 && !after.team && !after.cx && !after.key && after.owner===UB.uid && after.bk.every(b=>b.o===UA.uid) && after.bk.some(b=>/#/.test(b.k)) && f2.rows(UA.uid, 'tasks').length===2, after);
+  // Ana's copies never restore into Bruno's account
   await dp.evaluate(()=>refreshBackups()); const rs = await dp.evaluate(async a=>{ const b=BACKUPS.find(x=>x.owner===a); restoreBackup(b.date); await new Promise(r=>setTimeout(r,100)); return {toast:document.getElementById('toastText').textContent, sheet:!!document.querySelector('#asheet.on, #sheet.on')}; }, UA.uid);
   check('B_backup_not_restored', rs.toast==='Esta copia es de otra cuenta. Inicia sesión con ella para restaurarla' && !rs.sheet, rs);
-  // Back to Ana later: the same question; «Cerrar sesión» leaves both accounts as they were
-  await dp.evaluate(()=>{ updTask('b1', {title:'De Bruno, cambiada aquí'}); }); await synced(dp);
-  await dp.evaluate(()=>syncSignOut()); await until(dp, ()=>!SY.user); await dp.evaluate(u=>{ window.__fakeUser=u; }, UA); f2.calls.length=0; await signIn(dp);
-  check('A_other', await until(dp, ()=>SY.status==='other'&&!!document.querySelector('#asheet.on')&&performance.now()-sheetOpenedAt>500, null, 10000)); // a sheet ignores taps for its first 450 ms (sheetFresh)
-  await dp.evaluate(()=>{ const b=[...document.querySelectorAll('#asheet.on button')].find(x=>x.textContent.trim()==='Cerrar sesión'); b.click(); });
-  const outA = await until(dp, ()=>!SY.user);
-  check('A_signed_out', outA && f2.rows(UA.uid, 'tasks').length===2 && !f2.rows(UA.uid, 'tasks').some(r=>r.id==='b1') && !f2.calls.some(c=>/:(pull|upsert|markDeleted|upload)/.test(c)), {outA, rows:f2.rows(UA.uid, 'tasks').map(r=>r.id), calls:f2.calls, u:await dp.evaluate(()=>SY.user&&SY.user.email)});
+  // 3. Back to Ana the same day: Bruno's copy has its own key, Ana's stays
+  await dp.evaluate(()=>updTask('b1', {title:'De Bruno, cambiada aquí'})); await synced(dp); const bkA = after.bk.map(b=>b.k); await out();
+  f2.calls.length=0; await as(UA); check('A_other', await asked()); await tap('Continuar'); await dp.waitForLoadState('load');
+  check('A_back', await synced(dp, 20000) && await dp.evaluate(()=>!DB.tasks.some(x=>x.id==='b1')&&!!task('a1')) && !f2.rows(UA.uid, 'tasks').some(r=>r.id==='b1') && f2.rows(UB.uid, 'tasks').length===1);
+  const bks = await dp.evaluate(async()=>(await BK.list()).map(b=>({k:b.date, o:b.owner, n:b.tasks})));
+  check('both_backups_kept', bkA.every(k=>bks.some(b=>b.k===k&&b.o===UA.uid)) && bks.some(b=>b.o===UB.uid&&b.n===1), {bkA, bks});
+  const rs2 = await dp.evaluate(async b=>{ await refreshBackups(); const x=BACKUPS.find(o=>o.owner===b); restoreBackup(x.date); await new Promise(r=>setTimeout(r,100)); return document.getElementById('toastText').textContent; }, UB.uid);
+  check('A_refuses_B_copy', rs2==='Esta copia es de otra cuenta. Inicia sesión con ella para restaurarla', rs2);
+  // 4. The desktop: Intro is «Cerrar sesión», never «Continuar»
+  const K = await TF.device(browser, f2, {tag:'K', desk:true, user:UA, seed:seed([tk('k1', {title:'En el ordenador'})])}, PORT, errors); const kp=K.page;
+  await signIn(kp, true); await synced(kp); await kp.evaluate(()=>syncSignOut()); await until(kp, ()=>!SY.user);
+  await kp.evaluate(u=>{ window.__fakeUser=u; }, UB); await signIn(kp, true);
+  check('K_alert', await until(kp, ()=>SY.status==='other'&&!!document.querySelector('#asheet.on .al')&&performance.now()-sheetOpenedAt>500, null, 10000));
+  await kp.keyboard.press('Enter');
+  check('K_enter_signs_out', await until(kp, ()=>!SY.user) && await kp.evaluate(()=>!!task('k1')&&syncState().owner!==null));
   // A device that never synced with an account still brings its data in (decision 5): unchanged
   const N = await TF.device(browser, f2, {tag:'N', desk:true, user:UA, seed:seed([tk('n1', {title:'Antes de cualquier cuenta'})])}, PORT, errors); const np=N.page;
   await signIn(np, true); check('new_device_merges', await synced(np) && f2.rows(UA.uid, 'tasks').some(r=>r.id==='n1') && await np.evaluate(()=>!!task('a1')&&!!task('n1')));
-  await D.ctx.close(); await N.ctx.close();
+  await D.ctx.close(); await K.ctx.close(); await N.ctx.close();
 }
 
 module.exports = { pgSetup, strip, MIGS };

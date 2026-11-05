@@ -364,7 +364,7 @@ async function dataTests(browser){
 }
 
 /* ======================= 5. Sync ======================= */
-const TABLES = ['spaces','projects','tasks','voice_notes','attachments','subtasks','project_notes'];
+const TABLES = ['spaces','projects','tasks','voice_notes','attachments','subtasks','project_notes','contacts'];
 // rm-S's in-memory server (0001's trigger and RLS). noTable: a database where 0006 has not run: any request on project_notes fails as PostgREST does
 class Fake {
   constructor(noTable){ this.noTable=!!noTable; this.t={}; TABLES.forEach(x=>this.t[x]=new Map()); this.last=0; this.subs=new Map(); this.down=new Set(); this.calls=[]; this.ups=[]; }

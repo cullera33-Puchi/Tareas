@@ -229,7 +229,7 @@ async function iphone(browser){
   // Share text and CSV
   x = await ev(page, ()=>({share:shareText('r1'), csv:csvText()}));
   const head = x.csv.split('\r\n')[0];
-  check('share_csv', /\nSe repite: cada 2 semanas, lunes y jueves\n/.test(x.share) && /"Recordatorio";"Se repite";"Esperando a";"Aplazada"/.test(head) && x.csv.includes('"Cada 2 semanas, lunes y jueves"') && x.csv.includes('"Cada mes, el día 1"'), {share:x.share, head});
+  check('share_csv', /\nSe repite: cada 2 semanas, lunes y jueves\n/.test(x.share) && /"Recordatorio";"Se repite";"Esperando a";"Responsable";"Aplazada"/.test(head) && x.csv.includes('"Cada 2 semanas, lunes y jueves"') && x.csv.includes('"Cada mes, el día 1"'), {share:x.share, head});
 
   // 3c bis. Por confirmar (decision 41)
   await ev(page, ()=>rowMenu('a6')); await sleep(600); await menuItem(page, 'Por confirmar').tap(); await sleep(700);
@@ -389,7 +389,7 @@ async function desktop(browser){
   await page.click('#desk .pane [data-act=pickRepeat]'); await sleep(400); await shot(page, 'd4-repeat-menu');
   await menuItem(page, 'Cada mes').click(); await sleep(400);
   x = await ev(page, ()=>({rep:task('r1').repeat, val:document.querySelector('#desk .pane [data-act=pickRepeat] .val').textContent}));
-  check('desk_repeat_menu', iv==='Proyecto,Fecha,Fecha límite,Recordatorio,Repetir,Prioridad,Tiempo|Nunca' && /^M1:4@2026-11-04#/.test(x.rep) && x.val==='Cada mes, el día 4', {iv, x});
+  check('desk_repeat_menu', iv==='Proyecto,Fecha,Fecha límite,Recordatorio,Responsable,Repetir,Prioridad,Tiempo|Nunca' && /^M1:4@2026-11-04#/.test(x.rep) && x.val==='Cada mes, el día 4', {iv, x});
   await page.click('#desk .pane [data-act=pickRepeat]'); await sleep(400); await menuItem(page, 'Personalizada…').click(); await sleep(500);
   for(const k of ['u:W','d:3','d:2','d:5','n+']){ await page.click('#pmenu .pm-pop [data-rp="'+k+'"]'); await sleep(80); }
   const ps = await ev(page, ()=>document.querySelector('#pmenu .pm-pop .rpsum').textContent); await shot(page, 'd5-repeat-custom');
@@ -448,10 +448,10 @@ async function desktop(browser){
 }
 
 /* ======================= 5. Sync ======================= */
-const TABLES = ['spaces','projects','tasks','voice_notes','attachments','subtasks','project_notes']; // decisions 46 and 47: the app syncs the steps and the project notes too (0005, 0006)
+const TABLES = ['spaces','projects','tasks','voice_notes','attachments','subtasks','project_notes','contacts']; // decisions 46 and 47: the app syncs the steps and the project notes too (0005, 0006)
 const COLS = { spaces:['name','sort_order','members'], projects:['space_id','name','color','sort_order','archived'],
   tasks:['space_id','project_id','title','date','reminder','priority','status','notes','carried','assignees','completed','repeat','focus','waiting_for'], voice_notes:['task_id','text'],
-  attachments:['task_id','kind','path','mime','size','width','height','duration_ms','purged'], subtasks:['task_id','title','done','sort_order'], project_notes:['project_id','title','body','pinned'] };
+  attachments:['task_id','kind','path','mime','size','width','height','duration_ms','purged'], subtasks:['task_id','title','done','sort_order'], project_notes:['project_id','title','body','pinned'], contacts:['name','email','phone'] }; // contacts: decision 48c (0011)
 // rm-S's in-memory server (0001's trigger and RLS), plus the columns of 0004. noCol: a database where 0004 has not run; an upload naming one of
 // its columns is refused whole, with PostgREST's message, one column at a time
 const NEWCOLS=['repeat','focus','waiting_for'];

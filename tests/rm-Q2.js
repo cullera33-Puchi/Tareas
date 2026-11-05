@@ -22,10 +22,10 @@ const r={}, fails=[], errors=[]; const check=(name, ok, info)=>{ r[name]=ok?true
 /* ----- Fake server, adapter and device(): copied from rm-S.js (block 8) ----- */
 /* ---------- Fake server ---------- */
 // Updated by decision 29 (attachments): the app syncs a fifth table, so the fake server has it too (0003_attachments.sql)
-const TABLES = ['spaces','projects','tasks','voice_notes','attachments','subtasks','project_notes']; // decisions 46 and 47: the app syncs the steps and the project notes too (0005, 0006)
+const TABLES = ['spaces','projects','tasks','voice_notes','attachments','subtasks','project_notes','contacts']; // decisions 46 and 47: the app syncs the steps and the project notes too (0005, 0006)
 const COLS = { spaces:['name','sort_order','members'], projects:['space_id','name','color','sort_order','archived'],
   tasks:['space_id','project_id','title','date','reminder','priority','status','notes','carried','assignees','completed'], voice_notes:['task_id','text'],
-  attachments:['task_id','kind','path','mime','size','width','height','duration_ms','purged'], subtasks:['task_id','title','done','sort_order'], project_notes:['project_id','title','body','pinned'] };
+  attachments:['task_id','kind','path','mime','size','width','height','duration_ms','purged'], subtasks:['task_id','title','done','sort_order'], project_notes:['project_id','title','body','pinned'], contacts:['name','email','phone'] };
 class Fake {
   constructor(){ this.t={}; TABLES.forEach(x=>this.t[x]=new Map()); this.last=0; this.subs=new Map(); this.muted=new Set(); this.down=new Set(); this.calls=[]; }
   ts(){ this.last=Math.max(Date.now(), this.last+1); return new Date(this.last).toISOString(); } // one per request: now() of its transaction

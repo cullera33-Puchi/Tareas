@@ -465,10 +465,10 @@ async function desktop(browser){
 }
 
 /* ======================= 5. Sync ======================= */
-const TABLES = ['spaces','projects','tasks','voice_notes','attachments','subtasks','project_notes'];
+const TABLES = ['spaces','projects','tasks','voice_notes','attachments','subtasks','project_notes','contacts'];
 const COLS = { spaces:['name','sort_order','members'], projects:['space_id','name','color','sort_order','archived'],
   tasks:['space_id','project_id','title','date','reminder','priority','status','notes','carried','assignees','completed','repeat','focus','waiting_for','deadline','estimate','postponed','carried_since'], voice_notes:['task_id','text'],
-  attachments:['task_id','kind','path','mime','size','width','height','duration_ms','purged'], subtasks:['task_id','title','done','sort_order'], project_notes:['project_id','title','body','pinned'] };
+  attachments:['task_id','kind','path','mime','size','width','height','duration_ms','purged'], subtasks:['task_id','title','done','sort_order'], project_notes:['project_id','title','body','pinned'], contacts:['name','email','phone'] };
 // rm-DL's in-memory server; noCol: a database where 0008 has not run (an upload naming one of its columns is refused whole, with PostgREST's message)
 const NEWCOLS=['estimate','postponed','carried_since'];
 class Fake {

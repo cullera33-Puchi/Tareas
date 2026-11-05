@@ -20,7 +20,7 @@ window.addEventListener('unhandledrejection', e => log('error', 'Promesa rechaza
 const _consoleError = console.error.bind(console);
 console.error = (...a) => { log('error', a.map(x=>x&&x.message||String(x)).join(' ')); _consoleError(...a); };
 function logText(){
-  const d = (typeof DB!=='undefined'&&DB) ? ' | espacios '+DB.spaces.length+', proyectos '+DB.projects.length+', tareas '+DB.tasks.length+', notas de voz '+DB.voiceNotes.length+', adjuntos '+(DB.attachments||[]).length+', pasos '+(DB.subtasks||[]).length+', notas de proyecto '+(DB.projectNotes||[]).length : '';
+  const d = (typeof DB!=='undefined'&&DB) ? ' | espacios '+DB.spaces.length+', proyectos '+DB.projects.length+', tareas '+DB.tasks.length+', notas de voz '+DB.voiceNotes.length+', adjuntos '+(DB.attachments||[]).length+', pasos '+(DB.subtasks||[]).length+', notas de proyecto '+(DB.projectNotes||[]).length+', contactos '+(DB.contacts||[]).length : '';
   let st='?'; try{ st = (navigator.standalone===true||matchMedia('(display-mode: standalone)').matches)?'instalada':'navegador'; }catch(e){}
   const head = 'Tareas v'+APP_VERSION+' | '+st+' | '+navigator.userAgent+' | '+new Date().toString()+d;
   const lines = LOG.map(e=>{ const t=e.t.replace('T',' ').slice(5,19); return t+' ['+e.l+'] '+e.m+(e.x?' | '+e.x:''); });
@@ -165,6 +165,7 @@ const COLORS = ['#FF3B30','#FF9500','#FFCC00','#34C759','#007AFF','#AF52DE','#FF
   '#00C7BE','#32ADE6','#5856D6','#8E8E93','#9B2242','#7D8A2E','#1F3A8A','#FF7A5C'];
 
 const I = {
+  person:'<svg class="i-person" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M4.8 20a7.2 7.2 0 0114.4 0"/></svg>', // decision 48c: Responsable
   plus:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
   check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>',
   chev:'<svg viewBox="0 0 8 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 1.5L6.5 7l-5 5.5"/></svg>',
@@ -206,14 +207,14 @@ const KEY = 'tareas-v1';
 let DB = null;
 function blank(){
   const t=new Date().toISOString();
-  return { spaces:[{id:'trabajo',name:'Trabajo',order:0,created:t},{id:'personal',name:'Personal',order:1,created:t}], projects:[], tasks:[], voiceNotes:[], attachments:[], subtasks:[], projectNotes:[], settings:{activeSpace:'trabajo', filter:'hoy', doneOpen:false, theme:'auto', tipsSeen:false, shakeUndo:false, allGroup:'date', hoyGroup:'date'} };
+  return { spaces:[{id:'trabajo',name:'Trabajo',order:0,created:t},{id:'personal',name:'Personal',order:1,created:t}], projects:[], tasks:[], voiceNotes:[], attachments:[], subtasks:[], projectNotes:[], contacts:[], settings:{activeSpace:'trabajo', filter:'hoy', doneOpen:false, theme:'auto', tipsSeen:false, shakeUndo:false, allGroup:'date', hoyGroup:'date'} };
 }
 let lastRaw = null; // the stored text this window last read or wrote; another window may have changed it since
 function load(){
   let raw=null; try{ raw=localStorage.getItem(KEY); }catch(e){ log('error','No se pudieron leer los datos: '+(e&&e.message||e)); }
   lastRaw=raw; if(!raw) return blank();
   let d=null; try{ d=JSON.parse(raw); }catch(e){}
-  const b=blank(), lists=['spaces','projects','tasks','voiceNotes','attachments','subtasks','projectNotes']; // subtasks: decision 46; projectNotes: decision 47
+  const b=blank(), lists=['spaces','projects','tasks','voiceNotes','attachments','subtasks','projectNotes','contacts']; // subtasks: decision 46; projectNotes: decision 47; contacts: decision 48c
   if(!d || typeof d!=='object' || Array.isArray(d) || !lists.some(k=>Array.isArray(d[k]))){
     // Unreadable data: keep the raw text aside before the first save replaces it
     try{ localStorage.setItem(KEY+'-corrupt', raw); }catch(e){}
@@ -284,7 +285,7 @@ function orderTasks(list){
 }
 // The query is normalised once and the voice notes searched once per list, not once per task
 function queryMatcher(query){ const q=norm(query); const vn=new Set(DB.voiceNotes.filter(v=>norm(v.text).includes(q)).map(v=>v.taskId)), sv=new Set(DB.subtasks.filter(s=>s&&norm(s.title).includes(q)).map(s=>s.taskId)); // decision 46: the steps' titles too
-  return x => norm(x.title).includes(q) || norm(x.notes).includes(q) || (x.waitingFor && norm(x.waitingFor).includes(q)) || (x.projectId && norm((proj(x.projectId)||{}).name).includes(q)) || vn.has(x.id) || sv.has(x.id); }
+  return x => norm(x.title).includes(q) || norm(x.notes).includes(q) || (x.waitingFor && norm(x.waitingFor).includes(q)) || (x.responsible && norm(x.responsible).includes(q)) || (x.projectId && norm((proj(x.projectId)||{}).name).includes(q)) || vn.has(x.id) || sv.has(x.id); }
 function matchesQuery(x, query){ return queryMatcher(query)(x); }
 // R18: while one screen is drawn (drawing) each pending list is worked out once: the counts, the list and the close of the day ask for the same ones,
 // and nothing changes the data in between. Callers only read the lists
@@ -379,7 +380,7 @@ function doneList(projectId){
 
 /* ---------- UI state ---------- */
 const CAL_VIEWS=['day','week','month'], H0=7*60, H1=21*60, SLOT=30, SH=22; // R12, R19, R20: the calendar views; the hours grid's first and last minute, its slot and the slot's height in px
-const UI = { tab:'tareas', query:'', stack:[], scroll:{}, searchDone:false, select:null, projFilter:null, wide:false, deskView:'hoy', deskDetail:null, weekStart:null, calDay:null, calMonth:null, miniYM:null, addDraft:'', addPaste:null, convertedNotes:{}, deskScroll:{}, deskKey:null, snooze:null,
+const UI = { tab:'tareas', query:'', stack:[], scroll:{}, searchDone:false, select:null, projFilter:null, respFilter:null, wide:false, deskView:'hoy', deskDetail:null, weekStart:null, calDay:null, calMonth:null, miniYM:null, addDraft:'', addPaste:null, convertedNotes:{}, deskScroll:{}, deskKey:null, snooze:null,
   dsel:{cur:null, ids:new Set(), anchor:null, mode:false, edit:null, idx:0, order:[], key:null, follow:false} }; // R15, R16: the desktop selection (see deskOrder)
 let deskRedraw=false; // while renderDesktop replaces the markup: a field it takes away is not a field the user left (R15)
 const MODK=/Mac|iPhone|iPad/.test(navigator.platform||navigator.userAgent||'')?'Comando':'Control'; // the key a Mac calls Comando
@@ -473,7 +474,7 @@ function spawnNext(x){ const r=repParse(x.repeat); if(!r) return null;
   const t=todayStr(), date=repNext(r, x.date&&x.date>t?x.date:t); if(!date) return null;
   let reminder=null; if(x.reminder){ const a=new Date(x.reminder), d=new Date(date+'T00:00:00'); d.setHours(a.getHours(), a.getMinutes(), 0, 0); reminder=d.toISOString(); }
   const dl=dlShift(x, date); // decision 48a: its deadline as far from its date as the completed one's; none when that one had no date
-  const n=addTask(Object.assign({title:x.title, spaceId:x.spaceId, projectId:x.projectId, priority:x.priority, notes:x.notes||'', date, reminder, repeat:x.repeat}, dl?{deadline:dl}:{}, x.estimate?{estimate:x.estimate}:{})); // decision 56: the estimate too, never the counters
+  const n=addTask(Object.assign({title:x.title, spaceId:x.spaceId, projectId:x.projectId, priority:x.priority, notes:x.notes||'', date, reminder, repeat:x.repeat}, dl?{deadline:dl}:{}, x.estimate?{estimate:x.estimate}:{}, x.responsible?{responsible:x.responsible}:{})); // decision 56: the estimate too, never the counters; decision 48c: who does it
   copySteps(x.id, n.id); // decision 46: its steps, unchecked
   log('info','Siguiente tarea de la serie', {date}); return n; }
 // Reopening a completed task of a series (Deshacer, or marking it pending again) takes back the next one it created, while nobody has touched it
@@ -540,10 +541,10 @@ function removeFromAhora(ids){ const xs=ids.map(task).filter(x=>x&&x.focus); if(
 const waitSnap = x => ({status:x.status, waitingFor:x.waitingFor||null, date:x.date, carried:x.carried, reminder:x.reminder||null, focus:x.focus||null});
 function waitUndo(id, o){ const x=task(id); if(!x) return; const p={status:o.status, waitingFor:o.waitingFor, date:o.date, carried:o.carried, reminder:o.reminder}; if(o.focus||x.focus) p.focus=o.focus; updTask(id, p); }
 function setWaiting(id, who, date){ const x=task(id); if(!x||x.status==='done') return; const old=waitSnap(x), was=x.status==='waiting';
-  const p=Object.assign(date!==undefined&&date!==x.date ? dayPatch(x, date, {status:'waiting'}) : {}, {status:'waiting', waitingFor:String(who||'').trim()||null, carried:false}); if(x.focus) p.focus=null;
-  releaseHold(id); updTask(id, p); haptic(8); log('info', was?'Por confirmar cambiada':'Por confirmar', {date:x.date});
+  const p=Object.assign(date!==undefined&&date!==x.date ? dayPatch(x, date, {status:'waiting'}) : {}, {status:'waiting', waitingFor:personName(who), carried:false}); if(x.focus) p.focus=null;
+  releaseHold(id); let nc=null; batch(()=>{ nc=p.waitingFor?ensureContact(p.waitingFor):null; updTask(id, p); }); haptic(8); // decision 48c: a new name becomes a contact log('info', was?'Por confirmar cambiada':'Por confirmar', {date:x.date});
   const when=x.date&&x.date>todayStr()?', revisar '+dayWords(x.date):x.date?', revisar hoy':'';
-  toast('Por confirmar'+(x.waitingFor?', esperando a '+x.waitingFor:'')+when, ()=>waitUndo(id, old)); }
+  toast('Por confirmar'+(x.waitingFor?', esperando a '+x.waitingFor:'')+when, ()=>batch(()=>{ waitUndo(id, old); dropContact(nc); save(); })); }
 // Volver a pendiente: the task comes back to the lists as it was before it waited (a past date becomes today, carried, as rollOver)
 function unWait(id){ const x=task(id); if(!x||x.status!=='waiting') return; const old=waitSnap(x), t=todayStr();
   releaseHold(id); updTask(id, Object.assign(x.date&&x.date<t ? dayPatch(x, t, {carried:true}) : {}, {status:'pending', waitingFor:null})); haptic(6); log('info','Vuelve a pendiente');

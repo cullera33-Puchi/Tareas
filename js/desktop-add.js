@@ -149,7 +149,7 @@ function dropTask(id, z){ const x=task(id); if(!x) return; const old=daySnap(x);
   releaseHold(id); updTask(id, patch); haptic(6); renderAnimated(); log('info','Tarea movida en el calendario', {date:patch.date, time:!!patch.reminder});
   toast(msg, ()=>undoDay(old)); }
 function bindDeskEvents(d){
-  attBindDrop(d); bindColResize(d); // decision 58
+  attBindDrop(d); bindColResize(d); bindBlockResize(d); // decision 58; R20: a block's length
   axBind(d); // decision 31: the add bar's composer // decision 29: photos dragged from the computer onto the inspector
   // Right click opens the row menu, and on a sidebar project the project menu (the iPhone long press)
   // R17: each one opens at the pointer, as a Mac context menu; text fields keep the browser's own
@@ -209,17 +209,18 @@ function bindDeskEvents(d){
     if(z.dataset.dropProject!==undefined||z.dataset.dropAhora!==undefined) return null;
     if(z.dataset.gday!==undefined) return z.dataset.gday&&z.dataset.gday<todayStr()?'No se puede mover a un día pasado':null;
     return z.dataset.day&&z.dataset.day<todayStr()?'No se puede mover a un día pasado':null; };
-  d.addEventListener('dragstart', e=>{ const c=e.target.closest&&e.target.closest('[draggable="true"][data-id]'); dragId=c?c.dataset.id:null; dragIds=null; dropped=false; refusal=null; if(!c) return; dragFrom=gkey(c.closest('[data-gday],[data-gproj]')); c.classList.add('dragging'); try{ e.dataTransfer.setData('text/plain', dragId); e.dataTransfer.effectAllowed='move'; }catch(err){}
+  d.addEventListener('dragstart', e=>{ if(d._resizing){ e.preventDefault(); return; } const c=e.target.closest&&e.target.closest('[draggable="true"][data-id]'); dragId=c?c.dataset.id:null; dragIds=null; dropped=false; refusal=null; if(!c) return; dragFrom=gkey(c.closest('[data-gday],[data-gproj]')); c.classList.add('dragging'); setTimeout(()=>{ if(dragId) d.classList.add('carddrag'); }, 0); /* R20: the hour blocks let the drag through to the half hours under them */ try{ e.dataTransfer.setData('text/plain', dragId); e.dataTransfer.effectAllowed='move'; }catch(err){}
     // R16: a row of the multiple selection takes the whole selection along, under a badge with how many
     if(c.classList.contains('row')&&deskMulti()&&UI.dsel.ids.has(dragId)&&UI.dsel.ids.size>1){ dragIds=[...UI.dsel.ids]; dragIds.forEach(id=>{ const r=deskRow(id); if(r) r.classList.add('dragging'); });
       const g=document.createElement('div'); g.className='dragcount'; g.textContent=bulkN(dragIds.length); document.body.appendChild(g); try{ e.dataTransfer.setDragImage(g, 14, 14); }catch(err){} setTimeout(()=>g.remove(), 0); } });
-  d.addEventListener('dragend', e=>{ const id=dragId; dragId=null; dragIds=null; d.querySelectorAll('.dragging').forEach(x=>x.classList.remove('dragging')); d.querySelectorAll('.over').forEach(x=>x.classList.remove('over'));
+  d.addEventListener('pointerdown', ()=>d.classList.remove('carddrag'), true); // a drag that ended without its dragend (the card redrawn away) leaves no blocks unclickable
+  d.addEventListener('dragend', e=>{ const id=dragId; dragId=null; dragIds=null; d.classList.remove('carddrag'); d.querySelectorAll('.dragging').forEach(x=>x.classList.remove('dragging')); d.querySelectorAll('.over').forEach(x=>x.classList.remove('over'));
     if(id&&!dropped&&refusal){ toast(refusal); haptic(10); } refusal=null; }); // let go over a past day: said, not silently ignored
   d.addEventListener('dragover', e=>{ if(!dragId) return; const z=zoneOf(e.target); refusal=z?refuse(z):null; const same=!!z&&!!dragFrom&&gkey(z)===dragFrom; // its own group: nothing to do there
     if(!z||refusal||same){ d.querySelectorAll('.over').forEach(x=>x.classList.remove('over')); return; }
     e.preventDefault(); e.dataTransfer.dropEffect='move'; const L=lit(z); d.querySelectorAll('.over').forEach(x=>{ if(!L.includes(x)) x.classList.remove('over'); }); L.forEach(x=>x.classList.add('over')); });
   d.addEventListener('dragleave', e=>{ const z=zoneOf(e.target); if(z && !lit(z).some(x=>x.contains(e.relatedTarget))) lit(z).forEach(x=>x.classList.remove('over')); });
-  d.addEventListener('drop', e=>{ const z=zoneOf(e.target); if(!z||!dragId||e.dataTransfer.getData('text/plain')!==dragId||refuse(z)||(dragFrom&&gkey(z)===dragFrom)) return; e.preventDefault(); dropped=true; const id=dragId, ids=dragIds||[id]; dragId=null; dragIds=null;
+  d.addEventListener('drop', e=>{ const z=zoneOf(e.target); if(!z||!dragId||e.dataTransfer.getData('text/plain')!==dragId||refuse(z)||(dragFrom&&gkey(z)===dragFrom)) return; e.preventDefault(); dropped=true; d.classList.remove('carddrag'); const id=dragId, ids=dragIds||[id]; dragId=null; dragIds=null; // a drop that redraws takes the card away, and its dragend never reaches here
     if(z.dataset.dropAhora!==undefined){ addToAhora(ids); return; } // decision 39
     if(z.dataset.gday!==undefined){ dropToDay(ids, z.dataset.gday||null); return; } // decision 36: a day group of a list, or Sin fecha
     if(z.dataset.gproj!==undefined){ dropToProject(ids, z.dataset.gproj==='none'?null:z.dataset.gproj); return; } // a project group

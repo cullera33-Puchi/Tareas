@@ -18,7 +18,7 @@
      matched by name, the newest copy of each record wins and the rest goes up (decision 5). */
 const SYNC_KEY='tareas-sync', SUPABASE_JS='vendor/supabase-js-2.117.3.umd.js';
 const SYNC_PAGE=1000, SYNC_CHUNK=200, SYNC_OVERLAP=30e3, SYNC_DEBOUNCE=1500, EPOCH='1970-01-01T00:00:00.000Z';
-const SYNC_TABLES=[{list:'spaces', table:'spaces'},{list:'projects', table:'projects'},{list:'tasks', table:'tasks'},{list:'voiceNotes', table:'voice_notes'},{list:'attachments', table:'attachments'},{list:'subtasks', table:'subtasks'},{list:'projectNotes', table:'project_notes'}]; // attachments and steps after tasks (decisions 29 and 46); project notes after projects (decision 47)
+const SYNC_TABLES=[{list:'spaces', table:'spaces'},{list:'projects', table:'projects'},{list:'tasks', table:'tasks'},{list:'voiceNotes', table:'voice_notes'},{list:'attachments', table:'attachments'},{list:'subtasks', table:'subtasks'},{list:'projectNotes', table:'project_notes'},{list:'contacts', table:'contacts'}]; // attachments and steps after tasks (decisions 29 and 46); project notes after projects (decision 47); contacts last (decision 48c)
 const INITIAL_SPACES=['trabajo','personal'];
 // Local field, column and kind; id, created and modified are common to all.
 // tsOpt (block 9, reminder_sent): sent only when set, so the tasks' signatures from before block 9 stay the same and nothing is sent again;
@@ -31,14 +31,16 @@ const INITIAL_SPACES=['trabajo','personal'];
 const SYNC_FIELDS={
   spaces:[['name','name','text'],['order','sort_order','int'],['closedDay','closed_day','dayN']], // the day closed on every device (0009_closed_day.sql)
   projects:[['spaceId','space_id','id'],['name','name','text'],['color','color','id'],['order','sort_order','int'],['archived','archived','bool']],
-  tasks:[['spaceId','space_id','id'],['projectId','project_id','id'],['title','title','text'],['date','date','day'],['reminder','reminder','ts'],['priority','priority','pri'],['status','status','status'],['notes','notes','text'],['carried','carried','bool'],['completed','completed','ts'],['reminderSent','reminder_sent','tsOpt'],['repeat','repeat','textN'],['focus','focus','tsN'],['waitingFor','waiting_for','textN'],['deadline','deadline','dayN'],['estimate','estimate','intN'],['postponed','postponed','intN'],['carriedSince','carried_since','dayN']],
+  tasks:[['spaceId','space_id','id'],['projectId','project_id','id'],['title','title','text'],['date','date','day'],['reminder','reminder','ts'],['priority','priority','pri'],['status','status','status'],['notes','notes','text'],['carried','carried','bool'],['completed','completed','ts'],['reminderSent','reminder_sent','tsOpt'],['repeat','repeat','textN'],['focus','focus','tsN'],['waitingFor','waiting_for','textN'],['deadline','deadline','dayN'],['estimate','estimate','intN'],['postponed','postponed','intN'],['carriedSince','carried_since','dayN'],['responsible','responsible','textN']], // decision 48c (0011_contacts.sql)
   voice_notes:[['taskId','task_id','id'],['text','text','text']],
   // Decision 29 (0003_attachments.sql): the record of a photo or a recording; its file goes to Storage first (attFlush)
   attachments:[['taskId','task_id','id'],['kind','kind','kind'],['path','path','id'],['mime','mime','id'],['size','size','int'],['width','width','int'],['height','height','int'],['durationMs','duration_ms','int']],
   // Decision 46 (0005_subtasks.sql): the steps of a task, one row each
   subtasks:[['taskId','task_id','id'],['title','title','text'],['done','done','bool'],['order','sort_order','int']],
   // Decision 47 (0006_project_notes.sql): the notes of a project, one row each
-  project_notes:[['projectId','project_id','id'],['title','title','text'],['body','body','text'],['pinned','pinned','bool']] };
+  project_notes:[['projectId','project_id','id'],['title','title','text'],['body','body','text'],['pinned','pinned','bool']],
+  // Decision 48c (0011_contacts.sql): the people of Responsable and Esperando a, one row each
+  contacts:[['name','name','text'],['email','email','textN'],['phone','phone','textN']] };
 const syncTs = v => { if(!v) return null; const d=new Date(v); return isNaN(d) ? null : d.toISOString(); };
 const SYNC_TO={ id:v=>v==null||v===''?null:String(v), text:v=>v==null?'':String(v), int:v=>v==null||v===''||isNaN(+v)?null:Math.round(+v), bool:v=>!!v,
   day:v=>/^\d{4}-\d{2}-\d{2}$/.test(String(v||''))?v:null, dayN:v=>/^\d{4}-\d{2}-\d{2}$/.test(String(v||''))?String(v).slice(0,10):null, ts:syncTs, tsOpt:syncTs, tsN:syncTs, intN:v=>{ const n=v==null||v===''?NaN:Math.round(+v); return isFinite(n)&&n>0?n:null; }, textN:v=>v==null||v===''?null:String(v), pri:v=>['high','mid','none'].includes(v)?v:'none', status:v=>['pending','done','waiting'].includes(v)?v:'pending', kind:v=>['photo','audio'].includes(v)?v:null };
@@ -71,7 +73,7 @@ const syncDemoId = id => String(id).startsWith('demo-');
 const syncSkip = (table, rec) => syncDemoId(rec.id) || (table==='spaces'&&INITIAL_SPACES.includes(rec.id)) || ((table==='voice_notes'||table==='attachments'||table==='subtasks')&&syncDemoId(rec.taskId)) || (table==='project_notes'&&syncDemoId(rec.projectId)) || (table==='attachments'&&!rec.path);
 // A table the database does not have yet (attachments before 0003_attachments.sql ran, subtasks before 0005_subtasks.sql, project_notes before
 // 0006_project_notes.sql): left out of this session's sync
-const SYNC_LATE={attachments:['0003_attachments.sql','Los adjuntos se quedan en este dispositivo'], subtasks:['0005_subtasks.sql','Los pasos se quedan en este dispositivo'], project_notes:['0006_project_notes.sql','Las notas de proyecto se quedan en este dispositivo'],
+const SYNC_LATE={attachments:['0003_attachments.sql','Los adjuntos se quedan en este dispositivo'], subtasks:['0005_subtasks.sql','Los pasos se quedan en este dispositivo'], project_notes:['0006_project_notes.sql','Las notas de proyecto se quedan en este dispositivo'], contacts:['0011_contacts.sql','Los contactos se quedan en este dispositivo'],
   inbox:['0010_inbox.sql','Siri y el Atajo de iOS no están disponibles'], shortcut_keys:['0010_inbox.sql','Siri y el Atajo de iOS no están disponibles']}; // not synced tables: the Shortcut's inbox and key (js/inbox.js)
 // Whether a request failed because the table is not there (PostgREST's PGRST205, PostgreSQL's 42P01). The first time it is noted in missing and logged
 function syncAbsent(missing, table, error){ if(!SYNC_LATE[table]||!error) return false; const m=String(error.message||'')+' '+String(error.code||'');
@@ -206,7 +208,7 @@ function syncMerge(W, st, table, rows, stats){
    pulled: {table: rows}; o.cursor moves the tables' cursors (a pull; realtime events do not); o.pool runs the space matching */
 function syncApply(pulled, o){ o=o||{};
   const st=syncState(), stats={added:0, updated:0, removed:0, conflicts:[], remaps:[]};
-  const W={spaces:DB.spaces.map(x=>Object.assign({},x)), projects:DB.projects.map(x=>Object.assign({},x)), tasks:DB.tasks.map(x=>Object.assign({},x)), voiceNotes:DB.voiceNotes.map(x=>Object.assign({},x)), attachments:DB.attachments.map(x=>Object.assign({},x)), subtasks:DB.subtasks.map(x=>Object.assign({},x)), projectNotes:DB.projectNotes.map(x=>Object.assign({},x)), settings:Object.assign({}, DB.settings)};
+  const W={spaces:DB.spaces.map(x=>Object.assign({},x)), projects:DB.projects.map(x=>Object.assign({},x)), tasks:DB.tasks.map(x=>Object.assign({},x)), voiceNotes:DB.voiceNotes.map(x=>Object.assign({},x)), attachments:DB.attachments.map(x=>Object.assign({},x)), subtasks:DB.subtasks.map(x=>Object.assign({},x)), projectNotes:DB.projectNotes.map(x=>Object.assign({},x)), contacts:DB.contacts.map(x=>Object.assign({},x)), settings:Object.assign({}, DB.settings)};
   if(o.pool || W.spaces.some(s=>INITIAL_SPACES.includes(s.id))) stats.remaps=syncRemapSpaces(W, o.pool||null);
   SYNC_TABLES.forEach(({table})=>{ const rows=pulled[table]||[]; if(rows.length) syncMerge(W, st, table, rows, stats);
     if(o.cursor) rows.forEach(r=>{ if(syncTime(r.server_ts)>syncTime(st.cursor[table])) st.cursor[table]=r.server_ts; }); });
@@ -241,8 +243,8 @@ function syncColRefused(table, e){ const m=String(e&&(e.message||e.details||e)||
   if(!/PGRST204|42703|column|schema cache/i.test(m)) return null; return SYNC_NULLCOLS(table).find(c=>!syncNoCol(table,c)&&new RegExp('(^|\\W)'+c+'(\\W|$)').test(m))||null; }
 // The status check of 0001 (pending or done) refuses 'waiting' (decision 41) until 0004 widens it: from then on such tasks go up as pending
 const syncWaitRefused = (table, e) => { const m=String(e&&(e.message||e.details||e)||'')+' '+String(e&&e.code||''); return table==='tasks'&&!syncNoCol(table,'status:waiting')&&/23514|check constraint/i.test(m)&&/status/i.test(m); };
-const NOCOL_WHAT={repeat:'La repetición', focus:'Ahora', waiting_for:'Esperando a', deadline:'La fecha límite', estimate:'El tiempo estimado y las veces que se ha aplazado', closed_day:'El día cerrado'},
-  NOCOL_FILE={deadline:'0007_deadline.sql', estimate:'0008_estimate_postponed.sql', postponed:'0008_estimate_postponed.sql', carried_since:'0008_estimate_postponed.sql', closed_day:'0009_closed_day.sql'}; // the migration that adds each column (0004 unless said)
+const NOCOL_WHAT={repeat:'La repetición', focus:'Ahora', waiting_for:'Esperando a', deadline:'La fecha límite', estimate:'El tiempo estimado y las veces que se ha aplazado', closed_day:'El día cerrado', responsible:'El responsable'},
+  NOCOL_FILE={deadline:'0007_deadline.sql', estimate:'0008_estimate_postponed.sql', postponed:'0008_estimate_postponed.sql', carried_since:'0008_estimate_postponed.sql', closed_day:'0009_closed_day.sql', responsible:'0011_contacts.sql'}; // the migration that adds each column (0004 unless said)
 async function syncUpsert(table, rows){ for(;;){ const send=rows.map(r=>{ let o=r; SYNC_NULLCOLS(table).forEach(c=>{ if(syncNoCol(table,c)&&c in o){ if(o===r) o=Object.assign({}, r); delete o[c]; } });
       if(o.status==='waiting'&&syncNoCol(table,'status:waiting')){ if(o===r) o=Object.assign({}, r); o.status='pending'; } return o; });
     try{ return await SY.remote.upsert(table, send); }

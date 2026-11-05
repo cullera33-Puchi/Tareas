@@ -3,7 +3,7 @@
    A classic script: index.html loads every file of js/ in order and they share their global names. Only declarations and
    listeners run at load; the start itself (first screen, timers, sync, service worker) is in boot.js, the last file. */
 /* Multi-select: entered from the long-press menu; a bottom bar replaces the tab bar */
-function renderSelbar(){ const n=UI.select?UI.select.ids.size:0; const b=(act,ic,l,red)=>'<button data-act="'+act+'"'+(n?'':' disabled')+(red?' class="red"':'')+'>'+ic+'<span>'+l+'</span></button>'; $('#selbar').innerHTML=b('bulkComplete',I.check,'Completar')+b('bulkPostpone',I.cal,'Aplazar')+b('bulkMove',I.folder,'Mover')+b('bulkDelete',I.trash,'Eliminar',true); }
+function renderSelbar(){ const n=UI.select?UI.select.ids.size:0; const b=(act,ic,l,red)=>'<button data-act="'+act+'"'+(n?'':' disabled')+(red?' class="red"':'')+'>'+ic+'<span>'+l+'</span></button>'; $('#selbar').innerHTML=b('bulkComplete',I.check,'Completar')+b('bulkPostpone',I.cal,'Aplazar')+b('bulkMove',I.folder,'Mover')+(n&&bulkRemindOn()?b('bulkRemind',MI.send,'Recordar'):'')+b('bulkDelete',I.trash,'Eliminar',true); } // decision 48c: Recordar when every selected task has the same person
 function startSelect(id){ flushHeld(true); const top=UI.stack[UI.stack.length-1]; UI.select={scope: top&&top.kind==='project'?'project':'root', ids:new Set(id?[id]:[]), all:false}; if(openRow) closeRow(openRow); app.classList.add('selecting'); render(); renderSelbar(); haptic(6); }
 function endSelect(){ if(UI.wide){ endDeskSelect(); return; } UI.select=null; app.classList.remove('selecting'); render(); } // the desktop's own selection (R16) ends the same way
 function visibleRowIds(){ const scr=UI.select.scope==='project'?UI.stack[UI.stack.length-1].el:rootScreen('tareas'); return [...scr.querySelectorAll('.scroll .row[data-id], .scroll .rph[data-id]')].filter(r=>!r.closest('.first')).map(r=>r.dataset.id); } // rows of a long list not drawn yet count too
@@ -66,7 +66,7 @@ function closeDaySheet(){ flushHeld(true); const t=todayStr(), tm=addDays(t,1); 
 /* Decision 60b: kind 'forgot' walks the forgotten tasks of Sin fecha (isForgot) with the same steps: a quick day or one of the calendar,
    Completar, Eliminar, Saltar, Terminar, and the balance with Deshacer. It offers no Sin fecha: they have none already */
 function reviewStart(kind){ flushHeld(true); let xs=kind==='carried'?pendingFor('hoy').filter(carriedOn):kind==='forgot'?pendingFor('todas').filter(isForgot):pendingFor('hoy');
-  if(kind!=='close'&&UI.projFilter!==null) xs=xs.filter(x=> UI.projFilter==='none' ? !x.projectId : x.projectId===UI.projFilter);
+  if(kind!=='close'&&filterOn()) xs=xs.filter(passFilter); // the project filter and the responsible's (decision 48c)
   if(!xs.length) return; log('info', kind==='carried'?'Repasar aplazadas':kind==='forgot'?'Repasar olvidadas':'Cerrar el día una a una', {n:xs.length});
   reviewStep(xs.map(x=>x.id), 0, {kind, prev:new Map(), removed:[], tally:{}}); }
 const REVIEW_OUT=[['hoy','para hoy','para hoy'],['man','a mañana','a mañana'],['vie','al viernes','al viernes'],['nsem','a la próxima semana','a la próxima semana'],['none','sin fecha','sin fecha'],['done','completada','completadas'],['del','eliminada','eliminadas'],['cal','a otro día','a otro día'],['skip','saltada','saltadas']];
@@ -153,10 +153,11 @@ function rowMenu(id, src){ const x=task(id); if(!x) return; releaseHold(id);
   { // R10: the row lifts and the menu opens next to it
     const row=src&&src.row||visibleRow(id), b=row&&row.getBoundingClientRect();
     return popMenu({lift:row, x:src&&src.x||(b?b.left+b.width/2:0), y:src&&src.y||0, prio:{cur:x.priority, fn:pr=>setPriority(id,pr)}, groups:[
-      [{label:'Aplazar', icon:MI.postpone, menu:()=>postponeMenu(id)}].concat(x.status!=='done'?[{label:'Fecha límite', icon:MI.flag, menu:()=>deadlineMenu(id)}, {label:'Tiempo', icon:MI.est, menu:()=>estimateMenu(id)}]:[], canSnooze(x)?[{label:'Posponer recordatorio', icon:MI.bell, menu:()=>snoozeMenu(id)}]:[], [{label:'Mover a proyecto', icon:MI.folder, menu:()=>projectPickMenu(id)}]).concat(DB.spaces.length>1?[{label:'Mover a otro espacio', icon:MI.space, menu:()=>spaceMoveMenu(id)}]:[]), // decision 48a: Fecha límite next to Aplazar
+      [{label:'Aplazar', icon:MI.postpone, menu:()=>postponeMenu(id)}].concat(x.status!=='done'?[{label:'Fecha límite', icon:MI.flag, menu:()=>deadlineMenu(id)}, {label:'Tiempo', icon:MI.est, menu:()=>estimateMenu(id)}, {label:'Responsable', icon:MI.person, fn:()=>responsibleSheet(id)}]:[], canSnooze(x)?[{label:'Posponer recordatorio', icon:MI.bell, menu:()=>snoozeMenu(id)}]:[], [{label:'Mover a proyecto', icon:MI.folder, menu:()=>projectPickMenu(id)}]).concat(DB.spaces.length>1?[{label:'Mover a otro espacio', icon:MI.space, menu:()=>spaceMoveMenu(id)}]:[]), // decision 48a: Fecha límite next to Aplazar
       [{label:x.status==='done'?'Marcar pendiente':'Completar', icon:x.status==='done'?MI.undo:MI.done, fn:()=>{ leaveRows(id); setTimeout(()=>{ completeTask(id); renderAnimated(); },200); }}]
        .concat(x.status==='pending'?[{label:x.focus?'Quitar de Ahora':'Ahora', icon:x.focus?MI.starOff:MI.star, fn:()=>toggleFocus(id)}]:[]) // decision 39
        .concat(waitItems(x, MI)) // decision 41
+       .concat(canRemind(x)?[{label:'Enviar recordatorio', icon:MI.send, fn:()=>remindSheet([id])}]:[]) // decision 48c
        .concat([{label:'Duplicar', icon:MI.dup, fn:()=>duplicateTask(id)}, {label:'Seleccionar', icon:MI.select, fn:()=>startSelect(id)}]),
       [{label:'Eliminar', icon:MI.trash, red:true, fn:()=>confirmDelete(id)}] ]}); } }
 /* Desktop sidebar: a project dragged to another place (or moved with Alt and an arrow). The space's projects are numbered again from 0,
@@ -364,7 +365,7 @@ function reminderSheet(id, src){ const x=task(id); if(!x) return; const t=todayS
       if(e.target.closest('[data-x=ok]')){ const [hh,mi]=(tp?hmStr(tp.value()):(inp.value||time)).split(':').map(Number); const dt=new Date(day+'T00:00:00'); dt.setHours(hh||0, mi||0, 0, 0); if(dt.getTime()<=Date.now()){ let w=$('.hint.warn',s); if(!w){ w=document.createElement('div'); w.className='hint warn'; $('.timerow, .tpk',s).after(w); } w.textContent='Esa hora ya ha pasado'; haptic(10); return; } updTask(id,{reminder:dt.toISOString()}); closeSheet(); render(); pushOfferSoon(); } }; }); } // a past reminder could never notify: the sheet stays open, with a line above Guardar (a toast would cover the time field)
 
 /* Plan the undated tasks one by one */
-function planStart(){ let ids=pendingFor('todas').filter(x=>!x.date&&!dlDue(x)); /* decision 48a: one whose deadline has come is in Hoy, not in Sin fecha */ if(UI.projFilter!==null) ids=ids.filter(x=> UI.projFilter==='none' ? !x.projectId : x.projectId===UI.projFilter); ids=ids.map(x=>x.id); if(!ids.length) return; planStep(ids, 0, {done:0, skipped:0}); }
+function planStart(){ let ids=pendingFor('todas').filter(x=>!x.date&&!dlDue(x)); /* decision 48a: one whose deadline has come is in Hoy, not in Sin fecha */ if(filterOn()) ids=ids.filter(passFilter); ids=ids.map(x=>x.id); if(!ids.length) return; planStep(ids, 0, {done:0, skipped:0}); }
 function planEnd(st){ renderAnimated(); toast(st.done+(st.done===1?' planificada':' planificadas')+(st.skipped?', '+st.skipped+(st.skipped===1?' saltada':' saltadas'):'')); log('info','Planificar sin fecha', st); }
 function planStep(ids, i, st){
   if(i>=ids.length){ sheetOnClose=null; closeSheet(); planEnd(st); return; }
@@ -391,6 +392,7 @@ function shareText(id){ const x=task(id); if(!x) return ''; const p=x.projectId?
   if(x.estimate) t+='Tiempo estimado: '+estLabel(x.estimate).toLowerCase()+'\n'; // decision 56a
   if(x.deadline) t+='Fecha límite: '+new Date(x.deadline+'T00:00:00').toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'})+'\n'; // decision 48a
   if(x.status==='waiting') t+='Estado: por confirmar'+(x.waitingFor?', esperando a '+x.waitingFor:'')+'\n'; // decision 41
+  if(x.responsible) t+='Responsable: '+x.responsible+'\n'; // decision 48c
   if(repParse(x.repeat)) t+='Se repite: '+repSummary(x.repeat).replace(/^./, c=>c.toLowerCase())+'\n'; // decision 38
   if(x.notes&&x.notes.trim()) t+='\nNotas:\n'+x.notes.trim()+'\n';
   const ss=stepsOf(id); if(ss.length) t+='\nPasos ('+stepsCount(id)+' hechos):\n'+ss.map(o=>'- ['+(o.done?'x':' ')+'] '+o.title).join('\n')+'\n'; // decision 46: the boxes Convertir líneas reads back
@@ -442,28 +444,29 @@ function restoreBackup(date){ const b=BACKUPS.find(x=>x.date===date); if(!b) ret
   const when = date===todayStr()?'de hoy':date===addDays(todayStr(),-1)?'de ayer':'del '+fmtDate(date);
   // Signed in, the copy applies to every device (agreed with Enric): restored records get a new modified so they win, and what the copy lacks is deleted everywhere by the next sync
   const synced=!!(typeof SY!=='undefined'&&SY&&SY.user);
-  confirmSheet('Restaurar copia '+when, synced?'Se sustituyen espacios, proyectos, notas de proyecto, tareas, pasos, notas de voz y adjuntos por los de esa copia ('+b.tasks+' tareas) en todos tus dispositivos. Lo creado después de esa copia se eliminará también en ellos.':'Se sustituyen espacios, proyectos, notas de proyecto, tareas, pasos, notas de voz y adjuntos por los de esa copia ('+b.tasks+' tareas). Podrás deshacerlo durante unos segundos.', async()=>{
-    try{ const snap=await BK.get(date); if(!snap) return; const prev={spaces:DB.spaces, projects:DB.projects, tasks:DB.tasks, voiceNotes:DB.voiceNotes, attachments:DB.attachments, subtasks:DB.subtasks, projectNotes:DB.projectNotes}, prevActive=DB.settings.activeSpace;
+  confirmSheet('Restaurar copia '+when, synced?'Se sustituyen espacios, proyectos, notas de proyecto, tareas, pasos, notas de voz, adjuntos y contactos por los de esa copia ('+b.tasks+' tareas) en todos tus dispositivos. Lo creado después de esa copia se eliminará también en ellos.':'Se sustituyen espacios, proyectos, notas de proyecto, tareas, pasos, notas de voz, adjuntos y contactos por los de esa copia ('+b.tasks+' tareas). Podrás deshacerlo durante unos segundos.', async()=>{
+    try{ const snap=await BK.get(date); if(!snap) return; const prev={spaces:DB.spaces, projects:DB.projects, tasks:DB.tasks, voiceNotes:DB.voiceNotes, attachments:DB.attachments, subtasks:DB.subtasks, projectNotes:DB.projectNotes, contacts:DB.contacts}, prevActive=DB.settings.activeSpace;
       DB.spaces=snap.data.spaces||prev.spaces; DB.projects=snap.data.projects||[]; DB.tasks=snap.data.tasks||[]; DB.voiceNotes=snap.data.voiceNotes||[];
       // Decision 29.5: the copy's attachment records (their files are on the device or in Storage for 24 hours more); a copy from before them keeps those of its tasks
       { const tids=new Set(DB.tasks.map(x=>x.id)); DB.attachments=Array.isArray(snap.data.attachments)?snap.data.attachments:prev.attachments.filter(a=>tids.has(a.taskId));
         DB.subtasks=Array.isArray(snap.data.subtasks)?snap.data.subtasks:prev.subtasks.filter(o=>tids.has(o.taskId)); // decision 46: the copy's steps; a copy from before them keeps those of its tasks
-        const pids=new Set(DB.projects.map(p=>p.id)); DB.projectNotes=Array.isArray(snap.data.projectNotes)?snap.data.projectNotes:prev.projectNotes.filter(n=>pids.has(n.projectId)); } // decision 47: the same for the project notes
-      if(synced){ const now=new Date().toISOString(); [DB.spaces,DB.projects,DB.tasks,DB.voiceNotes,DB.attachments,DB.subtasks,DB.projectNotes].forEach(a=>a.forEach(r=>{ r.modified=now; })); log('info','Copia restaurada con sesión iniciada: se aplicará en todos los dispositivos', {date}); }
+        const pids=new Set(DB.projects.map(p=>p.id)); DB.projectNotes=Array.isArray(snap.data.projectNotes)?snap.data.projectNotes:prev.projectNotes.filter(n=>pids.has(n.projectId)); // decision 47: the same for the project notes
+        DB.contacts=Array.isArray(snap.data.contacts)?snap.data.contacts:prev.contacts; } // decision 48c: the copy's contacts; a copy from before them keeps today's
+      if(synced){ const now=new Date().toISOString(); [DB.spaces,DB.projects,DB.tasks,DB.voiceNotes,DB.attachments,DB.subtasks,DB.projectNotes,DB.contacts].forEach(a=>a.forEach(r=>{ r.modified=now; })); log('info','Copia restaurada con sesión iniciada: se aplicará en todos los dispositivos', {date}); }
       foldVoiceNotes(DB); // decision 49: a copy from before it brings dictated voice notes: they go into Notas
       if(!DB.spaces.some(sp=>sp.id===DB.settings.activeSpace)){ DB.settings.activeSpace=DB.spaces[0].id; resetListState(); } save(); rollOver(); render(); haptic(10);
-      log('info','Copia restaurada', {date, tasks:DB.tasks.length}); toast('Copia '+when+' restaurada', ()=>{ Object.assign(DB, prev); if(synced){ const now=new Date().toISOString(); [DB.spaces,DB.projects,DB.tasks,DB.voiceNotes,DB.attachments,DB.subtasks,DB.projectNotes].forEach(a=>a.forEach(r=>{ r.modified=now; })); } DB.settings.activeSpace=prevActive; save(); });
+      log('info','Copia restaurada', {date, tasks:DB.tasks.length}); toast('Copia '+when+' restaurada', ()=>{ Object.assign(DB, prev); if(synced){ const now=new Date().toISOString(); [DB.spaces,DB.projects,DB.tasks,DB.voiceNotes,DB.attachments,DB.subtasks,DB.projectNotes,DB.contacts].forEach(a=>a.forEach(r=>{ r.modified=now; })); } DB.settings.activeSpace=prevActive; save(); });
     }catch(e){ log('error','Restaurar copia falló: '+(e&&e.message||e)); toast('No se pudo restaurar'); } }, 'Restaurar'); }
 
 /* Export and import */
-function exportData(){ return { app:'tareas', version:APP_VERSION, exported:new Date().toISOString(), spaces:DB.spaces, projects:DB.projects, tasks:DB.tasks, voiceNotes:DB.voiceNotes, attachments:DB.attachments, subtasks:DB.subtasks, projectNotes:DB.projectNotes }; } // decision 29.5: the list of attachments, not their files; decision 46: the steps; decision 47: the project notes
+function exportData(){ return { app:'tareas', version:APP_VERSION, exported:new Date().toISOString(), spaces:DB.spaces, projects:DB.projects, tasks:DB.tasks, voiceNotes:DB.voiceNotes, attachments:DB.attachments, subtasks:DB.subtasks, projectNotes:DB.projectNotes, contacts:DB.contacts }; } // decision 48c: the contacts; decision 29.5: the list of attachments, not their files; decision 46: the steps; decision 47: the project notes
 function exportJSON(){ const t=JSON.stringify(exportData(),null,2); if(navigator.share){ navigator.share({title:'Tareas (copia)', text:t}).catch(()=>copyText(t,'Copia JSON en el portapapeles')); } else copyText(t,'Copia JSON en el portapapeles'); }
 // CSV for Excel in Spanish locales: semicolon separated, UTF-8 with BOM, one row per task.
 // A cell that starts with = + - or @ gets a leading apostrophe: Excel runs it as a formula even when quoted.
 function csvText(){ const q=v=>{ let s=String(v==null?'':v).replace(/"/g,'""').replace(/\r?\n/g,' '); if(/^[=+\-@\t\r]/.test(s)) s="'"+s; return '"'+s+'"'; }; const sp=Object.fromEntries(DB.spaces.map(s=>[s.id,s.name])); const pr={high:'Alta',mid:'Media',none:''};
-  const head=['Espacio','Proyecto','Título','Fecha','Fecha límite','Prioridad','Tiempo estimado','Estado','Completada','Recordatorio','Se repite','Esperando a','Aplazada','Notas','Pasos','Creada']; // decision 49: no Notas de voz column, they are in Notas; decision 38: Se repite, the rule in words; decision 46: Pasos, each with its box
+  const head=['Espacio','Proyecto','Título','Fecha','Fecha límite','Prioridad','Tiempo estimado','Estado','Completada','Recordatorio','Se repite','Esperando a','Responsable','Aplazada','Notas','Pasos','Creada']; // decision 49: no Notas de voz column, they are in Notas; decision 38: Se repite, the rule in words; decision 46: Pasos, each with its box
   const rows=DB.tasks.slice().sort((a,b)=>(a.spaceId+(a.date||'9999')+a.created)<(b.spaceId+(b.date||'9999')+b.created)?-1:1).map(x=>{ const p=x.projectId?proj(x.projectId):null; const ps=stepsOf(x.id).map(o=>'['+(o.done?'x':' ')+'] '+o.title).join(' | ');
-    return [sp[x.spaceId]||'', p?p.name:'', x.title, x.date||'', x.deadline||'', pr[x.priority]||'', x.estimate?estLabel(x.estimate).toLowerCase():'', x.status==='done'?'Hecha':x.status==='waiting'?'Por confirmar':'Pendiente', x.completed?localDay(x.completed)+' '+fmtTime(x.completed):'', x.reminder?localDay(x.reminder)+' '+fmtTime(x.reminder):'', repSummary(x.repeat), x.waitingFor||'', x.carried?'Sí':'', x.notes||'', ps, localDay(x.created)].map(q).join(';'); });
+    return [sp[x.spaceId]||'', p?p.name:'', x.title, x.date||'', x.deadline||'', pr[x.priority]||'', x.estimate?estLabel(x.estimate).toLowerCase():'', x.status==='done'?'Hecha':x.status==='waiting'?'Por confirmar':'Pendiente', x.completed?localDay(x.completed)+' '+fmtTime(x.completed):'', x.reminder?localDay(x.reminder)+' '+fmtTime(x.reminder):'', repSummary(x.repeat), x.waitingFor||'', x.responsible||'', x.carried?'Sí':'', x.notes||'', ps, localDay(x.created)].map(q).join(';'); });
   return '﻿'+head.map(q).join(';')+'\r\n'+rows.join('\r\n')+'\r\n'; }
 async function exportCSV(){
   const name='tareas-'+todayStr()+'.csv'; const blob=new Blob([csvText()],{type:'text/csv;charset=utf-8'});
@@ -486,7 +489,7 @@ function importData(text){
   const d=JSON.parse(text); if(!d||typeof d!=='object') throw new Error('Formato no reconocido');
   let added=0, updated=0;
   const merge=(arr,src)=>{ (Array.isArray(src)?src:[]).forEach(it=>{ if(!it||!it.id) return; const i=arr.findIndex(a=>a.id===it.id); if(i<0){ arr.push(it); added++; } else if((it.modified||'')>(arr[i].modified||'')){ arr[i]=it; updated++; } }); };
-  merge(DB.spaces,d.spaces); merge(DB.projects,d.projects); merge(DB.tasks,d.tasks); merge(DB.voiceNotes,d.voiceNotes); merge(DB.attachments,d.attachments); merge(DB.subtasks,d.subtasks); merge(DB.projectNotes,d.projectNotes);
+  merge(DB.spaces,d.spaces); merge(DB.projects,d.projects); merge(DB.tasks,d.tasks); merge(DB.voiceNotes,d.voiceNotes); merge(DB.attachments,d.attachments); merge(DB.subtasks,d.subtasks); merge(DB.projectNotes,d.projectNotes); merge(DB.contacts,d.contacts); // decision 48c
   DB.tasks.forEach(x=>{ if(x.carried===undefined) x.carried=false; });
   foldVoiceNotes(DB); // decision 49: an older export's voice notes go into Notas
   save(); rollOver(); log('info','Importación', {added, updated, spaces:(d.spaces||[]).length, projects:(d.projects||[]).length, tasks:(d.tasks||[]).length});

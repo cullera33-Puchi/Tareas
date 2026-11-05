@@ -3,7 +3,7 @@
 const CACHE = 'tareas-v0.31.0';
 // Every file the app loads: a missing one would leave the installed app unable to start offline (index.html lists the scripts in order)
 const SHELL = ['./', './index.html', './css/app.css',
-  './js/core.js', './js/render.js', './js/events.js', './js/menus.js', './js/sheets.js', './js/attachments.js', './js/steps.js', './js/notes.js', './js/status.js', './js/suggest.js', './js/sync.js', './js/push.js', './js/inbox.js', './js/lifecycle.js', './js/desktop.js', './js/desktop-calendar.js', './js/desktop-render.js', './js/desktop-add.js', './js/boot.js',
+  './js/core.js', './js/render.js', './js/events.js', './js/menus.js', './js/sheets.js', './js/attachments.js', './js/steps.js', './js/notes.js', './js/status.js', './js/suggest.js', './js/sync.js', './js/push.js', './js/inbox.js', './js/people.js', './js/lifecycle.js', './js/desktop.js', './js/desktop-calendar.js', './js/desktop-render.js', './js/desktop-add.js', './js/boot.js',
   './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png', './vendor/supabase-js-2.117.3.umd.js'];
 // Written at deploy time from the repository secrets (block 8). Cached when present; a copy without it (404) still installs and runs local only.
 const OPTIONAL = ['./config.js'];

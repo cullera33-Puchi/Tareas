@@ -20,10 +20,10 @@ const srv = http.createServer((req,res)=>{ let p = decodeURIComponent(req.url.sp
   res.writeHead(200,{'Content-Type':TYPES[path.extname(f)]||'application/octet-stream'}); res.end(fs.readFileSync(f)); });
 
 /* ---------- Fake server (as rm-S: newest modified wins, soft deletes, realtime to the owner's pages) ---------- */
-const TABLES = ['spaces','projects','tasks','voice_notes','attachments','subtasks','project_notes'];
+const TABLES = ['spaces','projects','tasks','voice_notes','attachments','subtasks','project_notes','contacts'];
 const COLS = { spaces:['name','sort_order','members'], projects:['space_id','name','color','sort_order','archived'],
   tasks:['space_id','project_id','title','date','reminder','priority','status','notes','carried','assignees','completed'], voice_notes:['task_id','text'],
-  attachments:['task_id','kind','path','mime','size','width','height','duration_ms','purged'], subtasks:['task_id','title','done','sort_order'], project_notes:['project_id','title','body','pinned'] };
+  attachments:['task_id','kind','path','mime','size','width','height','duration_ms','purged'], subtasks:['task_id','title','done','sort_order'], project_notes:['project_id','title','body','pinned'], contacts:['name','email','phone'] };
 class Fake {
   constructor(){ this.t={}; TABLES.forEach(x=>this.t[x]=new Map()); this.last=0; this.subs=new Map(); }
   ts(){ this.last=Math.max(Date.now(), this.last+1); return new Date(this.last).toISOString(); }

@@ -65,7 +65,8 @@ function onClick(e){
   const rb=e.target.closest('[data-restore]'); if(rb){ restoreBackup(rb.dataset.restore); return; }
   const pr=e.target.closest('[data-push-revoke]'); if(pr){ pushRevokeSheet(pr.dataset.pushRevoke); return; }
   const ua=e.target.closest('[data-unarchive]'); if(ua){ const p=proj(ua.dataset.unarchive); p.archived=false; p.modified=new Date().toISOString(); save(); render(); return; }
-  const pf=e.target.closest('[data-pf]'); if(pf){ const v=pf.dataset.pf; UI.projFilter=(v===''||UI.projFilter===v)?null:v; haptic(4); render(); return; }
+  const pf=e.target.closest('[data-pf]'); if(pf){ const v=pf.dataset.pf; UI.projFilter=(v===''||UI.projFilter===v)?null:v; if(v==='') UI.respFilter=null; haptic(4); render(); return; } // Quitar filtro clears the responsible's too (decision 48c)
+  const ct=e.target.closest('[data-contact]'); if(ct){ contactSheet(ct.dataset.contact); return; } // decision 48c: Ajustes, Contactos
   // Decision 29: a photo opens the viewer (on the desktop a click; Comando or the right button offer its menu); a recording plays, seeks or goes
   const aa=e.target.closest('[data-aact]'); if(aa){ const el=aa.closest('.vn[data-au]'), id=el&&el.dataset.au; if(!id) return;
     if(aa.dataset.aact==='del'){ closeVn(el); deleteAttachment(id); return; } if(el.dataset.open){ closeVn(el); return; }
@@ -111,6 +112,11 @@ function onClick(e){
     case 'back': pop(); break;
     case 'rowMenu': if(row) rowMenu(row.dataset.id, {anchor:act}); break; // the desktop three dots: the menu hangs from them (R17)
     case 'projFilterMenu': projFilterMenu(act); break;
+    case 'respFilterMenu': respFilterMenu(act); break; // decision 48c
+    case 'pickResp': if(detailId) responsibleSheet(detailId, UI.wide?act:null); break;
+    case 'sendRemind': if(detailId) remindSheet([detailId]); break;
+    case 'newContact': contactSheet(null); break;
+    case 'bulkRemind': bulkRemind(); break;
     case 'weekModeMenu': weekModeMenu(act); break;
     case 'toggleTray': DB.settings.weekTray=DB.settings.weekTray===false; save(); render(); break;
     case 'setPri': if(detailId) setPriority(detailId, act.dataset.pr); break;

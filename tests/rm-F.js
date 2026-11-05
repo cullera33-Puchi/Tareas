@@ -122,7 +122,7 @@ const clickItem = (page, label) => page.evaluate(l=>{ const b=[...document.query
       now:now&&now.style.transform, past:[...col.querySelectorAll('.hs.past')].map(s=>s.dataset.slot.slice(11)), tray:!!document.querySelector('#desk .wtray'), heads:document.querySelectorAll('#desk .hhead .dh').length,
       gridH:Math.round(document.querySelector('#desk .hgrid').getBoundingClientRect().height)}; });
   check('R20_hoursGrid', r.hours.mode==='hours' && r.hours.cols===7 && r.hours.slots===28 && r.hours.first==='2026-11-04T07:00' && r.hours.last==='2026-11-04T20:30' && r.hours.heads===7 && r.hours.tray, r.hours);
-  check('R20_blockHalfHour', r.hours.aTop===(15*60-420)/30*22 && r.hours.aH===20, r.hours);
+  check('R20_blockHalfHour', r.hours.aTop===(15*60-420)/30*22 && r.hours.aH===42, r.hours); // its estimate is an hour: the block is two half hours tall (owner, 4 November)
   check('R20_allDayStrip', JSON.stringify(r.hours.allIds)===JSON.stringify(['tB','tE','tF']) && r.hours.eTm==='06:00', r.hours); // 6:00 is outside the grid: shown with its time in Todo el día
   check('R20_nowLine', /translateY\(139\.\d+px\)/.test(r.hours.now) && JSON.stringify(r.hours.past)===JSON.stringify(['07:00','07:30','08:00','08:30','09:00','09:30','10:00']), r.hours);
   await page.screenshot({path:OUT+'/f-week-hours.png'});

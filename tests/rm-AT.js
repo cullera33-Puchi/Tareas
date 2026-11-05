@@ -163,7 +163,7 @@ async function fnTests(){
 
 /* ======================= 3. The app ======================= */
 // rm-S's fake server, with the attachments table and a fake Storage (signed URLs served on another origin, as Supabase's are)
-const TABLES = ['spaces','projects','tasks','voice_notes','attachments','subtasks','project_notes']; // decisions 46 and 47: the app syncs the steps and the project notes too (0005, 0006)
+const TABLES = ['spaces','projects','tasks','voice_notes','attachments','subtasks','project_notes','contacts']; // decisions 46 and 47: the app syncs the steps and the project notes too (0005, 0006)
 const STORE = new Map(), TOKENS = new Map(); let downloads = [];
 class Fake {
   constructor(){ this.t={}; TABLES.forEach(x=>this.t[x]=new Map()); this.last=0; this.subs=new Map(); this.down=new Set(); this.calls=[]; }
@@ -455,7 +455,7 @@ async function appTests(browser){
   await A.page.evaluate(()=>{ UI.tab='ajustes'; render(); restoreBackup(todayStr()); }); await A.page.waitForTimeout(700);
   const rtext = await A.page.evaluate(()=>(document.querySelector('#asheet .t')||{}).textContent||'');
   await A.page.click('#asheet .it.red'); await A.page.waitForTimeout(800);
-  check('restore_brings_back', /notas de voz y adjuntos/.test(rtext) && await A.page.evaluate(id=>DB.attachments.some(a=>a.id===id), gone) && await synced(A.page) && fake.t.attachments.get(gone).deleted===null, rtext);
+  check('restore_brings_back', /notas de voz,? y? ?adjuntos/.test(rtext) && await A.page.evaluate(id=>DB.attachments.some(a=>a.id===id), gone) && await synced(A.page) && fake.t.attachments.get(gone).deleted===null, rtext);
   check('restore_B', await until(B.page, id=>DB.attachments.some(a=>a.id===id), gone));
   await A.page.evaluate(()=>{ UI.tab='tareas'; render(); });
 

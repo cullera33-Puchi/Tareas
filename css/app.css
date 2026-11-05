@@ -1578,3 +1578,38 @@ body.desktop .sgopen svg{width:6px;height:11px;}
 body.hresizing,body.hresizing *{cursor:ns-resize !important;}
 /* While a card is dragged the hour blocks let it through to the half hours under them: a long block would otherwise hide its slots */
 #desk.carddrag .hcol .wcard.hb:not(.dragging){pointer-events:none;}
+/* ---------- Decision 65d: focus mode, the Ahora tasks alone, large and calm ---------- */
+.ahead .afoco{margin-right:14px;}
+.app.desktop .ahead .afoco{margin-right:10px;}
+.focusnav .title .fstar,.main .mhead h1 .fstar{width:18px;height:18px;color:var(--orange);margin-right:2px;}
+.focusnav .title .fn,.main .mhead h1 .fn{font-size:0.882rem;font-weight:500;color:var(--ink2);margin-left:6px;letter-spacing:0;}
+.focusnav .action.strong{font-weight:600;}
+.focusview{padding-top:20px;}
+.focusview .focuslist .row-content{min-height:72px;padding:16px 18px;gap:16px;}
+.focusview .focuslist .row-title{font-size:1.235rem;line-height:1.3;font-weight:500;letter-spacing:-.2px;}
+.focusview .focuslist .row-meta{margin-top:4px;}
+.focusview .focuslist .check{width:28px;height:28px;}
+.focusview .focuslist .check svg{width:15px;height:15px;}
+.focusnote{text-align:center;margin-top:4px;}
+.app.desktop .main.focusmain .mhead{max-width:820px;margin:0 auto;width:100%;box-sizing:border-box;padding-top:28px;}
+.app.desktop .main.focusmain .mhead h1{font-size:24px;display:flex;align-items:center;}
+.app.desktop .main.focusmain .mhead h1 .fn{font-size:15px;}
+.app.desktop .focusoff{flex:none;height:28px;padding:0 14px;font-size:13px;font-weight:600;border-radius:7px;background:var(--fill);color:var(--blue);}
+.app.desktop .focusoff:hover{background:var(--fill2);}
+.app.desktop .inner.focusinner{max-width:820px;margin:0 auto;padding-top:8px;}
+.app.desktop .main .focuslist{background:var(--dgroup,var(--card));border-radius:12px;border:.5px solid var(--dline,transparent);margin-bottom:12px;}
+.app.desktop .main .focuslist .row,.app.desktop .main .focuslist .row-content{background:transparent;}
+.app.desktop .main .focuslist .row-content{min-height:56px;padding:0 16px 0 18px;gap:14px;}
+.app.desktop .main .focuslist .row-title{font-size:17px;font-weight:500;}
+.app.desktop .main .focuslist .check{width:22px;height:22px;}
+.app.desktop .main .focuslist .check svg{width:12px;height:12px;}
+.app.desktop .focusnote{font-size:12px;}
+/* ---------- Decision 65: Personalizada, from the day it is done, the end of the series and not piling up ---------- */
+.rpsw{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;min-height:36px;text-align:left;color:var(--ink);}
+.rpsw .lbl{font-size:0.941rem;}
+.seg.rpend{flex:none;margin:0;}
+.rpdate{flex:1;min-width:0;height:36px;border-radius:9px;background:var(--fill);border:0;padding:0 10px;font:inherit;font-size:0.941rem;color:var(--ink);}
+.pm-pop .rpsw{min-height:24px;}
+.pm-pop .rpsw .lbl{font-size:13px;}
+.pm-pop .rpsw .switch{transform:scale(.7);transform-origin:right center;}
+.pm-pop .rpdate{height:24px;border-radius:6px;font-size:13px;}

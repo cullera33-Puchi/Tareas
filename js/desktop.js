@@ -4,7 +4,7 @@
    listeners run at load; the start itself (first screen, timers, sync, service worker) is in boot.js, the last file. */
 /* ---------- Desktop layout ---------- */
 function mondayOf(d){ const x=new Date(d+'T00:00:00'); return addDays(d, -((x.getDay()+6)%7)); }
-function setDeskView(v){ if(v==='project:none') v='project:none'; if(UI.pitOpen) pitCollapse(true); /* decision 59 */ if(UI.noteOpen&&v!==UI.deskView&&v!=='project:'+((noteRec(UI.noteOpen)||{}).projectId)) noteLeft(UI.noteOpen); UI.deskView=v; UI.deskDetail=null; UI.dsel.ids.clear(); UI.dsel.mode=false; UI.dsel.edit=null; UI.query=''; UI.searchDone=false; if(v==='hoy'||v==='todas'){ DB.settings.filter=v; save(); } render(); } // another list starts with nothing selected (R16)
+function setDeskView(v){ if(v==='project:none') v='project:none'; if(UI.pitOpen) pitCollapse(true); /* decision 59 */ if(UI.noteOpen&&v!==UI.deskView&&v!=='project:'+((noteRec(UI.noteOpen)||{}).projectId)) noteLeft(UI.noteOpen); if(v!=="hoy"&&DB.settings.focusMode){ delete DB.settings.focusMode; save(); } /* decision 65d: another view ends focus mode */ UI.deskView=v; UI.deskDetail=null; UI.dsel.ids.clear(); UI.dsel.mode=false; UI.dsel.edit=null; UI.query=''; UI.searchDone=false; if(v==='hoy'||v==='todas'){ DB.settings.filter=v; save(); } render(); } // another list starts with nothing selected (R16)
 /* ---------- R15, R16: the desktop lists' selected row, keyboard and multiple selection ----------
    UI.dsel.cur is the selected row, apart from the hover (the inspector, when open, shows it); arrows or J and K move it and the inspector
    follows, as in Mail. ids is the multiple selection (Comando clic, Mayúsculas clic, Comando A, Mayúsculas y flechas): it counts from two
@@ -230,7 +230,9 @@ function bindColResize(d){
   d.addEventListener('click', e=>{ if(e.target.closest('.colhead')) e.stopPropagation(); }, true); } // the header is not a row: a click on it does nothing
 function deskMain(){
   const v=UI.deskView; let title='', body='', search=true, pf=false, seg='', notes=false, pit=null, pitProj=false;
-  if(v==='hoy'||v==='todas'){ const f=v; title=f==='hoy'?(isClosed()?'Mañana':'Hoy'):'Todas'; pf=true; // the day closed: Hoy shows tomorrow
+  if(v==='hoy') focusCheck(); const foco=v==='hoy'&&focusOn(); // decision 65d: focus mode, the list area shows only Ahora
+  if(foco){ title='Ahora'; search=false; body=focusRowsHTML(); }
+  else if(v==='hoy'||v==='todas'){ const f=v; title=f==='hoy'?(isClosed()?'Mañana':'Hoy'):'Todas'; pf=true; // the day closed: Hoy shows tomorrow
     body = addBarHTML(null)+colHeadHTML()+(UI.query||f==='hoy'&&isClosed()?'':ahoraHTML())+
       listHTML(UI.query?'todas':f); }
   else if(v==='ahora'){ title='Ahora'; body=colHeadHTML()+ahoraViewHTML(); } // decision 39
@@ -242,5 +244,6 @@ function deskMain(){
   else if(v==='settings'){ title='Ajustes'; search=false; const h=viewAjustes(); body=h.slice(h.indexOf('<div class="scroll">')); }
   const cal=isCalView(v);
   const pitOn=pit&&!pitFolded();
+  if(foco) return '<main class="main focusmain"><div class="mhead"><h1>'+I.starF.replace('class="i-star on"','class="i-star on fstar"')+'Ahora<span class="fn">'+ahoraTasks().length+'</span></h1><button class="btn focusoff" data-act="focusOff">Salir del foco</button></div><div class="mbody"><div class="inner focusinner">'+body+'</div></div></main>';
   return '<main class="main'+(v==='hoy'?' with-agenda':'')+(pitOn?' with-pit':'')+(pitProj?' pit-proj':'')+'"><div class="mhead'+(cal?' wide-head':'')+'"><h1>'+esc(title)+(v==='hoy'&&!UI.query?hoyLoadHTML():'')+'</h1>'+seg+(pf?'<span class="pfslot">'+pfDropHTML()+rfDropHTML()+'</span>':'')+(search?'<div class="searchbar"><div class="search">'+I.search+'<input type="search" placeholder="Buscar" value="'+esc(UI.query)+'" data-role="search" autocomplete="off"></div>'+(UI.query?'<button class="cancel" data-act="clearSearch">Cancelar</button>':'')+'</div>':'')+(pit?pitOpenBtnHTML(pit):'')+(v==='hoy'||v==='todas'||(v.startsWith('project:')&&!notes)?'<button class="mopts" data-act="viewMenu" aria-label="Opciones de vista" title="Opciones de vista">'+I.more+'</button>':'')+'</div><div class="mbody'+(cal?' calbody':notes?' notesbody':'')+'"><div class="inner'+(cal?' week-inner':v==='settings'?' settings':notes?' notes-inner':'')+'">'+body+'</div></div>'+(v==='hoy'?agendaHTML():'')+(pitOn?pitColHTML(pit):'')+'</main>';
 }

@@ -98,7 +98,7 @@ function loadScript(src){ return new Promise((res,rej)=>{ const s=document.creat
 function cleanAuthUrl(){ try{ const u=new URL(location.href); const err=u.searchParams.get('error_description')||u.searchParams.get('error');
   let n=0; ['code','error','error_code','error_description','state'].forEach(k=>{ if(u.searchParams.has(k)){ u.searchParams.delete(k); n++; } });
   if(n) history.replaceState(history.state, '', u.pathname+(u.searchParams.toString()?'?'+u.searchParams:'')+u.hash);
-  if(err){ log('error','Inicio de sesión rechazado: '+err); toast('No se pudo iniciar sesión'); } }catch(e){} }
+  if(err){ log('error','Inicio de sesión rechazado: '+err); toast(/no tiene acceso/i.test(err)?'Esta cuenta no tiene acceso':'No se pudo iniciar sesión'); } }catch(e){} } // decision 63b: the Auth hook refuses an email nobody invited
 function supabaseRemote(cfg){
   let client=null; const T=SYNC_TABLES.map(t=>t.table); const fnUrl=cfg.url+'/functions/v1/send-reminders';
   const db=()=>{ if(!client) throw new Error('Cliente de Supabase no cargado'); return client; };
@@ -133,6 +133,7 @@ function supabaseRemote(cfg){
     subscribe(uid, onRow, onStatus){ const c=db(); const ch=c.channel('tareas-'+uid);
       T.filter(t=>!missing.has(t)).forEach(t=>ch.on('postgres_changes', {event:'*', schema:'public', table:t, filter:'owner_id=eq.'+uid}, p=>{ if(p&&p.new&&p.new.id) onRow(t, p.new); }));
       if(!missing.has('inbox')) ch.on('postgres_changes', {event:'INSERT', schema:'public', table:'inbox', filter:'owner_id=eq.'+uid}, p=>{ if(p&&p.new&&p.new.id) onRow('inbox', p.new); }); // Siri: a phrase just arrived
+      if(!missing.has('team_notices')) ch.on('postgres_changes', {event:'INSERT', schema:'public', table:'team_notices', filter:'recipient_id=eq.'+uid}, p=>{ if(p&&p.new&&p.new.id) onRow('team_notices', {id:p.new.id}); }); // decision 63b: a task sent to this member
       ch.subscribe((st, err)=>onStatus(st, err)); return ()=>{ try{ c.removeChannel(ch); }catch(e){} }; },
     // Block 9: the Edge Function's public key, this device's subscription (0002_push.sql) and the account's devices
     async pushKey(){ const r=await fetch(fnUrl+'?publicKey', {headers:{apikey:cfg.anonKey}}); const j=await r.json().catch(()=>({}));
@@ -155,10 +156,26 @@ function supabaseRemote(cfg){
     async inboxClear(){ const res=await db().from('inbox').update({text:'', url:null}).not('taken', 'is', null).neq('text', '').select('id'); if(absent('inbox', res.error)) return []; return rows(res); },
     // Decision 63a (0012_encryption.sql): the account's data key, wrapped by the encryption password. One row per user; insert fails if
     // another device activated first. A database without the table answers null (absent: logged once, Ajustes says it cannot be activated)
-    async cryptoGet(){ const res=await db().from('crypto_keys').select('kid,salt,iterations,wrapped,created,modified,migrated').maybeSingle(); if(absent('crypto_keys', res.error)) return null; if(res.error) throw res.error; return res.data||null; },
+    // Every column: the team's key pair too (0013_team.sql) when the database has it
+    async cryptoGet(){ const res=await db().from('crypto_keys').select('*').maybeSingle(); if(absent('crypto_keys', res.error)) return null; if(res.error) throw res.error; return res.data||null; },
     async cryptoPut(row){ const {error}=await db().from('crypto_keys').insert(row); if(error) throw error; },
     // Only when the row still matches (null: still null), so a change made meanwhile by another device is never overwritten
     async cryptoPatch(owner, match, patch){ let q=db().from('crypto_keys').update(patch).eq('owner_id', owner); Object.keys(match).forEach(c=>{ q=match[c]===null?q.is(c, null):q.eq(c, match[c]); }); return rows(await q.select('kid')); },
+    /* Decision 63b, c and d (0013_team.sql): the team, all through functions that check who calls. teamMe answers {absent:true} on a database
+       without 0013 (the app then works as before), null for an account without access */
+    async teamMe(){ const {data, error}=await db().rpc('tareas_team_me'); if(error){ if(teamAbsentErr(error)){ missing.add('team_notices'); return {absent:true}; } throw error; } return data||null; },
+    async teamDir(){ return rows(await db().rpc('tareas_team_directory')); },
+    async teamList(){ return rows(await db().rpc('tareas_team_list')); },
+    async teamInvite(email, name){ const {data, error}=await db().rpc('tareas_team_invite', {p_email:email, p_name:name}); if(error) throw error; return data; },
+    async teamQuota(id, quota){ const {error}=await db().rpc('tareas_team_quota', {p_id:id, p_quota:quota}); if(error) throw error; },
+    async teamRevoke(id){ const {error}=await db().rpc('tareas_team_revoke', {p_id:id}); if(error) throw error; },
+    // «Avisar a…»: inserted without reading it back; the server's «too soon» comes as an error whose details say until when
+    async noticeSend(row){ const {error}=await db().from('team_notices').insert(row); if(error) throw error; },
+    async noticeList(uid){ return rows(await db().from('team_notices').select('id,sender_id,payload,created').eq('recipient_id', uid).is('taken', null).is('dismissed', null).order('created', {ascending:true}).limit(200)); },
+    async noticeMark(id, patch){ return rows(await db().from('team_notices').update(patch).eq('id', id).select('id')); },
+    async feedbackSend(row){ const {error}=await db().from('team_feedback').insert(row); if(error) throw error; },
+    async feedbackList(){ return rows(await db().from('team_feedback').select('id,sender_id,kind,payload,created,status').order('created', {ascending:false}).limit(200)); },
+    async feedbackMark(id, status){ return rows(await db().from('team_feedback').update({status}).eq('id', id).select('id')); },
     async keyGet(){ const res=await db().from('shortcut_keys').select('space_id,created,revoked').maybeSingle(); if(absent('shortcut_keys', res.error)) return null; if(res.error) throw res.error; return res.data||null; },
     async keyPut(row){ const res=await db().from('shortcut_keys').upsert(row, {onConflict:'owner_id'}); if(absent('shortcut_keys', res.error)) throw new Error('Falta 0010_inbox.sql'); if(res.error) throw res.error; },
     async keyPatch(owner, patch){ return rows(await db().from('shortcut_keys').update(patch).eq('owner_id', owner).select('owner_id')); },
@@ -311,8 +328,11 @@ function syncRun(reason){
   if(!navigator.onLine){ SY.status='offline'; syncPaint(); return Promise.resolve(false); }
   SY.running=true; SY.again=false; syncStatus('syncing');
   const body=async()=>{ const t0=Date.now(); const user=SY.user;
+    // Decision 63b: an account without access syncs nothing (js/team.js); the server would refuse it anyway
+    const tg=await teamGate(user); if(tg==='denied') return 'denied';
     // Decision 63a: an account with encryption on and no key on this device neither pulls nor pushes (js/e2e.js)
-    if(await cryptoGate(user)==='locked') return 'locked';
+    const cg=await cryptoGate(user); if(cg==='locked') return 'locked';
+    if(cg==='off'&&tg==='member') return 'needkey'; // decision 71.1: a member creates the encryption password before anything syncs
     let st=syncState(); const first=st.owner!==user.id;
     if(first && st.firstFor!==user.id){ // decision 5: a local copy before anything comes in; the account's known state starts empty
       try{ flushEdits(); await BK.put(todayStr()); await refreshBackups(); log('info','Copia local antes de la primera sincronización', {tasks:DB.tasks.length, projects:DB.projects.length}); }
@@ -336,9 +356,12 @@ function syncRun(reason){
   const locked=()=>(navigator.locks&&navigator.locks.request) ? navigator.locks.request('tareas-sync', body) : body();
   SY.runP=locked().then(ok=>{ SY.running=false;
     if(ok==='locked'){ SY.status='locked'; SY.error=''; syncPaint(); cryptoAskUnlock(); return false; }
-    if(ok){ SY.status='ok'; SY.error=''; pushFlush(); attFlushSoon(0); syncResubscribe(); cryptoResume(); } syncPaint(); if(SY.again) syncChanged(); return !!ok; }, e=>{
+    if(ok==='denied'){ SY.status='denied'; SY.error=''; syncPaint(); teamDeniedPaint(); return false; } // decision 63b
+    if(ok==='needkey'){ SY.status='needkey'; SY.error=''; syncPaint(); teamAskKey(); return false; } // decision 71.1
+    if(ok){ SY.status='ok'; SY.error=''; pushFlush(); attFlushSoon(0); syncResubscribe(); cryptoResume(); teamAfter(); } syncPaint(); if(SY.again) syncChanged(); return !!ok; }, e=>{
     SY.running=false;
     if(cryptoFailed(e)){ syncRetry(); syncPaint(); return false; } // decision 63a: encrypted rows and no key, or plain text refused by the server
+    if(teamRefused(e)){ syncRetry(); syncPaint(); return false; } // decision 63b: refused by the team's rules (access removed): the next pass reads the account again
     const off=syncOffline(e); SY.status=off?'offline':'error'; SY.error=String(e&&(e.message||e.code)||e);
     log(off?'warn':'error', 'Sincronización falló ('+reason+'): '+SY.error); syncRetry(); syncPaint(); return false; });
   return SY.runP; }
@@ -346,7 +369,7 @@ function syncRun(reason){
 const syncMissingKey = () => SY&&SY.remote&&SY.remote.missing?[...SY.remote.missing].join():'';
 function syncResubscribe(){ if(SY.unsub&&SY.subKey!==syncMissingKey()){ SY.unsub(); SY.unsub=null; syncSubscribe(); } }
 function syncSubscribe(){ if(SY.unsub||!SY.user||!SY.remote.subscribe) return; SY.subKey=syncMissingKey();
-  let was=false; SY.unsub=SY.remote.subscribe(SY.user.id, (table,row)=>{ if(table==='inbox'){ clearTimeout(SY.ibT); SY.ibT=setTimeout(()=>syncRun('Siri'), 300); return; } SY.rt.push([table,row]); clearTimeout(SY.rtT); SY.rtT=setTimeout(syncRealtime, 250); }, (st, err)=>{
+  let was=false; SY.unsub=SY.remote.subscribe(SY.user.id, (table,row)=>{ if(table==='team_notices'){ teamRecvSoon(); return; } if(table==='inbox'){ clearTimeout(SY.ibT); SY.ibT=setTimeout(()=>syncRun('Siri'), 300); return; } SY.rt.push([table,row]); clearTimeout(SY.rtT); SY.rtT=setTimeout(syncRealtime, 250); }, (st, err)=>{
     if(st==='SUBSCRIBED'){ if(was) syncRun('tiempo real'); was=true; } // back after a cut: catch up with what came meanwhile
     else if(st==='CHANNEL_ERROR'||st==='TIMED_OUT') log('warn','Tiempo real: '+st+(err?' '+(err.message||err):'')); }); }
 // Changes from another device, a few at a time, through the same merge
@@ -361,7 +384,7 @@ function syncSetUser(user, why){
   if(user){ const changed=!SY.user||SY.user.id!==user.id; SY.user={id:user.id, email:user.email||''}; st.user=SY.user; st.lost=null; syncWrite(st); SY.lostShown=false;
     if(changed) log('info','Sesión iniciada', SY.user.email);
     syncSubscribe(); if(changed || why==='inicio') syncRun(why==='inicio'?'inicio':'sesión'); }
-  else if(SY.user){ const asked=SY.signingOut||why==='user'||cryptoSignOutRecent(); SY.user=null; st.user=null; // cryptoSignOutRecent: «Cerrar sesión» in another window
+  else if(SY.user){ const asked=SY.signingOut||why==='user'||cryptoSignOutRecent(); SY.user=null; st.user=null; teamReset(null); teamDeniedPaint(); // cryptoSignOutRecent: «Cerrar sesión» in another window
     // A session that ends without «Cerrar sesión» (revoked or expired elsewhere, such as a global sign-out from another app of the project):
     // said in the log, in a notice and in Ajustes until the next sign-in. The encryption key stays; the next sign-in checks it against the account
     if(asked){ log('info','Sesión cerrada'); CR.key=null; CR.kid=null; CR.owner=null; } else { st.lost=new Date().toISOString(); CR.force=true; log('warn','La sesión se ha cerrado sin pedirlo: se deja de sincronizar', why); }
@@ -392,15 +415,17 @@ function syncBoot(){
   window.addEventListener('offline', ()=>syncStatus('offline'));
   document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible' && SY.user) syncRun('vuelta'); });
   setInterval(()=>{ if(onSettings() && SY.user && !busyEditing()) render(); }, 6e4); // "hace 3 min" stays true
-  cryptoBoot(); syncInit(); if(onSettings()) render(); }
+  cryptoBoot(); teamBoot(); syncInit(); if(onSettings()) render(); }
 async function syncSignIn(){ if(!SY) return; if(!navigator.onLine){ toast('Sin conexión'); return; }
   try{ if(!SY.ready){ syncInit(); await SY.initP; } flushHeld(true); flushEdits(); log('info','Inicio de sesión con Google'); await SY.remote.signIn(); }
   catch(e){ log('error','Inicio de sesión falló: '+(e&&e.message||e)); toast('No se pudo iniciar sesión'); } }
 function syncSignOutSheet(){ const dev=UI.wide?'este dispositivo':'este iPhone';
-  // signingOut: the SIGNED_OUT event this causes is the user's own, not a session lost. Only this sign-out forgets the encryption key (decision 63a)
-  confirmSheet('Cerrar sesión', 'Los datos se quedan en '+dev+' y dejan de sincronizarse.', async()=>{ SY.signingOut=true; try{ localStorage.setItem(CR_OUT, String(Date.now())); }catch(e){}
-    try{ await pushSignOut(); try{ await SY.remote.signOut(); }catch(e){ log('warn','Cerrar sesión: '+(e&&e.message||e)); } syncSetUser(null, 'user'); await cryptoSignedOut(); }
-    finally{ SY.signingOut=false; } toast('Sesión cerrada'); }); }
+  confirmSheet('Cerrar sesión', 'Los datos se quedan en '+dev+' y dejan de sincronizarse.', syncSignOut); }
+// signingOut: the SIGNED_OUT event this causes is the user's own, not a session lost. Only this sign-out forgets the encryption key (decision 63a).
+// Also the only button of an account without access (decision 63b)
+async function syncSignOut(){ if(!SY||!SY.user) return; SY.signingOut=true; try{ localStorage.setItem(CR_OUT, String(Date.now())); }catch(e){}
+  try{ await pushSignOut(); try{ await SY.remote.signOut(); }catch(e){ log('warn','Cerrar sesión: '+(e&&e.message||e)); } syncSetUser(null, 'user'); await cryptoSignedOut(); }
+  finally{ SY.signingOut=false; } toast('Sesión cerrada'); }
 
 /* ---------- Ajustes, Cuenta ---------- */
 function syncAgo(iso){ const t=syncTime(iso); if(!t) return ''; const m=Math.floor((Date.now()-t)/6e4);
@@ -409,6 +434,8 @@ function syncAgo(iso){ const t=syncTime(iso); if(!t) return ''; const m=Math.flo
   const x=new Date(iso); return 'el '+x.getDate()+' '+MESES[x.getMonth()]+' a las '+fmtTime(iso); }
 function syncLine(){ if(!SY||!SY.user) return '';
   if(SY.status==='locked') return 'Falta la contraseña de cifrado'; // decision 63a
+  if(SY.status==='denied') return 'Esta cuenta no tiene acceso'; // decision 63b
+  if(SY.status==='needkey') return 'Falta crear la contraseña de cifrado'; // decision 71.1
   if(SY.status==='error'&&CRYPTO_REFUSED.test(SY.error)) return 'Actualiza la app: el cifrado está activado';
   if(SY.status==='offline') return 'Sin conexión. Se sincronizará al volver';
   if(SY.status==='syncing') return 'Sincronizando';
@@ -421,7 +448,7 @@ function syncAccountHTML(dev){
     '<div class="footnote">'+(SY.status==='offline'?'Sin conexión. ':'')+'Al iniciar sesión, tus tareas se guardan en tu cuenta y llegan a tus otros dispositivos. Lo que ya hay en '+dev+' se conserva.</div>';
   const n=SY.pending||0, line=syncLine();
   return '<div class="group-title">Cuenta</div><div class="group sync-acc"><div class="cell"><span class="lbl">Cuenta</span><span class="val">'+esc(SY.user.email||'Google')+'</span></div>'+
-    '<div class="cell"><span class="lbl sync-line'+(SY.status==='error'||SY.status==='offline'||SY.status==='locked'?' warn':'')+'">'+esc(line)+'</span></div>'+
+    '<div class="cell"><span class="lbl sync-line'+(SY.status==='error'||SY.status==='offline'||SY.status==='locked'||SY.status==='denied'||SY.status==='needkey'?' warn':'')+'">'+esc(line)+'</span></div>'+
     '<div class="cell"><span class="lbl">Cambios pendientes</span><span class="val">'+(n?n:'Ninguno')+'</span></div>'+
     '<button class="cell link" data-act="syncNow"'+(SY.status==='syncing'?' disabled':'')+'><span class="lbl">Sincronizar ahora</span></button>'+
     '<button class="cell" data-act="signOut"><span class="lbl" style="color:var(--red)">Cerrar sesión</span></button></div>'+

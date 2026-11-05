@@ -488,7 +488,7 @@ function viewTareas(){
   if(UI.select && UI.select.scope==='root') return selectNav()+'<div class="scroll">'+listHTML(UI.query?'todas':f)+'</div>';
   focusCheck(); if(focusOn()) return focusViewHTML(); // decision 65d
   return '<header class="nav"><div class="nav-row"><button class="title" data-act="spaceMenu" aria-label="Cambiar espacio">'+esc(space().name)+I.chevD+'</button>'+'<button class="action vopts" data-act="viewMenu" aria-label="Opciones de vista">'+I.more+'</button>'+'</div></header>'+
-   '<div class="scroll">'+(f==='hoy'&&!UI.query&&!isClosed()?ahoraHTML():'')+
+   '<div class="scroll">'+(f==='hoy'&&!UI.query?recvBannerHTML():'')+(f==='hoy'&&!UI.query&&!isClosed()?ahoraHTML():'')+ // decision 63b: Recibidas, one line while something waits
    '<div class="searchbar"><div class="search">'+I.search+'<input type="search" placeholder="Buscar" value="'+esc(UI.query)+'" data-role="search" autocomplete="off"></div>'+(UI.query?'<button class="cancel" data-act="clearSearch">Cancelar</button>':'')+'</div>'+
    (UI.query?'':'<div class="seg"><button data-filter="hoy" class="'+(f==='hoy'?'on':'')+'">'+(isClosed()?'Mañana':'Hoy')+'<span class="n">'+nHoy+'</span>'+hoyLoadHTML()+'</button><button data-filter="todas" class="'+(f==='todas'?'on':'')+'">Todas<span class="n">'+nTodas+'</span></button></div>')+
    (!UI.query&&(activeProjects().length||respChipHTML())?'<div class="pchips">'+respChipHTML()+(activeProjects().length?activeProjects().map(p=>'<button class="chip'+(UI.projFilter===p.id?' on':'')+'" data-pf="'+p.id+'"'+(UI.projFilter===p.id?' style="background:'+p.color+'"':'')+'><span class="dot" style="background:'+(UI.projFilter===p.id?'#fff':p.color)+'"></span>'+esc(p.name)+'</button>').join('')+'<button class="chip'+(UI.projFilter==='none'?' on':'')+'" data-pf="none"><span class="dot" style="background:'+(UI.projFilter==='none'?'#fff':'var(--ink3)')+'"></span>Sin proyecto</button>':'')+'</div>':'')+ // decision 48c: the responsible's chip first
@@ -521,7 +521,7 @@ function viewAjustes(){
   const th=DB.settings.theme||'auto'; const dev=UI.wide?'este dispositivo':'este iPhone'; // the desktop reuses this view
   return '<header class="nav"><div class="nav-row"><div class="title">Ajustes</div></div></header>'+
    '<div class="scroll">'+
-   syncAccountHTML(dev)+cryptoSectionHTML(dev)+pushSectionHTML(dev)+shortcutSectionHTML(dev)+ // decision 63a: Cifrado (js/e2e.js)
+   syncAccountHTML(dev)+cryptoSectionHTML(dev)+teamSectionHTML(dev)+pushSectionHTML(dev)+shortcutSectionHTML(dev)+ // decision 63a: Cifrado (js/e2e.js)
    '<div class="group-title">Espacios</div><div class="group">'+DB.spaces.slice().sort((a,b)=>a.order-b.order).map(sp=>'<button class="cell" data-edit-space="'+sp.id+'"><span class="lbl">'+esc(sp.name)+'</span>'+(sp.id===space().id?'<span class="val">Activo</span>':'')+I.chev.replace('<svg','<svg class="chev"')+'</button>').join('')+'<button class="cell link" data-act="newSpace">'+I.plus.replace('<svg','<svg style="width:18px;height:18px"')+'<span class="lbl">Nuevo espacio</span></button></div>'+
    '<div class="footnote">Al eliminar un espacio se eliminan también sus proyectos, tareas y notas de voz.</div>'+
    '<div class="group-title">Horas de trabajo al día</div><div class="group">'+DB.spaces.slice().sort((a,b)=>a.order-b.order).map(sp=>'<button class="cell" data-day-hours="'+sp.id+'" aria-haspopup="menu"><span class="lbl">'+esc(sp.name)+'</span><span class="val">'+dayHours(sp.id)+' h</span>'+I.chev.replace('<svg','<svg class="chev"')+'</button>').join('')+'</div>'+ // decision 60a
@@ -565,6 +565,7 @@ function viewDetail(id){
    (x.status!=='done'||x.estimate?'<button class="cell" data-act="pickEstimate"><span class="lbl">Tiempo</span><span class="val">'+(x.estimate?estLabel(x.estimate):'Ninguno')+'</span>'+chev+'</button>':'')+'</div>'+ // decision 56a
    (pushNote(x)?'<div class="footnote push-note">'+pushNote(x)+'</div>':'')+
    (canRemind(x)?'<div class="group"><button class="cell link remcell" data-act="sendRemind">'+MI.send+'<span class="lbl">Enviar recordatorio a '+esc(taskPeople(x)[0])+'</span></button></div>':'')+ // decision 48c
+   noticeCellHTML(x)+ // decision 63b: Avisar a…
    stepsGroupHTML(x)+ // decision 46
    attWrapHTML(x)+
    '</div>';
@@ -586,7 +587,7 @@ function inspectorHTML(x, p, links){
    '<span class="ilbl">Recordatorio</span>'+pop('pickReminder', x.reminder?fmtDateTime(x.reminder):'Ninguno', !x.reminder, I.bell)+
    (x.status==='waiting'?'<span class="ilbl">Por confirmar</span>'+pop('pickWaiting', x.waitingFor?'Esperando a '+esc(x.waitingFor):'Sí', false, MI.wait):'')+ // decision 41
    (x.status!=='done'||x.responsible?'<span class="ilbl">Responsable</span>'+pop('pickResp', x.responsible?esc(x.responsible):'Ninguno', !x.responsible, I.person):'')+ // decision 48c
-   (canRemind(x)?'<span></span><button class="iremind" data-act="sendRemind">'+MI.send+'Enviar recordatorio</button>':'')+
+   (canRemind(x)?'<span></span><button class="iremind" data-act="sendRemind">'+MI.send+'Enviar recordatorio</button>':'')+noticeCellHTML(x)+ // decision 63b: Avisar a…
    '<span class="ilbl">Repetir</span>'+pop('pickRepeat', repParse(x.repeat)?esc(repSummary(x.repeat)):'Nunca', !repParse(x.repeat), I.repeat)+ // decision 38
    '<span class="ilbl">Prioridad</span><div class="seg iseg" role="radiogroup" aria-label="Prioridad">'+seg+'</div>'+
    (x.status!=='done'||x.estimate?'<span class="ilbl">Tiempo</span>'+pop('pickEstimate', x.estimate?estLabel(x.estimate):'Ninguno', !x.estimate, I.est):'')+'</div>'+ // decision 56a

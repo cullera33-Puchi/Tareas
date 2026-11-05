@@ -15,6 +15,11 @@
 //                              24 hours ago, or whose task was, are removed from the private bucket "attachments" and their rows marked
 //                              purged (and deleted, when only the task was). A few per run; a file already gone counts as removed, so a
 //                              run cut halfway is simply repeated by the next one. Before 0003 runs it does nothing.
+//                              Then the team (decision 63, 0013_team.sql): the notification of each task sent with «Avisar a…» to its
+//                              recipient («Enric te ha enviado una tarea», nothing of the task) and of each suggestion or incident to the
+//                              admin («Nueva sugerencia», «Nueva incidencia»), each once; and the removal of the members whose access was
+//                              removed more than 30 days ago (their files through the Storage API first, then their rows, membership and
+//                              account). A reminder of an account without access is marked and not sent. Before 0013 runs none of it does.
 //   POST {test:true, id?} with the user's JWT in Authorization
 //                              A test notification to the caller's own devices (only the one with that id when given).
 //
@@ -189,8 +194,12 @@ async function sendDue(c: Conf) {
   const claimed = (await rest(c, 'PATCH', 'tasks?' + qs({ reminder: 'lte.' + nowIso, reminder_sent: 'is.null', deleted: 'is.null', status: 'in.(pending,waiting)', select: 'id,owner_id,title,project_id,date,reminder' }), // decision 41: Por confirmar notifies too
     { reminder_sent: nowIso }, 'return=representation')).data as { id: string; owner_id: string; title: string | null; project_id: string | null; date: string | null; reminder: string }[];
   if (!claimed.length) return { due: 0, late: 0, sent: 0, failed: 0, gone: 0 };
-  const fresh = claimed.filter(t => now.getTime() - Date.parse(t.reminder) <= LATE_LIMIT_MS);
+  let fresh = claimed.filter(t => now.getTime() - Date.parse(t.reminder) <= LATE_LIMIT_MS);
   const late = claimed.length - fresh.length;
+  if (!fresh.length) return { due: claimed.length, late, sent: 0, failed: 0, gone: 0 };
+  // Decision 63b: an account whose access was removed gets no reminder (already marked above, so it never goes)
+  const allowed = await teamAllowed(c, [...new Set(fresh.map(t => t.owner_id))]);
+  if (allowed) fresh = fresh.filter(t => allowed.has(t.owner_id));
   if (!fresh.length) return { due: claimed.length, late, sent: 0, failed: 0, gone: 0 };
   const owners = [...new Set(fresh.map(t => t.owner_id))];
   const subs = (await rest(c, 'GET', 'push_subscriptions?' + qs({ owner_id: inList(owners), deleted: 'is.null', select: 'id,owner_id,endpoint,p256dh,auth' }))).data as Sub[];
@@ -257,6 +266,81 @@ async function purgeAttachments(c: Conf): Promise<Record<string, number>> {
   return { purged: rows.length, files: paths.length, removed };
 }
 
+/* ---------- The team (decision 63, 0013_team.sql) ---------- */
+// A request that failed because 0013 is not there yet (the table or the function is missing): said once per instance, then quiet
+const absent = (e: unknown) => / 404 |PGRST20[25]|42P01|42883|Could not find|does not exist/i.test(String((e as Error)?.message || e));
+let teamMissing = false;
+function teamSkip(e: unknown, what: string): boolean {
+  if (!absent(e)) return false;
+  if (!teamMissing) { teamMissing = true; console.log(JSON.stringify({ event: 'team-skipped', reason: '0013_team.sql not run', what })); }
+  return true;
+}
+// The accounts of the list with access, or null without 0013 (everyone, as before)
+async function teamAllowed(c: Conf, ids: string[]): Promise<Set<string> | null> {
+  try {
+    const rows = (await rest(c, 'POST', 'rpc/tareas_team_allowed', { p_ids: ids })).data as (string | Record<string, string>)[] | null;
+    return new Set((rows || []).map(r => typeof r === 'string' ? r : Object.values(r)[0]));
+  } catch (e) {
+    // Never holds the reminders back: without the answer they all go, as before 0013
+    if (!teamSkip(e, 'allowed')) console.error(JSON.stringify({ event: 'team-allowed-failed', error: String((e as Error)?.message || e) }));
+    return null;
+  }
+}
+// A member's first name for «Enric te ha enviado una tarea»: the first word of the directory's name, else the start of the email
+const firstName = (m?: { name?: string | null; email?: string | null }) =>
+  (String(m?.name || '').trim().split(/\s+/)[0] || String(m?.email || '').split('@')[0] || 'Alguien');
+// Claims what has not been pushed yet (one statement, as the reminders: a run at the same time finds them marked) and notifies.
+// Older than an hour (the job stopped for a while): marked without notifying
+async function sendTeam(c: Conf): Promise<Record<string, number>> {
+  const nowIso = new Date().toISOString(), fresh = (iso: string) => Date.now() - Date.parse(iso) <= LATE_LIMIT_MS;
+  let notices: { id: string; sender_id: string; recipient_id: string; created: string }[] = [];
+  let feedback: { id: string; recipient_id: string; kind: string; created: string }[] = [];
+  try {
+    notices = (await rest(c, 'PATCH', 'team_notices?' + qs({ pushed: 'is.null', select: 'id,sender_id,recipient_id,created' }), { pushed: nowIso }, 'return=representation')).data || [];
+    feedback = (await rest(c, 'PATCH', 'team_feedback?' + qs({ pushed: 'is.null', select: 'id,recipient_id,kind,created' }), { pushed: nowIso }, 'return=representation')).data || [];
+  } catch (e) {
+    if (teamSkip(e, 'notices')) return { notices: 0, feedback: 0 };
+    throw e;
+  }
+  const ns = notices.filter(n => fresh(n.created)), fs = feedback.filter(f => fresh(f.created));
+  if (!ns.length && !fs.length) return { notices: notices.length, feedback: feedback.length };
+  const to = [...new Set([...ns.map(n => n.recipient_id), ...fs.map(f => f.recipient_id)])];
+  const subs = (await rest(c, 'GET', 'push_subscriptions?' + qs({ owner_id: inList(to), deleted: 'is.null', select: 'id,owner_id,endpoint,p256dh,auth' }))).data as Sub[];
+  const senders = [...new Set(ns.map(n => n.sender_id))];
+  const names = new Map<string, { name: string | null; email: string | null }>();
+  if (senders.length) ((await rest(c, 'GET', 'team_members?' + qs({ user_id: inList(senders), select: 'user_id,name,email' }))).data as { user_id: string; name: string | null; email: string | null }[]).forEach(m => names.set(m.user_id, m));
+  const jobs: { sub: Sub; msg: Message }[] = [];
+  for (const n of ns) {
+    const msg: Message = { title: 'Tareas', body: firstName(names.get(n.sender_id)) + ' te ha enviado una tarea', tag: 'notice-' + n.id, data: { open: 'received', url: './?open=received' } };
+    subs.filter(s => s.owner_id === n.recipient_id).forEach(sub => jobs.push({ sub, msg }));
+  }
+  for (const f of fs) {
+    const msg: Message = { title: 'Tareas', body: f.kind === 'incidencia' ? 'Nueva incidencia' : 'Nueva sugerencia', tag: 'feedback-' + f.id, data: { open: 'feedback', url: './?open=feedback' } };
+    subs.filter(s => s.owner_id === f.recipient_id).forEach(sub => jobs.push({ sub, msg }));
+  }
+  const out = jobs.length ? await deliver(c, await vapid(c), jobs) : { sent: 0, failed: 0, gone: 0 };
+  return { notices: notices.length, feedback: feedback.length, teamSent: out.sent, teamFailed: out.failed };
+}
+// The removal 30 days after the access was removed (decision 71.4): the files first (a few hundred per run), then the rows, once none is left.
+// tareas_team_remove checks again the 30 days and never touches an admin or an active member
+async function removeMembers(c: Conf): Promise<Record<string, number>> {
+  let due: { member_id: string; user_id: string | null; files: string[] | null }[];
+  try {
+    due = (await rest(c, 'POST', 'rpc/tareas_team_to_remove', {})).data || [];
+  } catch (e) {
+    if (teamSkip(e, 'removal')) return { removedMembers: 0 };
+    throw e;
+  }
+  let removedMembers = 0, removedFiles = 0;
+  for (const m of due) {
+    const files = (m.files || []).filter(Boolean);
+    if (files.length) { removedFiles += await removeObjects(c, files); continue; } // the rows go on a later run, once the folder is empty
+    const res = (await rest(c, 'POST', 'rpc/tareas_team_remove', { p_member: m.member_id })).data;
+    if (res && !res.skipped) { removedMembers++; console.log(JSON.stringify({ event: 'member-removed', member: m.member_id, rows: res })); }
+  }
+  return { removedMembers, removedFiles };
+}
+
 /* ---------- Test: the caller's own devices ---------- */
 async function sendTest(c: Conf, req: Request, body: { id?: string }) {
   const jwt = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim();
@@ -297,7 +381,13 @@ export async function handler(req: Request): Promise<Response> {
     let purge: Record<string, number> = { purged: 0 };
     try { purge = await purgeAttachments(c); } catch (e) { console.error(JSON.stringify({ event: 'purge-failed', error: String((e as Error)?.message || e) })); purge = { purged: 0, purgeFailed: 1 }; }
     if (purge.purged) console.log(JSON.stringify({ event: 'purge', ...purge, ms: Date.now() - t0 }));
-    return json({ ...out, ...purge });
+    // The team: its notifications, then the removals. Each failure is logged and tried again on the next run
+    let team: Record<string, number> = {};
+    try { team = await sendTeam(c); } catch (e) { console.error(JSON.stringify({ event: 'team-failed', error: String((e as Error)?.message || e) })); team = { teamFailed: 1 }; }
+    if (team.notices || team.feedback) console.log(JSON.stringify({ event: 'team', ...team, ms: Date.now() - t0 }));
+    let removal: Record<string, number> = {};
+    try { removal = await removeMembers(c); } catch (e) { console.error(JSON.stringify({ event: 'removal-failed', error: String((e as Error)?.message || e) })); removal = { removalFailed: 1 }; }
+    return json({ ...out, ...purge, ...team, ...removal });
   } catch (e) {
     console.error(JSON.stringify({ event: 'error', error: String((e as Error)?.message || e) }));
     return json({ error: String((e as Error)?.message || e) }, 500);

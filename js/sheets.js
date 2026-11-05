@@ -163,6 +163,7 @@ function rowMenu(id, src){ const x=task(id); if(!x) return; releaseHold(id);
        .concat(x.status==='pending'?[{label:x.focus?'Quitar de Ahora':'Ahora', icon:x.focus?MI.starOff:MI.star, fn:()=>toggleFocus(id)}]:[]) // decision 39
        .concat(waitItems(x, MI)) // decision 41
        .concat(canRemind(x)?[{label:'Enviar recordatorio', icon:MI.send, fn:()=>remindSheet([id])}]:[]) // decision 48c
+       .concat(noticeItems(x, true)) // decision 63b: Avisar a…
        .concat([{label:'Duplicar', icon:MI.dup, fn:()=>duplicateTask(id)}, {label:'Seleccionar', icon:MI.select, fn:()=>startSelect(id)}]),
       [{label:'Eliminar', icon:MI.trash, red:true, fn:()=>confirmDelete(id)}] ]}); } }
 /* Desktop sidebar: a project dragged to another place (or moved with Alt and an arrow). The space's projects are numbered again from 0,

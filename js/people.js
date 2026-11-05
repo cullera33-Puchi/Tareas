@@ -27,37 +27,52 @@ function ensureContact(name){ const n=String(name||'').replace(/\s+/g,' ').trim(
   const t=new Date().toISOString(), c={id:uid(), name:n, email:null, phone:null, created:t, modified:t}; DB.contacts.push(c); log('info','Contacto creado al escribir un nombre nuevo'); return c; }
 // Deshacer of the action that made c: it goes again while nobody has changed it
 function dropContact(c){ if(!c) return; const cur=contactRec(c.id); if(cur&&cur.modified===c.modified&&!cur.email&&!cur.phone) DB.contacts=DB.contacts.filter(o=>o!==cur); }
-// The names the fields suggest: the contacts, then the names the tasks use (Responsable, Esperando a) that no contact has; those that hold
-// what is typed, the ones that start with it first. At most six; the value already in the field is left out
-function personNames(q, cur){ const k=personKey(q), seen=new Set(), out=[];
-  const add=n=>{ const s=String(n||'').replace(/\s+/g,' ').trim(), key=personKey(s); if(!s||seen.has(key)) return; seen.add(key); out.push(s); };
-  contactsSorted().forEach(c=>add(c.name)); DB.tasks.map(x=>x.responsible).concat(DB.tasks.map(x=>x.waitingFor)).filter(Boolean).sort(nameCmp).forEach(add);
-  let l=out.filter(n=>personKey(n)!==personKey(cur)); if(k) l=l.filter(n=>personKey(n).includes(k)).sort((a,b)=>(personKey(b).startsWith(k)?1:0)-(personKey(a).startsWith(k)?1:0));
-  return l.slice(0,6); }
-const personSugHTML = (q, cur) => personNames(q, cur).map(n=>'<button type="button" class="chip" data-sug="'+esc(n)+'">'+esc(n)+'</button>').join('');
-/* The suggestions under a name field (Responsable, Esperando a): they follow what is typed; a tap puts the name in the field (pick, when
-   given, takes it at once). A press on a chip keeps the focus in the field, so the iPhone keyboard stays up */
-function bindPersonField(root, inp, pick){ const box=root.querySelector('.psug'); if(!box||!inp) return;
-  const fill=()=>{ box.innerHTML=personSugHTML(inp.value, ''); box.classList.toggle('empty', !box.children.length); };
-  fill(); inp.addEventListener('input', fill);
-  box.addEventListener('mousedown', e=>{ if(e.target.closest('[data-sug]')) e.preventDefault(); });
-  box.addEventListener('click', e=>{ const b=e.target.closest('[data-sug]'); if(!b) return; e.stopPropagation(); inp.value=b.dataset.sug; haptic(4); if(pick) pick(b.dataset.sug); else { fill(); inp.focus(); } }); }
+/* ---------- v0.33.1: the person picker, a list with a search field on top (Responsable and Esperando a) ----------
+   The names are the contacts, alphabetically, then those the tasks use (Responsable, Esperando a) that no contact has, with the contact's
+   phone or mail as a grey icon. What is typed filters them (no accents or case); with nothing typed the list starts with the «none» row
+   (Sin responsable, La tarea es tuya); a typed text that no name matches exactly gives «Añadir «Texto»» at the top. The current value has
+   the check mark. Keys: up and down move, Enter chooses; the mouse and the finger choose with one click. A press on a row keeps the focus in
+   the field, so the iPhone keyboard stays up. o: {cur, none:[label, sub], onPick(value or null, 'click'|'enter'), rows (desktop rows shown)} */
+function pickNames(cur){ const seen=new Set(), out=[]; const add=(n, c)=>{ const v=String(n||'').replace(/\s+/g,' ').trim(), k=personKey(v); if(!v||seen.has(k)) return; seen.add(k); out.push({name:v, c}); };
+  contactsSorted().forEach(c=>add(c.name, c)); const n=out.length;
+  DB.tasks.map(x=>x.responsible).concat(DB.tasks.map(x=>x.waitingFor)).concat([cur]).forEach(v=>add(v, null));
+  return out.slice(0, n).concat(out.slice(n).sort((a,b)=>nameCmp(a.name, b.name))); } // the contacts first, then the other names
+const personPickHTML = () => '<div class="ppick"><div class="ppsearch">'+I.search+'<input type="text" data-role="ppq" placeholder="Buscar o escribir un nombre" autocomplete="off" autocapitalize="words" enterkeyhint="done" spellcheck="false" aria-label="Buscar o escribir un nombre"'+(UI.wide?' autofocus':'')+'></div><div class="pplist" role="listbox"></div></div>';
+function bindPersonPick(root, o){ const inp=$('[data-role=ppq]', root), box=$('.pplist', root); if(!inp||!box) return null; let rows=[], act=-1;
+  const hl=()=>{ box.querySelectorAll('.pprow').forEach((b,i)=>b.classList.toggle('hl', i===act)); const b=box.children[act]; if(b&&b.scrollIntoView) b.scrollIntoView({block:'nearest'}); };
+  const paint=()=>{ const q=inp.value.replace(/\s+/g,' ').trim(), k=personKey(q), ck=personKey(o.cur), names=pickNames(o.cur);
+    rows=[]; if(!k) rows.push({none:true}); else if(!names.some(n=>personKey(n.name)===k)) rows.push({add:q});
+    names.forEach(n=>{ if(!k||personKey(n.name).includes(k)) rows.push(n); });
+    box.innerHTML=rows.map((r,i)=>{ const on=r.none?!ck:r.add==null&&personKey(r.name)===ck;
+      const ic=r.add!=null?I.plus:r.c&&r.c.phone?MI.phone:r.c&&r.c.email?MI.mail:'';
+      const lbl=r.none?esc(o.none[0])+'<small>'+esc(o.none[1])+'</small>':r.add!=null?'Añadir «'+esc(r.add)+'»':esc(r.name);
+      return '<button type="button" class="pprow'+(r.add!=null?' ppadd':'')+(r.none?' ppnone':'')+'" data-pp="'+i+'" role="option" aria-selected="'+on+'"'+(r.c&&(r.c.phone||r.c.email)?' title="'+esc(r.c.phone||r.c.email)+'"':'')+'><span class="ppck">'+(on?MI.check:'')+'</span><span class="ppl">'+lbl+'</span><span class="ppic">'+ic+'</span></button>'; }).join('');
+    act=k?0:Math.max(0, rows.findIndex(r=>r.none?!ck:personKey(r.name)===ck)); if(UI.wide) hl(); };
+  const pick=(i, how)=>{ const r=rows[i]; if(!r) return; haptic(4); o.onPick(r.none?null:r.add!=null?r.add:r.name, how); };
+  paint(); inp.addEventListener('input', paint);
+  inp.addEventListener('keydown', e=>{ if(e.isComposing) return;
+    if(e.key==='ArrowDown'||e.key==='ArrowUp'){ e.preventDefault(); if(!rows.length) return; act=e.key==='ArrowDown'?(act+1)%rows.length:(act<=0?rows.length-1:act-1); hl(); return; }
+    if(e.key==='Enter'){ e.preventDefault(); pick(act<0?0:act, 'enter'); } });
+  box.addEventListener('mousedown', e=>{ if(e.target.closest('.pprow')) e.preventDefault(); });
+  box.addEventListener('mousemove', e=>{ if(!UI.wide) return; const b=e.target.closest('.pprow'); if(b&&+b.dataset.pp!==act){ act=+b.dataset.pp; box.querySelectorAll('.pprow').forEach((x,i)=>x.classList.toggle('hl', i===act)); } });
+  box.addEventListener('click', e=>{ const b=e.target.closest('.pprow'); if(!b) return; e.stopPropagation(); pick(+b.dataset.pp, 'click'); });
+  // The picker inside a sheet that saves later (Esperando a): set the chosen value, clear the search, move the check mark
+  return { set(v){ o.cur=v||''; inp.value=''; paint(); }, typed:()=>inp.value.replace(/\s+/g,' ').trim(), input:inp }; }
 
 /* ---------- Responsable ---------- */
 function setResponsible(id, who){ const x=task(id); if(!x) return; const v=personName(who); if((x.responsible||null)===v) return; const old=x.responsible||null; releaseHold(id);
   let nc=null; batch(()=>{ nc=v?ensureContact(v):null; updTask(id, {responsible:v}); }); haptic(8); renderAnimated(); log('info', v?'Responsable':'Responsable quitado');
   toast(v?'Responsable: '+v:'Sin responsable', ()=>batch(()=>{ updTask(id, {responsible:old}); dropContact(nc); save(); })); }
-// The sheet (iPhone, actions in its head, decision 18; the field focused inside the tap) or the popover (desktop) of Responsable
+/* The Responsable picker (v0.33.1, a list): on the iPhone a sheet with Cancelar in its head (decision 18) and the field focused inside the
+   tap; on the desktop a popover of about 280 px under the control that opened it (the inspector's cell; a menu's or a key's opens it at
+   the row or centred). One choice closes it and applies, with Deshacer */
 function responsibleSheet(id, src){ const x=task(id); if(!x) return;
-  const field='<input type="text" class="wfor" data-role="resp" placeholder="Nombre" value="'+esc(x.responsible||'')+'" autocomplete="off" autocapitalize="words" enterkeyhint="done"'+(UI.wide?' autofocus':'')+'>';
-  const body='<div class="wsheet rsheet"><label class="wlbl">Quién la hace</label>'+field+'<div class="chips psug"></div><div class="hint">Vacío, la tarea es tuya.</div>'+(x.responsible?'<button class="wback" data-x="clear">Quitar responsable</button>':'');
-  const bind=(s, close)=>{ const inp=$('[data-role=resp]', s); const go=v=>{ close(); setResponsible(id, v); };
-    bindPersonField(s, inp, go);
-    inp.addEventListener('keydown', e=>{ if(e.key==='Enter'&&!e.isComposing){ e.preventDefault(); go(inp.value); } });
-    s.onclick=e=>{ const b=e.target.closest('[data-x]'); if(!b) return; if(b.dataset.x==='ok') go(inp.value); else if(b.dataset.x==='clear') go(''); else close(); };
-    if(!UI.wide){ inp.focus(); try{ inp.setSelectionRange(inp.value.length, inp.value.length); }catch(e){} } };
-  if(UI.wide){ pickerPanel('Responsable', '<div class="pm-title wtitle">Responsable</div>'+body+'<div class="sheet-actions"><button class="btn" data-x="cancel">Cancelar</button><button class="btn primary" data-x="ok">Guardar</button></div></div>', id, src&&src.isConnected?src:null, 'pickResp', bind); return; }
-  openSheet(sheadHTML('Responsable', 'Cancelar', 'Guardar')+body+'</div>', s=>bind(s, closeSheet)); }
+  const bind=(s, close)=>{ bindPersonPick(s, {cur:x.responsible||'', none:['Sin responsable','La tarea es tuya'], onPick:v=>{ close(); setResponsible(id, v||''); }});
+    s.addEventListener('click', e=>{ if(e.target.closest('[data-x=cancel]')) close(); });
+    if(!UI.wide){ const inp=$('[data-role=ppq]', s); if(inp) inp.focus(); } };
+  if(UI.wide){ const at=src&&src.isConnected?{anchor:src, align:src.closest('.pane')?'left':'right'}:taskAnchor(id, 'pickResp');
+    popMenu(Object.assign(at||{}, {html:'<div class="ppwrap">'+personPickHTML()+'</div>', bind:el=>{ el.classList.add('pp-pop'); bind(el, ()=>closeMenu(false, true)); }})); return; }
+  openSheet('<div class="shead"><button class="hbtn" data-x="cancel">Cancelar</button><h2>Responsable</h2><span></span></div>'+personPickHTML(), s=>{ s.classList.add('ppsheet'); bind(s, closeSheet); }); }
 
 /* ---------- List filter by responsible ----------
    UI.respFilter holds a name; with the project filter (UI.projFilter) both apply. One person at a time; a search ignores both, as it

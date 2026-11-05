@@ -236,7 +236,7 @@ async function iphone(browser){
   await ev(page, ()=>rowMenu('a6')); await sleep(600); await menuItem(page, 'Por confirmar').tap(); await sleep(700);
   x = await ev(page, ()=>({on:document.querySelector('#sheet').classList.contains('on'), chips:[...document.querySelectorAll('#sheet .wchips .chip')].map(c=>c.textContent+(c.classList.contains('on')?'*':'')), line:document.querySelector('#sheet .wline').textContent}));
   check('wait_sheet', x.on && x.chips.join()==='Hoy,Mañana*,En 3 días,Próxima semana,Sin fecha' && x.line==='Vuelve a Hoy mañana, en Revisar hoy.', x);
-  await page.fill('#sheet [data-role=waitfor]', 'Ramiro'); await page.tap('#sheet [data-wd="3d"]'); await sleep(200); await shot(page, 'm12-waiting-sheet');
+  await page.fill('#sheet [data-role=ppq]', 'Ramiro'); await page.tap('#sheet [data-wd="3d"]'); await sleep(200); await shot(page, 'm12-waiting-sheet');
   await page.tap('#sheet [data-x=ok]'); await sleep(700);
   x = await ev(page, L=>({st:task('a6').status, who:task('a6').waitingFor, d:task('a6').date, t:document.querySelector('#toastText').textContent, inList:!!document.querySelector(L+' .row[data-id=a6]'), hoy:pendingFor('hoy').some(x=>x.id==='a6'), btn:(document.querySelector(L+' .wblock [data-act=toggleWaiting]')||{}).textContent, head:(document.querySelector(L+' .wblock .gl')||{}).textContent}), L);
   check('wait_mark', x.st==='waiting' && x.who==='Ramiro' && x.d==='2026-11-07' && x.t==='Por confirmar, esperando a Ramiro, revisar el sábado 7' && !x.inList && !x.hoy && x.btn==='Mostrar las que esperan' && x.head==='Por confirmar más adelante1', x); // decision 51
@@ -251,7 +251,7 @@ async function iphone(browser){
   await ev(page, ()=>updTask('a6', {date:'2026-11-07'}));
   // Decision 57: «Hoy» as review day keeps it in Revisar hoy today, to close it today
   x = await ev(page, L=>{ const t=todayStr(); unWait('a6'); waitingSheet('a6'); const sh=document.querySelector('#sheet'); sh.querySelector('[data-wd=hoy]').click(); const line=sh.querySelector('.wline').textContent;
-    sh.querySelector('[data-role=waitfor]').value='Ramiro'; sh.querySelector('[data-x=ok]').click(); render(); const r=document.querySelector(L+' .group[data-review] .row[data-id=a6]');
+    sh.querySelector('[data-role=ppq]').value='Ramiro'; sh.querySelector('[data-x=ok]').click(); render(); const r=document.querySelector(L+' .group[data-review] .row[data-id=a6]');
     return {line, st:task('a6').status, d:task('a6').date===t, review:!!r, hoy:pendingFor('hoy').some(x=>x.id==='a6')}; }, L);
   check('wait_today', x.line==='Se queda hoy en Revisar hoy, arriba de la lista.' && x.st==='waiting' && x.d && x.review && x.hoy, x);
   await sleep(700); await ev(page, ()=>{ updTask('a6', {date:'2026-11-07'}); document.querySelector('#toast').classList.remove('on'); }); await sleep(300);

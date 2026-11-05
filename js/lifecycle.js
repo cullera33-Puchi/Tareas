@@ -153,3 +153,50 @@ window.addEventListener('storage', e=>{
   if(e.key===KEY || e.key===null) reloadIfChanged();
 });
 window.addEventListener('pageshow', e=>{ if(e.persisted) reloadIfChanged(); });
+
+/* ---------- Release notes when updating (decision 64) ----------
+   novedades.json is published with the app, outside SHELL, and sw.js lets it through to the network: it is always the one on the
+   server. Format: [{version:'0.33.1', date:'2026-11-05', items:['…', …]}, …], newest first. It is fetched when a new version is
+   detected (offerUpdate) and when Ajustes asks for it; the versions newer than APP_VERSION are the ones this device lacks.
+   Without it (offline, missing, malformed, or nothing newer listed), «Actualizar» updates right away as before. */
+const NV={list:null, p:null};
+function verParts(v){ const m=/^v?(\d+)\.(\d+)(?:\.(\d+))?$/.exec(String(v==null?'':v).trim()); return m?[+m[1],+m[2],+(m[3]||0)]:null; }
+function verCmp(a, b){ const pa=verParts(a), pb=verParts(b); if(!pa||!pb) return null; for(let i=0;i<3;i++) if(pa[i]!==pb[i]) return pa[i]-pb[i]; return 0; }
+const nvNewer = list => (list||[]).filter(e=>verCmp(e.version, APP_VERSION)>0);
+function nvClean(j){ // keeps the well formed entries, sorted newest first whatever order the file has
+  return (Array.isArray(j)?j:[]).filter(e=>e&&verParts(e.version)&&Array.isArray(e.items))
+    .map(e=>({version:String(e.version).trim().replace(/^v/,''), date:typeof e.date==='string'?e.date:'', items:e.items.filter(s=>typeof s==='string'&&s.trim()).map(s=>s.trim())}))
+    .filter(e=>e.items.length).sort((a,b)=>verCmp(b.version, a.version)); }
+function nvFetch(){ // one request at a time; resolves to the list, or null when it could not be read
+  if(NV.p) return NV.p;
+  NV.p=fetch('novedades.json', {cache:'no-store'}).then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+    .then(j=>{ NV.list=nvClean(j); return NV.list; })
+    .catch(e=>{ log('info','Novedades no disponibles: '+(e&&e.message||e)); return null; })
+    .finally(()=>{ NV.p=null; });
+  return NV.p; }
+// The notes in flight when «Actualizar» is tapped get a moment to arrive; past it, the update goes ahead as before
+const nvWait = ms => NV.p ? Promise.race([NV.p, new Promise(r=>setTimeout(()=>r(NV.list), ms))]) : Promise.resolve(NV.list);
+// «Actualizar» on the toast or in Ajustes: the sheet with what is new, or the update right away
+async function updateTap(){ if(!pendingSW) return; const sw=pendingSW;
+  const list=await nvWait(3000); if(pendingSW!==sw) return;
+  if(!nvNewer(list).length){ applyUpdate(); return; }
+  nvSheet(list, true); }
+function nvDate(d){ const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(d||''); return m?(+m[3])+' de '+MESES_FULL[+m[2]-1]:''; }
+function nvEntryHTML(e, tag){ const d=nvDate(e.date);
+  return '<section class="nv-ver"><div class="nv-head"><span class="nv-v">Versión '+esc(e.version)+'</span>'+(tag?'<span class="nv-tag">'+tag+'</span>':'')+(d?'<span class="nv-d">'+d+'</span>':'')+'</div>'+
+    '<ul class="nv-items">'+e.items.map(s=>'<li>'+esc(s)+'</li>').join('')+'</ul></section>'; }
+/* offer: only the versions this device lacks, titled with the newest one, with Actualizar and Más tarde.
+   Without offer (Ajustes): every version, the installed one marked; Actualizar too while an update waits. */
+function nvSheet(list, offer){ const newer=nvNewer(list), items=offer?newer:list, upd=!!pendingSW&&newer.length>0;
+  if(!items.length) return;
+  const title=offer?'Novedades de la '+items[0].version:'Novedades';
+  const body=items.map(e=>{ const c=verCmp(e.version, APP_VERSION); return nvEntryHTML(e, offer?'':c===0?'Instalada':c>0&&upd?'Nueva':''); }).join('');
+  const acts=upd?'<button class="btn" data-x="later">Más tarde</button><button class="btn primary" data-x="update">Actualizar</button>':'<button class="btn" data-x="later">Cerrar</button>';
+  openSheet('<h2>'+esc(title)+'</h2><div class="nv-list">'+body+'</div><div class="sheet-actions">'+acts+'</div>', s=>{ s.classList.add('nvsheet');
+    s.onclick=e=>{ const b=e.target.closest('[data-x]'); if(!b) return;
+      closeSheet(); if(b.dataset.x==='update') applyUpdate(); else if(offer) log('info','Actualización aplazada desde Novedades'); }; });
+  log('info','Novedades mostradas', {versiones:items.length, oferta:!!offer}); }
+// Ajustes, Novedades: the list from the server, even without an update; a copy read earlier serves when offline
+async function newsSheet(){ const list=(await nvFetch())||NV.list;
+  if(!list||!list.length){ toast('No se pudieron cargar las novedades. Prueba con conexión.'); return; }
+  nvSheet(list, false); }

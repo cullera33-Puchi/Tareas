@@ -143,7 +143,10 @@ const menuLabels = page => ev(page, ()=>[...document.querySelectorAll('#pmenu .p
 const sent = page => ev(page, ()=>window.__sent.splice(0));
 const rootRows = page => ev(page, ()=>[...document.querySelectorAll('.screen.root .scroll .row[data-id]')].filter(r=>!r.closest('.first')).map(r=>r.dataset.id).sort().join());
 const deskRows = page => ev(page, ()=>[...document.querySelectorAll('#desk .main .mbody .row[data-id]')].filter(r=>!r.closest('.first')).map(r=>r.dataset.id).sort().join());
-const sugs = page => ev(page, ()=>[...document.querySelectorAll('.psug [data-sug]')].map(b=>b.textContent).join());
+// v0.33.1: the person picker is a list (bindPersonPick): the names it shows, the checked one, a row by its name
+const sugs = page => ev(page, ()=>[...document.querySelectorAll('.pplist .pprow:not(.ppnone):not(.ppadd) .ppl')].map(b=>b.textContent).join());
+const ppChecked = page => ev(page, ()=>{ const r=document.querySelector('.pplist .pprow[aria-selected=true] .ppl'); return r&&r.textContent; });
+const ppRow = (page, name) => page.locator('.pplist .pprow').filter({has: page.locator('.ppl', {hasText: new RegExp('^'+name+'$')})}).first();
 
 /* ======================= 2. iPhone ======================= */
 async function iphone(browser){
@@ -159,19 +162,23 @@ async function iphone(browser){
   x = await ev(page, ()=>{ const s=document.querySelector('.pushed-screen.detail'); const c=s.querySelector('[data-act=pickResp]'); return {lbl:c&&c.querySelector('.lbl').textContent, val:c&&c.querySelector('.val').textContent, remind:!!s.querySelector('[data-act=sendRemind]')}; });
   check('i_detail_cell', x.lbl==='Responsable' && x.val==='Ninguno' && !x.remind, x);
   await page.tap('.pushed-screen.detail [data-act=pickResp]'); await sheetUp(page);
-  x = await ev(page, ()=>({h:document.querySelector('#sheet h2').textContent, focus:document.activeElement===document.querySelector('#sheet [data-role=resp]')}));
-  check('i_sheet', x.h==='Responsable' && x.focus, x);
+  x = await ev(page, ()=>({h:document.querySelector('#sheet h2').textContent, focus:document.activeElement===document.querySelector('#sheet [data-role=ppq]'), none:document.querySelector('#sheet .pprow').textContent, btns:[...document.querySelectorAll('#sheet .shead button')].map(b=>b.textContent).join()}));
+  check('i_sheet', x.h==='Responsable' && x.focus && x.none==='Sin responsableLa tarea es tuya' && x.btns==='Cancelar', x);
   check('i_sug_all', await sugs(page)==='Luis,Marta Ruiz,Ana', await sugs(page)); // contacts first, then the names the tasks use
-  await page.fill('#sheet [data-role=resp]', 'mar'); await page.dispatchEvent('#sheet [data-role=resp]', 'input');
-  check('i_sug_typed', await sugs(page)==='Marta Ruiz', await sugs(page));
+  await page.fill('#sheet [data-role=ppq]', 'MÁR'); // no accents nor case
+  check('i_sug_typed', await sugs(page)==='Marta Ruiz' && await ev(page, ()=>document.querySelector('#sheet .pprow').textContent==='Añadir «MÁR»'&&!document.querySelector('#sheet .ppnone')), await sugs(page));
+  await page.fill('#sheet [data-role=ppq]', 'marta ruiz'); // an exact name (any case) offers no Añadir
+  check('i_exact', await ev(page, ()=>!document.querySelector('#sheet .ppadd') && document.querySelectorAll('#sheet .pprow').length===1));
   await shot(page, 'i2-resp-sheet');
-  await page.fill('#sheet [data-role=resp]', 'Carmen  Vidal '); await page.press('#sheet [data-role=resp]', 'Enter'); await sheetGone(page); await calm(page);
+  await page.fill('#sheet [data-role=ppq]', 'Carmen  Vidal ');
+  check('i_add_row', await ev(page, ()=>document.querySelector('#sheet .pprow').textContent==='Añadir «Carmen Vidal»'));
+  await page.press('#sheet [data-role=ppq]', 'Enter'); await sheetGone(page); await calm(page);
   x = await ev(page, ()=>({r:task('a4').responsible, c:DB.contacts.filter(c=>c.name==='Carmen Vidal').length, val:document.querySelector('.pushed-screen.detail [data-act=pickResp] .val').textContent}));
   check('i_set_new', x.r==='Carmen Vidal' && x.c===1 && x.val==='Carmen Vidal' && await toastText(page)==='Responsable: Carmen Vidal', x);
   await page.tap('#toastBtn'); await calm(page);
   check('i_set_undo', await ev(page, ()=>task('a4').responsible===null && !DB.contacts.some(c=>c.name==='Carmen Vidal')));
   await page.tap('.pushed-screen.detail [data-act=pickResp]'); await sheetUp(page);
-  await page.tap('#sheet .psug [data-sug="Luis"]'); await sheetGone(page); await calm(page);
+  await ppRow(page, 'Luis').tap(); await sheetGone(page); await calm(page);
   check('i_set_chip', await ev(page, ()=>task('a4').responsible==='Luis' && DB.contacts.length===2 && !!document.querySelector('.pushed-screen.detail [data-act=sendRemind]')));
   await shot(page, 'i3-detail');
   // A different case and accents take the contact's spelling; empty clears
@@ -183,7 +190,7 @@ async function iphone(browser){
   await ev(page, ()=>rowMenu('a2')); await menuSettled(page);
   x = await menuLabels(page); check('i_menu', x.includes('Responsable') && x.includes('Enviar recordatorio') && x.indexOf('Responsable')===x.indexOf('Tiempo')+1, x);
   await menuItem(page, 'Responsable').click(); await sheetUp(page);
-  check('i_menu_sheet', await ev(page, ()=>document.querySelector('#sheet [data-role=resp]').value==='Marta Ruiz' && !!document.querySelector('#sheet [data-x=clear]')));
+  check('i_menu_sheet', await ppChecked(page)==='Marta Ruiz', await ppChecked(page));
   await page.tap('#sheet [data-x=cancel]'); await sheetGone(page);
   x = await ev(page, ()=>{ rowMenu('a4'); return null; }); await menuSettled(page);
   check('i_menu_luis', (await menuLabels(page)).includes('Enviar recordatorio'));
@@ -248,7 +255,7 @@ async function iphone(browser){
   // --- Esperando a: the suggestions, a new name becomes a contact, a reason does not
   await ev(page, ()=>waitingSheet('a2')); await sheetUp(page);
   check('w_sug', await sugs(page)==='Luis,Marta Ruiz,Ana', await sugs(page));
-  await page.fill('#sheet [data-role=waitfor]', 'Notaría'); await page.tap('#sheet [data-x=ok]'); await sheetGone(page); await calm(page);
+  await page.fill('#sheet [data-role=ppq]', 'Notaría'); await page.tap('#sheet [data-x=ok]'); await sheetGone(page); await calm(page);
   x = await ev(page, ()=>({w:task('a2').waitingFor, c:DB.contacts.filter(c=>c.name==='Notaría').length, t:document.querySelector('#toastText').textContent}));
   check('w_contact', x.w==='Notaría' && x.c===1 && /esperando a Notaría/.test(x.t), x);
   await page.tap('#toastBtn'); await calm(page);
@@ -315,8 +322,8 @@ async function desktop(browser){
   x = await ev(page, ()=>{ const l=[...document.querySelectorAll('#desk .pane .iform .ilbl')].map(e=>e.textContent); return {has:l.includes('Responsable'), val:document.querySelector('#desk .pane [data-act=pickResp] .val').textContent, remind:!!document.querySelector('#desk .pane [data-act=sendRemind]')}; });
   check('d_insp', x.has && x.val==='Ninguno' && !x.remind, x);
   await page.click('#desk .pane [data-act=pickResp]'); await menuSettled(page);
-  check('d_pop', await ev(page, ()=>document.activeElement===document.querySelector('#pmenu [data-role=resp]')) && await sugs(page)==='Luis,Marta Ruiz,Ana');
-  await page.keyboard.type('Pepa'); await until(page, ()=>!document.querySelector('#pmenu .psug [data-sug]'));
+  check('d_pop', await ev(page, ()=>document.activeElement===document.querySelector('#pmenu [data-role=ppq]') && Math.round(document.querySelector('#pmenu .pp-pop').getBoundingClientRect().width)===280) && await sugs(page)==='Luis,Marta Ruiz,Ana');
+  await page.keyboard.type('Pepa'); await until(page, ()=>!document.querySelector('#pmenu .pprow:not(.ppadd)') && document.querySelector('#pmenu .pprow.hl.ppadd'));
   await shot(page, 'd2-insp-pop');
   await page.keyboard.press('Enter'); await until(page, ()=>!menuOpen()); await calm(page);
   x = await ev(page, ()=>({r:task('a4').responsible, c:!!contactByName('Pepa'), val:document.querySelector('#desk .pane [data-act=pickResp] .val').textContent, remind:!!document.querySelector('#desk .pane [data-act=sendRemind]'), tag:(document.querySelector('#desk .main .row[data-id=a4] .rtag')||{}).textContent}));
@@ -332,9 +339,35 @@ async function desktop(browser){
   await page.click('#sheet [data-x=cancel]'); await sheetGone(page);
   await page.click('#desk .main .row[data-id=a4]:not(.first .row) .row-title', {button:'right'}); await menuSettled(page);
   await menuItem(page, 'Responsable…').click(); await menuSettled(page);
-  check('d_menu_resp', await ev(page, ()=>document.querySelector('#pmenu [data-role=resp]').value==='Pepa'));
-  await page.click('#pmenu [data-x=clear]'); await until(page, ()=>!menuOpen()); await calm(page);
+  check('d_menu_resp', await ppChecked(page)==='Pepa', await ppChecked(page));
+  await page.click('#pmenu .ppnone'); await until(page, ()=>!menuOpen()); await calm(page);
   check('d_cleared', await ev(page, ()=>task('a4').responsible===null) && await toastText(page)==='Sin responsable');
+  await page.click('#toastBtn'); await calm(page);
+  // v0.33.1, the list picker with the keys: the checked row is the active one; down moves, Enter chooses and closes, with Deshacer
+  await page.click('#desk .main .row[data-id=a4]:not(.first .row) .row-title', {button:'right'}); await menuSettled(page);
+  await menuItem(page, 'Responsable…').click(); await menuSettled(page);
+  x = await ev(page, ()=>({rows:[...document.querySelectorAll('#pmenu .pprow .ppl')].map(e=>e.textContent).join(), hl:(document.querySelector('#pmenu .pprow.hl .ppl')||{}).textContent, icons:[...document.querySelectorAll('#pmenu .pprow')].map(r=>!!r.querySelector('.ppic svg')).join()}));
+  check('d_keys_list', x.rows==='Sin responsableLa tarea es tuya,Luis,Marta Ruiz,Pepa,Ana' && x.hl==='Pepa' && x.icons==='false,true,true,false,false', x);
+  await page.keyboard.press('ArrowDown'); await page.keyboard.press('Enter'); await until(page, ()=>!menuOpen()); await calm(page);
+  check('d_keys_pick', await ev(page, ()=>task('a4').responsible==='Ana') && await toastText(page)==='Responsable: Ana');
+  await page.click('#toastBtn'); await calm(page);
+  // Typing filters (no accents nor case); Esc closes and changes nothing
+  await page.click('#desk .main .row[data-id=a4]:not(.first .row) .row-title', {button:'right'}); await menuSettled(page);
+  await menuItem(page, 'Responsable…').click(); await menuSettled(page);
+  await page.keyboard.type('LÚ'); await until(page, ()=>document.querySelectorAll('#pmenu .pprow').length===2);
+  x = await ev(page, ()=>[...document.querySelectorAll('#pmenu .pprow')].map(r=>r.textContent+(r.classList.contains('hl')?'*':'')).join());
+  check('d_filter', x==='Añadir «LÚ»*,Luis', x);
+  await page.keyboard.press('ArrowDown'); await shot(page, 'd2b-list-keys');
+  await page.keyboard.press('Escape'); await until(page, ()=>!menuOpen());
+  check('d_esc', await ev(page, ()=>task('a4').responsible==='Pepa'));
+  // Esperando a: the same list inside its popover; a click marks the name and keeps the popover for the review day and Guardar
+  await ev(page, ()=>waitingSheet('a1')); await menuSettled(page);
+  await ppRow(page, 'Luis').click();
+  x = await ev(page, ()=>({open:menuOpen(), ck:(document.querySelector('#pmenu .pprow[aria-selected=true] .ppl')||{}).textContent, none:(document.querySelector('#pmenu .ppnone .ppl')||{}).textContent}));
+  check('d_wait_pick', x.open && x.ck==='Luis' && x.none==='Sin indicarPor confirmar sin nombre', x);
+  await shot(page, 'd2c-wait-list');
+  await page.click('#pmenu [data-x=ok]'); await until(page, ()=>!menuOpen()); await calm(page);
+  check('d_wait_saved', await ev(page, ()=>task('a1').status==='waiting' && task('a1').waitingFor==='Luis'));
   await page.click('#toastBtn'); await calm(page);
   // --- The filter: Responsable beside Proyecto, both applying
   check('d_rfdrop', await ev(page, ()=>{ const b=document.querySelector('#desk .pfslot .rfdrop'); return !!b && b.textContent==='Responsable: Todos' && b.previousElementSibling.classList.contains('pfdrop'); }));

@@ -28,14 +28,15 @@ function ensureContact(name){ const n=String(name||'').replace(/\s+/g,' ').trim(
 // Deshacer of the action that made c: it goes again while nobody has changed it
 function dropContact(c){ if(!c) return; const cur=contactRec(c.id); if(cur&&cur.modified===c.modified&&!cur.email&&!cur.phone) DB.contacts=DB.contacts.filter(o=>o!==cur); }
 /* ---------- v0.33.1: the person picker, a list with a search field on top (Responsable and Esperando a) ----------
-   The names are the contacts and those the tasks use (Responsable, Esperando a) that no contact has, alphabetically, with the contact's
+   The names are the contacts, alphabetically, then those the tasks use (Responsable, Esperando a) that no contact has, with the contact's
    phone or mail as a grey icon. What is typed filters them (no accents or case); with nothing typed the list starts with the «none» row
    (Sin responsable, La tarea es tuya); a typed text that no name matches exactly gives «Añadir «Texto»» at the top. The current value has
    the check mark. Keys: up and down move, Enter chooses; the mouse and the finger choose with one click. A press on a row keeps the focus in
    the field, so the iPhone keyboard stays up. o: {cur, none:[label, sub], onPick(value or null, 'click'|'enter'), rows (desktop rows shown)} */
 function pickNames(cur){ const seen=new Set(), out=[]; const add=(n, c)=>{ const v=String(n||'').replace(/\s+/g,' ').trim(), k=personKey(v); if(!v||seen.has(k)) return; seen.add(k); out.push({name:v, c}); };
-  contactsSorted().forEach(c=>add(c.name, c)); DB.tasks.map(x=>x.responsible).concat(DB.tasks.map(x=>x.waitingFor)).forEach(n=>add(n, null)); add(cur, null);
-  return out.sort((a,b)=>nameCmp(a.name, b.name)); }
+  contactsSorted().forEach(c=>add(c.name, c)); const n=out.length;
+  DB.tasks.map(x=>x.responsible).concat(DB.tasks.map(x=>x.waitingFor)).concat([cur]).forEach(v=>add(v, null));
+  return out.slice(0, n).concat(out.slice(n).sort((a,b)=>nameCmp(a.name, b.name))); } // the contacts first, then the other names
 const personPickHTML = () => '<div class="ppick"><div class="ppsearch">'+I.search+'<input type="text" data-role="ppq" placeholder="Buscar o escribir un nombre" autocomplete="off" autocapitalize="words" enterkeyhint="done" spellcheck="false" aria-label="Buscar o escribir un nombre"'+(UI.wide?' autofocus':'')+'></div><div class="pplist" role="listbox"></div></div>';
 function bindPersonPick(root, o){ const inp=$('[data-role=ppq]', root), box=$('.pplist', root); if(!inp||!box) return null; let rows=[], act=-1;
   const hl=()=>{ box.querySelectorAll('.pprow').forEach((b,i)=>b.classList.toggle('hl', i===act)); const b=box.children[act]; if(b&&b.scrollIntoView) b.scrollIntoView({block:'nearest'}); };

@@ -10,7 +10,9 @@
      Responsable or Esperando a makes a contact with just the name (ensureContact); both fields suggest the contacts first, then the names
      the tasks use. Ajustes, Contactos: edit, add, delete (the tasks keep their names) and rename (the tasks follow, one Deshacer).
    - Enviar recordatorio (remindSheet): a message to the task's person, editable before it goes: WhatsApp with the contact's phone, mail
-     with its email, the share sheet otherwise (or a copy). A multiple selection of one person's tasks sends one message with every title. */
+     with its email, the share sheet otherwise (or a copy). A multiple selection of one person's tasks sends one message with every title.
+   - Por persona (decision 65a): the people with open tasks, in the desktop sidebar and the iPhone's Proyectos tab, each with a view of what
+     they do and what is waited from them, and Recordar todo (one message with the whole list). */
 
 /* ---------- Contacts ---------- */
 const contactRec = id => DB.contacts.find(c=>c&&c.id===id);
@@ -97,6 +99,8 @@ function filterEmptyTitle(){ const pf=UI.projFilter===null?'':UI.projFilter==='n
 /* ---------- Rows ----------
    The responsible in grey next to Esperando a: on the iPhone in the line under the title, on the desktop a tag in the title cell. The same
    name in both says it once, as Esperando a */
+// Decision 65a: in a person's view the rows do not repeat that person (opts.person, its key), as R3 asks
+const isViewPerson = (name, opts) => !!(opts&&opts.person) && personKey(name)===opts.person;
 const respShown = x => !!x.responsible && !(x.status==='waiting'&&x.waitingFor&&personKey(x.waitingFor)===personKey(x.responsible));
 const respMetaHTML = x => respShown(x) ? '<span class="resp" title="Responsable: '+esc(x.responsible)+'">'+I.person+esc(x.responsible)+'</span>' : '';
 const respTagHTML = x => respShown(x) ? '<span class="rtag" title="Responsable: '+esc(x.responsible)+'">'+I.person+esc(x.responsible)+'</span>' : '';
@@ -125,9 +129,10 @@ function sendRemind(name, text, xs){ const via=remindVia(name); log('info','Reco
   if(navigator.share){ navigator.share({text}).catch(e=>{ if(!e||e.name!=='AbortError') copyText(text, 'Recordatorio copiado. Pégalo donde quieras.'); }); return; }
   copyText(text, 'Recordatorio copiado. Pégalo donde quieras.'); }
 /* The sheet: whom (when the task has two people), the message to edit and how it will go. Enviar opens WhatsApp, mail or the share sheet
-   inside the tap, as browsers ask. after: run once it is sent (the end of a multiple selection) */
-function remindSheet(ids, after){ const xs=ids.map(task).filter(canRemind); if(!xs.length) return; flushEdits();
-  const names=xs.length===1?taskPeople(xs[0]):[sharedPerson(xs)].filter(Boolean); if(!names.length) return; let who=names[0], edited=false;
+   inside the tap, as browsers ask. after: run once it is sent (the end of a multiple selection). to: whom, when the caller knows (the
+   person's view: its tasks may share another person too) */
+function remindSheet(ids, after, to){ const xs=ids.map(task).filter(canRemind); if(!xs.length) return; flushEdits();
+  const names=to?[to]:xs.length===1?taskPeople(xs[0]):[sharedPerson(xs)].filter(Boolean); if(!names.length) return; let who=names[0], edited=false; // to: the person of Recordar todo (decision 65a)
   const whoHTML=()=>names.length>1?'<label class="wlbl">Para</label><div class="chips wchips rwho">'+names.map(n=>'<button class="chip'+(n===who?' on':'')+'" data-who="'+esc(n)+'">'+esc(n)+'</button>').join('')+'</div>':'<div class="rto">Para '+esc(who)+'</div>';
   const body='<div class="wsheet remsheet">'+'<div class="rwhowrap">'+whoHTML()+'</div><textarea class="wfor rmsg" data-role="rmsg" rows="4">'+esc(remindText(xs, who))+'</textarea><div class="hint rvia">'+esc(remindVia(who).label)+'</div>'+
     (remindVia(who).kind==='share'?'<div class="hint">Añade su teléfono o su correo en Ajustes, Contactos, para enviarlo directamente.</div>':'')+'</div>';
@@ -167,10 +172,67 @@ function saveContact(c, v){ const t=new Date().toISOString();
     if(renamed) DB.tasks.forEach(x=>{ const p={}; if(personKey(x.responsible)===k&&x.responsible!==v.name) p.responsible=v.name; if(personKey(x.waitingFor)===k&&x.waitingFor!==v.name) p.waitingFor=v.name;
       if(Object.keys(p).length){ moved.push({id:x.id, responsible:x.responsible||null, waitingFor:x.waitingFor||null, keys:Object.keys(p)}); updTask(x.id, p); } });
     save(); });
-  const rf=renamed&&personKey(UI.respFilter)===k; if(rf) UI.respFilter=v.name; render(); log('info', renamed?'Contacto renombrado':'Contacto cambiado', renamed?{tasks:moved.length}:undefined);
+  const rf=renamed&&personKey(UI.respFilter)===k; if(rf) UI.respFilter=v.name; if(renamed) personRenamed(prev.name, v.name); /* decision 65a: the person's view follows */ render(); log('info', renamed?'Contacto renombrado':'Contacto cambiado', renamed?{tasks:moved.length}:undefined);
   toast(renamed&&moved.length?'Contacto renombrado en '+bulkN(moved.length):'Contacto guardado', ()=>batch(()=>{ const cur=contactRec(c.id); if(cur) Object.assign(cur, prev, {modified:new Date().toISOString()});
-    moved.forEach(o=>{ if(task(o.id)) updTask(o.id, Object.fromEntries(o.keys.map(kk=>[kk, o[kk]]))); }); if(rf) UI.respFilter=prev.name; save(); })); }
+    moved.forEach(o=>{ if(task(o.id)) updTask(o.id, Object.fromEntries(o.keys.map(kk=>[kk, o[kk]]))); }); if(rf) UI.respFilter=prev.name; if(renamed) personRenamed(v.name, prev.name); save(); })); }
 function confirmDeleteContact(id){ const c=contactRec(id); if(!c) return; const n=contactUses(c);
   confirmSheet('Eliminar contacto', '"'+c.name+'" se eliminará de tus contactos.'+(n?' '+(n===1?'La tarea que lo usa conserva':'Las '+n+' tareas que lo usan conservan')+' el nombre.':'')+' Podrás deshacerlo durante unos segundos.', ()=>{
     const i=DB.contacts.indexOf(c); if(i<0) return; DB.contacts.splice(i,1); save(); render(); haptic(14); log('info','Contacto eliminado');
     toast('Contacto eliminado', ()=>{ if(!contactRec(c.id)){ c.modified=new Date().toISOString(); DB.contacts.push(c); } save(); }); }); }
+
+/* ---------- Por persona (decision 65a, design approved by the owner on 5 November) ----------
+   What is open with each person in the active space (the spaces never mix): Le toca a <Nombre>, the open tasks (pending or waiting) whose
+   Responsable is that person, and Esperando a <Nombre>, the waiting tasks whose Esperando a is that person. A task in both goes only in
+   Esperando a. Each group by date (no date last), then priority. Names match without accents or case (personKey); a person is any name
+   those two fields use, contact or not, written as the contact writes it when there is one. Only people with something open are listed,
+   the busiest first. Desktop: the sidebar's Personas and a view 'person:<name>' in the column. iPhone: Personas in the Proyectos tab and
+   a pushed screen of kind 'person'. Recordar todo sends one message with the whole list (remindSheet). No data of its own */
+const personOrder = xs => xs.slice().sort((a,b)=>{ const da=a.date||'~', db=b.date||'~'; if(da!==db) return da<db?-1:1;
+  const pa=PRI[a.priority]??2, pb=PRI[b.priority]??2; if(pa!==pb) return pa-pb; return a.created<b.created?-1:a.created>b.created?1:0; });
+// The open names of a task: its responsible and, while it waits, whom it waits for (one entry per person)
+function openPeople(x){ const out=[]; if(!isOpen(x)) return out; [x.responsible, x.status==='waiting'?x.waitingFor:null].forEach(n=>{ const s=String(n||'').replace(/\s+/g,' ').trim(), k=personKey(s); if(k&&!out.some(o=>o.k===k)) out.push({k, s}); }); return out; }
+// [{key, name, n}] of the active space, the most open tasks first, then by name. A name with no contact keeps the spelling of its oldest task
+function peopleList(){ const by=new Map();
+  spaceTasks().slice().sort((a,b)=>a.created<b.created?-1:a.created>b.created?1:0).forEach(x=>openPeople(x).forEach(({k, s})=>{ let e=by.get(k); if(!e){ const c=contactByName(s); e={key:k, name:c?c.name:s, n:0}; by.set(k, e); } e.n++; }));
+  return [...by.values()].sort((a,b)=>b.n-a.n||nameCmp(a.name, b.name)); }
+// The two groups of a person's view (UI.query, when the desktop search has one, filters them)
+function personGroups(name){ const k=personKey(name); if(!k) return {mine:[], wait:[]}; let xs=spaceTasks().filter(isOpen); if(UI.query) xs=xs.filter(queryMatcher(UI.query));
+  const wait=xs.filter(x=>x.status==='waiting'&&personKey(x.waitingFor)===k), mine=xs.filter(x=>personKey(x.responsible)===k&&!wait.includes(x));
+  return {mine:personOrder(mine), wait:personOrder(wait)}; }
+// The name a view shows: the contact's spelling, else the list's, else as it came
+function personLabel(name){ const c=contactByName(name); if(c) return c.name; const k=personKey(name), e=peopleList().find(p=>p.key===k); return e?e.name:String(name||'').trim(); }
+const personFirst = name => String(name||'').trim().split(' ')[0];
+// The tasks Recordar todo sends: the whole list, Le toca a first
+function personRemindable(name){ const g=personGroups(name); return g.mine.concat(g.wait).filter(canRemind); }
+function remindAll(name){ const q=UI.query; UI.query=''; let xs; try{ xs=personRemindable(name); } finally{ UI.query=q; } if(!xs.length) return; // a search never shortens the message
+  log('info','Recordar todo', {n:xs.length}); remindSheet(xs.map(x=>x.id), null, personLabel(name)); }
+// The contact's phone and mail, for the view's head
+function personContactLine(name){ const c=contactByName(name); return c?[c.phone, c.email].map(v=>String(v||'').trim()).filter(Boolean):[]; }
+// The two groups (or the empty state), shared by the iPhone screen and the desktop column
+function personListHTML(name){ const g=personGroups(name), nm=personLabel(name), pk=personKey(name), R=x=>rowHTML(x, {person:pk});
+  if(!g.mine.length&&!g.wait.length){ if(UI.query) return '<div class="empty">'+I.search.replace('<svg','<svg style="width:44px;height:44px"')+'<b>Sin resultados</b>Prueba con otra palabra</div>';
+    return '<div class="empty pempty">'+I.person.replace('<svg','<svg style="width:44px;height:44px"')+'<b>Nada pendiente con '+esc(nm)+'</b>Aquí verás lo que le toca y lo que esperas de '+esc(personFirst(nm))+'.</div>'; }
+  return (g.mine.length?gsec(gtitle('Le toca a '+esc(nm), g.mine.length, '', ' data-pgroup="mine"'), g.mine.map(R).join('')):'')+
+    (g.wait.length?gsec(gtitle('Esperando a '+esc(nm), g.wait.length, '', ' data-pgroup="wait"'), g.wait.map(R).join('')):''); }
+// iPhone: the Proyectos tab's section, under the projects
+function peopleSectionHTML(){ const ps=peopleList(); if(!ps.length) return ''; const chev=I.chev.replace('<svg','<svg class="chev"');
+  return '<div class="group-title">Personas</div><div class="group people">'+ps.map(p=>'<button class="cell" data-open-person="'+esc(p.name)+'"><span class="picon pperson">'+I.person+'</span><span class="lbl">'+esc(p.name)+'</span><span class="count">'+p.n+'</span>'+chev+'</button>').join('')+'</div>'+
+    '<div class="footnote">Lo que le toca a cada persona y lo que esperas de ella.</div>'; }
+// iPhone: the person's pushed screen
+function viewPerson(name){ const nm=personLabel(name);
+  if(UI.select&&UI.select.scope==='project') return selectNav()+'<div class="scroll">'+personListHTML(name)+'</div>'; // the selection of the screen on top
+  const xs=personRemindable(name), via=xs.length?remindVia(nm):null;
+  return '<header class="nav"><div class="nav-row"><button class="back" data-act="back">'+I.back+'Atrás</button><div class="nav-title">'+esc(nm)+'</div><span class="action"></span></div></header>'+
+    '<div class="scroll">'+(xs.length?'<div class="group premind"><button class="cell link" data-act="remindAll" data-person="'+esc(nm)+'">'+MI.send+'<span class="lbl">Recordar todo</span><span class="val">'+bulkN(xs.length)+'</span></button></div><div class="footnote">'+esc(via.label)+'</div>':'')+
+    personListHTML(name)+'</div>'; }
+// Desktop: the sidebar's section, under Proyectos
+function peopleSideHTML(){ const ps=peopleList(); if(!ps.length) return ''; const k=UI.deskView.startsWith('person:')?personKey(UI.deskView.slice(7)):null;
+  return '<div class="sec">Personas</div>'+ps.map(p=>'<button class="it iperson'+(p.key===k?' on':'')+'" data-view="person:'+esc(p.name)+'">'+I.person+'<span>'+esc(p.name)+'</span><span class="n">'+p.n+'</span></button>').join(''); }
+// Desktop: the head of the person's column (name, phone or mail, Recordar todo) and its body
+function personHeadHTML(name){ const nm=personLabel(name), cl=personContactLine(nm), xs=personRemindable(name);
+  return {title:'<div class="ptitle"><h1>'+esc(nm)+'</h1>'+(cl.length?'<div class="psub">'+cl.map(v=>'<span>'+esc(v)+'</span>').join('')+'</div>':'')+'</div>',
+    btn:xs.length?'<button class="btn premindb" data-act="remindAll" data-person="'+esc(nm)+'" title="'+esc(remindVia(nm).label)+'">'+MI.send+'Recordar todo</button>':''}; }
+// The person views follow a contact renamed in Ajustes (saveContact)
+function personRenamed(oldName, newName){ const k=personKey(oldName);
+  if(UI.wide&&UI.deskView.startsWith('person:')&&personKey(UI.deskView.slice(7))===k) UI.deskView='person:'+newName;
+  UI.stack.forEach(s=>{ if(s.kind==='person'&&personKey(s.id)===k) s.id=newName; }); }

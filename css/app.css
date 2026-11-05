@@ -1586,11 +1586,40 @@ body.desktop .sgopen svg{width:6px;height:11px;}
 .pchips .chip.rchip.on{background:var(--blue);}
 .pfslot{gap:6px;}
 .pfdrop.rfdrop{max-width:200px;}
-/* The suggestions under Responsable and Esperando a, the reminder to send and the contact sheet */
-.wsheet .psug{flex-wrap:wrap;gap:6px;}
-.wsheet .psug.empty{display:none;}
-.wsheet .psug .chip{height:30px;font-size:0.824rem;}
-.pm-pop .wsheet .psug .chip{height:22px;font-size:12px;padding:0 8px;}
+/* v0.33.1: the person picker of Responsable and Esperando a, a search field over a list (bindPersonPick). iPhone: an inset grouped list of
+   44 pt rows with the check mark on the left; desktop: a popover of 280 px with Mac list rows, the one under the keys or the mouse in blue */
+.ppick{display:flex;flex-direction:column;gap:8px;min-height:0;}
+.ppsearch{position:relative;display:flex;align-items:center;}
+.ppsearch svg{position:absolute;left:10px;width:16px;height:16px;color:var(--ink2);pointer-events:none;}
+.ppsearch input{width:100%;height:36px;border:0;border-radius:10px;background:var(--fill);color:var(--ink);padding:0 10px 0 32px;font-size:max(16px,1rem);outline:0;-webkit-appearance:none;appearance:none;}
+.pplist{background:var(--card);border-radius:10px;overflow-y:auto;overscroll-behavior:contain;max-height:264px;}
+.wsheet .pplist{max-height:178px;}
+.pprow{position:relative;display:flex;align-items:center;gap:8px;width:100%;min-height:44px;padding:4px 14px 4px 8px;text-align:left;color:var(--ink);}
+.pprow + .pprow::before{content:"";position:absolute;left:36px;right:0;top:0;height:.5px;background:var(--sep);}
+.pprow:active{background:var(--press);}
+.ppck{flex:none;width:20px;display:flex;justify-content:center;color:var(--blue);}
+.ppck svg{width:14px;height:14px;}
+.ppl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:1rem;}
+.ppl small{display:block;font-size:0.765rem;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;}
+.ppadd .ppl,.ppadd .ppic{color:var(--blue);}
+.ppic{flex:none;display:flex;color:var(--ink3);}
+.ppic svg{width:15px;height:15px;}
+.ppsheet .ppick{margin-bottom:6px;}
+.pm.mac .pm-menu.pm-pop.pp-pop{width:280px;padding:6px;}
+.app.desktop .ppick,.pm-pop .ppick{gap:6px;}
+.pm-pop .ppsearch svg{left:8px;width:13px;height:13px;}
+.pm-pop .ppsearch input{height:26px;border-radius:6px;font-size:13px;padding:0 8px 0 26px;}
+.pm-pop .pplist{background:transparent;border-radius:0;max-height:212px;}
+.pm-pop .wsheet .pplist{max-height:134px;background:var(--fill);border-radius:6px;padding:2px;}
+.pm-pop .pprow{min-height:26px;padding:3px 8px 3px 2px;gap:4px;border-radius:5px;cursor:default;}
+.pm-pop .pprow + .pprow::before{display:none;}
+.pm-pop .pprow:active{background:transparent;}
+.pm-pop .ppck svg{width:11px;height:11px;}
+.pm-pop .ppl{font-size:13px;}
+.pm-pop .ppl small{font-size:11px;}
+.pm-pop .ppic svg{width:12px;height:12px;}
+.pm-pop .pprow.hl{background:var(--blue);color:#fff;}
+.pm-pop .pprow.hl .ppck,.pm-pop .pprow.hl .ppl,.pm-pop .pprow.hl .ppl small,.pm-pop .pprow.hl .ppic{color:#fff;}
 .wsheet .wback.red{color:var(--red);}
 .wsheet .rmsg{height:auto;min-height:120px;padding:10px 12px;resize:none;line-height:1.35;font-family:inherit;}
 .wsheet .rto{font-size:0.882rem;color:var(--ink2);}

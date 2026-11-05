@@ -27,6 +27,8 @@ const MI = {
   undo:mi('<path d="M9 14L4 9l5-5M4 9h10.5a5.5 5.5 0 010 11H11"/>'),
   trash:mi('<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>'),
   plus:mi('<path d="M12 5v14M5 12h14"/>'),
+  phone:mi('<path d="M6.5 3.5h3l1.5 4.5-2 1.3a10.5 10.5 0 005.7 5.7l1.3-2 4.5 1.5v3a2 2 0 01-2.2 2A16.5 16.5 0 014.5 5.7a2 2 0 012-2.2z"/>'), // v0.33.1: a contact's phone in the person picker
+  mail:mi('<rect x="3" y="5.5" width="18" height="13" rx="2"/><path d="M3.5 7l8.5 6.5L20.5 7"/>'), // and its mail
   eye:mi('<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/>'),
   eyeOff:mi('<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/><path d="M4 4l16 16"/>'),
   play:mi('<path d="M8 5.5v13l10.5-6.5z"/>'),
@@ -208,7 +210,9 @@ window.addEventListener('keydown', e=>{ const m=PM; if(!m||!m.mac) return; const
 // else the date column of the task's row, else its week card
 function taskAnchor(id, act){ if(!UI.wide) return null; const q=CSS.escape(id);
   const pc=document.querySelector('#desk .pane[data-task="'+q+'"] [data-act='+(act||'pickDate')+']'); if(pc) return {anchor:pc, align:'left'};
-  const r=document.querySelector('#desk .main .row[data-id="'+q+'"]:not(.first .row) '+(act==='pickDeadline'?'.row-meta':'.rc-date'))||document.querySelector('#desk .wcard[data-id="'+q+'"]'); // the deadline column may be hidden: the row's columns
+  // the date column (the deadline's may be hidden: the row's columns); v0.33.1: an empty column takes no room, then the row's right end
+  const row=document.querySelector('#desk .main .row[data-id="'+q+'"]:not(.first .row)'), seen=e=>e&&e.getBoundingClientRect().width>0;
+  const r=row?[row.querySelector(act==='pickDeadline'?'.row-meta':'.rc-date'), row.querySelector('.row-meta'), row.querySelector('.row-content')].find(seen):document.querySelector('#desk .wcard[data-id="'+q+'"]');
   return r?{anchor:r, align:'right'}:{}; }
 // R17: on the desktop a date or a reminder is chosen in a popover under its control; on the iPhone in a bottom sheet.
 // bind(panel, done) wires the content; done closes whichever it is
@@ -351,14 +355,14 @@ function waitDays(){ const t=todayStr(); return uniqueBy([['hoy',t,'Hoy'],['man'
 function waitingSheet(id, src){ const x=task(id); if(!x||x.status==='done') return; const days=waitDays(); let sel=(days.find(o=>o[1]===(x.date||null)&&(o[0]!=='hoy'||x.status==='waiting'))||[])[0]||(x.status==='waiting'?null:x.date&&x.date>todayStr()?null:'man');
   const chips=()=>days.map(o=>'<button class="chip'+(sel===o[0]?' on':'')+'" data-wd="'+o[0]+'">'+o[2]+'</button>').join('');
   const line=()=>{ const d=sel?days.find(o=>o[0]===sel)[1]:x.date; return d?(d<=todayStr()?'Se queda hoy en Revisar hoy, arriba de la lista.':'Vuelve a Hoy '+dayWords(d)+', en Revisar hoy.'):'Sin día de revisión: queda en Por confirmar.'; };
-  const field='<input type="text" class="wfor" data-role="waitfor" placeholder="Nombre o motivo (opcional)" value="'+esc(x.waitingFor||'')+'" autocomplete="off" enterkeyhint="done"'+(UI.wide?' autofocus':'')+'>';
+  let who=x.waitingFor||'', pk=null; // v0.33.1: whom it waits for, chosen in the person list (bindPersonPick) as in Responsable
   const back=x.status==='waiting'?'<button class="wback" data-x="unwait">Volver a pendiente</button>':''; // decision 50
-  const body='<div class="wsheet"><label class="wlbl">Esperando a</label>'+field+'<div class="chips psug"></div><div class="wlbl">Revisar</div><div class="chips wchips">'+chips()+'</div><div class="hint wline">'+line()+'</div>';
-  const save=(close, s)=>{ const v=$('[data-role=waitfor]', s).value; close(); setWaiting(id, v, sel?days.find(o=>o[0]===sel)[1]:undefined); renderAnimated(); };
-  const bind=(s, close)=>{ const inp=$('[data-role=waitfor]', s); bindPersonField(s, inp); // decision 48c: the contacts and the names already used
-    inp.addEventListener('keydown', e=>{ if(e.key==='Enter'&&!e.isComposing){ e.preventDefault(); save(close, s); } });
+  const body='<div class="wsheet"><label class="wlbl">Esperando a</label>'+personPickHTML()+'<div class="wlbl">Revisar</div><div class="chips wchips">'+chips()+'</div><div class="hint wline">'+line()+'</div>';
+  // Guardar with a name typed and not chosen takes what Enter would: that name, or the text as it is (a reason: «respuesta del banco»)
+  const save=close=>{ const t=pk&&pk.typed(); const v=t?personName(t):who; close(); setWaiting(id, v||'', sel?days.find(o=>o[0]===sel)[1]:undefined); renderAnimated(); };
+  const bind=(s, close)=>{ pk=bindPersonPick(s, {cur:who, none:['Sin indicar','Por confirmar sin nombre'], onPick:(v, how)=>{ who=v||''; pk.set(who); if(how==='enter') save(close); }});
     s.onclick=e=>{ const c=e.target.closest('[data-wd]'); if(c){ sel=c.dataset.wd; $('.wchips', s).innerHTML=chips(); $('.wline', s).textContent=line(); haptic(4); return; }
-      const b=e.target.closest('[data-x]'); if(!b) return; if(b.dataset.x==='ok') save(close, s); else if(b.dataset.x==='unwait'){ close(); unWait(id); renderAnimated(); } else close(); }; };
+      const b=e.target.closest('[data-x]'); if(!b) return; if(b.dataset.x==='ok') save(close); else if(b.dataset.x==='unwait'){ close(); unWait(id); renderAnimated(); } else close(); }; }; // the iPhone keyboard only on a tap in the field: the review day alone needs none
   const title=x.status==='waiting'?'Cambiar Por confirmar':'Por confirmar';
   if(UI.wide){ pickerPanel(title, '<div class="pm-title wtitle">'+title+'</div>'+body+back+'<div class="sheet-actions"><button class="btn" data-x="cancel">Cancelar</button><button class="btn primary" data-x="ok">Guardar</button></div></div>', id, src&&src.isConnected?src:null, 'menu', bind); return; }
   openSheet(sheadHTML(title, 'Cancelar', 'Guardar')+body+back+'</div>', s=>bind(s, closeSheet)); }

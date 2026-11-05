@@ -1,10 +1,12 @@
 /* Service worker: app shell cache and update notice.
    Bump CACHE on every release so installed devices pick up the new version. */
-const CACHE = 'tareas-v0.33.1';
+const CACHE = 'tareas-v0.34.0';
 // Every file the app loads: a missing one would leave the installed app unable to start offline (index.html lists the scripts in order)
 const SHELL = ['./', './index.html', './css/app.css',
-  './js/core.js', './js/render.js', './js/events.js', './js/menus.js', './js/sheets.js', './js/attachments.js', './js/steps.js', './js/notes.js', './js/status.js', './js/suggest.js', './js/sync.js', './js/push.js', './js/inbox.js', './js/people.js', './js/lifecycle.js', './js/desktop.js', './js/desktop-calendar.js', './js/desktop-render.js', './js/desktop-add.js', './js/boot.js',
+  './js/core.js', './js/render.js', './js/events.js', './js/menus.js', './js/sheets.js', './js/attachments.js', './js/steps.js', './js/notes.js', './js/status.js', './js/suggest.js', './js/crypto.js', './js/sync.js', './js/e2e.js', './js/push.js', './js/inbox.js', './js/people.js', './js/lifecycle.js', './js/desktop.js', './js/desktop-calendar.js', './js/desktop-render.js', './js/desktop-add.js', './js/boot.js',
   './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png', './vendor/supabase-js-2.117.3.umd.js'];
+// Decision 63a: the encryption primitives, to show the title of a reminder whose text arrives encrypted (cryptoPushPayload)
+importScripts('./js/crypto.js');
 // Written at deploy time from the repository secrets (block 8). Cached when present; a copy without it (404) still installs and runs local only.
 const OPTIONAL = ['./config.js'];
 
@@ -59,7 +61,7 @@ self.addEventListener('fetch', e => {
   })));
 });
 
-/* Block 9: reminders as notifications. The server (supabase/functions/send-reminders) sends {title, body, tag, badge, data:{taskId, url}};
+/* Block 9: reminders as notifications. The server (supabase/functions/send-reminders) sends {title, body, tag, badge, data:{taskId, projectId, url}};
    a push is always shown (userVisibleOnly). A tap opens that task: the open app gets a message, a closed one starts with ?task=id. */
 self.addEventListener('push', e => {
   let d = {};
@@ -68,7 +70,9 @@ self.addEventListener('push', e => {
   const icon = new URL('icons/icon-192.png', self.registration.scope).href;
   // Decision 55: where the browser shows buttons on a notification (desktop browsers; iOS shows none), a reminder offers 10 min and 1 h
   const acts = data.taskId && !data.test && self.Notification && Notification.maxActions > 0 ? { actions: [{ action: 'snooze10', title: '10 min' }, { action: 'snooze60', title: '1 h' }] } : {};
-  const shown = self.registration.showNotification(d.title || 'Tareas', Object.assign({ body: d.body || '', icon, badge: icon, tag: d.tag || data.taskId || 'tareas', data, timestamp: Date.now() }, acts));
+  // Decision 63a: an encrypted title and project name open with the key of this device; without it, «Recordatorio» and nothing secret
+  const shown = cryptoPushPayload(d).catch(() => Object.assign({}, d, { title: 'Recordatorio', body: '' })).then(p =>
+    self.registration.showNotification(p.title || 'Tareas', Object.assign({ body: p.body || '', icon, badge: icon, tag: d.tag || data.taskId || 'tareas', data, timestamp: Date.now() }, acts)));
   // The icon's count, worked out by the server when it sent the reminder (the app sets it again when it opens)
   const badged = typeof d.badge === 'number' && self.navigator && self.navigator.setAppBadge
     ? (d.badge > 0 ? self.navigator.setAppBadge(d.badge) : self.navigator.clearAppBadge()).catch(() => {}) : Promise.resolve();

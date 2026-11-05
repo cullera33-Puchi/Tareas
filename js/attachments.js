@@ -11,7 +11,7 @@
    - Upload (attFlush): signed in and online, each file waiting goes to the private bucket at <owner>/<task>/<id>.<ext>. Only then does
      the record get its path and go up with the sync (SYNC_TABLES), so another device never gets a record whose file is not there yet.
      Retried with a growing wait, logged. Signed out, or without config, the attachments stay on this device and the detail says so.
-   - Download on demand: a record with a path and no file here is fetched through a short-lived signed URL (SY.remote.fileUrl),
+   - Download on demand: a record with a path and no file here is fetched through a short-lived signed URL (SY.remote.fileDownload),
      kept (FS) and, for a photo, given its thumbnail.
    - Deleting: the record goes (the sync marks it deleted everywhere) and the file stays in the cache and in Storage, so Deshacer and a
      restored copy bring it back; send-reminders removes the file from Storage 24 hours later (decision 29.4).
@@ -91,10 +91,9 @@ const FDL=new Map(); // downloads under way, one per attachment
 async function attFile(a){ const b=await FS.getFile(a.id).catch(()=>null); return b||attDownload(a); }
 function attDownload(a){ if(FDL.has(a.id)) return FDL.get(a.id);
   if(!a.path){ AST.set(a.id,'none'); return Promise.resolve(null); } // captured on another device that never uploaded it, or imported
-  if(!SY||!SY.user||!SY.remote.fileUrl||!navigator.onLine){ AST.set(a.id,'off'); return Promise.resolve(null); }
+  if(!SY||!SY.user||!SY.remote.fileDownload||!navigator.onLine||cryptoLocked()){ AST.set(a.id,'off'); return Promise.resolve(null); } // decision 63a: without the key an encrypted file cannot open
   AST.set(a.id,'load'); const t0=Date.now();
-  const p=(async()=>{ const url=await SY.remote.fileUrl(a.path, SIGN_TTL); const r=await fetch(url, {cache:'no-store'}); if(!r.ok) throw new Error('HTTP '+r.status);
-      const raw=await r.blob(), blob=baseMime(raw.type)===baseMime(a.mime)?raw:new Blob([raw], {type:a.mime||raw.type});
+  const p=(async()=>{ const raw=await SY.remote.fileDownload(a.path, SIGN_TTL), blob=baseMime(raw.type)===baseMime(a.mime)?raw:new Blob([raw], {type:a.mime||raw.type});
       await FS.putFile(a.id, blob, {pending:false}).catch(e=>log('warn','Adjunto descargado pero no guardado en el dispositivo: '+(e&&e.message||e)));
       AST.delete(a.id); log('info', a.kind==='photo'?'Foto descargada':'Audio descargado', {size:blob.size, ms:Date.now()-t0}); return blob; })()
     .catch(e=>{ const off=syncOffline(e); AST.set(a.id, off?'off':'err'); log(off?'warn':'error','Adjunto no descargado: '+(e&&(e.message||e.error)||e), {id:a.id}); return null; })
@@ -164,7 +163,7 @@ function putAttachments(list){ (list||[]).forEach(a=>{ if(!DB.attachments.some(x
 /* ---------- Upload queue ---------- */
 const UQ={running:false, timer:0, retry:0};
 function attFlushSoon(ms){ clearTimeout(UQ.timer); UQ.timer=setTimeout(attFlush, ms==null?400:ms); }
-async function attFlush(){ if(UQ.running||!SY||!SY.user||!SY.remote.fileUpload||!navigator.onLine||syncMissing('attachments')) return;
+async function attFlush(){ if(UQ.running||!SY||!SY.user||!SY.remote.fileUpload||!navigator.onLine||syncMissing('attachments')||cryptoLocked()) return; // decision 63a: uploads wait for the key
   const user=SY.user.id, todo=DB.attachments.filter(a=>!a.path&&!syncDemoId(a.id)&&task(a.taskId)&&!syncDemoId(a.taskId)).map(a=>a.id); if(!todo.length) return;
   UQ.running=true; let done=0;
   try{ for(const id of todo){ if(!SY.user||SY.user.id!==user||!navigator.onLine) break; const a=att(id); if(!a||a.path||!task(a.taskId)) continue;
@@ -175,7 +174,8 @@ async function attFlush(){ if(UQ.running||!SY||!SY.user||!SY.remote.fileUpload||
       const cur=att(id); if(cur&&!cur.path){ cur.path=path; cur.modified=new Date().toISOString(); save(); } done++;
       log('info', a.kind==='photo'?'Foto subida':'Audio subido', {size:blob.size, ms:Date.now()-t0}); }
     UQ.retry=0; }
-  catch(e){ const off=syncOffline(e), ms=Math.min(300e3, 3000*Math.pow(2, UQ.retry++)); log(off?'warn':'error','Subida de adjunto falló: '+(e&&(e.message||e.error)||e), {reintento:Math.round(ms/1000)+' s'}); attFlushSoon(ms); }
+  catch(e){ const off=syncOffline(e), ms=Math.min(300e3, 3000*Math.pow(2, UQ.retry++)), wait=e&&(e.code==='tareas_wait'||e.code==='tareas_locked'); // decision 63a: waiting for the encryption, not a failure
+    log(wait?'info':off?'warn':'error', (wait?'Subida de adjunto en espera: ':'Subida de adjunto falló: ')+(e&&(e.message||e.error)||e), {reintento:Math.round(ms/1000)+' s'}); attFlushSoon(ms); }
   finally{ UQ.running=false; if(done){ const id=detailTaskId(); if(id&&hasAtt(id)) attPaint(id); } } }
 // Under the group: where the files are while they have not reached the account
 function attNote(taskId){ const all=attOf(taskId); if(!all.length) return ''; const dev=UI.wide?'este dispositivo':'este iPhone';

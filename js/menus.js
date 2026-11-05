@@ -324,7 +324,7 @@ function rpHTML(st){ const f=rpFreq(st), unit={D:['día','días'],W:['semana','s
   // Decision 65e: Termina (Nunca, El día, Después de N veces) and, for a calendar rule, Si no se hace, pasar a la siguiente
   h+='<div class="rplbl">Termina</div><div class="seg rpseg rpend">'+[['never','Nunca'],['until','El día'],['count','Después de']].map(([k,l])=>'<button data-rp="e:'+k+'" class="'+(st.end===k?'on':'')+'">'+l+'</button>').join('')+'</div>';
   if(st.end==='until') h+='<div class="rprow"><span class="rpl">Último día</span><input type="date" class="rpdate" data-role="rpuntil" min="'+todayStr()+'" value="'+st.until+'"></div>';
-  if(st.end==='count') h+='<div class="rprow"><span class="rpl">Después de</span>'+step('c', st.count, 1, 999)+'<span class="rpl">'+(st.count===1?'vez':'veces')+'</span></div>';
+  if(st.end==='count') h+='<div class="rprow">'+step('c', st.count, 1, 999)+'<span class="rpl">'+(st.count===1?'vez':'veces')+'</span></div>';
   if(!rpAfter(st)) h+=sw('skip', st.skip, 'Si no se hace, pasar a la siguiente');
   h+='<div class="rpsum">'+(rr?esc(repSummary(rr)):'Elige al menos un día')+'</div>';
   return h+'<div class="sheet-actions"><button class="btn" data-rp="cancel">Cancelar</button><button class="btn primary" data-rp="ok"'+(f?'':' disabled')+'>Guardar</button></div>'; }

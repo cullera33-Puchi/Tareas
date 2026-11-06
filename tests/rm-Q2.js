@@ -243,7 +243,7 @@ const toastOn = page => page.evaluate(()=>document.querySelector('#toast').class
   /* ================= d. Hours view ================= */
   { const s=JSON.parse(JSON.stringify(SEED)); for(let i=1;i<=5;i++) s.tasks.push(T('h'+i,{date:tomorrow, title:'Sin hora '+i}));
     const at10=new Date(today+'T00:00:00'); at10.setHours(10,0,0,0); s.tasks.push(T('hb',{date:today, reminder:at10.toISOString(), reminderSent:at10.toISOString(), title:'Con hora'}));
-    s.settings.calMode='hours';
+    s.settings.calMode='hours'; s.settings.workWeek={trabajo:false}; // whole week: on a Friday "tomorrow" is a Saturday, hidden by the work week (decision 35)
     const {ctx, page} = await device(browser, {tag:'Dd', seed:s, desk:true});
     await page.evaluate(()=>setDeskView('week')); await sleep(600);
     const strip = d=>page.evaluate(d=>{ const z=document.querySelector('#desk .hallday[data-day="'+d+'"]'); if(!z) return null; const wl=z.querySelector('.wl'), cs=wl&&getComputedStyle(wl);

@@ -1,5 +1,16 @@
 [
   {
+    "version": "0.36.0",
+    "date": "2026-11-05",
+    "items": [
+      "Nueva sección «Equipo» en Ajustes: invitas a una persona por su correo y le envías el enlace por WhatsApp o correo.",
+      "Cada persona solo ve lo suyo, con su propio cifrado. Tú no ves sus datos ni ellos los tuyos.",
+      "«Avisar a…» en una tarea le manda una copia a otra persona del equipo, que la recibe en «Recibidas».",
+      "Cada persona tiene su espacio para fotos y audios (50 MB de inicio), que puedes ampliar desde «Equipo».",
+      "En Ajustes, «Enviar sugerencia o incidencia» te llega solo a ti, al buzón de «Equipo»."
+    ]
+  },
+  {
     "version": "0.35.2",
     "date": "2026-11-05",
     "items": [

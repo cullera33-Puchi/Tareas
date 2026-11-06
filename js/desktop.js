@@ -181,7 +181,7 @@ function deskSide(){
   const it=(view,ic,label,n,on,attr)=>'<button class="it'+(on?' on':'')+'" data-view="'+view+'"'+(attr||'')+'>'+ic+'<span>'+label+'</span>'+(n!==undefined?'<span class="n">'+n+'</span>':'')+'</button>';
   return '<aside class="side"><button class="sp" data-act="spaceMenu">'+esc(space().name)+I.chevD+'</button>'+
     it('ahora',I.star,'Ahora',ahoraTasks().length,v==='ahora',' data-drop-ahora=""')+ // decision 39: above Hoy, and rows dropped on it go into Ahora
-    it('hoy',I.list,isClosed()?'Mañana':'Hoy',hoyShown().length,v==='hoy',' data-day="'+(isClosed()?addDays(todayStr(),1):todayStr())+'"')+it('todas',I.inbox.replace('viewBox="0 0 48 48"','viewBox="0 0 48 48" stroke-width="3"'),'Todas',pendingFor('todas').filter(x=>x.status!=='waiting').length,v==='todas')+it('waiting',MI.wait,'Por confirmar',spaceTasks().filter(x=>x.status==='waiting').length,v==='waiting')+it('week',I.cal,'Semana',undefined,isCalView(v))+miniMonthHTML()+ // decision 41
+    it('hoy',I.list,isClosed()?'Mañana':'Hoy',hoyShown().length,v==='hoy',' data-day="'+(isClosed()?addDays(todayStr(),1):todayStr())+'"')+it('todas',I.inbox.replace('viewBox="0 0 48 48"','viewBox="0 0 48 48" stroke-width="3"'),'Todas',pendingFor('todas').filter(x=>x.status!=='waiting').length,v==='todas')+it('waiting',MI.wait,'Por confirmar',spaceTasks().filter(x=>x.status==='waiting').length,v==='waiting')+recvSideHTML()+ /* decision 63b */it('week',I.cal,'Semana',undefined,isCalView(v))+miniMonthHTML()+ // decision 41
     '<div class="sec">Proyectos</div>'+ps.map(p=>'<button class="it'+(v==='project:'+p.id?' on':'')+'" data-view="project:'+p.id+'" data-drop-project="'+p.id+'" aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown"><span class="dot" style="background:'+p.color+'"></span><span>'+esc(p.name)+'</span><span class="n">'+cnt(p.id)+'</span></button>').join('')+
     '<button class="it'+(v==='project:none'?' on':'')+'" data-view="project:none" data-drop-project=""><span class="dot" style="background:var(--ink3)"></span><span>Sin proyecto</span><span class="n">'+cnt(null)+'</span></button>'+
     '<button class="it add" data-act="newProject">'+I.plus+'<span>Nuevo proyecto</span></button>'+peopleSideHTML()+ // decision 65a: Personas, under Proyectos
@@ -238,6 +238,7 @@ function deskMain(){
       listHTML(UI.query?'todas':f); }
   else if(v==='ahora'){ title='Ahora'; body=colHeadHTML()+ahoraViewHTML(); } // decision 39
   else if(v==='waiting'){ title='Por confirmar'; body=colHeadHTML()+waitingViewHTML(); } // decision 41
+  else if(v==='received'){ title='Recibidas'; search=false; body='<div class="recvview">'+recvListHTML()+'</div>'; } // decision 63b: tasks sent with Avisar a…
   else if(v.startsWith('person:')){ ph=personHeadHTML(v.slice(7)); title=personLabel(v.slice(7)); body=colHeadHTML()+personListHTML(v.slice(7)); } // decision 65a
   else if(isCalView(v)){ title={day:'Día',week:'Semana',month:'Mes'}[v]; pf=true; body=weekHTML(); } // the project filter applies here too, so it stays visible and clearable
   else if(v.startsWith('project:')){ const id=v.slice(8); const p=id==='none'?null:proj(id); if(id!=='none'&&(!p||p.archived||p.spaceId!==space().id)){ UI.deskView=DB.settings.filter||'hoy'; return deskMain(); } /* gone, archived or in another space */ title=p?p.name:'Sin proyecto';

@@ -129,9 +129,9 @@ async function processPhoto(file){ const img=await decodeImage(file);
 
 /* ---------- Adding ---------- */
 // Inside the tap: iOS offers the camera or the library for an image input
-function pickPhotos(taskId){ let inp=$('#attFile'); if(!inp){ inp=document.createElement('input'); inp.type='file'; inp.id='attFile'; inp.accept='image/*'; inp.multiple=true; inp.tabIndex=-1; inp.setAttribute('aria-hidden','true'); inp.style.cssText='position:fixed;left:-100px;top:0;width:1px;height:1px;opacity:0'; document.body.appendChild(inp); }
+function pickPhotos(taskId){ if(!teamRoomOk()) return; let inp=$('#attFile'); if(!inp){ inp=document.createElement('input'); inp.type='file'; inp.id='attFile'; inp.accept='image/*'; inp.multiple=true; inp.tabIndex=-1; inp.setAttribute('aria-hidden','true'); inp.style.cssText='position:fixed;left:-100px;top:0;width:1px;height:1px;opacity:0'; document.body.appendChild(inp); }
   inp.value=''; inp.onchange=()=>{ const fs=[...(inp.files||[])]; inp.value=''; if(fs.length) addPhotos(taskId, fs); }; inp.click(); }
-async function addPhotos(taskId, files){
+async function addPhotos(taskId, files){ if(!teamRoomOk()) return 0; // decision 63c: no room left in the account
   const imgs=files.filter(f=>/^image\//.test(f.type||'')||/\.(jpe?g|png|heic|heif|webp|gif)$/i.test(f.name||''));
   if(!imgs.length){ toast('Solo se pueden añadir fotos'); return 0; }
   let n=0;
@@ -163,18 +163,20 @@ function putAttachments(list){ (list||[]).forEach(a=>{ if(!DB.attachments.some(x
 /* ---------- Upload queue ---------- */
 const UQ={running:false, timer:0, retry:0};
 function attFlushSoon(ms){ clearTimeout(UQ.timer); UQ.timer=setTimeout(attFlush, ms==null?400:ms); }
-async function attFlush(){ if(UQ.running||!SY||!SY.user||!SY.remote.fileUpload||!navigator.onLine||syncMissing('attachments')||cryptoLocked()) return; // decision 63a: uploads wait for the key
+async function attFlush(){ if(UQ.running||!SY||!SY.user||!SY.remote.fileUpload||!navigator.onLine||syncMissing('attachments')||cryptoLocked()||teamHold()) return; // decision 71.1: a member uploads only once encrypted // decision 63a: uploads wait for the key
   const user=SY.user.id, todo=DB.attachments.filter(a=>!a.path&&!syncDemoId(a.id)&&task(a.taskId)&&!syncDemoId(a.taskId)).map(a=>a.id); if(!todo.length) return;
-  UQ.running=true; let done=0;
+  UQ.running=true; let done=0, size=0;
   try{ for(const id of todo){ if(!SY.user||SY.user.id!==user||!navigator.onLine) break; const a=att(id); if(!a||a.path||!task(a.taskId)) continue;
       const blob=await FS.getFile(id).catch(()=>null); if(!blob){ if(AST.get(id)!=='none'){ AST.set(id,'none'); log('warn','Adjunto sin archivo en este dispositivo: no se puede subir', {id}); } continue; }
       const mime=baseMime(a.mime)||baseMime(blob.type), path=user+'/'+a.taskId+'/'+id+'.'+(ATT_EXT[mime]||'bin'), t0=Date.now();
-      await SY.remote.fileUpload(path, blob, mime);
+      if(!teamUploadFits(blob.size)) break; // decision 63c: the quota is full, the files wait on the device
+      size=blob.size; await SY.remote.fileUpload(path, blob, mime); teamUploaded(blob.size); size=0;
       await FS.setPending(id, false).catch(()=>{});
       const cur=att(id); if(cur&&!cur.path){ cur.path=path; cur.modified=new Date().toISOString(); save(); } done++;
       log('info', a.kind==='photo'?'Foto subida':'Audio subido', {size:blob.size, ms:Date.now()-t0}); }
     UQ.retry=0; }
   catch(e){ const off=syncOffline(e), ms=Math.min(300e3, 3000*Math.pow(2, UQ.retry++)), wait=e&&(e.code==='tareas_wait'||e.code==='tareas_locked'); // decision 63a: waiting for the encryption, not a failure
+    teamUploadRefused(e, size); // decision 63c: refused by the server's quota (re-read)
     log(wait?'info':off?'warn':'error', (wait?'Subida de adjunto en espera: ':'Subida de adjunto falló: ')+(e&&(e.message||e.error)||e), {reintento:Math.round(ms/1000)+' s'}); attFlushSoon(ms); }
   finally{ UQ.running=false; if(done){ const id=detailTaskId(); if(id&&hasAtt(id)) attPaint(id); } } }
 // Under the group: where the files are while they have not reached the account
@@ -183,6 +185,7 @@ function attNote(taskId){ const all=attOf(taskId); if(!all.length) return ''; co
   const n=all.filter(a=>!a.path).length; if(!n) return '';
   if(!SY.user) return 'Se guardan en '+dev+' y se subirán a tu cuenta al iniciar sesión.';
   if(!navigator.onLine) return 'Se subirán a tu cuenta al volver la conexión.';
+  if(teamFull()||TM.noSpace) return 'No queda espacio en tu cuenta: '+(n===1?'1 adjunto espera':n+' adjuntos esperan')+' en '+dev+'. Borra adjuntos o pide más al administrador.'; // decision 63c
   return 'Subiendo '+n+(n===1?' adjunto':' adjuntos')+' a tu cuenta.'; }
 
 /* ---------- The Adjuntos group of the detail ---------- */
@@ -242,7 +245,7 @@ function recMime(){ const MR=window.MediaRecorder; if(!MR||!MR.isTypeSupported) 
 const playerHTML = () => '<div class="au-c"><button class="au-play" data-x="play" aria-label="Reproducir">'+I.play+I.pause+'</button><div class="au-body"><div class="au-top"><span class="au-name">Grabación</span><span class="au-t"><span class="au-cur">0:00</span> de <span class="au-dur">0:00</span></span></div><div class="au-bar" data-x="seek"><i></i></div></div></div>';
 // The sheet: elapsed time, a big button that records and stops, then the recording to listen to before Guardar. Up to REC_MAX_MS, then it
 // stops by itself. Closing it in any way stops the recording and lets the microphone go; one not saved asks first (decision 28b)
-function recordSheet(taskId){ if(!task(taskId)) return;
+function recordSheet(taskId){ if(!task(taskId)||!teamRoomOk()) return; // decision 63c
   const can=!!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia&&window.MediaRecorder);
   const R={state:'idle', rec:null, stream:null, chunks:[], blob:null, mime:'', t0:0, ms:0, timer:0, url:null, gen:0, saveAfter:false, pa:null, raf:0, auto:false};
   const maxMin=Math.round(REC_MAX_MS/6e4);

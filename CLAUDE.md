@@ -8,7 +8,7 @@ App web personal de gestión de tareas para iPhone (PWA instalada en pantalla de
 
 ## 2. Estado actual (2 de noviembre de 2026)
 
-- Versión publicada: **v0.35.2**. El repositorio `tareas` está en GitHub y se publica con GitHub Pages desde la rama `main`. Enric la usa instalada en el iPhone (pantalla de inicio) y en el navegador del ordenador.
+- Versión publicada: **v0.36.0**. El repositorio `tareas` está en GitHub y se publica con GitHub Pages desde la rama `main`. Enric la usa instalada en el iPhone (pantalla de inicio) y en el navegador del ordenador.
 - Sigue sin build ni dependencias de interfaz: HTML, CSS y JavaScript que se publican tal cual. El antiguo `index.html` de un solo archivo está repartido en `css/app.css` y en scripts clásicos dentro de `js/`, con el mismo comportamiento y el mismo aspecto.
 - Hecho: bloques 1 a 7 (v0.1), roadmap R1 a R20 (v0.15.0), escritorio a partir de 900 px con barra lateral, inspector, Semana, Día, Mes y vista por horas (v0.13.0 y v0.15.0), sincronización con Supabase e inicio de sesión con Google (bloque 8, v0.16.0), recordatorios con Web Push y la función `send-reminders` (bloque 9, v0.17.0), fotos y audios adjuntos en Supabase Storage (v0.19.0) y el lote de v0.20.0 (puntos 31 a 36 de la sección 8).
 - Datos: `localStorage` del dispositivo (clave `tareas-v1`) como verdad para la interfaz; copias diarias y archivos adjuntos en IndexedDB; Supabase sincroniza cuando hay sesión.
@@ -37,6 +37,9 @@ tareas/
 │   ├── notes.js               notas de proyecto
 │   ├── status.js              resumen de estado para compartir
 │   ├── suggest.js             «¿Qué hago ahora?»: tres tareas sugeridas según el tiempo disponible
+│   ├── inbox.js               bandeja de Siri y del Atajo de iOS (punto 62)
+│   ├── people.js              responsable, contactos, vista «Por persona» y recordatorios a personas
+│   ├── team.js                equipo: acceso por invitación, «Avisar a…», Recibidas, cupo, sugerencias y sección Equipo
 │   ├── crypto.js              cifrado: claves, valores y archivos (punto 63a); también lo carga sw.js
 │   ├── sync.js                sincronización con Supabase (bloque 8)
 │   ├── e2e.js                 cifrado de la sincronización, activación, migración y sección Cifrado
@@ -53,7 +56,7 @@ tareas/
 ├── sw.js                      service worker: caché de la app (SHELL), aviso de actualización y notificaciones
 ├── icons/                     192, 512 y apple-touch-icon
 ├── vendor/                    supabase-js 2.117.3 (UMD), servida y cacheada con la app
-├── supabase/                  migraciones SQL (0001 a 0012), all.sql (todas seguidas), check.sql (comprobación), README.md y la función send-reminders
+├── supabase/                  migraciones SQL (0001 a 0013), all.sql (todas seguidas), check.sql (comprobación), README.md y la función send-reminders
 ├── tests/                     pruebas de regresión con Playwright (sección 7 bis)
 ├── package.json               solo para las pruebas; la app no tiene build
 ├── .github/workflows/pages.yml   pruebas y publicación
@@ -107,6 +110,7 @@ Los datos: `DB` es un objeto único en `localStorage` bajo la clave `tareas-v1` 
 - `js/sync.js`: adaptador `supabaseRemote` (sustituible en pruebas con `SY.remote`); `syncMerge`, `syncPull`, `syncPush`, `syncRun`, `syncRealtime`; arranque `syncBoot`; sesión (`syncSignIn`, `syncSignOutSheet`); sección Cuenta (`syncAccountHTML`).
 - `js/crypto.js`: primitivas sin DOM, compartidas con el service worker (`cryptoDerive`, `cryptoSeal`, `cryptoOpen`, `cryptoEnc`, `cryptoDec`, `cryptoSealRow`, `cryptoDecRow`, `cryptoEncFile`, `cryptoDecFile`, `cryptoKeyLoad`, `cryptoKeySave`, `cryptoKeyForget`, `cryptoPushPayload`; columnas en `CRYPTO_COLS`).
 - `js/e2e.js`: envoltura `cryptoRemote` sobre `SY.remote` (cifra al subir y descifra al bajar, también archivos y tiempo real); `cryptoGate` al empezar cada pasada (off, on o bloqueado); `cryptoActivate`, `cryptoMigrate`, `cryptoUnlockSheet`, `cryptoChangePassword`, `cryptoSectionHTML`.
+- `js/team.js`: acceso (`teamGate`, `teamFetch`, `teamRefused`, pantalla «Esta cuenta no tiene acceso» con `teamDeniedPaint`); cifrado obligatorio del invitado (`teamAskKey`); claves ECDH (`teamKeys`) y copias cifradas para otra persona (`teamSeal`, `teamOpen`, prefijo `t1:`); «Avisar a…» (`noticeSheet`); Recibidas (`recvSheet`, `recvAdd`); cupo de almacenamiento; sugerencias e incidencias (`feedbackSheet`, `inboxSheet`); sección Equipo (`teamSectionHTML`, `inviteSheet`, `memberSheet`, `revokeAsk`). En `js/sync.js`, cambio de cuenta en un dispositivo (`syncOtherOwner`, `syncOtherPending`, `syncOtherAsk`, `syncSwitchAccount`).
 - `js/push.js`: estado `PS` (clave `tareas-push`); `pushEnable`, `pushSubscribe`, `pushCheck`, `pushRevokeSheet`, `pushTest`, `pushSignOut`; sección Notificaciones (`pushSectionHTML`, `pushDevicesHTML`); apertura desde un aviso (`openTaskFromPush`).
 - `js/lifecycle.js`: tirar para sincronizar (`bindPullRefresh`); agitar para deshacer (`armShake`); teclado (`kbFallback`); insignia (`badge`); cambio de día (`checkDay`, envoltura de `render`); `tipsSheet`; vuelta a Hoy (`returnHome`); varias ventanas (`reloadFromStorage`, `reloadIfChanged`).
 - `js/desktop.js`: vistas (`setDeskView`, `applyWide`); fila seleccionada y teclado (`paintSel`, `deskRowClick`, `moveSel`, `deskShortcut`, `startRowEdit`); selección múltiple (`multiPaneHTML`, `bulkDateMenu`); soltar en grupos (`dropToDay`, `dropToProject`, `dropMany`); barra lateral y columna (`deskSide`, `deskMain`, `addBarHTML`).
@@ -217,6 +221,8 @@ Cambios acordados con Enric sobre el diseño de abajo. Mandan sobre el texto del
 
 74. **v0.35.2, recordatorios con proyecto y canal a elegir (Enric, 5 de noviembre).** El mensaje empieza con «Hola X,» en su línea, como un correo; cada viñeta lleva el proyecto y la fecha o entrega; en la hoja se elige el canal entre WhatsApp (con teléfono), Correo y Teams (con correo; Teams por enlace `teams.microsoft.com/l/chat/0/0?users=...&message=...`) y Otras apps (hoja de compartir). Código: `remindItem`, `remindText`, `remindVias`, `remindVia(name, kind)`, `sendRemind(..., kind)`.
 
+75. **v0.36.0, Equipo (puntos 63b, 63c, 63d y 71; detalles aprobados por Enric el 5 de noviembre).** Migración `0013_team.sql`: tabla `team_members` (correo, nombre, rol admin o miembro, cupo, invitado, quitado, último acceso, usuario); la cuenta más antigua pasa a administrador sin escribir su correo en el código. Cada tabla de la app y Storage llevan una regla restrictiva `<tabla>_team_gate`: sin acceso vigente no se lee ni se escribe nada, y cada uno sigue viendo solo lo suyo; para escribir, un miembro necesita además su clave de cifrado. Filtro de alta `tareas_before_user_created` (Enric lo activa en Authentication, Hooks) que solo deja entrar correos invitados; las reglas protegen aunque no esté activo. (1) Administrador: no se le puede quitar el acceso y no tiene límite de espacio; no ve los datos de nadie. (2) Sección «Equipo» en Ajustes: miembros con último acceso y espacio usado, invitar (la app prepara el mensaje con el enlace para WhatsApp o correo), reenviar, cambiar cupo (50, 100, 250 y 500 MB, 1 GB o sin límite) y quitar acceso. (3) Quitar acceso bloquea al momento y no avisa: la persona solo ve «Esta cuenta no tiene acceso»; invitarla de nuevo antes de 30 días le devuelve sus datos; a los 30 días `send-reminders` borra sus archivos, sus filas, sus sugerencias y su cuenta, y lo anota en `team_log`. (4) Cifrado obligatorio para cada invitado al entrar por primera vez. Cada persona tiene un par de claves ECDH P-256 (pública en `crypto_keys.ecdh_pub`, privada envuelta con su clave de datos). (5) «Avisar a…»: copia de la tarea cifrada para el destinatario en `team_notices`, como máximo una cada 4 horas por tarea y persona (y 20 por hora); el aviso dice solo «Enric te ha enviado una tarea»; llega a «Recibidas» (iPhone, línea arriba de Hoy; escritorio, entrada en la barra lateral mientras haya algo), con «Añadir a mis tareas» (se elige proyecto; una fecha pasada pasa a hoy; no se copian recordatorio, responsable ni «Esperando a») o «Descartar». (6) Cupo (63c): Storage suma los archivos de la carpeta del usuario; al límite solo se bloquean fotos y audios. (7) Sugerencias e incidencias (63d): cifradas para el administrador, siempre con versión y dispositivo, el registro solo si se marca; aviso «Nueva sugerencia» o «Nueva incidencia»; buzón en Equipo con estado nueva, vista o resuelta. Los avisos de equipo con más de 1 hora de retraso se marcan sin notificar. (8) Cambio de cuenta en un dispositivo (sustituye a la fusión del punto 23(5) cuando los datos locales son de otra cuenta): no se sincroniza nada y se pregunta; «Continuar» hace una copia local propia y vacía el dispositivo para la cuenta nueva, conservando los ajustes del dispositivo; si la otra cuenta tiene cambios o archivos sin enviar, la opción por defecto es «Cerrar sesión» y «Vaciar de todos modos» pide confirmación; no se puede restaurar la copia de otra cuenta. Un dispositivo que nunca sincronizó sigue fusionando en la primera conexión. `add-task` rechaza cuentas sin acceso. Código en `js/team.js`; pruebas `rm-TM`, `rm-AV` y `rm-QT`. Lo siguiente: tareas compartidas (punto 43).
+
 
 ## 9. Decisiones pendientes de Enric (revisión del 1 de noviembre)
 
@@ -309,7 +315,7 @@ Orden fijado por Enric el 2 de noviembre y revisado el 3 de noviembre: tras el r
 | 20 | Siri y Atajo de iOS (decisión pendiente 1; aplazado por Enric el 2 de noviembre) | hecho en v0.31.0 | alto |
 | 21 | Lista de contactos (nombre, correo, teléfono) para Responsable y «Esperando a» | hecho en v0.32.0 | medio |
 | 22 | Duración de los bloques en la vista por horas (campo nuevo, parte de R20) | hecho en v0.32.0 (con el tiempo estimado, sin campo nuevo) | alto |
-| 22b | Cifrado de extremo a extremo y equipo con acceso por invitación y «Avisar a…» (punto 63 de la sección 8) | cifrado hecho en v0.34.0; queda el equipo, 6 a 7 h | máximo |
+| 22b | Cifrado de extremo a extremo y equipo con acceso por invitación y «Avisar a…» (punto 63 de la sección 8) | cifrado hecho en v0.34.0; equipo hecho en v0.36.0 | máximo |
 | 22c | Vista «Por persona», repetir desde que se completa, resumen de la mañana, modo foco y repeticiones con inicio, fin y sin acumular (punto 65 de la sección 8) | modo foco, repetir desde que se completa y repeticiones con fin hechos en v0.33.0; «Por persona» hecha en v0.35.0; queda el resumen de la mañana (2 h) | medio |
 | 22c bis | Correcciones de «Por persona»: elegir qué tareas recordar y mensaje con viñetas (punto 73 de la sección 8) | hecho en v0.35.1 | medio |
 | 22d | Planificar el día, «Algún día» y fases dentro de un proyecto (punto 72 de la sección 8) | 2 a 3 h, 1 a 2 h y 3 a 4 h | medio |

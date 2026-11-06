@@ -2,7 +2,7 @@
 /* Tareas. Core: version, log, utilities, data (DB in localStorage), UI state, Deshacer toast and the task actions.
    A classic script: index.html loads every file of js/ in order and they share their global names. Only declarations and
    listeners run at load; the start itself (first screen, timers, sync, service worker) is in boot.js, the last file. */
-const APP_VERSION = '0.35.2';
+const APP_VERSION = '0.36.0';
 let pendingSW = null; // service worker installed and waiting to take over
 let updateRequested = false; // the user asked for the waiting worker to take over
 
@@ -13,7 +13,7 @@ function log(level, msg, extra){
   const e = { t:new Date().toISOString(), l:level, m:String(msg) };
   if(extra!==undefined){ try{ e.x = typeof extra==='string' ? extra : JSON.stringify(extra); }catch(err){ e.x = String(extra); } }
   LOG.push(e); if(LOG.length>400) LOG = LOG.slice(-400);
-  try{ localStorage.setItem(LOGKEY, JSON.stringify(LOG)); }catch(err){}
+  try{ if(!localStorage.getItem('tareas-switching')) localStorage.setItem(LOGKEY, JSON.stringify(LOG)); }catch(err){} // a switch to another account under way (js/sync.js): no window writes the old log back
 }
 window.addEventListener('error', e => log('error', e.message||'Error', (e.filename||'').split('/').pop()+':'+e.lineno+':'+e.colno+(e.error&&e.error.stack?'\n'+e.error.stack:'')));
 window.addEventListener('unhandledrejection', e => log('error', 'Promesa rechazada: '+(e.reason&&e.reason.message||e.reason), e.reason&&e.reason.stack));
@@ -244,6 +244,8 @@ function saveEdit(x, patch){ Object.assign(x, patch, {modified:new Date().toISOS
   clearTimeout(editSaveT); editSaveT=setTimeout(save, 400); }
 function flushEdits(){ if(editSaveT) save(); }
 function save(){
+  if(typeof SY!=='undefined'&&SY&&SY.switching) return true; // the device is being emptied for another account (syncSwitchAccount): nothing is written
+  try{ if(localStorage.getItem('tareas-switching')) return true; }catch(e){} // nor by another window of the app meanwhile (SWITCH_KEY, cleared by syncSwitchBoot)
   if(saveHold){ saveDirty=true; return true; }
   dataVer++; clearTimeout(editSaveT); editSaveT=null; editPatch=null; // this write carries any typing still waiting for its save
   const raw=JSON.stringify(DB);

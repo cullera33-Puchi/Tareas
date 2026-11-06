@@ -98,7 +98,7 @@ function loadScript(src){ return new Promise((res,rej)=>{ const s=document.creat
 function cleanAuthUrl(){ try{ const u=new URL(location.href); const err=u.searchParams.get('error_description')||u.searchParams.get('error');
   let n=0; ['code','error','error_code','error_description','state'].forEach(k=>{ if(u.searchParams.has(k)){ u.searchParams.delete(k); n++; } });
   if(n) history.replaceState(history.state, '', u.pathname+(u.searchParams.toString()?'?'+u.searchParams:'')+u.hash);
-  if(err){ log('error','Inicio de sesión rechazado: '+err); toast('No se pudo iniciar sesión'); } }catch(e){} }
+  if(err){ log('error','Inicio de sesión rechazado: '+err); toast(/no tiene acceso/i.test(err)?'Esta cuenta no tiene acceso':'No se pudo iniciar sesión'); } }catch(e){} } // decision 63b: the Auth hook refuses an email nobody invited
 function supabaseRemote(cfg){
   let client=null; const T=SYNC_TABLES.map(t=>t.table); const fnUrl=cfg.url+'/functions/v1/send-reminders';
   const db=()=>{ if(!client) throw new Error('Cliente de Supabase no cargado'); return client; };
@@ -133,6 +133,7 @@ function supabaseRemote(cfg){
     subscribe(uid, onRow, onStatus){ const c=db(); const ch=c.channel('tareas-'+uid);
       T.filter(t=>!missing.has(t)).forEach(t=>ch.on('postgres_changes', {event:'*', schema:'public', table:t, filter:'owner_id=eq.'+uid}, p=>{ if(p&&p.new&&p.new.id) onRow(t, p.new); }));
       if(!missing.has('inbox')) ch.on('postgres_changes', {event:'INSERT', schema:'public', table:'inbox', filter:'owner_id=eq.'+uid}, p=>{ if(p&&p.new&&p.new.id) onRow('inbox', p.new); }); // Siri: a phrase just arrived
+      if(!missing.has('team_notices')) ch.on('postgres_changes', {event:'INSERT', schema:'public', table:'team_notices', filter:'recipient_id=eq.'+uid}, p=>{ if(p&&p.new&&p.new.id) onRow('team_notices', {id:p.new.id}); }); // decision 63b: a task sent to this member
       ch.subscribe((st, err)=>onStatus(st, err)); return ()=>{ try{ c.removeChannel(ch); }catch(e){} }; },
     // Block 9: the Edge Function's public key, this device's subscription (0002_push.sql) and the account's devices
     async pushKey(){ const r=await fetch(fnUrl+'?publicKey', {headers:{apikey:cfg.anonKey}}); const j=await r.json().catch(()=>({}));
@@ -155,10 +156,26 @@ function supabaseRemote(cfg){
     async inboxClear(){ const res=await db().from('inbox').update({text:'', url:null}).not('taken', 'is', null).neq('text', '').select('id'); if(absent('inbox', res.error)) return []; return rows(res); },
     // Decision 63a (0012_encryption.sql): the account's data key, wrapped by the encryption password. One row per user; insert fails if
     // another device activated first. A database without the table answers null (absent: logged once, Ajustes says it cannot be activated)
-    async cryptoGet(){ const res=await db().from('crypto_keys').select('kid,salt,iterations,wrapped,created,modified,migrated').maybeSingle(); if(absent('crypto_keys', res.error)) return null; if(res.error) throw res.error; return res.data||null; },
+    // Every column: the team's key pair too (0013_team.sql) when the database has it
+    async cryptoGet(){ const res=await db().from('crypto_keys').select('*').maybeSingle(); if(absent('crypto_keys', res.error)) return null; if(res.error) throw res.error; return res.data||null; },
     async cryptoPut(row){ const {error}=await db().from('crypto_keys').insert(row); if(error) throw error; },
     // Only when the row still matches (null: still null), so a change made meanwhile by another device is never overwritten
     async cryptoPatch(owner, match, patch){ let q=db().from('crypto_keys').update(patch).eq('owner_id', owner); Object.keys(match).forEach(c=>{ q=match[c]===null?q.is(c, null):q.eq(c, match[c]); }); return rows(await q.select('kid')); },
+    /* Decision 63b, c and d (0013_team.sql): the team, all through functions that check who calls. teamMe answers {absent:true} on a database
+       without 0013 (the app then works as before), null for an account without access */
+    async teamMe(){ const {data, error}=await db().rpc('tareas_team_me'); if(error){ if(teamAbsentErr(error)){ missing.add('team_notices'); return {absent:true}; } throw error; } return data||null; },
+    async teamDir(){ return rows(await db().rpc('tareas_team_directory')); },
+    async teamList(){ return rows(await db().rpc('tareas_team_list')); },
+    async teamInvite(email, name){ const {data, error}=await db().rpc('tareas_team_invite', {p_email:email, p_name:name}); if(error) throw error; return data; },
+    async teamQuota(id, quota){ const {error}=await db().rpc('tareas_team_quota', {p_id:id, p_quota:quota}); if(error) throw error; },
+    async teamRevoke(id){ const {error}=await db().rpc('tareas_team_revoke', {p_id:id}); if(error) throw error; },
+    // «Avisar a…»: inserted without reading it back; the server's «too soon» comes as an error whose details say until when
+    async noticeSend(row){ const {error}=await db().from('team_notices').insert(row); if(error) throw error; },
+    async noticeList(uid){ return rows(await db().from('team_notices').select('id,sender_id,payload,created').eq('recipient_id', uid).is('taken', null).is('dismissed', null).order('created', {ascending:true}).limit(200)); },
+    async noticeMark(id, patch){ return rows(await db().from('team_notices').update(patch).eq('id', id).select('id')); },
+    async feedbackSend(row){ const {error}=await db().from('team_feedback').insert(row); if(error) throw error; },
+    async feedbackList(){ return rows(await db().from('team_feedback').select('id,sender_id,kind,payload,created,status').order('created', {ascending:false}).limit(200)); },
+    async feedbackMark(id, status){ return rows(await db().from('team_feedback').update({status}).eq('id', id).select('id')); },
     async keyGet(){ const res=await db().from('shortcut_keys').select('space_id,created,revoked').maybeSingle(); if(absent('shortcut_keys', res.error)) return null; if(res.error) throw res.error; return res.data||null; },
     async keyPut(row){ const res=await db().from('shortcut_keys').upsert(row, {onConflict:'owner_id'}); if(absent('shortcut_keys', res.error)) throw new Error('Falta 0010_inbox.sql'); if(res.error) throw res.error; },
     async keyPatch(owner, patch){ return rows(await db().from('shortcut_keys').update(patch).eq('owner_id', owner).select('owner_id')); },
@@ -295,15 +312,15 @@ async function syncPull(cursor){ const out={};
   return out; }
 
 /* ---------- Runs ---------- */
-function syncPaint(){ if(!SY) return; if(SY.user && !SY.running){ try{ SY.pending=syncCollect(true).count; }catch(e){} }
+function syncPaint(){ if(!SY) return; if(SY.user && !SY.running){ try{ SY.pending=syncOtherOwner()?0:syncCollect(true).count; }catch(e){} } // another account's data are never pending for this one
   if(onSettings() && !busyEditing() && !touchDrag) render(); }
 function syncStatus(s){ if(!SY||SY.status===s) return; SY.status=s; syncPaint(); }
 // Called by save(): the change goes up a moment after the last one
-function syncChanged(){ if(!SY||!SY.user||SY.quiet) return; clearTimeout(SY.timer); SY.timer=setTimeout(()=>syncRun('cambio'), SYNC_DEBOUNCE); }
+function syncChanged(){ if(!SY||!SY.user||SY.quiet||SY.switching) return; clearTimeout(SY.timer); SY.timer=setTimeout(()=>syncRun('cambio'), SYNC_DEBOUNCE); }
 function syncRetry(){ clearTimeout(SY.timer); const ms=Math.min(300e3, 2000*Math.pow(2, SY.retry++)); SY.timer=setTimeout(()=>syncRun('reintento'), ms); }
 // One run: pull, merge, push. Resolves true when it reached the server. Runs one at a time (and one per device with Web Locks)
 function syncRun(reason){
-  if(!SY||!SY.user||!SY.remote) return Promise.resolve(false);
+  if(!SY||!SY.user||!SY.remote||SY.switching) return Promise.resolve(false); // switching: the device is being emptied for another account
   if(SY.running){ SY.again=true; return SY.runP; }
   if(CR.busy){ SY.again=true; return Promise.resolve(false); } // decision 63a: activating encryption or encrypting the server copy; a run follows
   clearTimeout(SY.timer);
@@ -311,8 +328,14 @@ function syncRun(reason){
   if(!navigator.onLine){ SY.status='offline'; syncPaint(); return Promise.resolve(false); }
   SY.running=true; SY.again=false; syncStatus('syncing');
   const body=async()=>{ const t0=Date.now(); const user=SY.user;
+    // Decision 63b: an account without access syncs nothing (js/team.js); the server would refuse it anyway
+    const tg=await teamGate(user); if(tg==='denied') return 'denied';
+    // This device's data belong to another account (it synced with it before): nothing of them goes up to this one, and nothing of this one
+    // comes down into them. The person chooses: start this device again for this account, or sign out (syncOtherAsk)
+    if(syncOtherOwner()) return 'other';
     // Decision 63a: an account with encryption on and no key on this device neither pulls nor pushes (js/e2e.js)
-    if(await cryptoGate(user)==='locked') return 'locked';
+    const cg=await cryptoGate(user); if(cg==='locked') return 'locked';
+    if(cg==='off'&&tg==='member') return 'needkey'; // decision 71.1: a member creates the encryption password before anything syncs
     let st=syncState(); const first=st.owner!==user.id;
     if(first && st.firstFor!==user.id){ // decision 5: a local copy before anything comes in; the account's known state starts empty
       try{ flushEdits(); await BK.put(todayStr()); await refreshBackups(); log('info','Copia local antes de la primera sincronización', {tasks:DB.tasks.length, projects:DB.projects.length}); }
@@ -327,18 +350,25 @@ function syncRun(reason){
     const pool=first?(pulled.spaces||[]).filter(r=>!r.deleted).map(r=>crUnread('spaces', syncFromRow('spaces', r), null)):null;
     const a=syncApply(pulled, {cursor:true, pool});
     await inboxPickup(); // Siri: the inbox rows become tasks, which this pass pushes (js/inbox.js)
+    const cleanAt=new Date().toISOString(); // what changes after this moment is not in this upload (syncOtherPending)
     const p=await syncPush(syncCollect(false));
     await cryptoAfterPush(); // decision 63a: the Siri phrases taken leave the server once their tasks are up encrypted
     st=syncState(); st.fields=fsig; if(first){ st.owner=user.id; log('info','Primera conexión completada', {spaces:DB.spaces.length, projects:DB.projects.length, tasks:DB.tasks.length, remaps:a.remaps.length}); }
-    st.lastSync=new Date().toISOString(); syncWrite(st); SY.lastSync=st.lastSync; SY.retry=0;
+    st.lastSync=new Date().toISOString(); st.missing=SY.remote.missing?[...SY.remote.missing]:[]; // the tables this database lacks, for the unsent count of another account's sign-in (syncOtherPending)
+    st.cleanAt=cleanAt; try{ const left=syncCollect(true); st.dirty=Object.keys(left.up).flatMap(t=>left.up[t].map(x=>t+':'+x.row.id)).slice(0, 2000); }catch(e){ st.dirty=[]; } // and what stayed different after it (a local copy kept, an edit during the pass)
+    syncWrite(st); SY.lastSync=st.lastSync; SY.retry=0;
     log('info','Sincronización ('+reason+')', {recibidas:a.added+a.updated, eliminadas:a.removed, conflictos:a.conflicts.length, enviadas:p.pushed, borradas:p.deleted, mantenidas:p.kept, ms:Date.now()-t0});
     return true; };
   const locked=()=>(navigator.locks&&navigator.locks.request) ? navigator.locks.request('tareas-sync', body) : body();
   SY.runP=locked().then(ok=>{ SY.running=false;
     if(ok==='locked'){ SY.status='locked'; SY.error=''; syncPaint(); cryptoAskUnlock(); return false; }
-    if(ok){ SY.status='ok'; SY.error=''; pushFlush(); attFlushSoon(0); syncResubscribe(); cryptoResume(); } syncPaint(); if(SY.again) syncChanged(); return !!ok; }, e=>{
+    if(ok==='other'){ SY.status='other'; SY.error=''; syncPaint(); syncOtherAsk(); return false; }
+    if(ok==='denied'){ SY.status='denied'; SY.error=''; syncPaint(); teamDeniedPaint(); return false; } // decision 63b
+    if(ok==='needkey'){ SY.status='needkey'; SY.error=''; syncPaint(); teamAskKey(); return false; } // decision 71.1
+    if(ok){ SY.status='ok'; SY.error=''; pushFlush(); attFlushSoon(0); syncResubscribe(); cryptoResume(); teamAfter(); } syncPaint(); if(SY.again) syncChanged(); return !!ok; }, e=>{
     SY.running=false;
     if(cryptoFailed(e)){ syncRetry(); syncPaint(); return false; } // decision 63a: encrypted rows and no key, or plain text refused by the server
+    if(teamRefused(e)){ syncRetry(); syncPaint(); return false; } // decision 63b: refused by the team's rules (access removed): the next pass reads the account again
     const off=syncOffline(e); SY.status=off?'offline':'error'; SY.error=String(e&&(e.message||e.code)||e);
     log(off?'warn':'error', 'Sincronización falló ('+reason+'): '+SY.error); syncRetry(); syncPaint(); return false; });
   return SY.runP; }
@@ -346,7 +376,7 @@ function syncRun(reason){
 const syncMissingKey = () => SY&&SY.remote&&SY.remote.missing?[...SY.remote.missing].join():'';
 function syncResubscribe(){ if(SY.unsub&&SY.subKey!==syncMissingKey()){ SY.unsub(); SY.unsub=null; syncSubscribe(); } }
 function syncSubscribe(){ if(SY.unsub||!SY.user||!SY.remote.subscribe) return; SY.subKey=syncMissingKey();
-  let was=false; SY.unsub=SY.remote.subscribe(SY.user.id, (table,row)=>{ if(table==='inbox'){ clearTimeout(SY.ibT); SY.ibT=setTimeout(()=>syncRun('Siri'), 300); return; } SY.rt.push([table,row]); clearTimeout(SY.rtT); SY.rtT=setTimeout(syncRealtime, 250); }, (st, err)=>{
+  let was=false; SY.unsub=SY.remote.subscribe(SY.user.id, (table,row)=>{ if(table==='team_notices'){ teamRecvSoon(); return; } if(table==='inbox'){ clearTimeout(SY.ibT); SY.ibT=setTimeout(()=>syncRun('Siri'), 300); return; } SY.rt.push([table,row]); clearTimeout(SY.rtT); SY.rtT=setTimeout(syncRealtime, 250); }, (st, err)=>{
     if(st==='SUBSCRIBED'){ if(was) syncRun('tiempo real'); was=true; } // back after a cut: catch up with what came meanwhile
     else if(st==='CHANNEL_ERROR'||st==='TIMED_OUT') log('warn','Tiempo real: '+st+(err?' '+(err.message||err):'')); }); }
 // Changes from another device, a few at a time, through the same merge
@@ -358,10 +388,11 @@ function syncRealtime(){ const ev=SY.rt.splice(0); if(!ev.length||!SY.user) retu
   catch(e){ log('error','Tiempo real: '+(e&&e.message||e)); } }
 function syncSetUser(user, why){
   const st=syncState();
+  SY.otherAsked=false; // the question about another account's data is asked again for each sign-in
   if(user){ const changed=!SY.user||SY.user.id!==user.id; SY.user={id:user.id, email:user.email||''}; st.user=SY.user; st.lost=null; syncWrite(st); SY.lostShown=false;
     if(changed) log('info','Sesión iniciada', SY.user.email);
     syncSubscribe(); if(changed || why==='inicio') syncRun(why==='inicio'?'inicio':'sesión'); }
-  else if(SY.user){ const asked=SY.signingOut||why==='user'||cryptoSignOutRecent(); SY.user=null; st.user=null; // cryptoSignOutRecent: «Cerrar sesión» in another window
+  else if(SY.user){ const asked=SY.signingOut||why==='user'||cryptoSignOutRecent(); SY.user=null; st.user=null; teamReset(null); teamDeniedPaint(); // cryptoSignOutRecent: «Cerrar sesión» in another window
     // A session that ends without «Cerrar sesión» (revoked or expired elsewhere, such as a global sign-out from another app of the project):
     // said in the log, in a notice and in Ajustes until the next sign-in. The encryption key stays; the next sign-in checks it against the account
     if(asked){ log('info','Sesión cerrada'); CR.key=null; CR.kid=null; CR.owner=null; } else { st.lost=new Date().toISOString(); CR.force=true; log('warn','La sesión se ha cerrado sin pedirlo: se deja de sincronizar', why); }
@@ -392,15 +423,123 @@ function syncBoot(){
   window.addEventListener('offline', ()=>syncStatus('offline'));
   document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible' && SY.user) syncRun('vuelta'); });
   setInterval(()=>{ if(onSettings() && SY.user && !busyEditing()) render(); }, 6e4); // "hace 3 min" stays true
-  cryptoBoot(); syncInit(); if(onSettings()) render(); }
+  cryptoBoot(); teamBoot(); syncInit(); if(onSettings()) render(); }
 async function syncSignIn(){ if(!SY) return; if(!navigator.onLine){ toast('Sin conexión'); return; }
   try{ if(!SY.ready){ syncInit(); await SY.initP; } flushHeld(true); flushEdits(); log('info','Inicio de sesión con Google'); await SY.remote.signIn(); }
   catch(e){ log('error','Inicio de sesión falló: '+(e&&e.message||e)); toast('No se pudo iniciar sesión'); } }
 function syncSignOutSheet(){ const dev=UI.wide?'este dispositivo':'este iPhone';
-  // signingOut: the SIGNED_OUT event this causes is the user's own, not a session lost. Only this sign-out forgets the encryption key (decision 63a)
-  confirmSheet('Cerrar sesión', 'Los datos se quedan en '+dev+' y dejan de sincronizarse.', async()=>{ SY.signingOut=true; try{ localStorage.setItem(CR_OUT, String(Date.now())); }catch(e){}
-    try{ await pushSignOut(); try{ await SY.remote.signOut(); }catch(e){ log('warn','Cerrar sesión: '+(e&&e.message||e)); } syncSetUser(null, 'user'); await cryptoSignedOut(); }
-    finally{ SY.signingOut=false; } toast('Sesión cerrada'); }); }
+  confirmSheet('Cerrar sesión', 'Los datos se quedan en '+dev+' y dejan de sincronizarse.', syncSignOut); }
+// signingOut: the SIGNED_OUT event this causes is the user's own, not a session lost. Only this sign-out forgets the encryption key (decision 63a).
+// Also the only button of an account without access (decision 63b)
+async function syncSignOut(){ if(!SY||!SY.user) return; SY.signingOut=true; try{ localStorage.setItem(CR_OUT, String(Date.now())); }catch(e){}
+  try{ await pushSignOut(); try{ await SY.remote.signOut(); }catch(e){ log('warn','Cerrar sesión: '+(e&&e.message||e)); } syncSetUser(null, 'user'); await cryptoSignedOut(); }
+  finally{ SY.signingOut=false; } toast('Sesión cerrada'); }
+
+/* ---------- Another account's data on this device ----------
+   A device that synced with account A keeps A's data after A signs out (or its session ends). Signing in there with account B never merges
+   them (decision 5's merge is only for a device that never synced with an account): A's rows would go up into B, and their ids, which are
+   global, would be refused anyway. Instead, «Continuar»: a local backup (marked as A's, so it never restores into B), then this device is
+   emptied (data, files, the team's copy, the encryption state and keys of A) and the app starts again, and B's data come down. Or «Cerrar
+   sesión». The same happens when A signs in again after B */
+// The account this device's data belong to: the one it synced with, or the one whose first pass began here and never ended (its pulled rows
+// are already merged in). Null: a device that never synced, whose data go into the first account that signs in (decision 5)
+const syncPrevOwner = () => { const st=syncState(); return st.owner||st.firstFor||null; };
+const syncOtherOwner = () => { if(!SY||!SY.user) return false; const o=syncPrevOwner(); return !!o&&o!==SY.user.id; };
+// A promise that gives up: IndexedDB can hang (Safari); null then means «unknown»
+const syncWithin = (p, ms) => Promise.race([p, new Promise(r=>setTimeout(()=>r(null), ms))]);
+/* What of the old account this device has not sent: rows the server never saw, rows changed (modified) after its last pass, deletions not sent,
+   and the photos or recordings of its live tasks whose file is waiting here. Not counted: what rollOver changes without touching modified,
+   demo data, attachments of tasks that are gone, files of attachments that are gone, and tables its database lacks (st.missing, kept by its
+   last pass). Returns the number, or -1 when the files cannot be read (unknown: treated as unsent) */
+// A row that differs from what the server holds counts when it changed after the last clean moment of a pass (cleanAt, with 5 s of margin),
+// when it was still different at the end of that pass (st.dirty), or always when the clock is now before that moment (moved back)
+async function syncOtherPending(){ const st=syncState(), clean=syncTime(st.cleanAt||st.lastSync), since=clean-5000, missing=new Set(st.missing||[]), dirty=new Set(st.dirty||[]), firstOnly=!st.owner||Date.now()<clean; let n=0;
+  SYNC_TABLES.forEach(({list, table})=>{ if(missing.has(table)) return; const known=(st.known||{})[table]||{}, here=new Set();
+    DB[list].forEach(rec=>{ if(!rec||rec.id==null) return; here.add(rec.id); if(syncSkip(table, rec)) return; const k=known[rec.id];
+      if(k===undefined||k==='x'){ n++; return; } // never seen by the server, or back after its deletion went up
+      if(firstOnly||dirty.has(table+':'+rec.id)||syncTime(rec.modified)>since){ if(syncSig(syncToRow(table, rec))!==k) n++; } });
+    Object.keys(known).forEach(id=>{ if(known[id]!=='x'&&!here.has(id)&&!syncDemoId(id)) n++; }); }); // deleted here, not sent
+  const waiting=new Set(DB.attachments.filter(a=>a&&!a.path&&!syncDemoId(a.id)&&!syncDemoId(a.taskId)&&task(a.taskId)).map(a=>a.id));
+  if(waiting.size){ const metas=await syncWithin(FS.allMeta().catch(()=>null), 3000); if(!metas) return -1;
+    metas.forEach(m=>{ if(m&&m.pending&&waiting.has(m.id)) n++; }); }
+  return n; }
+// Nothing of the person's own: the device can start again without asking (when in doubt, it asks)
+const syncLocalEmpty = () => !DB.tasks.length&&!DB.projects.length&&!DB.projectNotes.length&&!DB.contacts.length&&!DB.attachments.length&&!DB.voiceNotes.length&&!DB.subtasks.length
+  && DB.spaces.length<=2 && DB.spaces.every(sp=>['trabajo','personal'].includes(norm(sp.name||'').trim()));
+/* The question. Something unsent (N, or unknown): «Cerrar sesión» (the old account sends it first; the default, Intro on the desktop) or, behind
+   a confirmation, «Vaciar de todos modos» (what was unsent stays only in this device's copy). Nothing unsent: «Continuar» or «Cerrar
+   sesión»; on the desktop Intro is «Cerrar sesión», Continuar takes a click */
+async function syncOtherAsk(force){ if(!syncOtherOwner()||SY.switching||SY.otherBusy) return; SY.otherBusy=true; let n=-1;
+  try{ n=await syncOtherPending(); }catch(e){ n=-1; } finally{ SY.otherBusy=false; } if(!syncOtherOwner()||SY.switching) return;
+  if(!n&&syncLocalEmpty()){ syncSwitchAccount(); return; }
+  if(SY.otherAsked&&!force) return; if(!force&&(sheet.classList.contains('on')||asheet.classList.contains('on')||menuOpen()||touchDrag)){ clearTimeout(SY.otherT); SY.otherT=setTimeout(()=>syncOtherAsk(), 1500); return; }
+  SY.otherAsked=true; const dev=UI.wide?'este dispositivo':'este iPhone';
+  if(n){ const title='Este dispositivo tiene cambios sin enviar de otra cuenta'+(n>0?' ('+n+')':''), text='Entra con esa cuenta para enviarlos antes de usar aquí otra.';
+    log('info','Cambios sin enviar de otra cuenta: no se puede usar aquí esta cuenta', {n});
+    if(UI.wide){ macAlert({title, text, ok:'Cerrar sesión', red:false, fn:syncSignOut, more:[{label:'Vaciar de todos modos', red:true, fn:()=>setTimeout(()=>syncEmptyAnyway(n), 50)}]}); return; }
+    actionSheet(title+'. '+text, [{label:'Cerrar sesión', fn:syncSignOut}, {label:'Vaciar de todos modos', red:true, fn:()=>setTimeout(()=>syncEmptyAnyway(n), 50)}]); return; }
+  const title='Este dispositivo tiene datos de otra cuenta';
+  const text='Ya están todos en esa cuenta. Para usar '+(SY.user.email||'esta cuenta')+' aquí, se guarda una copia local de lo que hay en '+dev+' y se vacía; después llegan los datos de esta cuenta.';
+  log('info','Datos de otra cuenta en este dispositivo: no se sincroniza');
+  if(UI.wide){ macAlert({title, text, ok:'Cerrar sesión', red:false, fn:syncSignOut, more:[{label:'Continuar', fn:()=>syncSwitchAccount()}]}); return; }
+  actionSheet(title+'. '+text, [{label:'Continuar', fn:()=>syncSwitchAccount()}, {label:'Cerrar sesión', red:true, fn:syncSignOut}]); }
+// «Vaciar de todos modos»: confirmed apart; Intro and the first button stay on the safe side
+function syncEmptyAnyway(n){ if(!syncOtherOwner()||SY.switching) return;
+  const text='Los cambios sin enviar de la otra cuenta'+(n>0?' ('+n+')':'')+' solo quedarán en una copia de este dispositivo. Las fotos y audios sin subir se perderán.';
+  if(UI.wide){ macAlert({title:'Vaciar este dispositivo', text, ok:'Cerrar sesión', red:false, fn:syncSignOut, more:[{label:'Vaciar', red:true, fn:()=>syncSwitchAccount(true)}]}); return; }
+  actionSheet(text, [{label:'Vaciar', red:true, fn:()=>syncSwitchAccount(true)}]); }
+/* «Continuar» (and «Vaciar de todos modos», force). From the start nothing syncs or saves here (SY.switching) or in another window (the
+   marker SWITCH_KEY, which save() checks and which makes the other windows start again), and a screen covers the app; pending typing and
+   marked rows are written first and, without force, the unsent check is made again. Then the backup (its own key, never over another copy),
+   the sync state for the new account (written first: if that fails nothing is touched; if the data cannot be blanked after it, the old
+   account's state comes back), the blank data in memory and on the device, the old account's files, team copy, encryption state and keys,
+   push subscription and log gone, and a reload, which checks the data are still blank (syncSwitchBoot) */
+const SWITCH_KEY='tareas-switching';
+async function syncSwitchAccount(force){ if(!syncOtherOwner()||SY.switching) return; const user=SY.user, prev=syncPrevOwner();
+  clearTimeout(SY.timer); try{ flushHeld(true); flushEdits(); }catch(e){}
+  if(!force){ const n=await syncOtherPending().catch(()=>-1); if(n){ SY.otherAsked=false; syncOtherAsk(true); return; } } // something arrived meanwhile: the old account sends it first
+  if(SY.switching||!syncOtherOwner()) return; SY.switching=true; clearTimeout(SY.timer); syncCover(true);
+  const fail=msg=>{ try{ localStorage.removeItem(SWITCH_KEY); }catch(e){} SY.switching=false; syncCover(false); toast(msg); };
+  try{ await BK.tagOwnerless(prev); }catch(e){ log('warn','Copias locales sin marcar: '+(e&&e.message||e)); }
+  if(!syncLocalEmpty()){ try{ await BK.put(todayStr(), prev, true); await refreshBackups(); }catch(e){ log('error','Copia local antes de cambiar de cuenta no disponible: '+(e&&e.message||e)); fail('No se pudo guardar la copia local. No se ha cambiado nada'); return; } }
+  LOG=[]; try{ localStorage.removeItem(LOGKEY); }catch(e){} // the old account's log (with its email) goes first; with the marker no window writes it back
+  try{ localStorage.setItem(SWITCH_KEY, JSON.stringify({to:user.id, at:new Date().toISOString()})); }catch(e){ fail('No se pudo cambiar de cuenta. No se ha cambiado nada'); return; }
+  const prevSync=localStorage.getItem(SYNC_KEY);
+  // the account's sync state starts empty, as a first connection that has nothing to merge (and needs no backup: the device will be empty)
+  if(!syncWrite({user:{id:user.id, email:user.email||''}, firstFor:user.id, known:{}, cursor:{}, del:{}})){ fail('No se pudo cambiar de cuenta. No se ha cambiado nada'); return; }
+  const keep={}, s=DB.settings||{}; ['theme','tipsSeen','shakeUndo','colWidths','paneWidth','hap','weekMode','weekTray','calMode','pitFold'].forEach(k=>{ if(k in s) keep[k]=s[k]; });
+  const fresh=blank(); Object.assign(fresh.settings, keep);
+  try{ localStorage.setItem(KEY, JSON.stringify(fresh)); }
+  catch(e){ // the data stay the old account's: so does its sync state (or one that only knows the owner: its next pass then only sends)
+    let back=false; try{ localStorage.setItem(SYNC_KEY, prevSync||'{}'); back=true; }catch(x){} if(!back) try{ localStorage.setItem(SYNC_KEY, JSON.stringify({owner:prev, firstFor:prev})); }catch(x){}
+    fail('No se pudo cambiar de cuenta. No se ha cambiado nada'); log('error','No se pudo vaciar el dispositivo: '+(e&&e.message||e)); return; } // logged once the marker is gone, so it is kept
+  DB=fresh; // nothing of the old account stays in memory either
+  [TEAM_KEY, CR_FLAG, CR_FILES, 'tareas-inbox'].forEach(k=>{ try{ localStorage.removeItem(k); }catch(e){} });
+  try{ localStorage.setItem(BK_SKIP, todayStr()); }catch(e){} // no daily copy of the empty device today: the account's data are on the server
+  let dropped=null; try{ dropped=pushDrop(); localStorage.removeItem(PUSH_KEY); }catch(e){} // the old account's notifications stop reaching this device
+  await syncWithin(Promise.resolve(dropped).catch(()=>{}), 3000);
+  await syncWithin(FS.tx(['files','thumbs','meta'], 'readwrite', (f,t,m)=>{ f.clear(); t.clear(); m.clear(); }).catch(()=>{}), 5000);
+  await syncWithin(Promise.all([cryptoKeyForget().catch(()=>{}), cryptoKdbDo('readwrite', st=>st.delete('ecdh')).catch(()=>{})]), 5000);
+  location.reload(); }
+// The screen over the app while the device is emptied
+function syncCover(on){ let el=document.getElementById('switching'); app.inert=!!on||teamDenied();
+  if(!on){ if(el) el.remove(); return; } if(el) return; el=document.createElement('div'); el.id='switching'; el.className='noaccess'; el.setAttribute('role','alert');
+  el.innerHTML='<div class="na-box"><h1>Vaciando este dispositivo</h1><p>Un momento.</p></div>'; document.body.appendChild(el); if(sheet.classList.contains('on')) closeSheet(); }
+// At start: a switch was under way. Its sync state already for the new account: the data must be blank (a window that wrote the old data back
+// meanwhile is undone). Otherwise it never got that far: the marker stays while it is fresh (another window may be switching now), and goes once older than a minute
+function syncSwitchBoot(){ let m=null; try{ m=JSON.parse(localStorage.getItem(SWITCH_KEY)||'null'); }catch(e){} if(!m) return;
+  const st=syncState();
+  if(st.firstFor===m.to&&!st.owner){ // it got as far as the new account's sync state: finish what an interruption may have left of the old one
+    LOG=[]; try{ localStorage.removeItem(LOGKEY); }catch(e){}
+    FS.tx(['files','thumbs','meta'], 'readwrite', (f,t,x)=>{ f.clear(); t.clear(); x.clear(); }).catch(()=>{}); cryptoKeyForget().catch(()=>{}); cryptoKdbDo('readwrite', s=>s.delete('ecdh')).catch(()=>{});
+    if(!syncLocalEmpty()){ const s=DB.settings||{}, fresh=blank(); ['theme','tipsSeen'].forEach(k=>{ if(k in s) fresh.settings[k]=s[k]; });
+      try{ localStorage.setItem(KEY, JSON.stringify(fresh)); DB=fresh; syncWrite({user:st.user||null, firstFor:m.to, known:{}, cursor:{}, del:{}, missing:st.missing||[]}); // and nothing the new account already had here is taken for deleted
+        log('warn','Datos de otra cuenta escritos durante el cambio: se vacía de nuevo'); }catch(e){} }
+    else log('info','Dispositivo vaciado para otra cuenta'); }
+  else if(Date.now()-(Date.parse(m.at)||0)<60e3) return; // still under way in another window (this one restarted on its marker): it ends it
+  try{ localStorage.removeItem(SWITCH_KEY); }catch(e){} }
+// Another window started emptying the device: this one starts again too, so it never writes the old account's data back
+window.addEventListener('storage', e=>{ if(e.key===SWITCH_KEY&&e.newValue) location.reload(); });
 
 /* ---------- Ajustes, Cuenta ---------- */
 function syncAgo(iso){ const t=syncTime(iso); if(!t) return ''; const m=Math.floor((Date.now()-t)/6e4);
@@ -409,6 +548,9 @@ function syncAgo(iso){ const t=syncTime(iso); if(!t) return ''; const m=Math.flo
   const x=new Date(iso); return 'el '+x.getDate()+' '+MESES[x.getMonth()]+' a las '+fmtTime(iso); }
 function syncLine(){ if(!SY||!SY.user) return '';
   if(SY.status==='locked') return 'Falta la contraseña de cifrado'; // decision 63a
+  if(SY.status==='denied') return 'Esta cuenta no tiene acceso'; // decision 63b
+  if(SY.status==='other') return 'Este dispositivo tiene datos de otra cuenta';
+  if(SY.status==='needkey') return 'Falta crear la contraseña de cifrado'; // decision 71.1
   if(SY.status==='error'&&CRYPTO_REFUSED.test(SY.error)) return 'Actualiza la app: el cifrado está activado';
   if(SY.status==='offline') return 'Sin conexión. Se sincronizará al volver';
   if(SY.status==='syncing') return 'Sincronizando';
@@ -421,7 +563,8 @@ function syncAccountHTML(dev){
     '<div class="footnote">'+(SY.status==='offline'?'Sin conexión. ':'')+'Al iniciar sesión, tus tareas se guardan en tu cuenta y llegan a tus otros dispositivos. Lo que ya hay en '+dev+' se conserva.</div>';
   const n=SY.pending||0, line=syncLine();
   return '<div class="group-title">Cuenta</div><div class="group sync-acc"><div class="cell"><span class="lbl">Cuenta</span><span class="val">'+esc(SY.user.email||'Google')+'</span></div>'+
-    '<div class="cell"><span class="lbl sync-line'+(SY.status==='error'||SY.status==='offline'||SY.status==='locked'?' warn':'')+'">'+esc(line)+'</span></div>'+
+    '<div class="cell"><span class="lbl sync-line'+(SY.status==='error'||SY.status==='offline'||SY.status==='locked'||SY.status==='denied'||SY.status==='needkey'||SY.status==='other'?' warn':'')+'">'+esc(line)+'</span></div>'+
+    (SY.status==='other'?'<button class="cell link" data-act="syncSwitch"><span class="lbl">Usar este dispositivo con esta cuenta</span></button>':'')+
     '<div class="cell"><span class="lbl">Cambios pendientes</span><span class="val">'+(n?n:'Ninguno')+'</span></div>'+
     '<button class="cell link" data-act="syncNow"'+(SY.status==='syncing'?' disabled':'')+'><span class="lbl">Sincronizar ahora</span></button>'+
     '<button class="cell" data-act="signOut"><span class="lbl" style="color:var(--red)">Cerrar sesión</span></button></div>'+

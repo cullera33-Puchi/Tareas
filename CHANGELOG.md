@@ -1,5 +1,15 @@
 # Registro de cambios
 
+## v0.36.0. Equipo (5 de noviembre de 2026)
+
+- Acceso solo por invitación (puntos 63b y 71): Enric, como administrador, invita desde Ajustes, «Equipo», y la app prepara el mensaje con el enlace para WhatsApp o correo. Una cuenta de Google sin invitación ve «Esta cuenta no tiene acceso» y no sincroniza nada. Supabase lo controla con reglas en todas las tablas y en Storage, más un filtro de alta que se activa en el panel.
+- Cada invitado activa su cifrado al entrar por primera vez. Quitar el acceso bloquea al momento, sin aviso; los datos se borran a los 30 días.
+- «Avisar a…» en una tarea: copia cifrada para la otra persona, que la recibe en «Recibidas» con «Añadir a mis tareas» o «Descartar». Como máximo un aviso cada 4 horas por tarea y persona. La notificación no muestra el contenido.
+- Cupo de almacenamiento por persona (50 MB de inicio, ajustable; el administrador sin límite). Al llegar al límite solo se bloquean fotos y audios. «Almacenamiento: N de 50 MB» en Ajustes.
+- «Enviar sugerencia o incidencia» en Ajustes, cifrada para el administrador, con buzón y estados en «Equipo».
+- Un dispositivo con datos de otra cuenta no los mezcla: pregunta antes, hace una copia local y lo vacía para la cuenta nueva; con cambios sin enviar propone cerrar sesión.
+- Migración `0013_team.sql`; cambios en `send-reminders` y `add-task`. Pruebas nuevas `rm-TM`, `rm-AV` y `rm-QT`.
+
 ## v0.35.2. Recordatorios con proyecto y canal a elegir (5 de noviembre de 2026)
 
 - Formato (punto 74): «Hola X,» en su propia línea, una línea en blanco, «Te recuerdo esta tarea» o «estas tareas», las viñetas y «Gracias.». Cada viñeta lleva el proyecto y, si la hay, la fecha o la entrega: «Preparar SteerCo (OCA, para hoy)».

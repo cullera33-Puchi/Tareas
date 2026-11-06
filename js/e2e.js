@@ -107,7 +107,7 @@ function crKeyBoot(){ if(!CR.keyP) CR.keyP=cryptoKeyLoad().then(r=>{ if(r&&!CR.k
 // The row of the server. Throws on a network error (the pass fails and is retried, as any other)
 async function crFetch(user){ const R=SY.remote; if(!R.__crypto||!R.cryptoGet){ CR.row=null; CR.for=user.id; return null; }
   const row=await R.cryptoGet(); if(!SY.user||SY.user.id!==user.id) return null;
-  CR.absent=syncMissing('crypto_keys'); CR.row=row&&row.kid?{kid:row.kid, salt:row.salt, iterations:+row.iterations||CRYPTO_ITER, wrapped:row.wrapped, created:row.created||null, modified:row.modified||null, migrated:row.migrated||null}:null;
+  CR.absent=syncMissing('crypto_keys'); CR.row=row&&row.kid?{kid:row.kid, salt:row.salt, iterations:+row.iterations||CRYPTO_ITER, wrapped:row.wrapped, created:row.created||null, modified:row.modified||null, migrated:row.migrated||null, ecdh_pub:row.ecdh_pub||null, ecdh_priv:row.ecdh_priv||null}:null; // ecdh_*: the team's key pair (js/team.js)
   CR.for=user.id; CR.at=Date.now(); CR.force=false; return CR.row; }
 /* An activation flag left here: confirmed once the server row carries its kid. Cleared only when the server holds no row with its kid and
    it is not an activation in progress (in this window, or another one in the last two minutes); its key then goes too */
@@ -158,6 +158,7 @@ function cryptoAskUnlock(){ if(CR.asked||!cryptoLocked()) return; if(sheet.class
   CR.asked=true; cryptoUnlockSheet(); }
 async function crForget(why){ CR.key=null; CR.kid=null; CR.owner=null; CR.keyP=Promise.resolve();
   try{ await cryptoKeyForget(); }catch(e){}
+  try{ await cryptoKdbDo('readwrite', st=>st.delete('ecdh')); }catch(e){} TM.priv=null; TM.pub=null; TM.keyKid=null; TM.keyOwner=null; // decision 63b: the team's private key goes with the data key
   log('info','Clave de cifrado olvidada en este dispositivo'+(why?' ('+why+')':'')); }
 // Only from «Cerrar sesión» (syncSignOutSheet): a session that ends without asking keeps the key, checked against the account at the next sign-in
 async function cryptoSignedOut(){ CR.keyP=Promise.resolve(); CR.row=undefined; CR.for=null; CR.asked=false; CR.lockLogged=false; CR.bad.clear(); CR.repaired=null;
@@ -185,11 +186,13 @@ function crRulesPaint(s, a, b){ const p=a.value, q=b.value; let all=true;
 const crField = (role, ph, auto) => '<input class="wfor" data-role="'+role+'" type="password" placeholder="'+ph+'" autocomplete="'+(auto||'new-password')+'" autocapitalize="off" autocorrect="off" spellcheck="false">';
 
 /* ---------- Activation ---------- */
-function cryptoActivateSheet(){ if(!SY||!SY.user) return; if(!navigator.onLine){ toast('Sin conexión'); return; } if(CR.busy||CR.migrating) return;
-  openSheet(sheadHTML('Activar cifrado', 'Cancelar', 'Activar')+'<div class="wsheet cxsheet">'+crField('cx1','Contraseña de cifrado')+crField('cx2','Repite la contraseña')+crRulesHTML()+
+// o.required: a member of the team on their first sign-in (decision 71.1): the same sheet, said as the step it is
+function cryptoActivateSheet(o){ o=o||{}; if(!SY||!SY.user) return; if(!navigator.onLine){ toast('Sin conexión'); return; } if(CR.busy||CR.migrating) return;
+  openSheet(sheadHTML(o.required?'Contraseña de cifrado':'Activar cifrado', o.required?'Ahora no':'Cancelar', o.required?'Crear':'Activar')+'<div class="wsheet cxsheet">'+
+    (o.required?'<div class="cx-intro">Para usar Tareas en equipo, tus datos se cifran en este dispositivo antes de guardarse en tu cuenta. Crea una contraseña que solo sepas tú.</div>':'')+crField('cx1','Contraseña de cifrado')+crField('cx2','Repite la contraseña')+crRulesHTML()+
     '<div class="cx-warn">Si olvidas esta contraseña, los datos guardados en el servidor no se pueden recuperar. No hay código de recuperación.</div>'+
     '<label class="cx-check"><input type="checkbox" data-role="cxok"><span>Entiendo que no se puede recuperar</span></label>'+
-    '<div class="cx-note">Actualiza la app en todos tus dispositivos antes de activarlo.</div></div>', s=>{
+    (o.required?'':'<div class="cx-note">Actualiza la app en todos tus dispositivos antes de activarlo.</div>')+'</div>', s=>{
     const a=$('[data-role=cx1]', s), b=$('[data-role=cx2]', s), chk=$('[data-role=cxok]', s), okb=$('.hbtn.ok', s);
     const paint=()=>{ const v=crRulesPaint(s, a, b); okb.disabled=!(v&&chk.checked); return v; };
     const go=()=>{ if(!paint()){ toast(crRulesOk(a.value)?'Las dos contraseñas no son iguales':'La contraseña no cumple las reglas'); return; } if(!chk.checked){ toast('Marca que entiendes que no se puede recuperar'); return; }
@@ -218,7 +221,8 @@ async function cryptoActivate(pw){ if(CR.busy||CR.migrating||CR.activating||!SY|
   CR.activating=true; CR.prog={n:0, of:0, step:'Sincronizando'}; crProgSheet(); log('info','Activación del cifrado: inicio');
   let kid=null, outcome='none', key=null;
   try{ flushHeld(true); flushEdits();
-    if(!await syncRun('cifrado')) throw new Error(navigator.onLine?'No se pudo sincronizar':'Sin conexión');
+    // A member's first activation (decision 71.1): nothing has synced yet, so there is nothing of theirs on the server to bring first
+    if(SY.status!=='needkey'&&!await syncRun('cifrado')) throw new Error(navigator.onLine?'No se pudo sincronizar':'Sin conexión');
     CR.busy=true; await crWaitUploads();
     if(await crFetch(user)) throw crErr('El cifrado ya está activado en esta cuenta', 'tareas_on');
     if(CR.absent) throw crErr('Falta 0012_encryption.sql en Supabase', 'tareas_absent');
@@ -400,8 +404,8 @@ function cryptoSectionHTML(dev){
   if(!SY.remote.__crypto||!SY.remote.cryptoGet||CR.absent||syncMissing('crypto_keys')) return g(cell('Cifrado','No disponible'), 'Falta poner al día Supabase con 0012_encryption.sql. Hasta entonces no se puede activar.');
   cryptoLoad(false);
   if(CR.for!==SY.user.id||CR.row===undefined) return g(cell('Cifrado', CR.loading||navigator.onLine?'Comprobando':'Sin conexión'));
-  if(!CR.row) return g(btn('cxOn', CR.busy||CR.migrating?'Activando cifrado':'Activar cifrado', CR.busy||CR.migrating),
-    'Con el cifrado, lo que escribes se cifra en '+dev+' antes de guardarse en tu cuenta: el servidor solo guarda texto ilegible. Se protege con una contraseña que solo sabes tú.');
+  if(!CR.row) return g(btn('cxOn', CR.busy||CR.migrating?'Activando cifrado':teamOn()&&!teamAdmin()?'Crear contraseña de cifrado':'Activar cifrado', CR.busy||CR.migrating),
+    (teamOn()&&!teamAdmin()?'Es necesario para usar Tareas en equipo: hasta crearla no se sincroniza nada. ':'')+'Con el cifrado, lo que escribes se cifra en '+dev+' antes de guardarse en tu cuenta: el servidor solo guarda texto ilegible. Se protege con una contraseña que solo sabes tú.');
   if(!crKey()) return g(cell('Falta la contraseña de cifrado', '', true)+btn('cxUnlock','Desbloquear'),
     'El cifrado está activado en tu cuenta. Escribe su contraseña para ver y sincronizar tus datos en '+dev+'.');
   if(CR.migrating||!CR.row.migrated) return g(cell(CR.migrating?crProgText()||'Cifrando':'Cifrado sin terminar'), 'Se están cifrando los datos que ya había en tu cuenta. Si se interrumpe, continúa en la próxima sincronización.');

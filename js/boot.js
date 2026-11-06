@@ -3,6 +3,7 @@
    A classic script: index.html loads every file of js/ in order and they share their global names. Only declarations and
    listeners run at load; the start itself (first screen, timers, sync, service worker) is in boot.js, the last file. */
 // The start, in the order it had at the end of the single script: the first screen and what follows it need every other file
+syncSwitchBoot(); // a switch to another account under way: its data must be blank, then saving works again (js/sync.js)
 (function(){ let st='?'; try{ st=(navigator.standalone===true||matchMedia('(display-mode: standalone)').matches)?'instalada':'navegador'; }catch(e){} log('info','Inicio v'+APP_VERSION+' ('+st+')', {spaces:DB.spaces.length, projects:DB.projects.length, tasks:DB.tasks.length}); })();
 DB.settings.filter='hoy'; // the app always opens on Hoy; the filter is kept only while it runs
 // Voice notes saved without a task (an old desktop pane bug) never show anywhere: drop them
@@ -11,6 +12,7 @@ if(foldVoiceNotes(DB)) save(); // decision 49: dictated voice notes go into thei
 { const n=rollOver(); if(n) log('info','Tareas pasadas a hoy: '+n); } if(wideMQ.matches) applyWide(); else render(); // a desktop start never builds the iPhone screens
 backupChain=refreshBackups().then(()=>{ if(onSettings()) render(); return dailyBackup(false); }).catch(()=>{});
 (function(){ // Entry from the iOS Shortcut: ?add=texto opens the new-task sheet with the text
+  try{ const q=new URLSearchParams(location.search), op=q.get('open'); if(op==='received'||op==='feedback'){ history.replaceState(null,'',location.pathname); setTimeout(()=>teamOpenFrom(op),300); return; } }catch(e){} // decision 63b: a notification of the team tapped with the app closed
   try{ const q=new URLSearchParams(location.search), tk=q.get('task'), snz=q.get('snooze'); if(tk){ history.replaceState(null,'',location.pathname); setTimeout(()=>openTaskFromPush(tk,'inicio',snz),300); return; } }catch(e){} // block 9: a notification tapped with the app closed (sw.js); decision 55: snooze, its action 10 min or 1 h
   try{ const q=new URLSearchParams(location.search); const add=q.get('add'); if(add!==null){ history.replaceState(null,'',location.pathname); log('info','Entrada por URL', add.slice(0,80)); setTimeout(()=>addSheet(null, add.trim()),250); return; } }catch(e){}
   if(!DB.settings.tipsSeen) setTimeout(tipsSheet, 400);
@@ -41,6 +43,7 @@ if('serviceWorker' in navigator){
   // Block 9: a tap on a notification while the app is open, and every push received (sw.js)
   navigator.serviceWorker.addEventListener('message', e=>{ const d=e.data||{};
     if(d.type==='openTask') openTaskFromPush(d.taskId, 'app abierta', d.snooze);
+    else if(d.type==='openTeam') teamOpenFrom(d.what); // decision 63b
     else if(d.type==='push') log('info','Notificación recibida', {tarea:!!d.taskId, prueba:!!d.test}); });
   let hadController = !!navigator.serviceWorker.controller;
   navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(reloading) return; if(!hadController && !updateRequested){ hadController=true; return; } reloading=true; location.reload(); });

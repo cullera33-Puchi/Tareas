@@ -1,9 +1,9 @@
 /* Service worker: app shell cache and update notice.
    Bump CACHE on every release so installed devices pick up the new version. */
-const CACHE = 'tareas-v0.35.2';
+const CACHE = 'tareas-v0.36.0';
 // Every file the app loads: a missing one would leave the installed app unable to start offline (index.html lists the scripts in order)
 const SHELL = ['./', './index.html', './css/app.css',
-  './js/core.js', './js/render.js', './js/events.js', './js/menus.js', './js/sheets.js', './js/attachments.js', './js/steps.js', './js/notes.js', './js/status.js', './js/suggest.js', './js/crypto.js', './js/sync.js', './js/e2e.js', './js/push.js', './js/inbox.js', './js/people.js', './js/lifecycle.js', './js/desktop.js', './js/desktop-calendar.js', './js/desktop-render.js', './js/desktop-add.js', './js/boot.js',
+  './js/core.js', './js/render.js', './js/events.js', './js/menus.js', './js/sheets.js', './js/attachments.js', './js/steps.js', './js/notes.js', './js/status.js', './js/suggest.js', './js/crypto.js', './js/sync.js', './js/e2e.js', './js/push.js', './js/inbox.js', './js/people.js', './js/team.js', './js/lifecycle.js', './js/desktop.js', './js/desktop-calendar.js', './js/desktop-render.js', './js/desktop-add.js', './js/boot.js',
   './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png', './vendor/supabase-js-2.117.3.umd.js'];
 // Decision 63a: the encryption primitives, to show the title of a reminder whose text arrives encrypted (cryptoPushPayload)
 importScripts('./js/crypto.js');
@@ -85,13 +85,16 @@ self.addEventListener('push', e => {
 self.addEventListener('notificationclick', e => {
   e.notification.close();
   const data = e.notification.data || {}, id = data.taskId || null, scope = self.registration.scope;
+  // Decision 63b: a task sent with «Avisar a…» opens Recibidas; a suggestion or an incident, the admin's inbox
+  const team = !id && (data.open === 'received' || data.open === 'feedback') ? data.open : null;
   // Decision 55: an action postpones the reminder; this worker has no localStorage, so the app does it (with Deshacer) from ?snooze= or the message
   const snooze = id && e.action === 'snooze10' ? 10 : id && e.action === 'snooze60' ? 60 : null;
-  const target = new URL(id ? './?task=' + encodeURIComponent(id) + (snooze ? '&snooze=' + snooze : '') : './', scope).href;
+  const target = new URL(id ? './?task=' + encodeURIComponent(id) + (snooze ? '&snooze=' + snooze : '') : team ? './?open=' + team : './', scope).href;
   e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
     const c = list.find(w => w.url.startsWith(scope));
     if (c) {
       if (id) c.postMessage({ type: 'openTask', taskId: id, snooze });
+      else if (team) c.postMessage({ type: 'openTeam', what: team });
       return c.focus ? c.focus().catch(() => self.clients.openWindow(target)) : self.clients.openWindow(target);
     }
     return self.clients.openWindow(target);

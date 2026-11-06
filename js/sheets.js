@@ -163,6 +163,7 @@ function rowMenu(id, src){ const x=task(id); if(!x) return; releaseHold(id);
        .concat(x.status==='pending'?[{label:x.focus?'Quitar de Ahora':'Ahora', icon:x.focus?MI.starOff:MI.star, fn:()=>toggleFocus(id)}]:[]) // decision 39
        .concat(waitItems(x, MI)) // decision 41
        .concat(canRemind(x)?[{label:'Enviar recordatorio', icon:MI.send, fn:()=>remindSheet([id])}]:[]) // decision 48c
+       .concat(noticeItems(x, true)) // decision 63b: Avisar a…
        .concat([{label:'Duplicar', icon:MI.dup, fn:()=>duplicateTask(id)}, {label:'Seleccionar', icon:MI.select, fn:()=>startSelect(id)}]),
       [{label:'Eliminar', icon:MI.trash, red:true, fn:()=>confirmDelete(id)}] ]}); } }
 /* Desktop sidebar: a project dragged to another place (or moved with Alt and an arrow). The space's projects are numbered again from 0,
@@ -414,14 +415,26 @@ const BK = {
     r.onupgradeneeded=()=>{ const db=r.result, tx=r.transaction; const snaps=db.objectStoreNames.contains('snapshots')?tx.objectStore('snapshots'):db.createObjectStore('snapshots',{keyPath:'date'});
       if(!db.objectStoreNames.contains('meta')){ const meta=db.createObjectStore('meta',{keyPath:'date'}); snaps.openCursor().onsuccess=e=>{ const c=e.target.result; if(!c) return; meta.put(BK.metaOf(c.value)); c.continue(); }; } };
     r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }catch(e){ rej(e); } }); },
-  metaOf(x){ const d=x.data||{}; return {date:x.date, created:x.created, tasks:(d.tasks||[]).length, projects:(d.projects||[]).length}; },
+  metaOf(x){ const d=x.data||{}; return {date:x.date, day:x.day||String(x.date).slice(0,10), created:x.created, tasks:(d.tasks||[]).length, projects:(d.projects||[]).length, owner:x.owner||null}; },
   async tx(mode, fn){ const db=await this.open(); return new Promise((res,rej)=>{ const t=db.transaction(['snapshots','meta'],mode); const out=fn(t.objectStore('snapshots'), t.objectStore('meta')); t.oncomplete=()=>{ db.close(); res(out&&out.result!==undefined?out.result:out); }; t.onerror=()=>{ db.close(); rej(t.error); }; }); },
   async list(){ const db=await this.open(); return new Promise((res,rej)=>{ const t=db.transaction('meta','readonly'); const r=t.objectStore('meta').getAll(); r.onsuccess=()=>{ db.close(); res((r.result||[]).sort((a,b)=>a.date<b.date?1:-1)); }; r.onerror=()=>{ db.close(); rej(r.error); }; }); },
   async get(date){ const db=await this.open(); return new Promise((res,rej)=>{ const t=db.transaction('snapshots','readonly'); const r=t.objectStore('snapshots').get(date); r.onsuccess=()=>{ db.close(); res(r.result); }; r.onerror=()=>{ db.close(); rej(r.error); }; }); },
   del(date){ return this.tx('readwrite', (st,meta)=>{ st.delete(date); meta.delete(date); }); }, // decision 34
   clear(){ return this.tx('readwrite', (st,meta)=>{ st.clear(); meta.clear(); }); },
-  async put(date){ const snap={date, created:new Date().toISOString(), data:exportData()}; await this.tx('readwrite', (st,meta)=>{ st.put(snap); meta.put(BK.metaOf(snap)); });
-    const old=(await this.list()).slice(7); if(old.length) await this.tx('readwrite', (st,meta)=>{ old.forEach(b=>{ st.delete(b.date); meta.delete(b.date); }); }); }
+  // Copies made before copies carried their account (or before the first sync) hold the data of the account the device synced with: before
+  // emptying it for another account they are marked as that account's, so none of them restores into another
+  tagOwnerless(owner){ if(!owner) return Promise.resolve(); return this.tx('readwrite', (st,meta)=>{ st.openCursor().onsuccess=e=>{ const c=e.target.result; if(!c) return; const v=c.value;
+    if(!v.owner){ v.owner=owner; c.update(v); meta.put(BK.metaOf(v)); } c.continue(); }; }); },
+  /* owner: the account these data synced with (null when none), so a copy of one account never restores into another. The key is the day;
+     a copy that would replace that day's copy of another account, or one asked to be apart (own: the copy before emptying the device for
+     another account), takes its own key (day, owner and time), so no copy ever replaces another account's (a copy of no account, made
+     before the device first synced, belongs to it and may be replaced). day: the day it shows */
+  async put(date, owner, own){ owner=owner!==undefined?owner:syncPrevOwner()||null; let key=date; // owner: the account these data belong to, signed in or not
+    const cur=own?null:(await this.list()).find(b=>b.date===date); if(own||(cur&&cur.owner&&cur.owner!==owner)) key=date+'#'+(owner||'sin-cuenta')+'#'+Date.now();
+    const snap={date:key, day:date, created:new Date().toISOString(), data:exportData(), owner}; await this.tx('readwrite', (st,meta)=>{ st.put(snap); meta.put(BK.metaOf(snap)); });
+    // Seven copies of this device's account (or of none) are kept; another account's copies (made when the device was emptied for this one)
+    // never count and are never removed automatically: they may be the only home of what that account had not sent. Ajustes deletes them
+    const mine=syncPrevOwner()||null, old=(await this.list()).filter(b=>!b.owner||b.owner===mine).slice(7); if(old.length) await this.tx('readwrite', (st,meta)=>{ old.forEach(b=>{ st.delete(b.date); meta.delete(b.date); }); }); }
 };
 let BACKUPS=[];
 async function refreshBackups(){ try{ BACKUPS=await BK.list(); }catch(e){ BACKUPS=[]; } }
@@ -431,11 +444,12 @@ function onSettings(){ return UI.wide ? UI.deskView==='settings' : (UI.tab==='aj
    of them at once. Always confirmed, never undone. A copy of today deleted by hand is not made again until tomorrow ('tareas-bk-skip') */
 const BK_SKIP='tareas-bk-skip';
 const bkWhen = date => date===todayStr()?'de hoy':date===addDays(todayStr(),-1)?'de ayer':'del '+fmtDate(date);
-const backupRowHTML = b => '<div class="vn bk" data-bk="'+b.date+'"><div class="vn-bg r"><button data-bkact="del">Eliminar</button></div><div class="vn-c bk-c"><button class="cell" data-restore="'+b.date+'"><span class="lbl">'+fmtDate(b.date)+'</span><span class="val">'+b.tasks+(b.tasks===1?' tarea':' tareas')+'</span>'+I.chev.replace('<svg','<svg class="chev"')+'</button>'+
-  (UI.wide?'<button class="bk-del" data-bkact="del" aria-label="Borrar la copia '+bkWhen(b.date)+'" title="Borrar la copia">'+I.trash+'</button>':'')+'</div></div>';
+const bkDay = b => b.day||String(b.date).slice(0,10);
+const backupRowHTML = b => '<div class="vn bk" data-bk="'+esc(b.date)+'"><div class="vn-bg r"><button data-bkact="del">Eliminar</button></div><div class="vn-c bk-c"><button class="cell" data-restore="'+esc(b.date)+'"><span class="lbl">'+fmtDate(bkDay(b))+'</span><span class="val">'+b.tasks+(b.tasks===1?' tarea':' tareas')+'</span>'+I.chev.replace('<svg','<svg class="chev"')+'</button>'+
+  (UI.wide?'<button class="bk-del" data-bkact="del" aria-label="Borrar la copia '+bkWhen(bkDay(b))+'" title="Borrar la copia">'+I.trash+'</button>':'')+'</div></div>';
 function backupMenu(date, at){ popMenu(Object.assign(at, {groups:[[{label:'Restaurar', icon:MI.undo, fn:()=>restoreBackup(date)}],[{label:'Borrar copia', icon:MI.trash, red:true, fn:()=>deleteBackup(date)}]]})); }
 function deleteBackup(date){ const b=BACKUPS.find(x=>x.date===date); if(!b) return; const dev=UI.wide?'este dispositivo':'este iPhone';
-  confirmSheet('Borrar copia', 'La copia '+bkWhen(date)+' ('+b.tasks+(b.tasks===1?' tarea':' tareas')+') se borrará de '+dev+'. No se puede deshacer.', async()=>{
+  confirmSheet('Borrar copia', 'La copia '+bkWhen(bkDay(b))+' ('+b.tasks+(b.tasks===1?' tarea':' tareas')+') se borrará de '+dev+'. No se puede deshacer.', async()=>{
     try{ await BK.del(date); if(date===todayStr()) try{ localStorage.setItem(BK_SKIP, date); }catch(e){} await refreshBackups(); log('info','Copia local borrada', {date}); toast('Copia borrada'); }
     catch(e){ log('error','No se pudo borrar la copia: '+(e&&e.message||e)); toast('No se pudo borrar la copia'); }
     render(); }, 'Borrar'); }
@@ -444,9 +458,14 @@ function deleteAllBackups(){ const n=BACKUPS.length; if(!n) return; const dev=UI
     try{ await BK.clear(); try{ localStorage.setItem(BK_SKIP, todayStr()); }catch(e){} await refreshBackups(); log('info','Copias locales borradas', {n}); toast(n===1?'Copia borrada':n+' copias borradas'); }
     catch(e){ log('error','No se pudieron borrar las copias: '+(e&&e.message||e)); toast('No se pudieron borrar las copias'); }
     render(); }, 'Borrar todas'); }
-async function dailyBackup(force){ try{ const t=todayStr(); let skip=null; try{ skip=localStorage.getItem(BK_SKIP); }catch(e){} if(!force&&skip===t) return; if(force || !BACKUPS.some(b=>b.date===t)){ await BK.put(t); await refreshBackups(); log('info', force?'Copia local creada':'Copia local diaria', {date:t, tasks:DB.tasks.length}); if(onSettings()) render(); } }catch(e){ log('warn','Copia local no disponible: '+(e&&e.message||e)); } }
+async function dailyBackup(force){ try{ const t=todayStr(); let skip=null; try{ skip=localStorage.getItem(BK_SKIP); }catch(e){} if(!force&&skip===t) return; if(force || !BACKUPS.some(b=>bkDay(b)===t&&(!b.owner||b.owner===(syncState().owner||null)))){ await BK.put(t); await refreshBackups(); log('info', force?'Copia local creada':'Copia local diaria', {date:t, tasks:DB.tasks.length}); if(onSettings()) render(); } }catch(e){ log('warn','Copia local no disponible: '+(e&&e.message||e)); } }
 function restoreBackup(date){ const b=BACKUPS.find(x=>x.date===date); if(!b) return;
-  const when = date===todayStr()?'de hoy':date===addDays(todayStr(),-1)?'de ayer':'del '+fmtDate(date);
+  // Never into another account: not while this device holds another account's data, and never a copy of an account other than the one these
+  // data belong to (or the one signed in)
+  if(SY&&syncOtherOwner()){ toast('Este dispositivo tiene datos de otra cuenta. No se puede restaurar ahora'); log('info','Restaurar con datos de otra cuenta: no'); return; }
+  const mine=syncPrevOwner()||(SY&&SY.user&&SY.user.id)||null;
+  if(b.owner&&mine&&b.owner!==mine){ toast('Esta copia es de otra cuenta. Inicia sesión con ella para restaurarla'); log('info','Copia de otra cuenta: no se restaura'); return; }
+  const day=bkDay(b), when = day===todayStr()?'de hoy':day===addDays(todayStr(),-1)?'de ayer':'del '+fmtDate(day);
   // Signed in, the copy applies to every device (agreed with Enric): restored records get a new modified so they win, and what the copy lacks is deleted everywhere by the next sync
   const synced=!!(typeof SY!=='undefined'&&SY&&SY.user);
   confirmSheet('Restaurar copia '+when, synced?'Se sustituyen espacios, proyectos, notas de proyecto, tareas, pasos, notas de voz, adjuntos y contactos por los de esa copia ('+b.tasks+' tareas) en todos tus dispositivos. Lo creado después de esa copia se eliminará también en ellos.':'Se sustituyen espacios, proyectos, notas de proyecto, tareas, pasos, notas de voz, adjuntos y contactos por los de esa copia ('+b.tasks+' tareas). Podrás deshacerlo durante unos segundos.', async()=>{

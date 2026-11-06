@@ -265,7 +265,7 @@ function deskTaskMenu(id){ const x=task(id); if(!x) return null; const done=x.st
   return {groups:[
     [{label:done?'Marcar pendiente':'Completar', key:'C', fn:()=>{ releaseHold(id); leaveRows(id); setTimeout(()=>{ completeTask(id); renderAnimated(); },200); }}].concat(x.status==='pending'?[{label:x.focus?'Quitar de Ahora':'Ahora', key:'A', fn:()=>toggleFocus(id)}]:[]).concat(waitItems(x)), // decisions 39 and 41
     [{label:'Fecha', menu:()=>dateMenu(id)}].concat(x.status!=='done'?[{label:'Fecha límite', menu:()=>deadlineMenu(id)}]:[], canSnooze(x)?[{label:'Posponer recordatorio', menu:()=>snoozeMenu(id)}]:[], [{label:'Prioridad', menu:()=>({title:'Prioridad', groups:[prioItems(x, id)]})}].concat(x.status!=='done'?[{label:'Tiempo', menu:()=>estimateMenu(id)}]:[], [{label:'Proyecto', key:'P', menu:()=>projectPickMenu(id)}])).concat(DB.spaces.length>1?[{label:'Mover a otro espacio', menu:()=>spaceMoveMenu(id)}]:[]),
-    (x.status!=='done'?[{label:'Responsable…', fn:()=>responsibleSheet(id)}]:[]).concat(canRemind(x)?[{label:'Enviar recordatorio…', fn:()=>remindSheet([id])}]:[]), // decision 48c
+    (x.status!=='done'?[{label:'Responsable…', fn:()=>responsibleSheet(id)}]:[]).concat(canRemind(x)?[{label:'Enviar recordatorio…', fn:()=>remindSheet([id])}]:[], noticeItems(x)), // decision 48c; decision 63b: Avisar a…
     [{label:'Duplicar', fn:()=>duplicateTask(id)}],
     [{label:'Eliminar', key:'Supr', red:true, fn:()=>confirmDelete(id)}] ]}; }
 function duplicateTask(id){ const x=task(id); if(!x) return; const n=addTask(Object.assign({title:x.title, projectId:x.projectId, priority:x.priority, notes:x.notes, spaceId:x.spaceId}, x.deadline?{deadline:x.deadline}:{}, x.estimate?{estimate:x.estimate}:{}, x.responsible?{responsible:x.responsible}:{})); /* decision 48c: the responsible too; decision 48a: the deadline too; decision 56: the estimate, never the counters */ copySteps(id, n.id); /* decision 46: the steps, unchecked */ haptic(8); renderAnimated(); toast('Tarea duplicada'); openDetail(n.id); }
@@ -285,7 +285,7 @@ function askRepeatDelete(o, onlyFn, seriesFn){ const one=o.n===1, k=o.rep||1;
 function detailMenu(id, src){ const x=task(id); if(!x) return;
   popMenu({anchor:src, align:'right', groups:[
     [{label:x.status==='done'?'Marcar pendiente':'Marcar completada', icon:x.status==='done'?MI.undo:MI.done, key:'C', fn:()=>{ completeTask(id,true); render(); }}].concat(waitItems(x, MI, src)), // decision 41
-    (canRemind(x)?[{label:UI.wide?'Enviar recordatorio…':'Enviar recordatorio', icon:MI.send, fn:()=>remindSheet([id])}]:[]).concat(DB.spaces.length>1?[{label:'Mover a otro espacio', icon:MI.space, menu:()=>spaceMoveMenu(id)}]:[], [{label:'Duplicar', icon:MI.dup, fn:()=>duplicateTask(id)}]), // decision 48c
+    (canRemind(x)?[{label:UI.wide?'Enviar recordatorio…':'Enviar recordatorio', icon:MI.send, fn:()=>remindSheet([id])}]:[]).concat(noticeItems(x, true), DB.spaces.length>1?[{label:'Mover a otro espacio', icon:MI.space, menu:()=>spaceMoveMenu(id)}]:[], [{label:'Duplicar', icon:MI.dup, fn:()=>duplicateTask(id)}]), // decision 48c
     [{label:'Eliminar tarea', icon:MI.trash, red:true, key:'Supr', fn:()=>confirmDelete(id, closeDetailOf(id))}] ]}); }
 // After a delete from the detail, close that task's detail only if it is still the one showing: Atrás may have been tapped meanwhile
 const closeDetailOf = id => ()=>{ if(detailTaskId()===id) pop(); else renderAnimated(); };

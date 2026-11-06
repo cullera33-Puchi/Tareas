@@ -159,10 +159,11 @@ function onClick(e){
     case 'news': newsSheet(); break;
     case 'signIn': syncSignIn(); break;
     case 'syncNow': syncRun('manual'); break;
+    case 'syncSwitch': syncOtherAsk(true); break; // another account's data on this device
     case 'signOut': syncSignOutSheet(); break;
     case 'pushEnable': pushEnable(); break; // block 9: inside the tap, so iOS shows the permission prompt
     case 'pushTest': pushTest(); break;
-    case 'cxOn': cryptoActivateSheet(); break; // decision 63a: Cifrado (js/e2e.js); inside the tap, so the field takes the keyboard
+    case 'cxOn': cryptoActivateSheet({required:teamOn()&&!teamAdmin()}); break; // decision 63a: Cifrado (js/e2e.js); inside the tap, so the field takes the keyboard
     case 'cxUnlock': cryptoUnlockSheet(); break;
     case 'cxPass': cryptoPassSheet(); break;
     case 'scCreate': shortcutCreateAsk(); break; // Siri and the iOS Shortcut (js/inbox.js)
@@ -170,6 +171,7 @@ function onClick(e){
     case 'scSpace': shortcutSpaceMenu(act.querySelector('.val')||act); break;
     case 'scCopyKey': if(SK.newKey) copyText(SK.newKey, 'Clave copiada'); break;
     case 'scCopyUrl': copyText(shortcutUrl(), 'Dirección copiada'); break;
+    default: if(a.startsWith('tm')) teamAct(a, act, detailId, e); // decision 63b, c and d (js/team.js)
   }
 }
 

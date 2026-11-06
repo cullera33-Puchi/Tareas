@@ -1,5 +1,10 @@
 # Registro de cambios
 
+## v0.36.1. Página de privacidad (6 de noviembre de 2026)
+
+- Página `privacidad.html`, publicada junto a la app, con qué datos se guardan, cómo se cifran, quién interviene (Supabase en Frankfurt, Google, GitHub y los servicios de notificaciones), cuánto tiempo se conservan y cómo pedir su borrado. Es la política de privacidad de la ficha de Google Cloud.
+- El service worker la deja pasar a la red, para que no se sustituya por la app. La prueba `update` lo comprueba.
+
 ## v0.36.0. Equipo (5 de noviembre de 2026)
 
 - Acceso solo por invitación (puntos 63b y 71): Enric, como administrador, invita desde Ajustes, «Equipo», y la app prepara el mensaje con el enlace para WhatsApp o correo. Una cuenta de Google sin invitación ve «Esta cuenta no tiene acceso» y no sincroniza nada. Supabase lo controla con reglas en todas las tablas y en Storage, más un filtro de alta que se activa en el panel.

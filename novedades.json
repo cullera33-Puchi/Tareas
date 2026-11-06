@@ -1,5 +1,14 @@
 [
   {
+    "version": "0.36.1",
+    "date": "2026-11-06",
+    "items": [
+      "Nueva página de privacidad, que explica qué datos guarda Tareas, cómo se cifran y cómo se borran.",
+      "Es la página que ve quien entra con Google, en el enlace de la política de privacidad.",
+      "La app no cambia: solo se añade la página."
+    ]
+  },
+  {
     "version": "0.36.0",
     "date": "2026-11-05",
     "items": [

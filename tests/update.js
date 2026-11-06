@@ -24,6 +24,11 @@ const srv = http.createServer((req,res)=>{ let p = decodeURIComponent(req.url.sp
   await page.waitForFunction(()=>typeof APP_VERSION!=='undefined' && APP_VERSION==='B', null, {timeout:8000}).catch(()=>{});
   await page.waitForTimeout(800);
   r.v2 = await page.evaluate(()=>APP_VERSION); r.cacheNames = await page.evaluate(()=>caches.keys());
+  // privacidad.html (the privacy policy of the Google sign-in screen): with the service worker in control it is the page itself, not the app shell
+  { const p2 = await ctx.newPage(); await p2.goto('http://localhost:8770/privacidad.html'); await p2.waitForTimeout(300);
+    r.privacy = await p2.evaluate(()=>({title:document.title, h1:(document.querySelector('h1')||{}).textContent, app:!!document.querySelector('#app'), controlled:!!navigator.serviceWorker.controller, wide:document.documentElement.scrollWidth>innerWidth, sections:document.querySelectorAll('section').length}));
+    await p2.screenshot({path:require('path').join(require('./lib/out.js'),'privacidad.png'), fullPage:true}).catch(()=>{}); await p2.close();
+    if(r.privacy.title!=='Privacidad de Tareas'||r.privacy.h1!=='Privacidad de Tareas'||r.privacy.app||!r.privacy.controlled||r.privacy.wide||r.privacy.sections<6) errors.push('privacy page: '+JSON.stringify(r.privacy)); }
   // Assertions (the summary reads the errors array): the waiting worker is offered and applied, and only the new cache stays
   if(r.v1!=='A'||!r.controlled) errors.push('first version not served by the service worker: '+r.v1+' '+r.controlled);
   if(r.toast!=='Nueva versión disponible'||r.settingsRow!=='Nueva versión disponible') errors.push('update not offered: '+r.toast+' / '+r.settingsRow);

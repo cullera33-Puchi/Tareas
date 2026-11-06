@@ -1808,3 +1808,8 @@ body.desktop .na-box .btn{height:32px;border-radius:7px;font-size:13px;font-weig
 .invsheet .inv-acts .btn{height:44px;font-size:0.941rem;}
 body.desktop .invsheet .inv-acts .btn{height:30px;border-radius:7px;font-size:13px;font-weight:500;}
 .cxsheet .cx-intro{font-size:0.941rem;line-height:1.4;}
+/* v0.36.2: what came of each notice of a task (detail and inspector), and the last one per person in «Avisar a» */
+.ntnote .ntline+.ntline{margin-top:3px;}
+.intnotes{font-size:12px;color:var(--ink2);line-height:1.35;margin:-2px 0 4px;}
+.intnotes .ntline+.ntline{margin-top:2px;}
+.ppl small.ntago{color:var(--blue);}

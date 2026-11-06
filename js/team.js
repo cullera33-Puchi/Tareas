@@ -33,10 +33,10 @@ const teamDenied = () => !!(SY&&SY.user&&TM.for===SY.user.id&&TM.state==='denied
 /* ---------- The device's copy: the account's state, the directory and what came, for when there is no connection ---------- */
 function teamCache(){ try{ const v=JSON.parse(localStorage.getItem(TEAM_KEY)||'null'); return v&&typeof v==='object'?v:null; }catch(e){ return null; } }
 function teamCacheWrite(){ if(!SY||!SY.user||TM.for!==SY.user.id) return;
-  try{ localStorage.setItem(TEAM_KEY, JSON.stringify({owner:SY.user.id, state:TM.state, me:TM.me, dir:TM.dir, recv:TM.recv})); }catch(e){} }
+  try{ localStorage.setItem(TEAM_KEY, JSON.stringify({owner:SY.user.id, state:TM.state, me:TM.me, dir:TM.dir, recv:TM.recv, sent:TM.sent})); }catch(e){} }
 // A new account (or none): what was known of another one goes
-function teamReset(user){ Object.assign(TM, {state:undefined, for:user?user.id:null, me:null, at:0, force:false, dir:[], dirAt:0, recv:[], recvAt:0, list:null, listAt:0, inbox:null, priv:null, pub:null, keyKid:null, keyOwner:null, deniedLogged:false, askedKey:false, noSpace:false});
-  const c=teamCache(); if(user&&c&&c.owner===user.id){ TM.state=['admin','member','denied'].includes(c.state)?c.state:undefined; TM.me=c.me||null; TM.dir=Array.isArray(c.dir)?c.dir:[]; TM.recv=Array.isArray(c.recv)?c.recv:[]; }
+function teamReset(user){ Object.assign(TM, {state:undefined, for:user?user.id:null, me:null, at:0, force:false, dir:[], dirAt:0, recv:[], recvAt:0, list:null, listAt:0, inbox:null, priv:null, pub:null, keyKid:null, keyOwner:null, deniedLogged:false, askedKey:false, noSpace:false, sent:[], sentAt:0, sentForce:false});
+  const c=teamCache(); if(user&&c&&c.owner===user.id){ TM.state=['admin','member','denied'].includes(c.state)?c.state:undefined; TM.me=c.me||null; TM.dir=Array.isArray(c.dir)?c.dir:[]; TM.recv=Array.isArray(c.recv)?c.recv:[]; TM.sent=Array.isArray(c.sent)?c.sent:[]; }
   else { try{ localStorage.removeItem(TEAM_KEY); }catch(e){} } }
 
 // At start: an account known to have no access shows the full screen before anything else (the first pass reads it again)
@@ -61,7 +61,7 @@ async function teamFetch(user){ const t0=Date.now(), me=await SY.remote.teamMe()
   teamCacheWrite(); teamDeniedPaint(); }
 // After a pass that reached the server: the member's keys, the directory and what came for them. Never fails the pass
 async function teamAfter(){ TM.refused=false; if(!teamOn()||TM.busy) return; TM.busy=true;
-  try{ await teamKeys(); if(Date.now()-TM.dirAt>180e3||TM.dirForce) await teamDirFetch(); await teamRecvFetch(); }
+  try{ await teamKeys(); if(Date.now()-TM.dirAt>180e3||TM.dirForce) await teamDirFetch(); await teamRecvFetch(); await teamSentFetch(); }
   catch(e){ log('warn','Equipo: '+(e&&e.message||e)); }
   finally{ TM.busy=false; } }
 async function teamDirFetch(){ const rows=await SY.remote.teamDir(); TM.dirAt=Date.now(); TM.dirForce=false;
@@ -143,6 +143,15 @@ async function teamRecvFetch(){ if(!TM.priv||TM.recvBusy) return; TM.recvBusy=tr
 function teamAskKey(){ if(TM.askedKey||CR.busy||CR.migrating||CR.activating||!SY||!SY.user) return;
   if(sheet.classList.contains('on')||asheet.classList.contains('on')||menuOpen()||touchDrag){ clearTimeout(TM.askT); TM.askT=setTimeout(teamAskKey, 1500); return; }
   TM.askedKey=true; log('info','Equipo: falta crear la contraseña de cifrado'); cryptoActivateSheet({required:true}); }
+/* What this account sent (point 3 of v0.36.2): read from the server once a minute (as the account itself), right after sending, so every device
+   of the sender knows who was told about which task and what they did (added, dismissed, nothing yet). Never the payload. Without the method
+   or on an error, the device's own record (x.sentTo) stands alone; said once */
+async function teamSentFetch(force){ const R=SY&&SY.remote; if(!R||!R.noticeSent||!teamOn()) return; if(!force&&!TM.sentForce&&Date.now()-TM.sentAt<60e3) return;
+  TM.sentAt=Date.now(); TM.sentForce=false;
+  try{ const rows=await R.noticeSent(SY.user.id, new Date(Date.now()-90*864e5).toISOString()), before=JSON.stringify(TM.sent);
+    TM.sent=(rows||[]).filter(r=>r&&r.id).map(r=>({id:r.id, to:r.recipient_id, ref:String(r.task_ref||''), at:r.created, taken:r.taken||null, dismissed:r.dismissed||null})); TM.sentErr=false;
+    if(JSON.stringify(TM.sent)!==before){ teamCacheWrite(); log('info','Equipo: avisos enviados leídos', {n:TM.sent.length}); if(!busyEditing()&&!touchDrag) render(); else staleView=true; } }
+  catch(e){ if(!TM.sentErr){ TM.sentErr=true; log('warn','Equipo: avisos enviados no disponibles, se usa lo de este dispositivo: '+(e&&e.message||e)); } } }
 // Realtime: a task sent to this member, a pass soon reads it
 function teamRecvSoon(){ clearTimeout(TM.recvT); TM.recvT=setTimeout(()=>syncRun('aviso'), 300); }
 const recvCount = () => teamOn()?TM.recv.length:0;
@@ -151,8 +160,8 @@ function teamRepaint(){ if(sheet.classList.contains('on')&&sheet.querySelector('
 // iPhone: one line at the top of Hoy while something waits
 function recvBannerHTML(){ const n=recvCount(); if(!n) return '';
   return '<div class="group recvban"><button class="cell link" data-act="tmRecv">'+TI.recv.replace('<svg','<svg class="rb-ic"')+'<span class="lbl">'+(n===1?'1 tarea recibida':n+' tareas recibidas')+'</span>'+I.chev.replace('<svg','<svg class="chev"')+'</button></div>'; }
-// Desktop: the sidebar's entry under Por confirmar, while something waits (or the view is open)
-function recvSideHTML(){ const n=recvCount(), on=UI.deskView==='received'; if(!n&&!on) return '';
+// Desktop: the sidebar's entry under Por confirmar, always for a member of the team (0 when nothing waits); none without the team
+function recvSideHTML(){ const n=recvCount(), on=UI.deskView==='received'; if(!teamOn()) return '';
   return '<button class="it'+(on?' on':'')+'" data-view="received">'+TI.recv+'<span>Recibidas</span><span class="n">'+n+'</span></button>'; }
 function recvMeta(o){ const m=[]; if(o.date) m.push(fmtDate(o.date)); if(o.deadline) m.push('Entrega '+dayWords(o.deadline)); if(o.priority==='high') m.push('Prioridad alta'); else if(o.priority==='mid') m.push('Prioridad media');
   if(o.estimate) m.push(estLabel(o.estimate)); if(o.steps&&o.steps.length) m.push(o.steps.length===1?'1 paso':o.steps.length+' pasos'); return m.join('   '); }
@@ -162,7 +171,7 @@ function recvCardHTML(o){ const when=syncAgo(o.created);
   return '<div class="recv" data-recv="'+esc(o.id)+'"><div class="rv-h"><b>De '+esc(recvFrom(o))+'</b><span>'+esc(when)+'</span></div><div class="rv-t">'+esc(o.title||'Sin título')+'</div>'+
     (o.phrase?'<div class="rv-p">«'+esc(o.phrase)+'»</div>':'')+(meta?'<div class="rv-m">'+esc(meta)+'</div>':'')+(o.notes?'<div class="rv-n">'+esc(o.notes.length>280?o.notes.slice(0,279)+'…':o.notes)+'</div>':'')+
     '<div class="rv-acts"><button class="btn" data-act="tmRecvDrop" data-id="'+esc(o.id)+'">Descartar</button><button class="btn primary" data-act="tmRecvAdd" data-id="'+esc(o.id)+'">Añadir a mis tareas</button></div></div>'; }
-function recvListHTML(){ if(!TM.recv.length) return '<div class="empty">'+TI.recv.replace('<svg','<svg style="width:44px;height:44px"')+'<b>Nada recibido</b>Aquí llegan las tareas que te envían con Avisar a.</div>';
+function recvListHTML(){ if(!TM.recv.length) return '<div class="empty recvempty">'+TI.recv.replace('<svg','<svg style="width:44px;height:44px"')+'<b>No hay tareas recibidas</b>Aquí llegan las tareas que te envían con Avisar a.</div>';
   return '<div class="recvlist">'+TM.recv.map(recvCardHTML).join('')+'</div>'; }
 // iPhone: the sheet of Recibidas; the desktop shows the same list in its column (view 'received')
 function recvSheet(){ if(UI.wide){ setDeskView('received'); return; }
@@ -174,7 +183,10 @@ function recvAddMenu(id, src){ const o=TM.recv.find(x=>x.id===id); if(!o||o.titl
   const dot=c=>'<span class="pm-dot" style="background:'+c+'"></span>';
   popMenu({anchor:src, align:UI.wide?'right':undefined, title:UI.wide?'':'Añadir al proyecto', groups:[activeProjects().map(p=>({label:p.name, icon:dot(p.color), fn:()=>recvAdd(id, p.id)})), [{label:'Sin proyecto', icon:dot('var(--ink3)'), fn:()=>recvAdd(id, null)}]]}); }
 async function recvAdd(id, projectId){ const o=TM.recv.find(x=>x.id===id); if(!o) return; if(!navigator.onLine){ toast('Sin conexión'); return; }
-  const t=todayStr(), data={title:String(o.title||'').slice(0,500)||'Sin título', notes:String(o.notes||''), projectId:projectId||null, priority:['high','mid','none'].includes(o.priority)?o.priority:'none',
+  // Point 1 of v0.36.2: the notes start with who sent it and when (and the phrase), so the task keeps where it came from
+  const c=new Date(o.created||Date.now()), when=c.getDate()+' de '+MESES_FULL[c.getMonth()]+(c.getFullYear()!==new Date().getFullYear()?' de '+c.getFullYear():'');
+  const origin='De '+recvFrom(o)+', '+when+(o.phrase?': «'+String(o.phrase)+'»':''), body=String(o.notes||'');
+  const t=todayStr(), data={title:String(o.title||'').slice(0,500)||'Sin título', notes:origin+(body?'\n\n'+body:''), projectId:projectId||null, priority:['high','mid','none'].includes(o.priority)?o.priority:'none',
     date:/^\d{4}-\d{2}-\d{2}$/.test(o.date||'')?(o.date<t?t:o.date):null};
   if(/^\d{4}-\d{2}-\d{2}$/.test(o.deadline||'')) data.deadline=o.deadline; if(EST_VALUES.includes(+o.estimate)) data.estimate=+o.estimate;
   let x=null; batch(()=>{ x=addTask(data); (o.steps||[]).forEach(s=>{ const st=addStep(x.id, s.title); if(s.done) st.done=true; }); save(); });
@@ -192,14 +204,27 @@ async function recvDrop(id){ const o=TM.recv.find(x=>x.id===id); if(!o) return; 
 
 /* ---------- Avisar a… ---------- */
 const canNotice = x => !!x && teamOn() && !!TM.priv && isOpen(x) && teamPeers().length>0;
-// «Avisado a Susana hace 2 h»: the last notice of this device for the task
-function noticeNote(x){ const l=(x&&x.sentTo||[]).slice(-1)[0]; if(!l) return ''; return 'Avisado a '+String(l.name||'').split(/\s+/)[0]+' '+syncAgo(l.at); }
-const noticeLast = (x, to) => (x&&x.sentTo||[]).filter(s=>s.to===to).map(s=>Date.parse(s.at)||0).sort((a,b)=>b-a)[0]||0;
+/* The notices of a task, newest first: the server's (any device of this account) and this device's own record (x.sentTo) for what the server
+   has not shown yet (just sent, or no connection): {to, name, at, state: 'taken' | 'dismissed' | null} */
+function taskNotices(x){ if(!x) return []; const id=String(x.id), srv=(TM.sent||[]).filter(n=>n.ref===id).map(n=>({to:n.to, at:n.at, state:n.taken?'taken':n.dismissed?'dismissed':null, name:null}));
+  const out=srv.slice(); (x.sentTo||[]).forEach(l=>{ const t=Date.parse(l.at)||0; if(!srv.some(n=>n.to===l.to&&Math.abs((Date.parse(n.at)||0)-t)<120e3)) out.push({to:l.to, at:l.at, state:null, name:l.name||null}); });
+  return out.sort((a,b)=>(Date.parse(b.at)||0)-(Date.parse(a.at)||0)); }
+// «hoy a las 12:43», «ayer a las 9:05», «el jueves 6 a las 18:00»
+function noticeWhen(iso){ const d=localDay(iso), t=todayStr(); return (d===t?'hoy':d===addDays(t,-1)?'ayer':dayWords(d))+' a las '+fmtTime(iso); }
+const noticeFirst = n => { const m=teamMember(n.to); return m?teamFirst(m):String(n.name||'').split(/\s+/)[0]||'Alguien'; };
+// «Avisado a Víctor hoy a las 12:43: la ha añadido a sus tareas», at most three and «y N más»
+function noticeLines(x){ const ns=taskNotices(x); if(!ns.length) return [];
+  const out=ns.slice(0,3).map(n=>'Avisado a '+noticeFirst(n)+' '+noticeWhen(n.at)+': '+(n.state==='taken'?'la ha añadido a sus tareas':n.state==='dismissed'?'la ha descartado':'sin respuesta todavía'));
+  if(ns.length>3) out.push('y '+(ns.length-3)+' más'); return out; }
+// The last notice of this task to that person (server or this device), as a time
+const noticeLast = (x, to) => taskNotices(x).filter(n=>n.to===to).map(n=>Date.parse(n.at)||0).sort((a,b)=>b-a)[0]||0;
+// «hace un momento», «hace 5 min», «hace 2 h», «hace 3 días»
+function agoShort(t){ const m=Math.floor((Date.now()-t)/6e4); if(m<1) return 'hace un momento'; if(m<60) return 'hace '+m+' min'; const h=Math.floor(m/60); if(h<24) return 'hace '+h+' h'; const d=Math.floor(h/24); return d===1?'hace 1 día':'hace '+d+' días'; }
 const noticeAgain = t => 'Podrás volver a avisarle a las '+fmtTime(new Date(t+TEAM_NOTICE_WAIT).toISOString());
 // The member list (the look of the person picker of decision 68): search, one row per member, those without keys yet shown and not choosable
 function noticeSheet(id){ const x=task(id); if(!canNotice(x)) return; flushEdits(); let to=null;
   const rows=q=>{ const k=personKey(q); const ms=teamPeers().filter(m=>!k||personKey(teamName(m)+' '+m.email).includes(k));
-    return ms.length?ms.map(m=>'<button type="button" class="pprow'+(m.pub?'':' off')+'" data-to="'+esc(m.id)+'" role="option" aria-selected="'+(m.id===to)+'"'+(m.pub?'':' aria-disabled="true"')+'><span class="ppck">'+(m.id===to?MI.check:'')+'</span><span class="ppl">'+esc(teamName(m))+'<small>'+esc(m.pub?m.email:'Todavía no ha entrado en la app')+'</small></span></button>').join(''):'<div class="ppnone-l">Nadie con ese nombre</div>'; };
+    return ms.length?ms.map(m=>'<button type="button" class="pprow'+(m.pub?'':' off')+'" data-to="'+esc(m.id)+'" role="option" aria-selected="'+(m.id===to)+'"'+(m.pub?'':' aria-disabled="true"')+'><span class="ppck">'+(m.id===to?MI.check:'')+'</span><span class="ppl">'+esc(teamName(m))+'<small>'+esc(m.pub?m.email:'Todavía no ha entrado en la app')+'</small>'+(noticeLast(x, m.id)?'<small class="ntago">Avisado '+esc(agoShort(noticeLast(x, m.id)))+'</small>':'')+'</span></button>').join(''):'<div class="ppnone-l">Nadie con ese nombre</div>'; };
   openSheet(sheadHTML('Avisar a', 'Cancelar', 'Enviar')+'<div class="wsheet ntsheet"><div class="ppick"><div class="ppsearch">'+I.search+'<input type="text" data-role="ntq" placeholder="Buscar" autocomplete="off" spellcheck="false" aria-label="Buscar"></div><div class="pplist" role="listbox">'+rows('')+'</div></div>'+
     '<textarea class="wfor" data-role="ntmsg" rows="2" maxlength="300" placeholder="Frase (opcional)"></textarea><div class="hint">Le llega una copia de la tarea: título, notas, fechas, prioridad, tiempo y pasos. Solo esa persona puede leerla.</div><div class="hint nt-when"></div></div>', s=>{
     const q=$('[data-role=ntq]', s), list=$('.pplist', s), okb=$('.hbtn.ok', s), when=$('.nt-when', s);
@@ -222,11 +247,12 @@ async function noticeSend(id, to, phrase){ const x=task(id), m=teamMember(to); i
     if(/bad_recipient/.test(msg)){ TM.dirForce=true; toast('Esa persona ya no puede recibir tareas'); log('info','Equipo: destinatario sin acceso'); return 'no'; }
     log('warn','Equipo: el aviso no se pudo enviar: '+msg); toast(syncOffline(e)?'Sin conexión':'No se pudo enviar'); return 'no'; }
   const at=new Date().toISOString(), cur=task(id); if(cur){ cur.sentTo=(cur.sentTo||[]).concat({to, name:teamName(m), at}).slice(-10); SY.quiet=true; try{ save(); } finally{ SY.quiet=false; } }
+  teamSentFetch(true); // every device of the sender learns of it from the server
   log('info','Equipo: tarea enviada', {pasos:steps.length}); haptic(8); toast('Avisado a '+teamFirst(m)); if(!busyEditing()) render(); return 'ok'; }
-// The detail (iPhone) and the inspector (desktop): the action, and the last notice of this device under it
-function noticeCellHTML(x){ if(!canNotice(x)&&!(x&&x.sentTo&&x.sentTo.length&&teamOn())) return ''; const n=noticeNote(x);
-  if(UI.wide) return canNotice(x)?'<span></span><button class="iremind inotice" data-act="tmNotice">'+TI.notice+'Avisar a…'+(n?'<small>'+esc(n)+'</small>':'')+'</button>':'';
-  return '<div class="group"><button class="cell link remcell" data-act="tmNotice"'+(canNotice(x)?'':' disabled')+'>'+TI.notice+'<span class="lbl">Avisar a…</span></button></div>'+(n?'<div class="footnote ntnote">'+esc(n)+'</div>':''); }
+// The detail (iPhone) and the inspector (desktop): the action, and under it every notice of this task and what came of it (also once completed)
+function noticeCellHTML(x){ const ls=teamOn()?noticeLines(x):[]; if(!canNotice(x)&&!ls.length) return ''; const lines=ls.map(l=>'<div class="ntline">'+esc(l)+'</div>').join('');
+  if(UI.wide) return (canNotice(x)?'<span></span><button class="iremind inotice" data-act="tmNotice">'+TI.notice+'Avisar a…</button>':'')+(lines?'<span></span><div class="intnotes">'+lines+'</div>':'');
+  return '<div class="group"><button class="cell link remcell" data-act="tmNotice"'+(canNotice(x)?'':' disabled')+'>'+TI.notice+'<span class="lbl">Avisar a…</span></button></div>'+(lines?'<div class="footnote ntnote">'+lines+'</div>':''); }
 // The menu entries (iPhone long press, detail and desktop menus)
 const noticeItems = (x, icon) => canNotice(x)?[{label:'Avisar a…', icon:icon?TI.notice:undefined, fn:()=>noticeSheet(x.id)}]:[];
 

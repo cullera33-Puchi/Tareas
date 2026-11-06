@@ -1,5 +1,13 @@
 # Registro de cambios
 
+## v0.36.2. Estado de los avisos y origen de las tareas recibidas (6 de noviembre de 2026)
+
+- «Añadir a mis tareas» empieza las notas con «De Enric, 6 de noviembre: «frase»» (sin frase, solo el nombre y la fecha).
+- Quien envía ve en el detalle y en el inspector una línea por aviso de esa tarea: «Avisado a Víctor hoy a las 12:43: la ha añadido a sus tareas», «la ha descartado» o «sin respuesta todavía», en todos sus dispositivos. La app lee de Supabase solo las fechas y el estado de sus avisos enviados, nunca la copia cifrada. La hoja «Avisar a» muestra «Avisado hace 2 h» junto a cada persona.
+- Escritorio: «Recibidas» siempre en la barra lateral para los miembros del equipo, con su contador y «No hay tareas recibidas» cuando está vacía.
+- Cambio de cuenta: sin copia diaria mientras se vacía el dispositivo y la línea del registro del cambio se conserva aunque haya otra ventana abierta.
+- La página de privacidad dice que quien envía una tarea ve si se ha añadido o descartado. Sin cambios en Supabase. Prueba `rm-AV` ampliada.
+
 ## v0.36.1. Página de privacidad (6 de noviembre de 2026)
 
 - Página `privacidad.html`, publicada junto a la app, con qué datos se guardan, cómo se cifran, quién interviene (Supabase en Frankfurt, Google, GitHub y los servicios de notificaciones), cuánto tiempo se conservan y cómo pedir su borrado. Es la política de privacidad de la ficha de Google Cloud.

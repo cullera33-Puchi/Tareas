@@ -458,7 +458,8 @@ function deleteAllBackups(){ const n=BACKUPS.length; if(!n) return; const dev=UI
     try{ await BK.clear(); try{ localStorage.setItem(BK_SKIP, todayStr()); }catch(e){} await refreshBackups(); log('info','Copias locales borradas', {n}); toast(n===1?'Copia borrada':n+' copias borradas'); }
     catch(e){ log('error','No se pudieron borrar las copias: '+(e&&e.message||e)); toast('No se pudieron borrar las copias'); }
     render(); }, 'Borrar todas'); }
-async function dailyBackup(force){ try{ const t=todayStr(); let skip=null; try{ skip=localStorage.getItem(BK_SKIP); }catch(e){} if(!force&&skip===t) return; if(force || !BACKUPS.some(b=>bkDay(b)===t&&(!b.owner||b.owner===(syncState().owner||null)))){ await BK.put(t); await refreshBackups(); log('info', force?'Copia local creada':'Copia local diaria', {date:t, tasks:DB.tasks.length}); if(onSettings()) render(); } }catch(e){ log('warn','Copia local no disponible: '+(e&&e.message||e)); } }
+// No copy while the device is emptied for another account (the marker of js/sync.js)
+async function dailyBackup(force){ try{ const t=todayStr(); let skip=null; try{ skip=localStorage.getItem(BK_SKIP); if(localStorage.getItem('tareas-switching')) return; }catch(e){} if(!force&&skip===t) return; if(force || !BACKUPS.some(b=>bkDay(b)===t&&(!b.owner||b.owner===(syncState().owner||null)))){ await BK.put(t); await refreshBackups(); log('info', force?'Copia local creada':'Copia local diaria', {date:t, tasks:DB.tasks.length}); if(onSettings()) render(); } }catch(e){ log('warn','Copia local no disponible: '+(e&&e.message||e)); } }
 function restoreBackup(date){ const b=BACKUPS.find(x=>x.date===date); if(!b) return;
   // Never into another account: not while this device holds another account's data, and never a copy of an account other than the one these
   // data belong to (or the one signed in)

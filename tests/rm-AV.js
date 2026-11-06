@@ -12,7 +12,7 @@ require('./lib/out.js'); // outputs (screenshots, downloads) go to tests/out
 const { chromium } = require('playwright');
 const fs = require('fs'); const path = require('path');
 const TF = require('./lib/team-fake.js'); const { until, synced, settled, sheetIn, toSettings, signIn, activate, hideToast, tk, seed, today } = TF;
-const PORT = 8815, OUT = path.join(__dirname, 'out', 'TM'); fs.mkdirSync(OUT, {recursive:true});
+const PORT = 8815, OUT = path.join(__dirname, 'out', 'AV'); fs.mkdirSync(OUT, {recursive:true});
 const r={}, fails=[], errors=[]; const check=(name, ok, info)=>{ r[name]=ok?true:(info===undefined?false:info); if(!ok) fails.push(name); };
 const shot=(page, name)=>page.screenshot({path:path.join(OUT, name+'.png')});
 const addDays=(d,n)=>{ const x=new Date(d+'T12:00:00'); x.setDate(x.getDate()+n); return x.toISOString().slice(0,10); };
@@ -62,7 +62,7 @@ async function run(browser){
   const sOpen = await sp.evaluate(async v=>{ try{ await teamOpen(v, 'notice'); return 'opened'; }catch(e){ return 'refused'; } }, n1.payload);
   check('sender_cannot_open', sOpen==='refused', sOpen);
   await sp.waitForTimeout(300); const note = await sp.evaluate(()=>{ const b=document.querySelector('.pushed-screen .ntnote'); return b&&b.textContent; });
-  check('S_note', note==='Avisado a Enric hace un momento', note);
+  check('S_note', /^Avisado a Enric hoy a las \d\d:\d\d: sin respuesta todavía$/.test(note||''), note);
   check('S_note_local', await sp.evaluate(()=>!JSON.stringify(syncToRow('tasks', task('s1'))).includes('sentTo')) && ![...fake.t.tasks.values()].some(x=>JSON.stringify(x).includes('sentTo')));
   await shot(sp, 'av-ip-dark-avisado');
   // The same task to Enric again: the sheet says until when and does not send; the server refuses it too
@@ -79,6 +79,14 @@ async function run(browser){
   check('S_cap', capR==='no' && capT==='Has enviado muchos avisos seguidos. Prueba dentro de un rato', {capR, capT});
   // Another task, to discard
   await sp.evaluate(to=>noticeSend('s2', to, ''), UE.uid); check('S_second', fake.notices.length===2);
+  /* ---------- Susana's second device (iPhone, light): what she sent, from the server ---------- */
+  const S2 = await dev({tag:'S2', user:US}); const s2p=S2.page; await signIn(s2p);
+  check('S2_unlocked', await until(s2p, ()=>SY.status==='locked', null, 15000) && await s2p.evaluate(async()=>{ await cryptoUnlock('Susana gil #2026x'); return true; }) && await until(s2p, ()=>SY.status==='ok'&&!!task('s1')&&TM.sent.length===2&&!!TM.priv, null, 20000), await s2p.evaluate(()=>({st:SY.status, sent:TM.sent.length})));
+  await s2p.evaluate(()=>{ if(document.querySelector('#sheet.on')) closeSheet(); }); await settled(s2p);
+  await s2p.evaluate(()=>openDetail('s1')); await s2p.waitForTimeout(700);
+  const l0 = await s2p.evaluate(()=>[...document.querySelectorAll('.pushed-screen .ntnote .ntline')].map(x=>x.textContent));
+  check('S2_no_answer_yet', l0.length===1 && /^Avisado a Enric hoy a las \d\d:\d\d: sin respuesta todavía$/.test(l0[0]) && await s2p.evaluate(()=>!(task('s1').sentTo||[]).length), l0);
+  check('sent_never_payload', (fake.sentAsked||[]).length>0 && fake.sentAsked.every(c=>c==='id,recipient_id,task_ref,created,taken,dismissed'), fake.sentAsked);
 
   /* ---------- Enric: Recibidas ---------- */
   check('E_received', await until(ep, ()=>TM.recv.length===2, null, 10000), await ep.evaluate(()=>TM.recv));
@@ -93,7 +101,7 @@ async function run(browser){
   await ep.evaluate(()=>{ const b=[...document.querySelectorAll('.pm.open *')].find(x=>x.children.length<=2&&/^FLC$/.test(x.textContent.trim())&&x.closest('[role=menuitem], .pm-item, button')); (b.closest('[role=menuitem], .pm-item, button')||b).click(); });
   check('E_added', await until(ep, ()=>DB.tasks.some(x=>x.title==='Preparar la demo del lunes')) && !!fake.notices[0].taken, fake.notices[0]);
   const made = await ep.evaluate(()=>{ const x=DB.tasks.find(t=>t.title==='Preparar la demo del lunes'); return {x, steps:stepsOf(x.id).map(s=>s.title+':'+s.done)}; });
-  check('E_task_copy', made.x.notes==='Revisar el guion\nProbar el proyector' && made.x.date===D2 && made.x.priority==='high' && made.x.estimate===60 && made.x.deadline===D5 && made.x.projectId==='pe' && made.x.spaceId===made.x.spaceId && made.steps.join()==='Guion:true,Proyector:false' && !made.x.sentTo, made);
+  check('E_task_copy', /^De Susana, \d{1,2} de [a-z]+: «Lo vemos el lunes a primera hora»\n\nRevisar el guion\nProbar el proyector$/.test(made.x.notes) && made.x.date===D2 && made.x.priority==='high' && made.x.estimate===60 && made.x.deadline===D5 && made.x.projectId==='pe' && made.x.spaceId===made.x.spaceId && made.steps.join()==='Guion:true,Proyector:false' && !made.x.sentTo, made);
   check('E_synced_encrypted', await synced(ep) && TF.isEnc(fake.t.tasks.get(made.x.id).title), fake.t.tasks.get(made.x.id));
   // Deshacer: the task goes, the copy comes back (and on the server)
   await ep.click('#toastBtn'); check('E_undo', await until(ep, ()=>!DB.tasks.some(x=>x.title==='Preparar la demo del lunes')&&TM.recv.length===2) && !fake.notices[0].taken);
@@ -102,7 +110,21 @@ async function run(browser){
   check('E_added_again', await until(ep, ()=>DB.tasks.some(x=>x.title==='Preparar la demo del lunes'&&!x.projectId)&&TM.recv.length===1) && !!fake.notices[0].taken);
   await ep.click('[data-act=tmRecvDrop]'); check('E_dropped', await until(ep, ()=>TM.recv.length===0) && !!fake.notices[1].dismissed && !fake.notices[1].taken);
   await ep.waitForTimeout(400); const empty = await ep.evaluate(()=>document.querySelector('.recvview').textContent);
-  check('E_empty', /Nada recibido/.test(empty), empty);
+  check('E_empty', /No hay tareas recibidas/.test(empty), empty);
+  await hideToast(ep); await ep.waitForTimeout(300); await shot(ep, 'av-desk-recibidas-vacia');
+  check('E_sidebar_zero', await ep.evaluate(()=>{ const b=document.querySelector('.side [data-view=received]'); return b&&b.textContent==='Recibidas0'; }));
+  // Susana's second device: what Enric did with each, from the server
+  await s2p.evaluate(()=>teamSentFetch(true)); await s2p.waitForTimeout(300);
+  const l1 = await s2p.evaluate(()=>{ render(); return {s1:noticeLines(task('s1')), s2:noticeLines(task('s2'))}; });
+  check('S2_added_dropped', l1.s1.length===1 && /: la ha añadido a sus tareas$/.test(l1.s1[0]) && l1.s2.length===1 && /: la ha descartado$/.test(l1.s2[0]), l1);
+  await s2p.waitForTimeout(400); await shot(s2p, 'av-ip-light-detalle-avisos');
+  await s2p.evaluate(()=>{ while(UI.stack.length) pop(); }); await s2p.waitForTimeout(600);
+  await s2p.evaluate(()=>noticeSheet('s1')); await sheetIn(s2p);
+  const ago = await s2p.evaluate(()=>[...document.querySelectorAll('#sheet .pprow')].map(b=>b.textContent));
+  check('S2_sheet_ago', ago.some(t=>/^Enric Vidalenric@example\.comAvisado hace un momento$/.test(t)), ago);
+  await s2p.click('#sheet .pprow:not(.off)'); check('S2_sheet_soon', await s2p.evaluate(()=>/^Ya le avisaste de esta tarea/.test(document.querySelector('#sheet .nt-when').textContent)&&document.querySelector('#sheet .hbtn.ok').disabled));
+  await shot(s2p, 'av-ip-light-avisar-avisado');
+  await s2p.evaluate(()=>closeSheet()); await settled(s2p);
   // Desktop: the context menu and the inspector offer it too
   await ep.evaluate(()=>setDeskView('todas')); await ep.waitForTimeout(300);
   const dm = await ep.evaluate(()=>deskTaskMenu('e1').groups.flat().map(i=>i.label));
@@ -120,11 +142,31 @@ async function run(browser){
   await sp.click('.recvban [data-act=tmRecv]'); await sheetIn(sp);
   const sc = await sp.evaluate(()=>[...document.querySelectorAll('#sheet .recv')].map(c=>c.querySelector('.rv-h b').textContent+'|'+c.querySelector('.rv-t').textContent));
   check('S_sheet', sc.join()==='De Enric|Cerrar acta', sc); await shot(sp, 'av-ip-dark-recibidas');
-  await sp.click('#sheet [data-act=tmRecvDrop]'); check('S_dropped', await until(sp, ()=>!document.querySelector('#sheet.on')&&!document.querySelector('.recvban')) && !!fake.notices[2].dismissed);
+  // Added without a phrase: the origin line alone
+  await sp.click('#sheet [data-act=tmRecvAdd]'); await until(sp, ()=>!!document.querySelector('.pm.open'));
+  await sp.waitForTimeout(300); await sp.locator('.pm.open .pm-it', {hasText:'Sin proyecto'}).click();
+  check('S_added_origin', await until(sp, ()=>DB.tasks.some(x=>x.title==='Cerrar acta')) && await sp.evaluate(()=>/^De Enric, \d{1,2} de [a-z]+$/.test(DB.tasks.find(x=>x.title==='Cerrar acta').notes)) && !!fake.notices[2].taken, await sp.evaluate(()=>(DB.tasks.find(x=>x.title==='Cerrar acta')||{}).notes));
+  await sp.evaluate(()=>{ if(document.querySelector('#sheet.on')) closeSheet(); }); await settled(sp);
+  // Enric's inspector: what Susana did with it
+  await ep.evaluate(()=>teamSentFetch(true)); await ep.evaluate(()=>{ setDeskView('todas'); openDetail('e1'); }); await ep.waitForTimeout(500);
+  const il = await ep.evaluate(()=>[...document.querySelectorAll('.intnotes .ntline')].map(x=>x.textContent));
+  check('E_inspector_lines', il.length===1 && /^Avisado a Susana hoy a las \d\d:\d\d: la ha añadido a sus tareas$/.test(il[0]), il);
+  await hideToast(ep); await shot(ep, 'av-desk-inspector-avisos');
+  await ep.click('[data-act=tmNotice]'); await sheetIn(ep); await shot(ep, 'av-desk-avisar-avisado');
+  check('E_sheet_ago', await ep.evaluate(()=>[...document.querySelectorAll('#sheet .pprow')].some(b=>/Avisado hace un momento$/.test(b.textContent))));
+  await ep.evaluate(()=>closeSheet()); await settled(ep);
+  // The server says nothing (no 0013 method answer): this device's own record stands, said once
+  const fb = await ep.evaluate(async()=>{ const was=TM.sent; TM.sent=[]; const real=SY.remote.noticeSent; SY.remote.noticeSent=async()=>{ throw new Error('PGRST205'); };
+    try{ await teamSentFetch(true); return {lines:noticeLines(task('e1')), logged:LOG.some(e=>/avisos enviados no disponibles/.test(e.m))}; } finally{ SY.remote.noticeSent=real; TM.sent=was; } });
+  check('sent_fallback_local', fb.lines.length===1 && /sin respuesta todavía$/.test(fb.lines[0]) && fb.logged, fb);
   // Pablo, without the password, has no key to send or receive with; nobody sees what was not for them
   check('P_nothing', await pp.evaluate(()=>!canNotice({status:'pending'})&&TM.recv.length===0));
   check('noticeList_own', (await sp.evaluate(()=>SY.remote.noticeList(SY.user.id))).length===0 && (await pp.evaluate(uid=>SY.remote.noticeList(uid), UE.uid)).length===0);
-  await E.ctx.close(); await S.ctx.close(); await P.ctx.close();
+  await E.ctx.close(); await S.ctx.close(); await P.ctx.close(); await S2.ctx.close();
+  // A single-user setup without 0013: no Recibidas entry at all
+  fake.team=false; const UN = fake.user('9b2f6d3e-0000-4000-8000-0000000000f9', 'solo@example.com', 'Solo'); const N = await dev({tag:'N', desk:true, user:UN, seed:seed([tk('n1')])}); const np=N.page;
+  await signIn(np, true); check('no_team_no_entry', await until(np, ()=>TM.state==='absent'&&SY.status==='ok', null, 15000) && await np.evaluate(()=>!document.querySelector('.side [data-view=received]')));
+  await N.ctx.close(); fake.team=true;
 }
 
 (async()=>{

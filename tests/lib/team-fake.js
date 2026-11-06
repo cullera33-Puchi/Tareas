@@ -79,6 +79,10 @@ class Fake {
         const n={id:newId(), sender_id:own, recipient_id:to, task_ref:r.task_ref, payload:r.payload, created:new Date().toISOString(), pushed:null, taken:null, dismissed:null}; this.notices.push(n);
         this.notify(to, 'team_notices', {id:n.id}); return true; }
       case 'noticeList': if(!ok()) return []; return this.notices.filter(n=>n.recipient_id===own&&n.recipient_id===a.uid&&!n.taken&&!n.dismissed).map(n=>({id:n.id, sender_id:n.sender_id, payload:n.payload, created:n.created}));
+      // The sender's own notices, only the columns asked for (never payload: the test checks what was asked)
+      case 'noticeSent': { (this.sentAsked=this.sentAsked||[]).push(a.cols); if(this.sentFail) return this.err('HTTP 500 boom'); if(!ok()) return [];
+        const cols=String(a.cols||'').split(','), since=Date.parse(a.since)||0;
+        return this.notices.filter(n=>n.sender_id===own&&Date.parse(n.created)>=since).sort((x,y)=>Date.parse(y.created)-Date.parse(x.created)).slice(0,500).map(n=>Object.fromEntries(cols.map(c=>[c, n[c]===undefined?null:n[c]]))); }
       case 'noticeMark': { if(!ok()) return []; const n=this.notices.find(x=>x.id===a.id&&x.recipient_id===own); if(!n) return []; Object.assign(n, a.patch); return [{id:n.id}]; }
       case 'feedbackSend': { if(!ok()) return this.err(RLS('team_feedback').message); if(this.role(a.row.recipient_id)!=='admin') return this.err('tareas_feedback_bad_recipient');
         this.feedback.push({id:newId(), sender_id:own, recipient_id:a.row.recipient_id, kind:a.row.kind, payload:a.row.payload, created:new Date().toISOString(), status:'nueva', pushed:null}); return true; }
@@ -107,7 +111,7 @@ function fakeAdapter(){
     cryptoGet:()=>call('cryptoGet', {owner:owner()}), cryptoPut:row=>call('cryptoPut', {owner:owner(), row}), cryptoPatch:(own, match, patch)=>call('cryptoPatch', {owner:owner(), match, patch}),
     teamMe:()=>call('teamMe', {owner:owner()}), teamDir:()=>call('teamDir', {owner:owner()}), teamList:()=>call('teamList', {owner:owner()}),
     teamInvite:(email, name)=>call('teamInvite', {owner:owner(), email, name}), teamQuota:(id, quota)=>call('teamQuota', {owner:owner(), id, quota}), teamRevoke:id=>call('teamRevoke', {owner:owner(), id}),
-    noticeSend:row=>call('noticeSend', {owner:owner(), row}), noticeList:uid=>call('noticeList', {owner:owner(), uid}), noticeMark:(id, patch)=>call('noticeMark', {owner:owner(), id, patch}),
+    noticeSend:row=>call('noticeSend', {owner:owner(), row}), noticeList:uid=>call('noticeList', {owner:owner(), uid}), noticeMark:(id, patch)=>call('noticeMark', {owner:owner(), id, patch}), noticeSent:(uid, since)=>call('noticeSent', {owner:owner(), uid, since, cols:TEAM_SENT_COLS}),
     feedbackSend:row=>call('feedbackSend', {owner:owner(), row}), feedbackList:()=>call('feedbackList', {owner:owner()}), feedbackMark:(id, status)=>call('feedbackMark', {owner:owner(), id, status})
   };
 }

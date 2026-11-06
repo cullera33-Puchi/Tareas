@@ -16,6 +16,7 @@
    - Never synced: the settings (decision 4), demo- ids (decision 3). 'trabajo' and 'personal' get a real id first (decision 2).
    - First connection on a device (or with another account): a local backup, then everything is pulled, the initial spaces are
      matched by name, the newest copy of each record wins and the rest goes up (decision 5). */
+const TEAM_SENT_COLS='id,recipient_id,task_ref,created,taken,dismissed'; // a sent notice's columns read by its sender (js/team.js); payload never
 const SYNC_KEY='tareas-sync', SUPABASE_JS='vendor/supabase-js-2.117.3.umd.js';
 const SYNC_PAGE=1000, SYNC_CHUNK=200, SYNC_OVERLAP=30e3, SYNC_DEBOUNCE=1500, EPOCH='1970-01-01T00:00:00.000Z';
 const SYNC_TABLES=[{list:'spaces', table:'spaces'},{list:'projects', table:'projects'},{list:'tasks', table:'tasks'},{list:'voiceNotes', table:'voice_notes'},{list:'attachments', table:'attachments'},{list:'subtasks', table:'subtasks'},{list:'projectNotes', table:'project_notes'},{list:'contacts', table:'contacts'}]; // attachments and steps after tasks (decisions 29 and 46); project notes after projects (decision 47); contacts last (decision 48c)
@@ -172,6 +173,8 @@ function supabaseRemote(cfg){
     // «Avisar a…»: inserted without reading it back; the server's «too soon» comes as an error whose details say until when
     async noticeSend(row){ const {error}=await db().from('team_notices').insert(row); if(error) throw error; },
     async noticeList(uid){ return rows(await db().from('team_notices').select('id,sender_id,payload,created').eq('recipient_id', uid).is('taken', null).is('dismissed', null).order('created', {ascending:true}).limit(200)); },
+    // The notices this account sent (its other devices see them too): their state only, never the payload (a copy only the recipient opens)
+    async noticeSent(uid, since){ return rows(await db().from('team_notices').select(TEAM_SENT_COLS).eq('sender_id', uid).gte('created', since).order('created', {ascending:false}).limit(500)); },
     async noticeMark(id, patch){ return rows(await db().from('team_notices').update(patch).eq('id', id).select('id')); },
     async feedbackSend(row){ const {error}=await db().from('team_feedback').insert(row); if(error) throw error; },
     async feedbackList(){ return rows(await db().from('team_feedback').select('id,sender_id,kind,payload,created,status').order('created', {ascending:false}).limit(200)); },
@@ -494,7 +497,7 @@ function syncEmptyAnyway(n){ if(!syncOtherOwner()||SY.switching) return;
    the sync state for the new account (written first: if that fails nothing is touched; if the data cannot be blanked after it, the old
    account's state comes back), the blank data in memory and on the device, the old account's files, team copy, encryption state and keys,
    push subscription and log gone, and a reload, which checks the data are still blank (syncSwitchBoot) */
-const SWITCH_KEY='tareas-switching';
+const SWITCH_KEY='tareas-switching', SWITCHED_KEY='tareas-switched'; // SWITCHED_KEY (sessionStorage): this tab emptied the device; its restart says so in its own log
 async function syncSwitchAccount(force){ if(!syncOtherOwner()||SY.switching) return; const user=SY.user, prev=syncPrevOwner();
   clearTimeout(SY.timer); try{ flushHeld(true); flushEdits(); }catch(e){}
   if(!force){ const n=await syncOtherPending().catch(()=>-1); if(n){ SY.otherAsked=false; syncOtherAsk(true); return; } } // something arrived meanwhile: the old account sends it first
@@ -502,8 +505,8 @@ async function syncSwitchAccount(force){ if(!syncOtherOwner()||SY.switching) ret
   const fail=msg=>{ try{ localStorage.removeItem(SWITCH_KEY); }catch(e){} SY.switching=false; syncCover(false); toast(msg); };
   try{ await BK.tagOwnerless(prev); }catch(e){ log('warn','Copias locales sin marcar: '+(e&&e.message||e)); }
   if(!syncLocalEmpty()){ try{ await BK.put(todayStr(), prev, true); await refreshBackups(); }catch(e){ log('error','Copia local antes de cambiar de cuenta no disponible: '+(e&&e.message||e)); fail('No se pudo guardar la copia local. No se ha cambiado nada'); return; } }
-  LOG=[]; try{ localStorage.removeItem(LOGKEY); }catch(e){} // the old account's log (with its email) goes first; with the marker no window writes it back
   try{ localStorage.setItem(SWITCH_KEY, JSON.stringify({to:user.id, at:new Date().toISOString()})); }catch(e){ fail('No se pudo cambiar de cuenta. No se ha cambiado nada'); return; }
+  LOG=[]; try{ localStorage.removeItem(LOGKEY); }catch(e){} // the old account's log (with its email) goes, after the marker: no window writes it back
   const prevSync=localStorage.getItem(SYNC_KEY);
   // the account's sync state starts empty, as a first connection that has nothing to merge (and needs no backup: the device will be empty)
   if(!syncWrite({user:{id:user.id, email:user.email||''}, firstFor:user.id, known:{}, cursor:{}, del:{}})){ fail('No se pudo cambiar de cuenta. No se ha cambiado nada'); return; }
@@ -520,6 +523,7 @@ async function syncSwitchAccount(force){ if(!syncOtherOwner()||SY.switching) ret
   await syncWithin(Promise.resolve(dropped).catch(()=>{}), 3000);
   await syncWithin(FS.tx(['files','thumbs','meta'], 'readwrite', (f,t,m)=>{ f.clear(); t.clear(); m.clear(); }).catch(()=>{}), 5000);
   await syncWithin(Promise.all([cryptoKeyForget().catch(()=>{}), cryptoKdbDo('readwrite', st=>st.delete('ecdh')).catch(()=>{})]), 5000);
+  try{ sessionStorage.setItem(SWITCHED_KEY, '1'); }catch(e){}
   location.reload(); }
 // The screen over the app while the device is emptied
 function syncCover(on){ let el=document.getElementById('switching'); app.inert=!!on||teamDenied();
@@ -527,17 +531,18 @@ function syncCover(on){ let el=document.getElementById('switching'); app.inert=!
   el.innerHTML='<div class="na-box"><h1>Vaciando este dispositivo</h1><p>Un momento.</p></div>'; document.body.appendChild(el); if(sheet.classList.contains('on')) closeSheet(); }
 // At start: a switch was under way. Its sync state already for the new account: the data must be blank (a window that wrote the old data back
 // meanwhile is undone). Otherwise it never got that far: the marker stays while it is fresh (another window may be switching now), and goes once older than a minute
-function syncSwitchBoot(){ let m=null; try{ m=JSON.parse(localStorage.getItem(SWITCH_KEY)||'null'); }catch(e){} if(!m) return;
-  const st=syncState();
+function syncSwitchBoot(){ let m=null, done=false; try{ m=JSON.parse(localStorage.getItem(SWITCH_KEY)||'null'); done=!!sessionStorage.getItem(SWITCHED_KEY); sessionStorage.removeItem(SWITCHED_KEY); }catch(e){}
+  if(!m){ if(done) log('info','Dispositivo vaciado para otra cuenta'); return; }
+  LOG=[]; try{ localStorage.removeItem(LOGKEY); }catch(e){} // whatever this window read of the log is the old account's
+  const st=syncState(); let msg=null; // logged once the marker is gone (no window writes the log while it is there)
   if(st.firstFor===m.to&&!st.owner){ // it got as far as the new account's sync state: finish what an interruption may have left of the old one
-    LOG=[]; try{ localStorage.removeItem(LOGKEY); }catch(e){}
     FS.tx(['files','thumbs','meta'], 'readwrite', (f,t,x)=>{ f.clear(); t.clear(); x.clear(); }).catch(()=>{}); cryptoKeyForget().catch(()=>{}); cryptoKdbDo('readwrite', s=>s.delete('ecdh')).catch(()=>{});
     if(!syncLocalEmpty()){ const s=DB.settings||{}, fresh=blank(); ['theme','tipsSeen'].forEach(k=>{ if(k in s) fresh.settings[k]=s[k]; });
       try{ localStorage.setItem(KEY, JSON.stringify(fresh)); DB=fresh; syncWrite({user:st.user||null, firstFor:m.to, known:{}, cursor:{}, del:{}, missing:st.missing||[]}); // and nothing the new account already had here is taken for deleted
-        log('warn','Datos de otra cuenta escritos durante el cambio: se vacía de nuevo'); }catch(e){} }
-    else log('info','Dispositivo vaciado para otra cuenta'); }
+        msg=['warn','Datos de otra cuenta escritos durante el cambio: se vacía de nuevo']; }catch(e){} }
+    else if(done) msg=['info','Dispositivo vaciado para otra cuenta']; }
   else if(Date.now()-(Date.parse(m.at)||0)<60e3) return; // still under way in another window (this one restarted on its marker): it ends it
-  try{ localStorage.removeItem(SWITCH_KEY); }catch(e){} }
+  try{ localStorage.removeItem(SWITCH_KEY); }catch(e){} if(msg) log(msg[0], msg[1]); else if(done) log('info','Dispositivo vaciado para otra cuenta'); }
 // Another window started emptying the device: this one starts again too, so it never writes the old account's data back
 window.addEventListener('storage', e=>{ if(e.key===SWITCH_KEY&&e.newValue) location.reload(); });
 

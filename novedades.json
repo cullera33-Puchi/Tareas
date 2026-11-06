@@ -1,5 +1,15 @@
 [
   {
+    "version": "0.36.2",
+    "date": "2026-11-06",
+    "items": [
+      "En cada tarea ves a quién la has avisado y qué ha hecho: si la ha añadido a sus tareas, si la ha descartado o si aún no ha respondido.",
+      "Lo ves en todos tus dispositivos, y en «Avisar a» aparece «Avisado hace 2 h» junto a cada persona.",
+      "Quien recibe una tarea ve en sus notas de quién viene: «De Enric, 6 de noviembre» y tu frase.",
+      "En el ordenador, «Recibidas» está siempre en la barra lateral, aunque no haya nada."
+    ]
+  },
+  {
     "version": "0.36.1",
     "date": "2026-11-06",
     "items": [

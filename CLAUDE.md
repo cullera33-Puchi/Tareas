@@ -8,7 +8,7 @@ App web personal de gestión de tareas para iPhone (PWA instalada en pantalla de
 
 ## 2. Estado actual (2 de noviembre de 2026)
 
-- Versión publicada: **v0.36.1**. El repositorio `tareas` está en GitHub y se publica con GitHub Pages desde la rama `main`. Enric la usa instalada en el iPhone (pantalla de inicio) y en el navegador del ordenador.
+- Versión publicada: **v0.36.2**. El repositorio `tareas` está en GitHub y se publica con GitHub Pages desde la rama `main`. Enric la usa instalada en el iPhone (pantalla de inicio) y en el navegador del ordenador.
 - Sigue sin build ni dependencias de interfaz: HTML, CSS y JavaScript que se publican tal cual. El antiguo `index.html` de un solo archivo está repartido en `css/app.css` y en scripts clásicos dentro de `js/`, con el mismo comportamiento y el mismo aspecto.
 - Hecho: bloques 1 a 7 (v0.1), roadmap R1 a R20 (v0.15.0), escritorio a partir de 900 px con barra lateral, inspector, Semana, Día, Mes y vista por horas (v0.13.0 y v0.15.0), sincronización con Supabase e inicio de sesión con Google (bloque 8, v0.16.0), recordatorios con Web Push y la función `send-reminders` (bloque 9, v0.17.0), fotos y audios adjuntos en Supabase Storage (v0.19.0) y el lote de v0.20.0 (puntos 31 a 36 de la sección 8).
 - Datos: `localStorage` del dispositivo (clave `tareas-v1`) como verdad para la interfaz; copias diarias y archivos adjuntos en IndexedDB; Supabase sincroniza cuando hay sesión.
@@ -226,6 +226,8 @@ Cambios acordados con Enric sobre el diseño de abajo. Mandan sobre el texto del
 
 
 76. **v0.36.1, página de privacidad (Enric, 6 de noviembre).** Para pasar Google Cloud a «En producción» hace falta una política de privacidad. `privacidad.html` en la raíz, con su propio estilo claro y oscuro: responsable y contacto (cullera33@gmail.com), datos que se guardan, cifrado (el administrador solo ve correo, nombre, último acceso y espacio usado), proveedores (Supabase en Frankfurt, Google, GitHub y los servicios de notificaciones), plazos (adjuntos 24 horas, cuentas sin acceso 30 días) y derechos. Fuera de `SHELL`; `sw.js` la deja pasar a la red. Pantalla de acceso de Google publicada «En producción» por Enric el 6 de noviembre, con la página principal y la política en `cullera33-puchi.github.io`. Si cambia lo que se guarda o quién interviene, se actualiza la página y su fecha.
+
+77. **v0.36.2, estado de los avisos (Enric, 6 de noviembre, tras probar Equipo con un compañero).** (1) «Añadir a mis tareas» empieza las notas con «De <nombre>, <día>: «frase»». (2) El remitente ve, en todos sus dispositivos, una línea por aviso de la tarea con el estado que marca quien la recibe: añadida, descartada o sin respuesta (método `noticeSent`, columnas `TEAM_SENT_COLS`, sin `payload`; lo permite la regla `team_notices_select_own` de 0013); como máximo 3 y «y N más»; también «Avisado hace…» en la hoja «Avisar a». Decidido por Enric: el remitente ve el estado; la página de privacidad lo dice. (3) En escritorio, «Recibidas» siempre en la barra lateral para los miembros. En el iPhone sigue solo cuando hay algo. Sin cambios en Supabase.
 
 ## 9. Decisiones pendientes de Enric (revisión del 1 de noviembre)
 

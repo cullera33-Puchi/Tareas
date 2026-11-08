@@ -251,7 +251,7 @@ function syncApply(pulled, o){ o=o||{};
     if(o.cursor) rows.forEach(r=>{ if(syncTime(r.server_ts)>syncTime(st.cursor[table])) st.cursor[table]=r.server_ts; }); });
   const folded=stats.folded=foldVoiceNotes(W); // decision 49: voice notes that came from a device on an older version go into Notas, and up as deleted
   const changed=stats.added+stats.updated+stats.removed+stats.remaps.length+folded;
-  if(changed){ const t=todayStr(); W.tasks.forEach(x=>{ if(x.status==='pending'&&x.date&&x.date<t) Object.assign(x, rollPatch(x, t)); if(x.focus&&localDay(x.focus)<t) x.focus=null; }); dedupeSeries(W); // two devices made the same next task of a series offline: one stays // as rollOver (a series that does not pile up goes to its next occurrence, decision 65e): never overdue, the reminder goes along (decision 25), Ahora of an earlier day emptied (decision 39), modified untouched
+  if(changed){ const t=todayStr(); W.tasks.forEach(x=>{ if(x.status==='pending'&&x.date&&x.date<t) Object.assign(x, rollPatch(x, t)); if(x.focus&&localDay(x.focus)<t) x.focus=null; }); dedupeSeries(W); dedupeNotices(W); // two devices made the same next task of a series offline, or added the same received task: one stays // as rollOver (a series that does not pile up goes to its next occurrence, decision 65e): never overdue, the reminder goes along (decision 25), Ahora of an earlier day emptied (decision 39), modified untouched
     if(!W.spaces.length) return stats; // never leave the app without a space (load would put Trabajo and Personal back)
     const raw=JSON.stringify(Object.assign({}, DB, W));
     try{ localStorage.setItem(KEY, raw); }catch(e){ log('error','Sincronización: no se pudieron guardar los cambios recibidos: '+(e&&e.message||e)); throw e; }

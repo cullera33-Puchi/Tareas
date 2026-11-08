@@ -52,6 +52,7 @@ async function sqlTests(){
   // Taken alone does not make it followed
   await as(V, () => q(`update public.team_notices set taken = now() where id = '${nid}'`)); const takenOnly = await row();
   // The recipient sets planned and done: seen now, followed now
+  await q(`update public.team_notices set created = now() - interval '1 day' where id = '${nid}'`); // sent yesterday: a completion 3 hours ago is after it
   const v1 = await as(V, () => tryq(`update public.team_notices set planned = '2026-11-20', done = now() - interval '3 hours' where id = '${nid}' returning planned::text, done, done_seen, done_pushed, followed`));
   check('sql_recipient_sets', takenOnly.followed===null && v1.rows && v1.rows.length===1 && v1.rows[0].planned==='2026-11-20' && !!v1.rows[0].done && v1.rows[0].done_pushed===null && !!v1.rows[0].followed
     && v1.rows[0].done_seen - v1.rows[0].done > 2.9*3600e3, {takenOnly, v1});
@@ -86,7 +87,8 @@ async function sqlTests(){
   // The server itself (no user) may set planned; a completion in the future is now
   const srv = await tryq(`update public.team_notices set planned = null where id = '${nid}' returning id`);
   const fut = await as(V, () => tryq(`update public.team_notices set done = now() + interval '2 days' where id = '${nid}' returning done <= now() + interval '1 minute' ok`));
-  check('sql_server_and_future', srv.rows && srv.rows.length===1 && fut.rows && fut.rows[0].ok===true, {srv, fut});
+  const past = await as(V, () => tryq(`update public.team_notices set done = '2000-01-01' where id = '${nid}' returning done = created ok`));
+  check('sql_server_and_future', srv.rows && srv.rows.length===1 && fut.rows && fut.rows[0].ok===true && past.rows && past.rows[0].ok===true, {srv, fut, past}); // never before the notice either
   await db.close();
   // all.sql twice on a fresh database; check.sql OK on every row, the three of 0014 among them
   db = await pgSetup(); const all = strip(fs.readFileSync(path.join(ROOT, 'supabase/all.sql'), 'utf8'));
@@ -114,7 +116,7 @@ async function appTests(browser){
   const D3=addDays(today(), 3), D5=addDays(today(), 5), T1=addDays(today(), 1);
   const pe={id:'pe', spaceId:'trabajo', name:'FLC', color:'#007AFF', order:0, archived:false, created:TF.T0, modified:TF.T0};
   /* ---------- Enric (desktop) and Víctor (iPhone), with their keys ---------- */
-  const Ed = await dev({tag:'E', desk:true, user:UE, seed:seed([tk('e1', {title:'Revisar el presupuesto de FLC', projectId:'pe', date:null}), tk('e2', {title:'Enviar el acta del comité', projectId:'pe'}), tk('e3', {title:'Preparar la demo'})], {projects:[pe]})}); const ep=Ed.page;
+  const Ed = await dev({tag:'E', desk:true, user:UE, seed:seed([tk('e1', {title:'Revisar el presupuesto de FLC', projectId:'pe', date:null}), tk('e2', {title:'Enviar el acta del comité', projectId:'pe'}), tk('e3', {title:'Preparar la demo'}), tk('e4', {title:'Revisar las actas'})], {projects:[pe]})}); const ep=Ed.page;
   await signIn(ep, true); await synced(ep); await activate(ep, PW_E); await ep.evaluate(()=>{ if(document.querySelector('#sheet.on')) closeSheet(); });
   check('E_ready', await until(ep, ()=>!!TM.priv&&SY.status==='ok', null, 20000));
   const Vd = await dev({tag:'V', user:UV, seed:seed([tk('v0', {title:'Una tarea de Enric de antes'})])}); const vp=Vd.page;
@@ -239,14 +241,39 @@ async function appTests(browser){
       {id:'nt-11111111-2222-4333-8444-666666666666-ab12cd34', title:'x', status:'done', completed:t, modified:t}, {id:'nt-11111111-2222-4333-8444-777777777777-ab12cd34', title:'x', status:'pending', modified:old}];
     DB.tasks.push(...add.map(x=>Object.assign({spaceId:'trabajo', date:null, notes:'', created:old}, x))); try{ return [...followWanted().keys()]; } finally{ DB.tasks=DB.tasks.filter(x=>!add.some(a=>a.id===x.id)); } });
   check('follow_volume', !wanted.includes('not-a-uuid') && !wanted.some(id=>/5555$/.test(id)) && wanted.some(id=>/6666$/.test(id)) && wanted.some(id=>/7777$/.test(id)) && !fake.followAsked.flat().some(id=>!/^[0-9a-f-]{36}$/.test(id)), {wanted, asked:fake.followAsked.flat().filter(id=>!/^[0-9a-f-]{36}$/.test(id))});
-  // A linked task whose notice is not taken yet (the mark of «Añadir» still on its way) leaves the next pass free to read again
-  const race = await vp.evaluate(async()=>{ const id='11111111-2222-4333-8444-888888888888', x={id:'nt-'+id+'-ab12cd34', title:'x', spaceId:'trabajo', status:'pending', date:null, notes:'', created:new Date().toISOString(), modified:new Date().toISOString()};
-    DB.tasks.push(x); TM.followSig=null; try{ await teamFollowSync(); return TM.followSig; } finally{ DB.tasks=DB.tasks.filter(t=>t!==x); TM.followSig=null; } });
+  // A linked task whose notice is not taken (the mark of «Añadir» on its way, or an «Añadir» undone where the task already was): read again
+  // 2 minutes later, not on every pass
   fake.notices.push({id:'11111111-2222-4333-8444-888888888888', sender_id:UE.uid, recipient_id:UV.uid, task_ref:'zz', payload:'t1:x', created:oldAt, pushed:oldAt, taken:null, dismissed:null, planned:null, done:null, done_seen:null, done_pushed:null, followed:null});
-  const race2 = await vp.evaluate(async()=>{ const id='11111111-2222-4333-8444-888888888888', x={id:'nt-'+id+'-ab12cd34', title:'x', spaceId:'trabajo', status:'pending', date:null, notes:'', created:new Date().toISOString(), modified:new Date().toISOString()};
-    DB.tasks.push(x); TM.followSig=null; try{ await teamFollowSync(); return TM.followSig; } finally{ DB.tasks=DB.tasks.filter(t=>t!==x); TM.followSig=null; } });
-  fake.notices = fake.notices.filter(n=>n.id!=='11111111-2222-4333-8444-888888888888');
-  check('follow_race_reads_again', typeof race==='string' && race2===null, {race, race2});
+  const asked = () => fake.followAsked.length;
+  const rl = await vp.evaluate(async()=>{ const id='11111111-2222-4333-8444-888888888888', x={id:'nt-'+id+'-ab12cd34', title:'x', spaceId:'trabajo', status:'pending', date:null, notes:'', created:'2026-11-08T10:00:00.000Z', modified:'2026-11-08T10:00:00.000Z'};
+    DB.tasks.push(x); TM.followSig=null; try{ await teamFollowSync(); return {skip:TM.followSkip, err:TM.followErr, off:TM.followOff, log:LOG.slice(-3).map(e=>e.m)}; } finally{ DB.tasks=DB.tasks.filter(t=>t!==x); } });
+  const a1 = asked();
+  const again = async back => vp.evaluate(async back=>{ const id='11111111-2222-4333-8444-888888888888', x={id:'nt-'+id+'-ab12cd34', title:'x', spaceId:'trabajo', status:'pending', date:null, notes:'', created:'2026-11-08T10:00:00.000Z', modified:'2026-11-08T10:00:00.000Z'};
+    DB.tasks.push(x); if(back) TM.followAt=Date.now()-121e3; try{ await teamFollowSync(); } finally{ DB.tasks=DB.tasks.filter(t=>t!==x); } }, back);
+  await again(false); await again(false); const a2 = asked(); await again(true); const a3 = asked();
+  fake.notices = fake.notices.filter(n=>n.id!=='11111111-2222-4333-8444-888888888888'); await vp.evaluate(()=>{ TM.followSig=null; TM.followSkip=false; });
+  check('follow_skip_rate_limited', rl.skip===true && a2===a1 && a3===a1+1, {rl, a1, a2, a3});
+  // The device's memory of confirmed deletions is only what the sync still knows as deleted: stable, and nothing in it is asked again
+  const gm = await vp.evaluate(()=>{ const kn=(syncState().known||{}).tasks||{}; return [...followGone()].every(id=>Object.keys(kn).some(k=>kn[k]==='x'&&noticeOfTask(k)===id)); });
+  check('follow_gone_stable', gm);
+  /* ---------- Víctor's second device: both tap «Añadir» on the same notice before syncing; one task stays, the notice is not dismissed ---------- */
+  const V2 = await dev({tag:'V2', user:UV}); const v2p=V2.page; await signIn(v2p);
+  check('V2_unlocked', await until(v2p, ()=>SY.status==='locked', null, 15000) && await v2p.evaluate(async pw=>{ await cryptoUnlock(pw); return true; }, PW_V) && await until(v2p, ()=>SY.status==='ok'&&!!TM.priv, null, 20000));
+  await v2p.evaluate(()=>{ if(document.querySelector('#sheet.on')) closeSheet(); }); await settled(v2p);
+  const s4 = await ep.evaluate(to=>noticeSend('e4', to, ''), UV.uid), n4 = fake.notices.find(n=>n.task_ref==='e4');
+  await Promise.all([vp, v2p].map(p=>p.evaluate(()=>syncRun('prueba'))));
+  check('both_received', s4==='ok' && await until(vp, id=>TM.recv.some(o=>o.id===id&&o.title!=null), n4.id, 15000) && await until(v2p, id=>TM.recv.some(o=>o.id===id&&o.title!=null), n4.id, 15000));
+  await Promise.all([vp, v2p].map(p=>p.evaluate(id=>recvAdd(id, null), n4.id)));
+  const two = await Promise.all([vp, v2p].map(p=>p.evaluate(id=>noticeTaskOf(id)&&noticeTaskOf(id).id, n4.id)));
+  for(let i=0;i<3;i++){ await synced(vp); await synced(v2p); await vp.evaluate(()=>syncRun('prueba')); await v2p.evaluate(()=>syncRun('prueba')); }
+  const keep = [two[0], two[1]].sort()[0], drop = [two[0], two[1]].sort()[1];
+  const left = await Promise.all([vp, v2p].map(p=>p.evaluate(id=>DB.tasks.filter(x=>noticeOfTask(x.id)===id).map(x=>x.id), n4.id)));
+  await Promise.all([vp, v2p].map(p=>p.evaluate(()=>{ TM.followSig=null; return syncRun('prueba'); }))); await synced(vp); await synced(v2p);
+  const srvDrop = fake.t.tasks.get(drop);
+  check('dedupe_notice_tasks', two[0]!==two[1] && left.every(l=>l.length===1&&l[0]===keep) && srvDrop && !!srvDrop.deleted && fake.t.tasks.has(keep) && !fake.t.tasks.get(keep).deleted && !!n4.taken && n4.dismissed===null && !!n4.followed, {two, left, keep, drop, srvDrop:srvDrop&&{deleted:srvDrop.deleted}, n4:{taken:n4.taken, dismissed:n4.dismissed, followed:n4.followed}});
+  check('dedupe_unit', await vp.evaluate(()=>{ const a='nt-11111111-2222-4333-8444-999999999999-', W={tasks:[{id:a+'bbbbbbbb'}, {id:a+'aaaaaaaa'}, {id:'otra'}], voiceNotes:[], attachments:[], subtasks:[{id:'s', taskId:a+'bbbbbbbb'}]};
+    const n=dedupeNotices(W); return n===1&&W.tasks.map(x=>x.id).join()===a+'aaaaaaaa,otra'&&W.subtasks.length===0; }));
+  await V2.ctx.close();
   /* ---------- Without 0014: nothing written, said once; the sender's lines as in v0.36.2 ---------- */
   fake.follow = false; const marks0 = fake.followMarks.length;
   await vp.evaluate(([id, d])=>{ TM.followOff=0; TM.followSig=null; updTask(id, {date:d}); }, [nid2, D5]); await synced(vp);

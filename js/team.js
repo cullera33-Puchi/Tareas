@@ -35,7 +35,7 @@ function teamCache(){ try{ const v=JSON.parse(localStorage.getItem(TEAM_KEY)||'n
 function teamCacheWrite(){ if(!SY||!SY.user||TM.for!==SY.user.id) return;
   try{ localStorage.setItem(TEAM_KEY, JSON.stringify({owner:SY.user.id, state:TM.state, me:TM.me, dir:TM.dir, recv:TM.recv, sent:TM.sent, followGone:[...followGone()]})); }catch(e){} }
 // A new account (or none): what was known of another one goes
-function teamReset(user){ Object.assign(TM, {state:undefined, for:user?user.id:null, me:null, at:0, force:false, dir:[], dirAt:0, recv:[], recvAt:0, list:null, listAt:0, inbox:null, priv:null, pub:null, keyKid:null, keyOwner:null, deniedLogged:false, askedKey:false, noSpace:false, sent:[], sentAt:0, sentForce:false, followSig:null, followAt:0, followOff:0, followErr:false, followGone:new Set()});
+function teamReset(user){ Object.assign(TM, {state:undefined, for:user?user.id:null, me:null, at:0, force:false, dir:[], dirAt:0, recv:[], recvAt:0, list:null, listAt:0, inbox:null, priv:null, pub:null, keyKid:null, keyOwner:null, deniedLogged:false, askedKey:false, noSpace:false, sent:[], sentAt:0, sentForce:false, followSig:null, followAt:0, followOff:0, followErr:false, followSkip:false, followGone:new Set()});
   const c=teamCache(); if(user&&c&&c.owner===user.id){ TM.state=['admin','member','denied'].includes(c.state)?c.state:undefined; TM.me=c.me||null; TM.dir=Array.isArray(c.dir)?c.dir:[]; TM.recv=Array.isArray(c.recv)?c.recv:[]; TM.sent=Array.isArray(c.sent)?c.sent:[]; TM.followGone=new Set(Array.isArray(c.followGone)?c.followGone:[]); }
   else { try{ localStorage.removeItem(TEAM_KEY); }catch(e){} } }
 
@@ -267,16 +267,27 @@ const followReady = () => !TM.followOff||Date.now()-TM.followOff>600e3;
 function followOff(){ TM.followOff=Date.now(); if(!TM.followLogged){ TM.followLogged=true; log('info','Equipo: el seguimiento de las tareas enviadas no está disponible todavía (falta 0014_notice_follow.sql)'); } }
 const sameTime = (a, b) => (a?Date.parse(a):null)===(b?Date.parse(b):null);
 const followGone = () => { if(!(TM.followGone instanceof Set)) TM.followGone=new Set(Array.isArray(TM.followGone)?TM.followGone:[]); return TM.followGone; };
-function followWanted(){ const want=new Map(), known=(syncState().known||{}).tasks||{}, cut=Date.now()-90*864e5, gone=followGone();
-  DB.tasks.forEach(x=>{ const nid=x&&noticeOfTask(x.id); if(!nid) return; if(!isOpen(x)&&(Date.parse(x.modified)||0)<cut) return;
+function followWanted(){ const want=new Map(), known=(syncState().known||{}).tasks||{}, cut=Date.now()-90*864e5, gone=followGone(), live=new Set();
+  DB.tasks.forEach(x=>{ const nid=x&&noticeOfTask(x.id); if(!nid) return; live.add(nid); if(!isOpen(x)&&(Date.parse(x.modified)||0)<cut) return;
     want.set(nid, {planned:/^\d{4}-\d{2}-\d{2}$/.test(x.date||'')?x.date:null, done:x.status==='done'?(x.completed||x.modified||null):null, mod:x.modified||null}); });
-  Object.keys(known).forEach(id=>{ const nid=noticeOfTask(id); if(nid&&known[id]==='x'&&!want.has(nid)&&!gone.has(nid)) want.set(nid, {gone:true}); });
+  // A deleted task whose notice still has a live task here (a duplicate of two devices, dedupeNotices) never dismisses that notice
+  Object.keys(known).forEach(id=>{ const nid=noticeOfTask(id); if(nid&&known[id]==='x'&&!live.has(nid)&&!gone.has(nid)) want.set(nid, {gone:true}); });
   return want; }
+/* Two devices that tap «Añadir» on the same notice before syncing make two tasks for it ('nt-<uuid>-<random>' each). When their data
+   meets (a sync, or the start), the one with the lowest id stays (the same choice on every device) and the others are removed as any
+   deletion is, so the server marks them deleted; the notice keeps being followed through the one that stays. Returns how many went */
+function dedupeNotices(W){ const by=new Map(), out=[];
+  (W.tasks||[]).forEach(x=>{ const nid=x&&noticeOfTask(x.id); if(!nid) return; const o=by.get(nid);
+    if(!o){ by.set(nid, x); return; } if(String(x.id)<String(o.id)){ out.push(o); by.set(nid, x); } else out.push(x); });
+  if(!out.length) return 0; const ids=new Set(out.map(x=>x.id));
+  W.tasks=W.tasks.filter(x=>!x||!ids.has(x.id)); W.voiceNotes=(W.voiceNotes||[]).filter(v=>!v||!ids.has(v.taskId)); W.attachments=(W.attachments||[]).filter(a=>!a||!ids.has(a.taskId)); if(W.subtasks) W.subtasks=W.subtasks.filter(s=>!s||!ids.has(s.taskId));
+  log('info','Tarea recibida duplicada retirada: dos dispositivos la añadieron', {n:out.length}); return out.length; }
 async function teamFollowSync(){ const R=SY&&SY.remote; if(!R||!R.noticeFollow||!teamOn()||!followReady()) return;
   const want=followWanted(); if(!want.size) return; const sig=JSON.stringify([...want]);
-  if(sig===TM.followSig&&Date.now()-(TM.followAt||0)<600e3) return;
+  // Unchanged: read again every 10 minutes, or 2 minutes after a pass that met a notice not taken yet (not on every pass)
+  if(sig===TM.followSig&&Date.now()-(TM.followAt||0)<(TM.followSkip?120e3:600e3)) return;
   try{ const ids=[...want.keys()], rows=[]; for(let i=0;i<ids.length;i+=100) rows.push(...((await R.noticeFollow(SY.user.id, ids.slice(i,i+100)))||[]));
-    let n=0, skipped=false; const now=new Date().toISOString(), gone=followGone(), seen=new Set(), was=gone.size;
+    let n=0, skipped=false; const now=new Date().toISOString(), gone=followGone(), seen=new Set(), was=JSON.stringify([...gone]);
     for(const r of rows){ const w=r&&want.get(r.id); if(!w) continue; seen.add(r.id);
       // Not taken yet: a task just made by «Añadir» whose mark is still on its way; asked again on the next pass
       if(!r.taken){ if(!w.gone) skipped=true; continue; }
@@ -288,9 +299,11 @@ async function teamFollowSync(){ const R=SY&&SY.remote; if(!R||!R.noticeFollow||
       if(Object.keys(patch).length){ await R.noticeMark(r.id, patch); n++; }
       if(w.gone) gone.add(r.id); }
     want.forEach((w, id)=>{ if(w.gone&&!seen.has(id)) gone.add(id); }); // no such notice any more
-    if(gone.size>500) TM.followGone=new Set([...gone].slice(-500));
-    if(gone.size!==was) teamCacheWrite();
-    TM.followSig=skipped?null:sig; TM.followAt=Date.now(); TM.followErr=false; if(n) log('info','Equipo: seguimiento de tareas recibidas enviado', {n}); }
+    // Only what the sync's state still knows as deleted is kept: the set never grows past it, and nothing kept is asked again
+    const kn=(syncState().known||{}).tasks||{}, xs=new Set(Object.keys(kn).filter(id=>kn[id]==='x').map(noticeOfTask).filter(Boolean));
+    [...gone].forEach(id=>{ if(!xs.has(id)) gone.delete(id); });
+    if(JSON.stringify([...gone])!==was) teamCacheWrite();
+    TM.followSig=sig; TM.followSkip=skipped; TM.followAt=Date.now(); TM.followErr=false; if(n) log('info','Equipo: seguimiento de tareas recibidas enviado', {n}); }
   catch(e){ if(followAbsentErr(e)){ followOff(); return; } if(!TM.followErr){ TM.followErr=true; log('warn','Equipo: el seguimiento de tareas recibidas no se pudo enviar: '+(e&&e.message||e)); } } }
 // «hace un momento», «hace 5 min», «hace 2 h», «hace 3 días»
 function agoShort(t){ const m=Math.floor((Date.now()-t)/6e4); if(m<1) return 'hace un momento'; if(m<60) return 'hace '+m+' min'; const h=Math.floor(m/60); if(h<24) return 'hace '+h+' h'; const d=Math.floor(h/24); return d===1?'hace 1 día':'hace '+d+' días'; }

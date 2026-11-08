@@ -36,7 +36,7 @@ alter table public.team_notices add column if not exists followed timestamptz;  
 create index if not exists team_notices_done_push on public.team_notices (done) where done is not null and done_pushed is null;
 
 -- On insert, the columns of the follow-up always start empty (the sender cannot claim a task done or followed). On update: planned and
--- done change only by the recipient (or the server itself, with no user), a completion never lies in the future, done_seen and
+-- done change only by the recipient (or the server itself, with no user), a completion never lies in the future nor before the notice, done_seen and
 -- followed are kept as they were (only the triggers set them), and a new completion (done from null to a value) is seen now and makes
 -- the sender be told again, unless they were told less than 4 hours ago
 create or replace function public.tareas_notice_follow()
@@ -62,6 +62,9 @@ begin
   new.followed := old.followed;
   if new.done is not null and new.done > now() + interval '5 minutes' then
     new.done := now();
+  end if;
+  if new.done is not null and new.done < old.created then
+    new.done := old.created;
   end if;
   if old.done is null and new.done is not null then
     new.done_seen := now();

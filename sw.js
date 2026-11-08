@@ -81,7 +81,7 @@ self.addEventListener('push', e => {
     ? (d.badge > 0 ? self.navigator.setAppBadge(d.badge) : self.navigator.clearAppBadge()).catch(() => {}) : Promise.resolve();
   // An open app writes it in its log
   const told = self.clients.matchAll({ type: 'window', includeUncontrolled: true })
-    .then(list => list.forEach(c => c.postMessage({ type: 'push', taskId: data.taskId || null, test: !!data.test })));
+    .then(list => list.forEach(c => c.postMessage({ type: 'push', taskId: data.taskId || null, test: !!data.test, follow: !!data.follow })));
   e.waitUntil(Promise.all([shown, badged, told]));
 });
 

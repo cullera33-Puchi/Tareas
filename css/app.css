@@ -769,6 +769,12 @@ body.desktop .stsheet .sttext{height:min(460px, calc(80svh - 170px));font-size:1
 .wcard .t .pri{display:inline;width:auto;min-width:0;margin-right:4px;letter-spacing:-1px;font-size:11px;}
 .wcard .ctag{flex:none;max-width:none;font-size:10px;line-height:15px;padding:0 4px;border-radius:4px;vertical-align:0;} /* decision 79: the project's short name */
 .wcard.done .ctag{opacity:.55;}
+.wcard.two{height:auto;min-height:40px;padding:4px 7px 5px 6px;} /* decision 79: capsule, indicators and time over the title */
+.wcard .wc2{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;}
+.wcard .wctop{display:flex;align-items:center;gap:4px;min-width:0;height:15px;}
+.wcard .wctop .grow{flex:1;min-width:0;}
+.wcard .wctop .cic{margin-left:0;}
+.wcard.two .t{width:100%;flex:none;}
 .wcard .tm{flex:none;font-size:11px;color:var(--ink2);font-variant-numeric:tabular-nums;}
 .wcard.done .t{text-decoration:line-through;color:var(--ink2);}
 /* The undated tray: a column at the right that folds into a narrow strip */

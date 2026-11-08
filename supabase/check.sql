@@ -46,9 +46,9 @@ with checks(orden, pieza, ok) as (
   union all select 41, 'Equipo: cupo de almacenamiento (0013)', exists (select 1 from pg_proc where proname='tareas_storage_ok')
   union all select 42, 'Equipo: filtro de altas por invitación (0013)', exists (select 1 from pg_proc where proname='tareas_before_user_created')
   union all select 43, 'Equipo: borrado a los 30 días (0013)', exists (select 1 from pg_proc where proname='tareas_team_remove')
-  union all select 44, 'Seguimiento: fecha prevista y completada en team_notices (0014)', (select count(*) from information_schema.columns where table_schema='public' and table_name='team_notices' and column_name in ('planned','done','done_pushed')) = 3
+  union all select 44, 'Seguimiento: fecha prevista y completada en team_notices (0014)', (select count(*) from information_schema.columns where table_schema='public' and table_name='team_notices' and column_name in ('planned','done','done_seen','done_pushed','followed')) = 5
   union all select 45, 'Seguimiento: quien recibe la tarea puede marcarlas (0014)', case when (select count(*) from information_schema.columns where table_schema='public' and table_name='team_notices' and column_name in ('planned','done')) < 2 then false else has_column_privilege('authenticated', 'public.team_notices', 'done', 'UPDATE') and has_column_privilege('authenticated', 'public.team_notices', 'planned', 'UPDATE') end
-  union all select 46, 'Seguimiento: regla de los cambios y aviso al completar otra vez (0014)', exists (select 1 from pg_trigger where tgname='tareas_notice_follow' and not tgisinternal)
+  union all select 46, 'Seguimiento: regla de los cambios y aviso al completar otra vez (0014)', (select count(*) from pg_trigger where tgname in ('tareas_notice_follow','tareas_notice_followed') and not tgisinternal) = 2
 )
 select orden as "N.º", pieza as "Pieza", case when ok then 'OK' else 'FALTA' end as "Estado"
 from checks order by orden;

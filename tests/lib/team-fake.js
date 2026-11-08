@@ -76,7 +76,7 @@ class Fake {
         const last=this.notices.filter(n=>n.sender_id===own&&n.recipient_id===to&&n.task_ref===r.task_ref).map(n=>Date.parse(n.created)).sort((x,y)=>y-x)[0];
         if(this.notices.filter(n=>n.sender_id===own&&Date.parse(n.created)>Date.now()-3600e3).length>=20) return this.err('tareas_notice_too_many');
         if(last&&last>Date.now()-4*3600e3) return this.err('tareas_notice_too_soon', new Date(last+4*3600e3).toISOString().slice(0,19)+'Z');
-        const n={id:newId(), sender_id:own, recipient_id:to, task_ref:r.task_ref, payload:r.payload, created:new Date().toISOString(), pushed:null, taken:null, dismissed:null, planned:null, done:null, done_pushed:null}; this.notices.push(n);
+        const n={id:newId(), sender_id:own, recipient_id:to, task_ref:r.task_ref, payload:r.payload, created:new Date().toISOString(), pushed:null, taken:null, dismissed:null, planned:null, done:null, done_seen:null, done_pushed:null, followed:null}; this.notices.push(n);
         this.notify(to, 'team_notices', {id:n.id}); return true; }
       case 'noticeList': if(!ok()) return []; return this.notices.filter(n=>n.recipient_id===own&&n.recipient_id===a.uid&&!n.taken&&!n.dismissed).map(n=>({id:n.id, sender_id:n.sender_id, payload:n.payload, created:n.created}));
       // The sender's own notices, only the columns asked for (never payload: the test checks what was asked)
@@ -84,14 +84,17 @@ class Fake {
         const cols=String(a.cols||'').split(','), since=Date.parse(a.since)||0; if(!this.follow&&cols.some(c=>c==='planned'||c==='done')) return this.err('column team_notices.planned does not exist');
         return this.notices.filter(n=>n.sender_id===own&&Date.parse(n.created)>=since).sort((x,y)=>Date.parse(y.created)-Date.parse(x.created)).slice(0,500).map(n=>Object.fromEntries(cols.map(c=>[c, n[c]===undefined?null:n[c]]))); }
       // Decision 78 (0014): the recipient's own notices by id, the columns of the follow-up; without 0014 the columns are missing
-      case 'noticeFollow': { if(!this.follow) return this.err('column team_notices.planned does not exist'); if(!ok()) return [];
-        return this.notices.filter(n=>n.recipient_id===own&&a.ids.includes(n.id)).map(n=>({id:n.id, taken:n.taken, dismissed:n.dismissed, planned:n.planned, done:n.done})); }
+      case 'noticeFollow': { (this.followAsked=this.followAsked||[]).push(a.ids); if(!this.follow) return this.err('column team_notices.planned does not exist'); if(!ok()) return [];
+        return this.notices.filter(n=>n.recipient_id===own&&a.ids.includes(n.id)).map(n=>({id:n.id, taken:n.taken, dismissed:n.dismissed, planned:n.planned, done:n.done, followed:n.followed||null})); }
       // The grants of 0013 and 0014 (the recipient writes taken and dismissed, and planned and done once 0014 ran) and the trigger of 0014
       case 'noticeMark': { if(!ok()) return []; const keys=Object.keys(a.patch||{}), allowed=['taken','dismissed'].concat(this.follow?['planned','done']:[]);
         const bad=keys.find(k=>!allowed.includes(k)); if(bad) return this.err(['planned','done'].includes(bad)?'column "'+bad+'" of relation "team_notices" does not exist':'permission denied for table team_notices');
         const n=this.notices.find(x=>x.id===a.id&&x.recipient_id===own); if(!n) return [];
         if(keys.some(k=>k==='planned'||k==='done')) this.followMarks.push({id:n.id, patch:Object.assign({}, a.patch)});
-        const wasDone=n.done; Object.assign(n, a.patch); if(!wasDone&&n.done) n.done_pushed=null; return [{id:n.id}]; }
+        const wasDone=n.done, now=new Date().toISOString(); Object.assign(n, a.patch);
+        if(keys.some(k=>k==='planned'||k==='done')&&!n.followed) n.followed=now; // UPDATE OF planned, done: the first follow-up write
+        if(!wasDone&&n.done){ n.done_seen=now; if(!n.done_pushed||Date.parse(n.done_pushed)<Date.now()-4*3600e3) n.done_pushed=null; } // seen now; told again at most every 4 hours
+        return [{id:n.id}]; }
       case 'feedbackSend': { if(!ok()) return this.err(RLS('team_feedback').message); if(this.role(a.row.recipient_id)!=='admin') return this.err('tareas_feedback_bad_recipient');
         this.feedback.push({id:newId(), sender_id:own, recipient_id:a.row.recipient_id, kind:a.row.kind, payload:a.row.payload, created:new Date().toISOString(), status:'nueva', pushed:null}); return true; }
       case 'feedbackList': if(!admin()) return []; return this.feedback.filter(f=>f.recipient_id===own).slice().reverse().map(f=>({id:f.id, sender_id:f.sender_id, kind:f.kind, payload:f.payload, created:f.created, status:f.status}));

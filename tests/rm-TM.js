@@ -227,7 +227,7 @@ async function fnServers(){
     const team = /team_|tareas_team/.test(u.pathname);
     if (FN.noTeam && team) return send(404, {code:'PGRST205', message:"Could not find the table in the schema cache"});
     if (FN.noFollow && u.pathname === '/rest/v1/team_notices' && /done|planned/.test(u.search)) return send(400, {code:'42703', message:'column team_notices.done does not exist'}); // before 0014
-    if (u.pathname === '/rest/v1/rpc/tareas_team_allowed') { if (FN.rpcFail) return send(500, {message:'boom'}); return send(200, (body.p_ids||[]).filter(id => (FN.t.team_members||[]).some(m => m.user_id===id && !m.revoked))); }
+    if (u.pathname === '/rest/v1/rpc/tareas_team_allowed') { if (FN.rpcFail) return send(500, {message:'boom'}); if (FN.allowedAbsent) return send(404, {code:'PGRST202', message:'Could not find the function public.tareas_team_allowed'}); return send(200, (body.p_ids||[]).filter(id => (FN.t.team_members||[]).some(m => m.user_id===id && !m.revoked))); }
     if (u.pathname === '/rest/v1/rpc/tareas_team_to_remove') return send(200, (FN.t.team_members||[]).filter(m => m.role==='member' && m.revoked && Date.parse(m.revoked) < Date.now()-30*864e5).map(m => ({member_id:m.id, user_id:m.user_id, files:[...FN.objects].filter(o => o.startsWith(m.user_id+'/'))})));
     if (u.pathname === '/rest/v1/rpc/tareas_team_remove') { const m = FN.t.team_members.find(x => x.id===body.p_member); if (!m || m.role!=='member') return send(200, {skipped:true});
       FN.t.team_members = FN.t.team_members.filter(x => x!==m); FN.t.tasks = FN.t.tasks.filter(x => x.owner_id!==m.user_id); return send(200, {tasks:1}); }
@@ -281,21 +281,28 @@ async function fnTests(){
     FN.pushes.length = 0; const c2 = await call();
     check('fn_removal_rows', c2.json.removedMembers===1 && FN.t.team_members.map(m=>m.id).join()==='mE,mS' && c2.json.notices===0 && FN.pushes.length===0 && /"event":"member-removed"/.test(S1.st.out), c2.json);
     // Decision 78 (0014): Susana completed a task Enric sent her: «Susana ha completado una tarea que le enviaste» to Enric's devices, once,
-    // nothing of the task, a tap opens his task; one completed two hours ago is marked without notifying; a re-completion notifies again
+    // nothing of the task, a tap opens his task. Lateness is measured on done_seen (when the server saw it), not on done (the device's
+    // clock): one done three hours ago on a phone that was offline but seen a minute ago notifies; one seen two hours ago is marked only
     FN.pushes.length = 0;
-    FN.t.team_notices.push({id:'d1', sender_id:E, recipient_id:S, task_ref:'tE1', payload:'t1:SECRETO', created:iso(-864e5), pushed:iso(-864e5), taken:iso(-8e7), planned:null, done:iso(-6e4), done_pushed:null},
-      {id:'d2', sender_id:E, recipient_id:S, task_ref:'tE2', payload:'t1:x', created:iso(-864e5), pushed:iso(-864e5), taken:iso(-8e7), planned:null, done:iso(-2*36e5), done_pushed:null},
-      {id:'d3', sender_id:E, recipient_id:S, task_ref:'tE3', payload:'t1:x', created:iso(-864e5), pushed:iso(-864e5), taken:iso(-8e7), planned:'2026-11-20', done:null, done_pushed:null});
+    FN.t.team_notices.push({id:'d1', sender_id:E, recipient_id:S, task_ref:'tE1', payload:'t1:SECRETO', created:iso(-864e5), pushed:iso(-864e5), taken:iso(-8e7), planned:null, done:iso(-3*36e5), done_seen:iso(-6e4), done_pushed:null, followed:iso(-8e7)},
+      {id:'d2', sender_id:E, recipient_id:S, task_ref:'tE2', payload:'t1:x', created:iso(-864e5), pushed:iso(-864e5), taken:iso(-8e7), planned:null, done:iso(-6e4), done_seen:iso(-2*36e5), done_pushed:null, followed:iso(-8e7)},
+      {id:'d3', sender_id:E, recipient_id:S, task_ref:'tE3', payload:'t1:x', created:iso(-864e5), pushed:iso(-864e5), taken:iso(-8e7), planned:'2026-11-20', done:null, done_seen:null, done_pushed:null, followed:iso(-8e7)});
     const f1 = await call(), pf = got(dE), ps2 = got(dS);
     check('fn_follow_push', f1.status===200 && f1.json.completed===2 && f1.json.completedSent===1 && pf.length===1 && pf[0].title==='Tareas' && pf[0].body==='Susana ha completado una tarea que le enviaste' && pf[0].data.taskId==='tE1' && pf[0].data.follow===true && pf[0].data.url==='./?task=tE1' && !JSON.stringify(pf[0]).includes('SECRETO') && ps2.length===0, {j:f1.json, pf, ps2});
     const dn = id => FN.t.team_notices.find(n => n.id===id);
     check('fn_follow_marked', !!dn('d1').done_pushed && !!dn('d2').done_pushed && dn('d3').done_pushed===null && /"completed":2/.test(S1.st.out), FN.t.team_notices.filter(n => /^d/.test(n.id)));
     FN.pushes.length = 0; const f2 = await call();
     check('fn_follow_once', !f2.json.completed && FN.pushes.length===0, f2.json);
-    Object.assign(dn('d1'), {done:iso(-1e4), done_pushed:null}); FN.pushes.length = 0; const f3 = await call(); // the trigger of 0014 empties done_pushed on a new completion
+    Object.assign(dn('d1'), {done:iso(-1e4), done_seen:iso(-1e4), done_pushed:null}); FN.pushes.length = 0; const f3 = await call(); // the trigger of 0014 empties done_pushed on a new completion (after 4 hours)
     check('fn_follow_again', f3.json.completed===1 && got(dE).length===1 && got(dE)[0].body==='Susana ha completado una tarea que le enviaste', f3.json);
+    // An answer of the access check that looks like a missing function (and marks the team missing for the logs) does not turn the
+    // follow-up off: this run's own claim of the notices decides
+    FN.allowedAbsent = true; FN.t.tasks.push({id:'rE3', owner_id:E, title:'otra más', project_id:null, date:null, reminder:iso(-6e4), reminder_sent:null, deleted:null, status:'pending'});
+    Object.assign(dn('d1'), {done:iso(-1e4), done_seen:iso(-1e4), done_pushed:null}); FN.pushes.length = 0; const f6 = await call(), f7 = await call(); FN.allowedAbsent = false;
+    Object.assign(dn('d3'), {done:iso(-1e4), done_seen:iso(-1e4)}); FN.pushes.length = 0; const f8 = await call();
+    check('fn_follow_not_disabled', f6.json.completed===1 && f6.json.completedSent===1 && f8.json.completed===1 && f8.json.completedSent===1, {f6:f6.json, f7:f7.json, f8:f8.json});
     // Before 0014 (the columns are missing): nothing, said once, the rest goes on
-    FN.noFollow = true; Object.assign(dn('d1'), {done:iso(-1e4), done_pushed:null}); FN.pushes.length = 0; const f4 = await call(), f5 = await call(); FN.noFollow = false;
+    FN.noFollow = true; Object.assign(dn('d1'), {done:iso(-1e4), done_seen:iso(-1e4), done_pushed:null}); FN.pushes.length = 0; const f4 = await call(), f5 = await call(); FN.noFollow = false;
     check('fn_follow_without_0014', f4.status===200 && !f4.json.completed && !f4.json.followFailed && f5.status===200 && FN.pushes.length===0 && (S1.st.out.match(/"event":"follow-skipped"/g)||[]).length===1 && !dn('d1').done_pushed, {f4:f4.json, f5:f5.json});
     FN.t.team_notices = FN.t.team_notices.filter(n => !/^d\d$/.test(n.id));
     // The allowed answer fails: the reminders still go

@@ -86,7 +86,7 @@ async function run(browser){
   await s2p.evaluate(()=>openDetail('s1')); await s2p.waitForTimeout(700);
   const l0 = await s2p.evaluate(()=>[...document.querySelectorAll('.pushed-screen .ntnote .ntline')].map(x=>x.textContent));
   check('S2_no_answer_yet', l0.length===1 && /^Avisado a Enric hoy a las \d\d:\d\d: sin respuesta todavía$/.test(l0[0]) && await s2p.evaluate(()=>!(task('s1').sentTo||[]).length), l0);
-  check('sent_never_payload', (fake.sentAsked||[]).length>0 && fake.sentAsked.every(c=>/^id,recipient_id,task_ref,created,taken,dismissed(,planned,done)?$/.test(c)), fake.sentAsked);
+  check('sent_never_payload', (fake.sentAsked||[]).length>0 && fake.sentAsked.every(c=>/^id,recipient_id,task_ref,created,taken,dismissed(,planned,done,followed)?$/.test(c)), fake.sentAsked);
 
   /* ---------- Enric: Recibidas ---------- */
   check('E_received', await until(ep, ()=>TM.recv.length===2, null, 10000), await ep.evaluate(()=>TM.recv));

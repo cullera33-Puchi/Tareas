@@ -42,6 +42,7 @@ async function run(browser){
     tk('d1', {title:'Plan anual', projectId:'p4', date:D1}),
     tk('d2', {title:'Revisar la hoja de ruta', projectId:'p2', date:D1, estimate:60, reminder:at(D1,'11:00')}),
     tk('d3', {title:'Mandar presupuesto', projectId:'p1', date:D2, deadline:D2}),
+    tk('u1', {title:'Sin fecha de la transformación digital', projectId:'p2', date:null}),
     tk('d4', {title:'Hecha ya', projectId:'p3', date:t, status:'done', completed:new Date().toISOString()}) ];
   const seed=TF.seed(tasks, {projects, settings:{tipsSeen:true, weekMode:'next7', workWeek:{trabajo:false}}});
 
@@ -53,9 +54,15 @@ async function run(browser){
   /* ---------- 2 and 3. Semana (list) ---------- */
   await pg.evaluate(()=>{ DB.settings.calMode='list'; save(); setDeskView('week'); }); await calm(pg);
   const card = id => pg.evaluate(id=>{ const c=document.querySelector('#desk .main .wcard[data-id="'+id+'"]'); if(!c) return null; const g=c.querySelector('.ctag');
-    return {cap:g?g.textContent:null, before:!!g&&g.nextElementSibling===c.querySelector('.t'), color:g?getComputedStyle(g).color:null, bg:g?getComputedStyle(g).backgroundColor:null, tip:c.title, drag:c.getAttribute('draggable')}; }, id);
-  const a1=await card('a1'), b1=await card('b1'), n1=await card('n1'), h1=await card('h1'), z1=await card('z1'), d1=await card('d1');
-  check('week_caps', a1&&a1.cap==='FLC'&&a1.before&&b1.cap==='Transf'&&d1.cap==='2026'&&z1.cap==='Archiv'&&n1&&n1.cap===null&&h1.cap===null, {a1, b1, n1, h1, z1, d1});
+    const t=c.querySelector('.t'), top=c.querySelector('.wctop'), cs=getComputedStyle(c), inner=c.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight)-c.querySelector('.check').offsetWidth-parseFloat(cs.columnGap||cs.gap||0);
+    return {two:c.classList.contains('two'), inTop:!!g&&!!top&&top.contains(g), second:!!top&&top.nextElementSibling===t, tm:top&&(top.querySelector('.tm')||{}).textContent||null,
+      tw:t.getBoundingClientRect().width, inner, h:c.getBoundingClientRect().height, cap:g?g.textContent:null, before:!!g&&g.nextElementSibling===t, color:g?getComputedStyle(g).color:null, bg:g?getComputedStyle(g).backgroundColor:null, tip:c.title, drag:c.getAttribute('draggable')}; }, id);
+  const a1=await card('a1'), b1=await card('b1'), n1=await card('n1'), h1=await card('h1'), z1=await card('z1'), d1=await card('d1'), u1=await card('u1');
+  // Two lines with a project or a time: the capsule (and the time on the right) over the title, which takes the card's whole width;
+  // none of either: one line (7 days and the Sin fecha tray open at 1440 px)
+  check('two_lines', a1.two && !n1.two && n1.h<32 && a1.h>=38 && h1.two && h1.tm==='08:15' && h1.cap===null && u1&&u1.two&&u1.cap==='Transf'
+    && [a1, b1, d1, u1].every(c=>Math.abs(c.tw-c.inner)<=2) && a1.tw>=70, {a1, n1, h1, u1});
+  check('week_caps', a1&&a1.cap==='FLC'&&a1.two&&a1.inTop&&a1.second&&b1.cap==='Transf'&&d1.cap==='2026'&&z1.cap==='Archiv'&&n1&&n1.cap===null&&h1.cap===null, {a1, b1, n1, h1, z1, d1});
   check('week_tooltip_drag', /\nFLC Comité/.test(a1.tip) && /\nTransformación digital/.test(b1.tip) && a1.drag==='true', {a1, b1});
   // The list capsule's colors: the project's tag colors, not a plain grey
   const tagC = await pg.evaluate(()=>{ const s=document.createElement('span'); s.className='tag'; s.textContent='x'; const w=document.createElement('div'); w.setAttribute('style', tagVars('#FF9500')); w.appendChild(s); document.body.appendChild(w); const o={c:getComputedStyle(s).color, b:getComputedStyle(s).backgroundColor}; w.remove(); return o; });
@@ -63,24 +70,27 @@ async function run(browser){
   const dayOrder = d => pg.evaluate(d=>[...document.querySelectorAll('#desk .main [data-day="'+d+'"] .wcard')].map(c=>c.dataset.id), d);
   // The rule: the timed ones first by time (h1 8:15, h2 9:30), then the ranks of the sidebar never go back (archived, then no project last);
   // within FLC the high one first (the lists' order)
-  const rank = id => { const x=tasks.find(k=>k.id===id), p=x&&projects.find(q=>q.id===x.projectId); return !x.projectId?99:p.archived?50:p.order; };
+  const rank = id => { if(id==='c2') return 2; const x=tasks.find(k=>k.id===id), p=x&&projects.find(q=>q.id===x.projectId); return !x.projectId?99:p.archived?50:p.order; };
   const ranked = ids => ids.every((id,i)=>i===0||rank(ids[i-1])<=rank(id));
   const o0 = await dayOrder(t);
   check('week_order_today', o0.slice(0,2).join()==='h1,h2' && ranked(o0.slice(2)) && o0.indexOf('a1')<o0.indexOf('a2') && o0[o0.length-1]==='n1' && o0.length===9, o0);
   const o1 = await dayOrder(D1);
   check('week_order_tomorrow', o1.join()==='d2,d1', o1);
   await shot(pg, 'pc-desk-light-semana');
+  await pg.evaluate(()=>{ DB.settings.calMode='list'; save(); setDeskView('day'); }); await calm(pg); await shot(pg, 'pc-desk-light-dia');
+  await pg.evaluate(()=>{ setDeskView('week'); }); await calm(pg);
 
   /* ---------- Día and the hours view ---------- */
   await pg.evaluate(()=>{ DB.settings.calMode='hours'; save(); setDeskView('day'); }); await calm(pg);
-  const hrs = await pg.evaluate(()=>[...document.querySelectorAll('#desk .main .wcard')].map(c=>({id:c.dataset.id, hb:c.classList.contains('hb'), cap:(c.querySelector('.ctag')||{}).textContent||null})));
+  const hrs = await pg.evaluate(()=>[...document.querySelectorAll('#desk .main .wcard:not(.wtray .wcard)')].map(c=>({id:c.dataset.id, hb:c.classList.contains('hb'), cap:(c.querySelector('.ctag')||{}).textContent||null})));
   const allDay = hrs.filter(x=>!x.hb).map(x=>x.id), blocks = hrs.filter(x=>x.hb);
-  check('hours_allday_order', allDay.slice(0,3).join()==='a1,a2,b1' && !allDay.includes('h1') && !allDay.includes('h2'), {allDay, hrs});
+  const oldFirst3 = await pg.evaluate(()=>calTimeSort(calTasks(todayStr(), todayStr()).filter(x=>x.date===todayStr()&&!inGrid(x))).slice(0,3).map(x=>x.id));
+  check('hours_allday_order', allDay.length===3 && allDay.includes('a1') && oldFirst3.every(id=>allDay.includes(id)) && ranked(allDay) && !allDay.includes('h1') && !allDay.includes('h2'), {allDay, oldFirst3, hrs});
   check('hours_caps', blocks.length===2 && blocks.find(x=>x.id==='h2').cap==='Oca' && blocks.find(x=>x.id==='h1').cap===null && hrs.find(x=>x.id==='a1').cap==='FLC', hrs);
   await pg.evaluate(()=>document.querySelector('#desk .wcard.hb[data-id=h2]').scrollIntoView({block:'center'})); await pg.waitForTimeout(200);
   await shot(pg, 'pc-desk-light-horas');
   await pg.evaluate(()=>{ DB.settings.calMode='list'; save(); setDeskView('day'); }); await calm(pg);
-  const dayList = await pg.evaluate(()=>[...document.querySelectorAll('#desk .main .wcard')].map(c=>c.dataset.id+':'+((c.querySelector('.ctag')||{}).textContent||'')));
+  const dayList = await pg.evaluate(()=>[...document.querySelectorAll('#desk .main .wcard:not(.wtray .wcard)')].map(c=>c.dataset.id+':'+((c.querySelector('.ctag')||{}).textContent||'')));
   const dIds = dayList.map(x=>x.split(':')[0]), dCap = Object.fromEntries(dayList.map(x=>x.split(':')));
   check('day_list', dIds.slice(0,2).join()==='h1,h2' && ranked(dIds.slice(2)) && dIds[dIds.length-1]==='n1' && dCap.h1==='' && dCap.h2==='Oca' && dCap.a1==='FLC' && dCap.b1==='Transf' && dCap.c1==='Oca' && dCap.z1==='Archiv' && dCap.n1==='', dayList);
   // Semana in the hours view: the blocks of tomorrow too
@@ -91,10 +101,28 @@ async function run(browser){
   /* ---------- Mes: 4 letters ---------- */
   await pg.evaluate(()=>{ DB.settings.calMode='list'; save(); setDeskView('month'); }); await calm(pg);
   const mo = await pg.evaluate(t=>[...document.querySelectorAll('#desk .main .mday[data-day="'+t+'"] .wcard.mc')].map(c=>c.dataset.id+':'+((c.querySelector('.ctag')||{}).textContent||'')), t);
-  check('month_caps', mo.join()==='h1:,h2:Oca,a1:FLC,a2:FLC', mo);
+  // Four of the day: chosen in the previous order (time, then the lists' order), shown grouped by project
+  const mo4 = await pg.evaluate(t=>calSort(calTimeSort(calTasks(t, t).filter(x=>x.date===t)).slice(0,4)).map(x=>x.id+':'+(x.projectId?projShort(proj(x.projectId).name, 4):'')), t);
+  check('month_caps', mo.join()===mo4.join() && mo.slice(0,3).join()==='h1:,h2:Oca,a1:FLC', {mo, mo4});
   const mb = await pg.evaluate(d=>{ const c=document.querySelector('#desk .main .wcard.mc[data-id=b1]')||document.querySelector('#desk .main .mday[data-day="'+d+'"] .wcard.mc[data-id=d2]'); return c&&(c.querySelector('.ctag')||{}).textContent; }, D1);
   check('month_cap_4', mb==='Tran', mb);
   await shot(pg, 'pc-desk-light-mes');
+
+  /* ---------- A day that shows only some of its tasks picks them in the previous order (time, then priority), then groups them ---------- */
+  // A second high priority in Oca (third in the sidebar): grouped first, it would fall behind «N más»
+  await pg.evaluate(t=>{ DB.tasks.push({id:'c2', title:'Urgente de Oca', spaceId:'trabajo', projectId:'p3', date:t, reminder:null, priority:'high', status:'pending', notes:'', carried:false, created:new Date().toISOString(), modified:new Date().toISOString(), completed:null}); render(); }, t); await calm(pg);
+  const mo2 = await pg.evaluate(t=>{ const c=document.querySelector('#desk .main .mday[data-day="'+t+'"]'); return {ids:[...c.querySelectorAll('.wcard.mc')].map(x=>x.dataset.id), more:(c.querySelector('.mmore')||{}).textContent||''}; }, t);
+  check('month_pick_priority', mo2.ids.join()==='h1,h2,a1,c2' && mo2.more==='6 más', mo2);
+  await pg.evaluate(()=>{ DB.settings.calMode='hours'; save(); setDeskView('day'); }); await calm(pg);
+  const ad2 = await pg.evaluate(()=>({ids:[...document.querySelectorAll('#desk .main .hallday .wcard')].map(c=>c.dataset.id), more:(document.querySelector('#desk .main .hallday .hmore')||{}).textContent||''}));
+  check('allday_pick_priority', ad2.ids.length===3 && ad2.ids.includes('a1') && ad2.ids.includes('c2') && ranked(ad2.ids) && ad2.more==='5 más', ad2);
+  await pg.evaluate(()=>{ UI.allDayOpen=todayStr(); render(); }); await calm(pg);
+  const ad3 = await pg.evaluate(()=>[...document.querySelectorAll('#desk .main .hallday .wcard')].map(c=>c.dataset.id));
+  check('allday_open_grouped', ad3.length===8 && ranked(ad3), ad3);
+  // Week and Day lists are not cut: grouped by project as before
+  await pg.evaluate(()=>{ UI.allDayOpen=null; DB.settings.calMode='list'; save(); setDeskView('week'); }); await calm(pg);
+  const wk2 = await dayOrder(t); check('week_not_cut_grouped', wk2.length===10 && ranked(wk2.slice(2)) && wk2.indexOf('c2')>wk2.indexOf('b1'), wk2);
+  await pg.evaluate(()=>{ DB.tasks=DB.tasks.filter(x=>x.id!=='c2'); render(); }); await calm(pg);
 
   /* ---------- The weekend column (Solo de lunes a viernes) keeps the rule ---------- */
   const wk = await pg.evaluate(()=>{ const sat=(()=>{ let d=todayStr(); while(!isWeekend(d)) d=addDays(d,1); return d; })();
@@ -120,6 +148,7 @@ async function run(browser){
     const o={c:getComputedStyle(g).color, ref:getComputedStyle(s).color}; w.remove(); return o; });
   check('dark_cap_colors', dk.c===dk.ref, dk);
   await shot(dp, 'pc-desk-dark-semana');
+  await dp.evaluate(()=>{ DB.settings.calMode='list'; save(); setDeskView('day'); }); await calm(dp); await shot(dp, 'pc-desk-dark-dia');
   await dp.evaluate(()=>{ DB.settings.calMode='hours'; save(); setDeskView('week'); }); await calm(dp); await dp.evaluate(()=>document.querySelector('#desk .wcard.hb[data-id=h2]').scrollIntoView({block:'center'})); await dp.waitForTimeout(200);
   await shot(dp, 'pc-desk-dark-horas');
   await dp.evaluate(()=>{ DB.settings.calMode='list'; save(); setDeskView('month'); }); await calm(dp); await shot(dp, 'pc-desk-dark-mes');

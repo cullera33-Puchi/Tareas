@@ -52,18 +52,31 @@ function inGrid(x){ const m=remMin(x); return m!==null&&m>=H0&&m<H1; }
 function calProjRank(){ const m=new Map(); activeProjects().forEach((p,i)=>m.set(p.id, i)); return x=>!x.projectId?2e9:m.has(x.projectId)?m.get(x.projectId):1e9; }
 function calSort(xs){ const tm=xs.map(x=>[x,remMin(x)]), rk=calProjRank();
   return tm.filter(a=>a[1]!==null).sort((a,b)=>a[1]-b[1]).map(a=>a[0]).concat(orderTasks(tm.filter(a=>a[1]===null).map(a=>a[0])).sort((a,b)=>rk(a)-rk(b))); }
+// The order before decision 79: with a time first by time, then the lists' order (priority first)
+function calTimeSort(xs){ const tm=xs.map(x=>[x,remMin(x)]); return tm.filter(a=>a[1]!==null).sort((a,b)=>a[1]-b[1]).map(a=>a[0]).concat(orderTasks(tm.filter(a=>a[1]===null).map(a=>a[0]))); }
+/* A day that shows only n of its tasks (Mes, «Todo el día»): which ones is chosen in that order, so the grouping by project never puts a
+   high priority behind «N más»; those n are then shown grouped by project */
+function calPick(xs, n){ return xs.length<=n ? calSort(xs) : calSort(calTimeSort(xs).slice(0, n)); }
 // Decision 79: a project's short name on the cards, its first word (letters and digits) up to 6 characters; 4 in the month
 const projShort = (name, n) => ((String(name||'').match(/[\p{L}\p{N}]+/u)||[''])[0]).slice(0, n||6);
-// A one-line card (kind ''), a month chip ('mc') or an hour block ('hb'); the full title shows on hover. Carried tasks have an orange edge
+/* A card (kind ''), a card of the «Todo el día» strip ('ad', one line), a month chip ('mc') or an hour block ('hb'); the full title shows on
+   hover. Carried tasks have an orange edge. Decision 79 (Enric, 8 November): in Semana and Día (and the weekend column and Sin fecha) a card
+   with a project or a time has two lines: the project's capsule, the small indicators and the time on the first, the title on the second
+   with the card's whole width; the circle spans both. One without either stays one line. Mes, the strip and the blocks keep one line, the
+   capsule before the title (cut to 4 letters in Mes) */
 function calCardHTML(x, kind, style){ const p=x.projectId?proj(x.projectId):null, m=remMin(x), done=x.status==='done', tm=m!==null?fmtTime(x.reminder):'';
   const wt=x.status==='waiting'?'\nPor confirmar'+(x.waitingFor?', esperando a '+x.waitingFor:''):''; // decision 41
   const dlc=dlLevel(x), dl=x.deadline&&!done?'<span class="cic cdl'+(dlc?' dl-'+dlc:'')+'">'+MI.flag+'</span>':''; // decision 48a: a flag, grey, orange or red
   const tip=x.title+(p?'\n'+p.name:'')+(tm?'\n'+tm:'')+(x.carried&&!done?'\nAplazada':'')+(x.deadline?'\n'+dlText(x.deadline):'')+wt+(x.responsible?'\nResponsable: '+x.responsible:'')+(repParse(x.repeat)?'\n'+repSummary(x.repeat):'')+(stepStats(x.id)?'\n'+stepsCount(x.id)+' pasos':'');
-  const sh=p?projShort(p.name, kind==='mc'?4:6):'', cap=sh?'<span class="tag ctag">'+esc(sh)+'</span>':''; // decision 79: the project's capsule before the title, as in the lists
-  return '<div class="wcard'+(kind?' '+kind:'')+(done?' done':'')+(x.carried&&!done?' carried':'')+'" draggable="true" data-id="'+x.id+'" title="'+esc(tip)+'" style="'+(p?tagVars(p.color)+';':'')+(style||'')+'">'+
+  const sh=p?projShort(p.name, kind==='mc'?4:6):'', cap=sh?'<span class="tag ctag">'+esc(sh)+'</span>':''; // decision 79: the project's capsule, as in the lists
+  const hb=/^hb/.test(kind), two=kind===''&&(!!p||!!tm), k=kind==='ad'?'':kind;
+  const title='<div class="t">'+(x.priority==='high'?'<span class="pri high">!!!</span>':x.priority==='mid'?'<span class="pri mid">!!</span>':'')+esc(x.title)+'</div>';
+  const inds=dl+(x.focus&&!done?'<span class="cic ist">'+I.starF+'</span>':'')+(repParse(x.repeat)?'<span class="cic irp">'+I.repeat+'</span>':'')+(stepStats(x.id)?'<span class="cic">'+stepProgHTML(x)+'</span>':''); // decisions 38, 39 and 46: repeats, in Ahora, its steps
+  return '<div class="wcard'+(k?' '+k:'')+(two?' two':'')+(done?' done':'')+(x.carried&&!done?' carried':'')+'" draggable="true" data-id="'+x.id+'" title="'+esc(tip)+'" style="'+(p?tagVars(p.color)+';':'')+(style||'')+'">'+
     (kind==='mc'?'<span class="mdot"></span>':'<button class="check'+(done?' done':x.status==='waiting'?' waiting':'')+'" data-act="wcheck" aria-label="Completar">'+I.check+'</button>')+
-    (/^hb/.test(kind)?'<span class="tm">'+tm+'</span>':'')+cap+'<div class="t">'+(x.priority==='high'?'<span class="pri high">!!!</span>':x.priority==='mid'?'<span class="pri mid">!!</span>':'')+esc(x.title)+'</div>'+
-    dl+(x.focus&&!done?'<span class="cic ist">'+I.starF+'</span>':'')+(repParse(x.repeat)?'<span class="cic irp">'+I.repeat+'</span>':'')+(stepStats(x.id)?'<span class="cic">'+stepProgHTML(x)+'</span>':'')+(tm&&!/^hb/.test(kind)?'<span class="tm">'+tm+'</span>':'')+(/^hb/.test(kind)&&!done?'<span class="hbd"></span><span class="hbr" title="Arrastra para cambiar la duración"></span>':'')+'</div>'; } // decisions 38, 39 and 46: repeats, in Ahora, its steps
+    (two ? '<div class="wc2"><div class="wctop">'+cap+'<span class="grow"></span>'+inds+(tm?'<span class="tm">'+tm+'</span>':'')+'</div>'+title+'</div>'
+      : (hb?'<span class="tm">'+tm+'</span>':'')+cap+title+inds+(tm&&!hb?'<span class="tm">'+tm+'</span>':''))+
+    (hb&&!done?'<span class="hbd"></span><span class="hbr" title="Arrastra para cambiar la duración"></span>':'')+'</div>'; }
 // R12: a day's header: name and date, pending count, high-priority count and a load bar. Decision 60a: the bar measures the estimated hours
 // of the day's open tasks (its line says them too): full at half as much again as the space's working hours, orange from them, red from there
 function dayHeadHTML(d, xs){ const t=todayStr(), dd=new Date(d+'T00:00:00'), pend=xs.filter(isOpen), n=pend.length, hi=pend.filter(x=>x.priority==='high').length, dn=xs.length-n;
@@ -93,11 +106,11 @@ function hhmm(m){ return Math.floor(m/60)+':'+String(m%60).padStart(2,'0'); }
 function hoursHTML(days, agenda){ const t=todayStr(), xs=calTasks(days[0], days[days.length-1]), cols='44px '+calCols(days), now=Date.now();
   const per=d=>xs.filter(x=>x.date===d);
   const head=agenda?'':'<div class="hrow hhead" style="grid-template-columns:'+cols+'"><div class="hgut"></div>'+days.map(d=>'<div class="hdh'+dayCls(d)+'">'+dayHeadHTML(d, per(d))+'</div>').join('')+'</div>';
-  const all='<div class="hrow hall" style="grid-template-columns:'+cols+'"><div class="hgut">Todo el día</div>'+days.map(d=>{ const a=calSort(per(d).filter(x=>!inGrid(x)));
+  const all='<div class="hrow hall" style="grid-template-columns:'+cols+'"><div class="hgut">Todo el día</div>'+days.map(d=>{ const raw=per(d).filter(x=>!inGrid(x)), a=calSort(raw);
     // Decision 28d: up to three tasks and "N más", which opens that day; in Día itself it shows the rest in place. The strip never scrolls inside
-    const one=days.length===1, open=one&&UI.allDayOpen===d, shown=open?a:a.slice(0,3), more=a.length-shown.length;
+    const one=days.length===1, open=one&&UI.allDayOpen===d, shown=open?a:calPick(raw, 3), more=a.length-shown.length;
     const link=more>0?'<button class="hmore" '+(one?'data-act="allDayMore" data-day-more="'+d+'"':'data-open-day="'+d+'" title="Abrir el día"')+'>'+more+' más</button>':open&&a.length>3?'<button class="hmore" data-act="allDayMore" data-day-more="">Mostrar menos</button>':'';
-    return '<div class="hallday'+dayCls(d)+'" data-day="'+d+'" data-allday="1">'+(agenda?'<span class="hcount">'+(a.length?a.length+(a.length===1?' tarea sin hora':' tareas sin hora'):'Ninguna tarea sin hora')+'</span>':'<div class="wl" data-keep="all'+d+'">'+shown.map(x=>calCardHTML(x,'')).join('')+link+'</div>')+'</div>'; }).join('')+'</div>';
+    return '<div class="hallday'+dayCls(d)+'" data-day="'+d+'" data-allday="1">'+(agenda?'<span class="hcount">'+(a.length?a.length+(a.length===1?' tarea sin hora':' tareas sin hora'):'Ninguna tarea sin hora')+'</span>':'<div class="wl" data-keep="all'+d+'">'+shown.map(x=>calCardHTML(x,'ad')).join('')+link+'</div>')+'</div>'; }).join('')+'</div>';
   let labels=''; for(let m=H0;m<H1;m+=60) labels+='<span style="top:'+((m-H0)/SLOT*SH)+'px">'+hhmm(m)+'</span>';
   const col=d=>{ let s=''; for(let m=H0;m<H1;m+=SLOT){ const dt=new Date(d+'T00:00:00'); dt.setHours(0,m,0,0); s+='<div class="hs'+(m%60?' half':'')+(dt.getTime()<=now?' past':'')+'" data-slot="'+d+'T'+String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0')+'"></div>'; }
     const b=layoutBlocks(calSort(per(d).filter(inGrid))).map(c=>calCardHTML(c.x,'hb'+(c.dur<SLOT?' short':c.dur>SLOT?' tall':''),'top:'+((c.m-H0)/SLOT*SH)+'px;height:'+blockPx(c.m, c.dur)+'px;left:calc('+c.col+' * 100% / '+c.k+' + 2px);width:calc(100% / '+c.k+' - 4px);')).join('');
@@ -114,13 +127,13 @@ function trayHTML(){ const pf=calFilter(), u=orderTasks(spaceTasks().filter(x=>x
     (open?'<div class="wl" data-keep="tray">'+(u.length?u.map(x=>calCardHTML(x,'')).join(''):'')+'<p class="trhint">Arrastra aquí para quitar la fecha</p></div>':'')+'</aside>'; }
 // R19: Mes. Six weeks from the Monday before the 1st; up to four tasks a day and, in the day's head, "N más", which opens the day
 function monthHTML(){ const t=todayStr(), ym=UI.calMonth||t.slice(0,7), start=mondayOf(ym+'-01'), days=[...Array(42)].map((_,i)=>addDays(start,i)), xs=calTasks(days[0], days[41]);
-  const cell=d=>{ const l=calSort(xs.filter(x=>x.date===d)), more=l.length-4, dd=new Date(d+'T00:00:00');
-    return '<div class="mday'+(d.slice(0,7)!==ym?' other':'')+dayCls(d)+'" data-day="'+d+'"><div class="mh">'+(more>0?'<button class="mmore" data-open-day="'+d+'" title="Abrir el día">'+more+' más</button>':'')+'<button class="mnum" data-open-week="'+d+'" title="Abrir la semana">'+dd.getDate()+(dd.getDate()===1?' '+MESES[dd.getMonth()]:'')+'</button></div>'+l.slice(0,4).map(x=>calCardHTML(x,'mc')).join('')+'</div>'; };
+  const cell=d=>{ const all=xs.filter(x=>x.date===d), l=calPick(all, 4), more=all.length-l.length, dd=new Date(d+'T00:00:00');
+    return '<div class="mday'+(d.slice(0,7)!==ym?' other':'')+dayCls(d)+'" data-day="'+d+'"><div class="mh">'+(more>0?'<button class="mmore" data-open-day="'+d+'" title="Abrir el día">'+more+' más</button>':'')+'<button class="mnum" data-open-week="'+d+'" title="Abrir la semana">'+dd.getDate()+(dd.getDate()===1?' '+MESES[dd.getMonth()]:'')+'</button></div>'+l.map(x=>calCardHTML(x,'mc')).join('')+'</div>'; };
   if(!workWeekOn()) return '<div class="month"><div class="mdow">'+['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'].map(d=>'<span>'+d+'</span>').join('')+'</div><div class="mgrid">'+days.map(cell).join('')+'</div></div>';
   // Decision 35: five columns; a narrow "Fin de semana" cell per week when some weekend of these six weeks has tasks, its two days each taking drops
   const wk=xs.some(x=>isWeekend(x.date)), cols='repeat(5,minmax(0,1fr))'+(wk?' minmax(70px,.45fr)':''), rows=[];
-  for(let w=0; w<6; w++){ const wd=days.slice(w*7, w*7+7); rows.push(wd.slice(0,5).map(cell).join('')+(wk?'<div class="mwkd">'+wd.slice(5).map(d=>{ const l=calSort(xs.filter(x=>x.date===d)), dd=new Date(d+'T00:00:00'), more=l.length-2;
-    return '<div class="mwk'+(d.slice(0,7)!==ym?' other':'')+dayCls(d)+'" data-day="'+d+'"><button class="mnum" data-open-day="'+d+'" title="Abrir el día">'+DIAS_FULL[dd.getDay()].slice(0,3)+' '+dd.getDate()+'</button>'+l.slice(0,2).map(x=>calCardHTML(x,'mc')).join('')+(more>0?'<button class="mmore" data-open-day="'+d+'">'+more+' más</button>':'')+'</div>'; }).join('')+'</div>':'')); }
+  for(let w=0; w<6; w++){ const wd=days.slice(w*7, w*7+7); rows.push(wd.slice(0,5).map(cell).join('')+(wk?'<div class="mwkd">'+wd.slice(5).map(d=>{ const all=xs.filter(x=>x.date===d), l=calPick(all, 2), dd=new Date(d+'T00:00:00'), more=all.length-l.length;
+    return '<div class="mwk'+(d.slice(0,7)!==ym?' other':'')+dayCls(d)+'" data-day="'+d+'"><button class="mnum" data-open-day="'+d+'" title="Abrir el día">'+DIAS_FULL[dd.getDay()].slice(0,3)+' '+dd.getDate()+'</button>'+l.map(x=>calCardHTML(x,'mc')).join('')+(more>0?'<button class="mmore" data-open-day="'+d+'">'+more+' más</button>':'')+'</div>'; }).join('')+'</div>':'')); }
   return '<div class="month workweek"><div class="mdow" style="grid-template-columns:'+cols+'">'+['Lun','Mar','Mié','Jue','Vie'].concat(wk?['Fin de semana']:[]).map(d=>'<span>'+d+'</span>').join('')+'</div><div class="mgrid" style="grid-template-columns:'+cols+'">'+rows.join('')+'</div></div>'; }
 // The calendar column: its head (period, navigation, week option, Lista or Horas, Día, Semana or Mes) and the chosen view
 function weekHTML(){ const v=UI.deskView, days=calDays(), start=days[0], end=days[days.length-1], mode=calMode(); let label, body;

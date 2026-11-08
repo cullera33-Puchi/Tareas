@@ -70,9 +70,10 @@ const clickItem = (page, label) => page.evaluate(l=>{ const b=[...document.query
   check('R12_columnScroll', r.colScroll.ov==='auto' && r.colScroll.scrolls && r.colScroll.moved && r.colScroll.headStays && r.colScroll.cards===25, r.colScroll);
   // Cards: one line, full title on hover, the time at the right and the timed tasks first; carried ones with an orange edge
   r.cards = await page.evaluate(()=>{ const today=[...document.querySelectorAll('#desk .wday.today .wcard')]; const sat=document.querySelector('#desk .wcard[data-id=sat0]'); const b=document.querySelector('#desk .wcard[data-id=tB]');
-    return {order:today.map(c=>c.dataset.id), hs:[...new Set([...document.querySelectorAll('#desk .wday .wcard')].map(c=>Math.round(c.getBoundingClientRect().height)))], ws:getComputedStyle(sat.querySelector('.t')).whiteSpace, tip:sat.title,
+    return {order:today.map(c=>c.dataset.id), hs:[...new Set([...document.querySelectorAll('#desk .wday .wcard:not(.two)')].map(c=>Math.round(c.getBoundingClientRect().height)))], hs2:[...new Set([...document.querySelectorAll('#desk .wday .wcard.two')].map(c=>Math.round(c.getBoundingClientRect().height)))], ws:getComputedStyle(sat.querySelector('.t')).whiteSpace, tip:sat.title,
       tm:document.querySelector('#desk .wcard[data-id=tA] .tm').textContent, tmE:(document.querySelector('#desk .wcard[data-id=tE] .tm')||{}).textContent, carried:b.classList.contains('carried'), sh:getComputedStyle(b).boxShadow}; });
-  check('R12_oneLineCards', r.cards.hs.length===1 && r.cards.hs[0]<=30 && r.cards.ws==='nowrap' && r.cards.tip.startsWith('Sábado cargado número 0 con un título bastante largo'), r.cards);
+  check('R12_oneLineCards', r.cards.hs.length<=1 && r.cards.hs.every(h=>h<=30) && r.cards.hs2.every(h=>h<=44) && r.cards.hs.length+r.cards.hs2.length>0 && // decision 79: a project or a time makes two lines, the title stays one
+     r.cards.ws==='nowrap' && r.cards.tip.startsWith('Sábado cargado número 0 con un título bastante largo'), r.cards);
   check('R12_timeAndOrder', r.cards.tm==='15:00' && r.cards.tmE==='06:00' && r.cards.order[0]==='tE' && r.cards.order[1]==='tA', r.cards);
   check('R12_carriedOrange', r.cards.carried && /255, 149, 0/.test(r.cards.sh), r.cards);
   // Sin fecha: a side tray with every undated task (no cap), folding into a strip that still takes a drop

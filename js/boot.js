@@ -44,7 +44,7 @@ if('serviceWorker' in navigator){
   navigator.serviceWorker.addEventListener('message', e=>{ const d=e.data||{};
     if(d.type==='openTask') openTaskFromPush(d.taskId, 'app abierta', d.snooze, !!d.follow);
     else if(d.type==='openTeam') teamOpenFrom(d.what); // decision 63b
-    else if(d.type==='push') log('info','Notificación recibida', {tarea:!!d.taskId, prueba:!!d.test}); });
+    else if(d.type==='push'){ log('info','Notificación recibida', {tarea:!!d.taskId, prueba:!!d.test}); if(d.follow) teamSentFetch(true); } }); // decision 78: a completion told, read at once
   let hadController = !!navigator.serviceWorker.controller;
   navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(reloading) return; if(!hadController && !updateRequested){ hadController=true; return; } reloading=true; location.reload(); });
 }

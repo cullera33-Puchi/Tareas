@@ -1,5 +1,16 @@
 [
   {
+    "version": "0.37.0",
+    "date": "2026-11-08",
+    "items": [
+      "Cuando envías una tarea con «Avisar a…», ves la fecha que la otra persona le ha puesto y cuándo la completa.",
+      "Te llega un aviso «Víctor ha completado una tarea que le enviaste», y en tu lista la tarea muestra «Hecha por Víctor» en verde hasta que la completes tú.",
+      "En el calendario del ordenador, cada tarea lleva el nombre corto de su proyecto, y las de un mismo proyecto salen juntas en cada día.",
+      "En Semana y Día, las tarjetas tienen dos líneas: arriba el proyecto y la hora, debajo el título completo.",
+      "Funciona con las tareas que envíes a partir de esta versión."
+    ]
+  },
+  {
     "version": "0.36.2",
     "date": "2026-11-06",
     "items": [

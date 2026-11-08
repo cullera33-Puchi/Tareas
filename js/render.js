@@ -316,6 +316,7 @@ function rowHTML(x, opts={}){
     else if(x.date){ if(x.carried&&x.date<=t){ if(!opts.hideCarried) meta.push('<span class="carried">Aplazada</span>'); }
       else if(!(opts.noToday&&x.date===t) && x.date!==opts.day && x.date!==x.deadline) meta.push('<span class="'+(x.date<t?'over':'')+'">'+fmtDate(x.date)+'</span>'); } // a date that is the deadline says it once
     if(dl) meta.push(dl);
+    const dby=noticeDoneBy(x); if(dby) meta.push('<span class="doneby">'+esc(dby)+'</span>'); // decision 78: done by the person it was sent to, in green
     if(x.status==='waiting'&&x.waitingFor&&!isViewPerson(x.waitingFor, opts)) meta.push('<span class="waitfor">Esperando a '+esc(x.waitingFor)+'</span>');
     if(respShown(x)&&!isViewPerson(x.responsible, opts)) meta.push(respMetaHTML(x)); // decision 48c: who does it, in grey; decision 65a: not the person whose view it is
     if(x.reminder) meta.push('<span class="bell">'+I.bell+(x.date&&localDay(x.reminder)===x.date?fmtTime(x.reminder):fmtDateTime(x.reminder))+'</span>'); // the reminder's own day when it is not the task's date (moved task, no date)
@@ -361,10 +362,12 @@ function deskRowHTML(x, opts, v){ const t=v.t; let date='', dcls='', rem=''; con
     '<div class="row-content">'+(v.selecting?'<span class="selbox">'+I.check+'</span>':'<button class="check'+(v.shownDone?' done':x.status==='waiting'?' waiting':'')+'" data-act="check" aria-label="Completar" tabindex="-1">'+I.check+'</button>')+pcol+
     '<div class="row-text">'+(edit?'<input class="rowedit" data-role="rowedit" type="text" value="'+esc(ds.edit.text)+'" aria-label="Título" autocomplete="off" spellcheck="false">':'<div class="row-title" title="'+esc(x.title||'')+'">'+esc(x.title||'Sin título')+'</div>')+'</div>'+
     // v0.33.1: Esperando a and the responsible in a column of their own, Persona, right after the title (decisions 41 and 48c)
-    '<span class="rc rc-per">'+(x.status==='waiting'&&x.waitingFor&&!v.done&&!isViewPerson(x.waitingFor, opts)?'<span class="wtag" title="Esperando a '+esc(x.waitingFor)+'">'+MI.wait+esc(x.waitingFor)+'</span>':'')+(v.done||isViewPerson(x.responsible, opts)?'':respTagHTML(x))+'</span>'+
+    '<span class="rc rc-per">'+(v.done?'':doneByTagHTML(x))+(x.status==='waiting'&&x.waitingFor&&!v.done&&!isViewPerson(x.waitingFor, opts)?'<span class="wtag" title="Esperando a '+esc(x.waitingFor)+'">'+MI.wait+esc(x.waitingFor)+'</span>':'')+(v.done||isViewPerson(x.responsible, opts)?'':respTagHTML(x))+'</span>'+
     '<span class="inds">'+deskIndHTML(x, v, opts)+'</span><span class="rsteps">'+v.prog+'</span><span class="row-meta"><span class="rc rc-date'+dcls+'"'+(date?' title="'+esc(date)+'"':'')+'>'+date+'</span><span class="rc rc-dl'+(dlc?' dl-'+dlc:'')+'"'+(dl?' title="Fecha límite: '+esc(fmtDate(x.deadline))+'"':'')+'>'+dl+'</span><span class="rc rc-rem"'+(rem?' title="Recordatorio: '+esc(rem)+'"':'')+'>'+(rem?I.bell+rem:'')+'</span><span class="rc rc-est"'+(x.estimate&&!v.done?' title="Tiempo estimado: '+esc(estLabel(x.estimate).toLowerCase())+'"':'')+'>'+(x.estimate&&!v.done?estLabel(x.estimate):'')+'</span></span>'+ // decision 56a: a column of its own
     '<span class="pri'+(v.pri?(x.priority==='high'?' high':' mid'):'')+'">'+(v.pri?(x.priority==='high'?'!!!':'!!'):'')+'</span>'+
     (v.selecting?'':opts.simple?'<span class="rowmore" aria-hidden="true"></span>':'<button class="rowmore" data-act="rowMenu" aria-label="Más" title="Más" tabindex="-1">'+I.more+'</button>')+'</div></div>'; } // Ahora keeps the columns aligned with the list
+// Decision 78: «Hecha por Víctor» in the Persona column of the desktop, first, in green
+const doneByTagHTML = x => { const t=noticeDoneBy(x); return t?'<span class="dtag" title="'+esc(t)+'">'+esc(t)+'</span>':''; };
 /* Decision 39: the Ahora block. iPhone: at the top of Hoy, above the search, compact rows (circle, title, project, priority) that open the
    detail and complete; hidden when empty. Desktop: above the list of Hoy and Todas, a drop zone for rows. Order: when each was put there */
 function ahoraHTML(){ const xs=ahoraTasks(); if(!xs.length) return '';

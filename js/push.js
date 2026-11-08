@@ -145,9 +145,12 @@ function pushNote(x){ if(!x||!x.reminder||x.status==='done') return ''; const de
 /* ---------- A tap on a notification ---------- */
 // snz: the minutes of a desktop notification's action (10 or 60, sw.js), applied here with Deshacer since the service worker has no localStorage.
 // A plain tap opens the task with the bar Posponer recordatorio (decision 55), until a choice or until the task is left
-function openTaskFromPush(id, how, snz){ if(!id) return; log('info','Notificación abierta', Object.assign({how}, snz?{posponer:snz}:{})); hiddenAt=0; // a tap on a notification is no return after hours away
+// follow (decision 78): «Víctor ha completado una tarea que le enviaste», the sender's task, with no bar to postpone its reminder
+function openTaskFromPush(id, how, snz, follow){ if(!id) return; log('info','Notificación abierta', Object.assign({how}, snz?{posponer:snz}:{}, follow?{seguimiento:true}:{})); hiddenAt=0; // a tap on a notification is no return after hours away
+  // Decision 78: what the recipient did is read again first, so the task opens with it (the line and «Hecha por…»)
+  if(follow&&typeof teamSentFetch==='function') teamSentFetch(true).then(()=>{ if(!busyEditing()&&!touchDrag) render(); }).catch(()=>{});
   const go=()=>{ const x=task(id); if(!x) return false; closeSheet(); closeMenu(true); if(UI.select) endSelect();
-    const bar=!snz&&!!x.reminder&&isOpen(x);
+    const bar=!snz&&!follow&&!!x.reminder&&isOpen(x);
     if(detailTaskId()===id){ UI.snooze=bar?id:null; render(); }
     else { if(UI.wide && UI.deskView==='settings') setDeskView('hoy'); openDetail(id, {snooze:bar}); }
     if(snz) snoozeFromPush(id, snz); return true; };

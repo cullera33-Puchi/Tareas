@@ -1,5 +1,13 @@
 # Registro de cambios
 
+## v0.37.0. Seguimiento de las tareas enviadas y proyecto en el calendario (8 de noviembre de 2026)
+
+- Seguimiento (punto 78): «Añadir a mis tareas» crea la tarea enlazada con el aviso (identificador `nt-<aviso>-<aleatorio>`). Cada dispositivo de quien la recibe comunica la fecha prevista y si está completada (o descartada al borrarla). Quien la envió lo ve en el detalle («la ha añadido, prevista para el lunes 10», «la ha completado el martes 11») y, mientras su tarea sigue abierta, «Hecha por Víctor» en verde en la fila. Los avisos enviados antes de esta versión siguen diciendo «la ha añadido a sus tareas».
+- Aviso «Víctor ha completado una tarea que le enviaste», sin el título; al tocarlo se abre la tarea. Como mucho uno cada 4 horas por aviso; el retraso se mide con la hora del servidor.
+- Migración `0014_notice_follow.sql`: columnas `planned`, `done`, `done_seen`, `done_pushed` y `followed` en `team_notices`; solo quien recibe puede escribir la fecha prevista y la completada, y los disparadores controlan el resto. Cambios en `send-reminders`.
+- Calendario del escritorio (punto 79): cápsula con el nombre corto del proyecto en cada tarjeta (en Mes, 4 letras); tarjetas de dos líneas en Semana y Día; dentro de cada día, las de hora primero y el resto agrupado por proyecto; en Mes y en «Todo el día», las tareas que se ven se eligen por hora y prioridad antes de agrupar.
+- La página de privacidad dice que quien envía una tarea ve su fecha prevista y si se ha completado. Pruebas nuevas `rm-NF` y `rm-PC`.
+
 ## v0.36.2. Estado de los avisos y origen de las tareas recibidas (6 de noviembre de 2026)
 
 - «Añadir a mis tareas» empieza las notas con «De Enric, 6 de noviembre: «frase»» (sin frase, solo el nombre y la fecha).

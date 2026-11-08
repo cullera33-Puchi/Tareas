@@ -351,7 +351,9 @@ async function decisionTests(browser){
   // Selection and Aplazar (bulkPostponeSheet, bulkReschedule)
   await page.evaluate(()=>{ startSelect('m2'); UI.select.ids.add('m3'); updateSelectUI(); }); await page.waitForTimeout(300);
   await page.evaluate(()=>bulkPostponeSheet(document.querySelector('[data-act=bulkPostpone]'))); await page.waitForTimeout(650);
-  await page.locator('#pmenu .pm-it', {hasText:'Próxima semana'}).first().click(); await page.waitForTimeout(500);
+  // On a Sunday, tomorrow is next Monday and the menu offers it once, as Mañana
+  const nwLabel=await page.evaluate(()=>addDays(todayStr(),1)===nextWeekday(1,true)?'Mañana':'Próxima semana');
+  await page.locator('#pmenu .pm-it', {hasText:nwLabel}).first().click(); await page.waitForTimeout(500);
   const nw=await page.evaluate(()=>nextWeekday(1,true)); let m2=await tk(page,'m2'), m3=await tk(page,'m3');
   check('A_bulk', m2.date===nw && sameTs(m2.reminder, at(nw,'10:00:00')) && m3.date===nw && sameTs(m3.reminder, at(nw,'11:00:00')), {m2, m3, nw});
   await undo(page); m2=await tk(page,'m2'); m3=await tk(page,'m3');

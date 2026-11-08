@@ -2,7 +2,7 @@
 /* Tareas. Core: version, log, utilities, data (DB in localStorage), UI state, Deshacer toast and the task actions.
    A classic script: index.html loads every file of js/ in order and they share their global names. Only declarations and
    listeners run at load; the start itself (first screen, timers, sync, service worker) is in boot.js, the last file. */
-const APP_VERSION = '0.36.2';
+const APP_VERSION = '0.37.0';
 let pendingSW = null; // service worker installed and waiting to take over
 let updateRequested = false; // the user asked for the waiting worker to take over
 
@@ -651,7 +651,7 @@ function rollPatch(x, t){ const s=rollTarget(x, t); return s ? skipPatch(x, s) :
 // Decision 65e: a task of a series that does not pile up goes to its next occurrence instead (rollPatch). Decision 65d: focus mode ends with the day
 function rollOver(){ const t=todayStr(); let n=0, f=0; if(DB.settings.summaryDay!==t){ DB.settings.summaryDay=t; save(); } /* the day this device last rolled over (checkDay); the name is older than decision 52 */ DB.tasks.forEach(x=>{ if(x.status==='pending'&&x.date&&x.date<t){ Object.assign(x, rollPatch(x, t)); n++; } if(x.focus&&localDay(x.focus)<t){ x.focus=null; f++; } });
   if(DB.settings.focusMode&&DB.settings.focusMode!==t){ delete DB.settings.focusMode; f++; }
-  if(f) log('info','Ahora vaciada con el cambio de día', {n:f}); const dd=dedupeSeries(DB); if(n||f||dd) save(); return n; } // decision 38: duplicates of a series, at the start too
+  if(f) log('info','Ahora vaciada con el cambio de día', {n:f}); const dd=dedupeSeries(DB)+(typeof dedupeNotices==='function'?dedupeNotices(DB):0); if(n||f||dd) save(); return n; } // decision 38: duplicates of a series, at the start too
 /* The data side of completing or reopening, with no feedback. Completing takes the task out of Ahora (decision 39) and, in a series,
    creates the next one (decision 38), which it returns; reopening takes that next one back */
 function applyDone(id, done){ const x=task(id); if(!x||(x.status==='done')===done) return null;

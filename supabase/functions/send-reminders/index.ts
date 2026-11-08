@@ -20,6 +20,8 @@
 //                              admin («Nueva sugerencia», «Nueva incidencia»), each once; and the removal of the members whose access was
 //                              removed more than 30 days ago (their files through the Storage API first, then their rows, membership and
 //                              account). A reminder of an account without access is marked and not sent. Before 0013 runs none of it does.
+//                              Then (decision 78, 0014_notice_follow.sql) «Víctor ha completado una tarea que le enviaste» to the sender of a
+//                              task its recipient has completed, once per completion; nothing of the task. Before 0014 runs it does nothing.
 //   POST {test:true, id?} with the user's JWT in Authorization
 //                              A test notification to the caller's own devices (only the one with that id when given).
 //
@@ -299,7 +301,7 @@ async function sendTeam(c: Conf): Promise<Record<string, number>> {
     notices = (await rest(c, 'PATCH', 'team_notices?' + qs({ pushed: 'is.null', select: 'id,sender_id,recipient_id,created' }), { pushed: nowIso }, 'return=representation')).data || [];
     feedback = (await rest(c, 'PATCH', 'team_feedback?' + qs({ pushed: 'is.null', select: 'id,recipient_id,kind,created' }), { pushed: nowIso }, 'return=representation')).data || [];
   } catch (e) {
-    if (teamSkip(e, 'notices')) return { notices: 0, feedback: 0 };
+    if (teamSkip(e, 'notices')) return { notices: 0, feedback: 0, teamAbsent: 1 };
     throw e;
   }
   const ns = notices.filter(n => fresh(n.created)), fs = feedback.filter(f => fresh(f.created));
@@ -320,6 +322,40 @@ async function sendTeam(c: Conf): Promise<Record<string, number>> {
   }
   const out = jobs.length ? await deliver(c, await vapid(c), jobs) : { sent: 0, failed: 0, gone: 0 };
   return { notices: notices.length, feedback: feedback.length, teamSent: out.sent, teamFailed: out.failed };
+}
+/* Decision 78 (0014_notice_follow.sql): a task sent with «Avisar a…» that its recipient has completed. Claimed in one statement (done set,
+   done_pushed empty), as the others; its sender's devices get «Víctor ha completado una tarea que le enviaste», nothing of the task, and a
+   tap opens the sender's own task (task_ref). Seen by the server more than an hour before (done_seen): marked without notifying. A sender without access gets
+   nothing. Before 0014 (no such columns): nothing, said once per instance */
+let followMissing = false;
+async function sendFollow(c: Conf): Promise<Record<string, number>> {
+  const nowIso = new Date().toISOString();
+  let rows: { id: string; sender_id: string; recipient_id: string; task_ref: string; done: string; done_seen: string | null }[] = [];
+  try {
+    rows = (await rest(c, 'PATCH', 'team_notices?' + qs({ done: 'not.is.null', done_pushed: 'is.null', select: 'id,sender_id,recipient_id,task_ref,done,done_seen' }), { done_pushed: nowIso }, 'return=representation')).data || [];
+  } catch (e) {
+    if (!absent(e)) throw e;
+    if (!followMissing) { followMissing = true; console.log(JSON.stringify({ event: 'follow-skipped', reason: '0014_notice_follow.sql not run' })); }
+    return { completed: 0 };
+  }
+  // Late is measured on when the server saw the completion (done_seen, set by 0014's trigger), not on the device's clock (done)
+  let fresh = rows.filter(n => Date.now() - Date.parse(n.done_seen || n.done) <= LATE_LIMIT_MS);
+  if (!fresh.length) return { completed: rows.length };
+  const allowed = await teamAllowed(c, [...new Set(fresh.map(n => n.sender_id))]);
+  if (allowed) fresh = fresh.filter(n => allowed.has(n.sender_id));
+  if (!fresh.length) return { completed: rows.length };
+  const subs = (await rest(c, 'GET', 'push_subscriptions?' + qs({ owner_id: inList([...new Set(fresh.map(n => n.sender_id))]), deleted: 'is.null', select: 'id,owner_id,endpoint,p256dh,auth' }))).data as Sub[];
+  const names = new Map<string, { name: string | null; email: string | null }>();
+  ((await rest(c, 'GET', 'team_members?' + qs({ user_id: inList([...new Set(fresh.map(n => n.recipient_id))]), select: 'user_id,name,email' }))).data as { user_id: string; name: string | null; email: string | null }[]).forEach(m => names.set(m.user_id, m));
+  const jobs: { sub: Sub; msg: Message }[] = [];
+  for (const n of fresh) {
+    const ref = String(n.task_ref || '');
+    const msg: Message = { title: 'Tareas', body: firstName(names.get(n.recipient_id)) + ' ha completado una tarea que le enviaste', tag: 'done-' + n.id,
+      data: { taskId: ref, follow: true, url: './?task=' + encodeURIComponent(ref) } };
+    subs.filter(s => s.owner_id === n.sender_id).forEach(sub => jobs.push({ sub, msg }));
+  }
+  const out = jobs.length ? await deliver(c, await vapid(c), jobs) : { sent: 0, failed: 0, gone: 0 };
+  return { completed: rows.length, completedSent: out.sent, completedFailed: out.failed };
 }
 // The removal 30 days after the access was removed (decision 71.4): the files first (a few hundred per run), then the rows, once none is left.
 // tareas_team_remove checks again the 30 days and never touches an admin or an active member
@@ -384,7 +420,12 @@ export async function handler(req: Request): Promise<Response> {
     // The team: its notifications, then the removals. Each failure is logged and tried again on the next run
     let team: Record<string, number> = {};
     try { team = await sendTeam(c); } catch (e) { console.error(JSON.stringify({ event: 'team-failed', error: String((e as Error)?.message || e) })); team = { teamFailed: 1 }; }
-    if (team.notices || team.feedback) console.log(JSON.stringify({ event: 'team', ...team, ms: Date.now() - t0 }));
+    // Decision 78: what a recipient has completed (only with the team there: before 0013 nothing of it exists)
+    // Decided by this run's own answer (the claim of the notices), not by a flag of the instance: a missing-looking error elsewhere
+    // (the access check, say) never turns the follow-up off for the instance's life
+    const teamAbsent = team.teamAbsent === 1; delete team.teamAbsent;
+    if (!teamAbsent) { try { Object.assign(team, await sendFollow(c)); } catch (e) { console.error(JSON.stringify({ event: 'follow-failed', error: String((e as Error)?.message || e) })); team.followFailed = 1; } }
+    if (team.notices || team.feedback || team.completed) console.log(JSON.stringify({ event: 'team', ...team, ms: Date.now() - t0 }));
     let removal: Record<string, number> = {};
     try { removal = await removeMembers(c); } catch (e) { console.error(JSON.stringify({ event: 'removal-failed', error: String((e as Error)?.message || e) })); removal = { removalFailed: 1 }; }
     return json({ ...out, ...purge, ...team, ...removal });

@@ -17,7 +17,7 @@ const RLS = t => new Error('new row violates row-level security policy for table
 let nid = 0; const newId = () => '00000000-0000-4000-8000-'+String(++nid).padStart(12, '0');
 class Fake {
   constructor(){ this.t={}; TABLES.forEach(x=>this.t[x]=new Map()); this.last=0; this.subs=new Map(); this.tags=new Map(); this.calls=[]; this.keys=new Map(); this.store=new Map();
-    this.users=new Map(); this.members=[]; this.notices=[]; this.feedback=[]; this.team=true; this.inbox=[]; }
+    this.users=new Map(); this.members=[]; this.notices=[]; this.feedback=[]; this.team=true; this.inbox=[]; this.follow=true; this.followMarks=[]; }
   // Accounts in creation order: the first one becomes the admin when nobody is (tareas_team_bootstrap)
   user(uid, email, name){ this.users.set(uid, {uid, email, name:name||''}); return {uid, email}; }
   ts(){ this.last=Math.max(Date.now(), this.last+1); return new Date(this.last).toISOString(); }
@@ -76,14 +76,25 @@ class Fake {
         const last=this.notices.filter(n=>n.sender_id===own&&n.recipient_id===to&&n.task_ref===r.task_ref).map(n=>Date.parse(n.created)).sort((x,y)=>y-x)[0];
         if(this.notices.filter(n=>n.sender_id===own&&Date.parse(n.created)>Date.now()-3600e3).length>=20) return this.err('tareas_notice_too_many');
         if(last&&last>Date.now()-4*3600e3) return this.err('tareas_notice_too_soon', new Date(last+4*3600e3).toISOString().slice(0,19)+'Z');
-        const n={id:newId(), sender_id:own, recipient_id:to, task_ref:r.task_ref, payload:r.payload, created:new Date().toISOString(), pushed:null, taken:null, dismissed:null}; this.notices.push(n);
+        const n={id:newId(), sender_id:own, recipient_id:to, task_ref:r.task_ref, payload:r.payload, created:new Date().toISOString(), pushed:null, taken:null, dismissed:null, planned:null, done:null, done_seen:null, done_pushed:null, followed:null}; this.notices.push(n);
         this.notify(to, 'team_notices', {id:n.id}); return true; }
       case 'noticeList': if(!ok()) return []; return this.notices.filter(n=>n.recipient_id===own&&n.recipient_id===a.uid&&!n.taken&&!n.dismissed).map(n=>({id:n.id, sender_id:n.sender_id, payload:n.payload, created:n.created}));
       // The sender's own notices, only the columns asked for (never payload: the test checks what was asked)
       case 'noticeSent': { (this.sentAsked=this.sentAsked||[]).push(a.cols); if(this.sentFail) return this.err('HTTP 500 boom'); if(!ok()) return [];
-        const cols=String(a.cols||'').split(','), since=Date.parse(a.since)||0;
+        const cols=String(a.cols||'').split(','), since=Date.parse(a.since)||0; if(!this.follow&&cols.some(c=>c==='planned'||c==='done')) return this.err('column team_notices.planned does not exist');
         return this.notices.filter(n=>n.sender_id===own&&Date.parse(n.created)>=since).sort((x,y)=>Date.parse(y.created)-Date.parse(x.created)).slice(0,500).map(n=>Object.fromEntries(cols.map(c=>[c, n[c]===undefined?null:n[c]]))); }
-      case 'noticeMark': { if(!ok()) return []; const n=this.notices.find(x=>x.id===a.id&&x.recipient_id===own); if(!n) return []; Object.assign(n, a.patch); return [{id:n.id}]; }
+      // Decision 78 (0014): the recipient's own notices by id, the columns of the follow-up; without 0014 the columns are missing
+      case 'noticeFollow': { (this.followAsked=this.followAsked||[]).push(a.ids); if(!this.follow) return this.err('column team_notices.planned does not exist'); if(!ok()) return [];
+        return this.notices.filter(n=>n.recipient_id===own&&a.ids.includes(n.id)).map(n=>({id:n.id, taken:n.taken, dismissed:n.dismissed, planned:n.planned, done:n.done, followed:n.followed||null})); }
+      // The grants of 0013 and 0014 (the recipient writes taken and dismissed, and planned and done once 0014 ran) and the trigger of 0014
+      case 'noticeMark': { if(!ok()) return []; const keys=Object.keys(a.patch||{}), allowed=['taken','dismissed'].concat(this.follow?['planned','done']:[]);
+        const bad=keys.find(k=>!allowed.includes(k)); if(bad) return this.err(['planned','done'].includes(bad)?'column "'+bad+'" of relation "team_notices" does not exist':'permission denied for table team_notices');
+        const n=this.notices.find(x=>x.id===a.id&&x.recipient_id===own); if(!n) return [];
+        if(keys.some(k=>k==='planned'||k==='done')) this.followMarks.push({id:n.id, patch:Object.assign({}, a.patch)});
+        const wasDone=n.done, now=new Date().toISOString(); Object.assign(n, a.patch);
+        if(keys.some(k=>k==='planned'||k==='done')&&!n.followed) n.followed=now; // UPDATE OF planned, done: the first follow-up write
+        if(!wasDone&&n.done){ n.done_seen=now; if(!n.done_pushed||Date.parse(n.done_pushed)<Date.now()-4*3600e3) n.done_pushed=null; } // seen now; told again at most every 4 hours
+        return [{id:n.id}]; }
       case 'feedbackSend': { if(!ok()) return this.err(RLS('team_feedback').message); if(this.role(a.row.recipient_id)!=='admin') return this.err('tareas_feedback_bad_recipient');
         this.feedback.push({id:newId(), sender_id:own, recipient_id:a.row.recipient_id, kind:a.row.kind, payload:a.row.payload, created:new Date().toISOString(), status:'nueva', pushed:null}); return true; }
       case 'feedbackList': if(!admin()) return []; return this.feedback.filter(f=>f.recipient_id===own).slice().reverse().map(f=>({id:f.id, sender_id:f.sender_id, kind:f.kind, payload:f.payload, created:f.created, status:f.status}));
@@ -111,7 +122,7 @@ function fakeAdapter(){
     cryptoGet:()=>call('cryptoGet', {owner:owner()}), cryptoPut:row=>call('cryptoPut', {owner:owner(), row}), cryptoPatch:(own, match, patch)=>call('cryptoPatch', {owner:owner(), match, patch}),
     teamMe:()=>call('teamMe', {owner:owner()}), teamDir:()=>call('teamDir', {owner:owner()}), teamList:()=>call('teamList', {owner:owner()}),
     teamInvite:(email, name)=>call('teamInvite', {owner:owner(), email, name}), teamQuota:(id, quota)=>call('teamQuota', {owner:owner(), id, quota}), teamRevoke:id=>call('teamRevoke', {owner:owner(), id}),
-    noticeSend:row=>call('noticeSend', {owner:owner(), row}), noticeList:uid=>call('noticeList', {owner:owner(), uid}), noticeMark:(id, patch)=>call('noticeMark', {owner:owner(), id, patch}), noticeSent:(uid, since)=>call('noticeSent', {owner:owner(), uid, since, cols:TEAM_SENT_COLS}),
+    noticeSend:row=>call('noticeSend', {owner:owner(), row}), noticeList:uid=>call('noticeList', {owner:owner(), uid}), noticeMark:(id, patch)=>call('noticeMark', {owner:owner(), id, patch}), noticeSent:(uid, since, cols)=>call('noticeSent', {owner:owner(), uid, since, cols:cols||TEAM_SENT_COLS}), noticeFollow:(uid, ids)=>call('noticeFollow', {owner:owner(), uid, ids}),
     feedbackSend:row=>call('feedbackSend', {owner:owner(), row}), feedbackList:()=>call('feedbackList', {owner:owner()}), feedbackMark:(id, status)=>call('feedbackMark', {owner:owner(), id, status})
   };
 }

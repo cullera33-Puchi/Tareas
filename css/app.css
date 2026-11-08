@@ -1,7 +1,7 @@
 :root{
   color-scheme:light;
   --bg:#F2F2F7; --card:#FFFFFF; --sep:#C6C6C8; --ink:#000000; --ink2:#8E8E93; --ink3:#AEAEB2;
-  --blue:#007AFF; --red:#FF3B30; --orange:#FF9500; --green:#34C759; --fill:#E5E5EA; --fill2:#D1D1D6;
+  --blue:#007AFF; --red:#FF3B30; --orange:#FF9500; --green:#34C759; --greentx:#248A3D; --fill:#E5E5EA; --fill2:#D1D1D6;
   --bar:rgba(249,249,249,.82); --mat:rgba(255,255,255,.88); --dim:rgba(0,0,0,.35); --press:#D9D9DE;
   --kb:0px; --qhl:rgba(0,122,255,.16); --ghbg:rgba(242,242,247,.86);
   --pmmat:rgba(246,246,248,.8); --pmhl:rgba(0,0,0,.1); --pmgap:rgba(0,0,0,.07); --pmsep:rgba(60,60,67,.24); --pmdim:rgba(0,0,0,.04); --pmdimL:rgba(0,0,0,.14);
@@ -10,14 +10,14 @@
 @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
   color-scheme:dark;
   --bg:#000000; --card:#1C1C1E; --sep:#38383A; --ink:#FFFFFF; --ink2:#8E8E93; --ink3:#636366;
-  --blue:#0A84FF; --red:#FF453A; --orange:#FF9F0A; --green:#30D158; --fill:#2C2C2E; --fill2:#3A3A3C;
+  --blue:#0A84FF; --red:#FF453A; --orange:#FF9F0A; --green:#30D158; --greentx:#30D158; --fill:#2C2C2E; --fill2:#3A3A3C;
   --bar:rgba(22,22,24,.82); --mat:rgba(36,36,38,.9); --dim:rgba(0,0,0,.55); --press:#2C2C2E; --qhl:rgba(10,132,255,.34); --ghbg:rgba(0,0,0,.78);
   --pmmat:rgba(44,44,46,.76); --pmhl:rgba(255,255,255,.13); --pmgap:rgba(0,0,0,.42); --pmsep:rgba(84,84,88,.55); --pmdim:rgba(0,0,0,.18); --pmdimL:rgba(0,0,0,.4);
 }}
 :root[data-theme="dark"]{
   color-scheme:dark;
   --bg:#000000; --card:#1C1C1E; --sep:#38383A; --ink:#FFFFFF; --ink2:#8E8E93; --ink3:#636366;
-  --blue:#0A84FF; --red:#FF453A; --orange:#FF9F0A; --green:#30D158; --fill:#2C2C2E; --fill2:#3A3A3C;
+  --blue:#0A84FF; --red:#FF453A; --orange:#FF9F0A; --green:#30D158; --greentx:#30D158; --fill:#2C2C2E; --fill2:#3A3A3C;
   --bar:rgba(22,22,24,.82); --mat:rgba(36,36,38,.9); --dim:rgba(0,0,0,.55); --press:#2C2C2E; --qhl:rgba(10,132,255,.34); --ghbg:rgba(0,0,0,.78);
   --pmmat:rgba(44,44,46,.76); --pmhl:rgba(255,255,255,.13); --pmgap:rgba(0,0,0,.42); --pmsep:rgba(84,84,88,.55); --pmdim:rgba(0,0,0,.18); --pmdimL:rgba(0,0,0,.4);
 }
@@ -639,6 +639,7 @@ body.pdragging,body.pdragging *{cursor:grabbing !important;user-select:none;-web
 .app.desktop .rc-per{flex:none;width:var(--col-per,150px);display:flex;align-items:center;justify-content:flex-start;gap:4px;min-width:0;text-align:left;}
 .app.desktop.has-pane .rc-per{width:var(--col-per,120px);}
 .app.desktop .rc-per .wtag,.app.desktop .rc-per .rtag{flex:0 1 auto;min-width:0;max-width:100%;}
+.app.desktop .rc-per .dtag + :is(.wtag,.rtag){flex-shrink:3;}
 .app.desktop .rc-per .wtag + .rtag{flex-shrink:2;}
 .app.desktop .rc-per .rtag,.app.desktop .rc-per .wtag{display:block;text-overflow:ellipsis;}
 .app.desktop .rc-per .wtag::before{content:none;} /* the column says Persona: a clock marks Esperando a (as Por confirmar in the sidebar), the tooltip says it in full */
@@ -766,6 +767,8 @@ body.desktop .stsheet .sttext{height:min(460px, calc(80svh - 170px));font-size:1
 .app.desktop .wcard .check svg{width:8px;height:8px;}
 .wcard .t{flex:1;min-width:0;font-size:12px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .wcard .t .pri{display:inline;width:auto;min-width:0;margin-right:4px;letter-spacing:-1px;font-size:11px;}
+.wcard .ctag{flex:none;max-width:none;font-size:10px;line-height:15px;padding:0 4px;border-radius:4px;vertical-align:0;} /* decision 79: the project's short name */
+.wcard.done .ctag{opacity:.55;}
 .wcard .tm{flex:none;font-size:11px;color:var(--ink2);font-variant-numeric:tabular-nums;}
 .wcard.done .t{text-decoration:line-through;color:var(--ink2);}
 /* The undated tray: a column at the right that folds into a narrow strip */
@@ -826,6 +829,7 @@ body.desktop .stsheet .sttext{height:min(460px, calc(80svh - 170px));font-size:1
 .wcard.mc.popped{box-shadow:inset 0 0 0 1.5px var(--blue);}
 .wcard.mc .mdot{flex:none;width:7px;height:7px;border-radius:50%;background:var(--pc,var(--ink3));}
 .wcard.mc .t{font-size:11px;}
+.wcard.mc .ctag{font-size:9px;line-height:13px;padding:0 3px;border-radius:3px;}
 .wcard.mc .tm{font-size:10px;}
 .mmore{flex:none;margin-right:auto;height:18px;padding:0 5px;border-radius:4px;font-size:11px;color:var(--ink2);font-weight:600;}
 .mmore:hover{background:var(--dhov);color:var(--ink);}
@@ -1216,6 +1220,8 @@ body.resizing,body.resizing *{cursor:col-resize !important;-webkit-user-select:n
 .check.waiting{background:linear-gradient(to top, var(--pc,var(--blue)) 50%, transparent 50%);border-color:var(--pc,var(--blue));}
 .row-meta .review{color:var(--orange);font-weight:500;}
 .row-meta .waitfor{color:var(--ink2);}
+.row-meta .doneby{color:var(--greentx);font-weight:500;} /* decision 78: Hecha por Víctor */
+.dtag{flex:0 1 auto;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;font-weight:600;color:var(--greentx);background:color-mix(in srgb, var(--green) 14%, transparent);border-radius:5px;padding:1px 6px;}
 .app.desktop .rc-date.review{color:var(--orange);font-weight:500;}
 .wtag{flex:0 0 auto;min-width:0;max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:var(--ink2);background:var(--fill);border-radius:5px;padding:1px 6px;}
 .wtag::before{content:"Esperando a ";}
@@ -1634,7 +1640,7 @@ body.desktop .sgopen svg{width:6px;height:11px;}
 .wcard.hb.tall{align-items:flex-start;padding-top:3px;}
 .wcard.hb.short{gap:2px;padding:0 3px;}
 .wcard.hb.short .t{font-size:9px;line-height:9px;}
-.wcard.hb.short .tm,.wcard.hb.short .check,.wcard.hb.short .cic{display:none;}
+.wcard.hb.short .tm,.wcard.hb.short .check,.wcard.hb.short .cic,.wcard.hb.short .ctag{display:none;}
 .wcard.hb .hbr{position:absolute;left:0;right:0;bottom:-2px;height:6px;cursor:ns-resize;}
 .wcard.hb.short .hbr{height:4px;bottom:-2px;}
 .wcard.hb .hbd{display:none;}

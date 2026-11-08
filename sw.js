@@ -71,7 +71,8 @@ self.addEventListener('push', e => {
   const data = d.data && typeof d.data === 'object' ? d.data : {};
   const icon = new URL('icons/icon-192.png', self.registration.scope).href;
   // Decision 55: where the browser shows buttons on a notification (desktop browsers; iOS shows none), a reminder offers 10 min and 1 h
-  const acts = data.taskId && !data.test && self.Notification && Notification.maxActions > 0 ? { actions: [{ action: 'snooze10', title: '10 min' }, { action: 'snooze60', title: '1 h' }] } : {};
+  // Decision 78: «Víctor ha completado una tarea que le enviaste» opens the task, with no reminder buttons
+  const acts = data.taskId && !data.test && !data.follow && self.Notification && Notification.maxActions > 0 ? { actions: [{ action: 'snooze10', title: '10 min' }, { action: 'snooze60', title: '1 h' }] } : {};
   // Decision 63a: an encrypted title and project name open with the key of this device; without it, «Recordatorio» and nothing secret
   const shown = cryptoPushPayload(d).catch(() => Object.assign({}, d, { title: 'Recordatorio', body: '' })).then(p =>
     self.registration.showNotification(p.title || 'Tareas', Object.assign({ body: p.body || '', icon, badge: icon, tag: d.tag || data.taskId || 'tareas', data, timestamp: Date.now() }, acts)));
@@ -90,12 +91,12 @@ self.addEventListener('notificationclick', e => {
   // Decision 63b: a task sent with «Avisar a…» opens Recibidas; a suggestion or an incident, the admin's inbox
   const team = !id && (data.open === 'received' || data.open === 'feedback') ? data.open : null;
   // Decision 55: an action postpones the reminder; this worker has no localStorage, so the app does it (with Deshacer) from ?snooze= or the message
-  const snooze = id && e.action === 'snooze10' ? 10 : id && e.action === 'snooze60' ? 60 : null;
-  const target = new URL(id ? './?task=' + encodeURIComponent(id) + (snooze ? '&snooze=' + snooze : '') : team ? './?open=' + team : './', scope).href;
+  const snooze = id && e.action === 'snooze10' ? 10 : id && e.action === 'snooze60' ? 60 : null, follow = !!(id && data.follow);
+  const target = new URL(id ? './?task=' + encodeURIComponent(id) + (snooze ? '&snooze=' + snooze : '') + (follow ? '&follow=1' : '') : team ? './?open=' + team : './', scope).href;
   e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
     const c = list.find(w => w.url.startsWith(scope));
     if (c) {
-      if (id) c.postMessage({ type: 'openTask', taskId: id, snooze });
+      if (id) c.postMessage({ type: 'openTask', taskId: id, snooze, follow });
       else if (team) c.postMessage({ type: 'openTeam', what: team });
       return c.focus ? c.focus().catch(() => self.clients.openWindow(target)) : self.clients.openWindow(target);
     }

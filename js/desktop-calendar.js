@@ -47,16 +47,22 @@ function calTasks(start, end){ const pf=calFilter(); return spaceTasks().filter(
 // The minute of the day of a reminder set on the task's own date; any other reminder gives the task no time in the calendar
 function remMin(x){ if(!x.reminder||!x.date||localDay(x.reminder)!==x.date) return null; const d=new Date(x.reminder); return d.getHours()*60+d.getMinutes(); }
 function inGrid(x){ const m=remMin(x); return m!==null&&m>=H0&&m<H1; }
-// Tasks with a time first, by time; the rest in the lists' fixed order
-function calSort(xs){ const tm=xs.map(x=>[x,remMin(x)]); return tm.filter(a=>a[1]!==null).sort((a,b)=>a[1]-b[1]).map(a=>a[0]).concat(orderTasks(tm.filter(a=>a[1]===null).map(a=>a[0]))); }
+/* Tasks with a time first, by time; the rest grouped by project (decision 79), in the sidebar's order (archived projects after, no project
+   last), each project in the lists' fixed order, with no headers */
+function calProjRank(){ const m=new Map(); activeProjects().forEach((p,i)=>m.set(p.id, i)); return x=>!x.projectId?2e9:m.has(x.projectId)?m.get(x.projectId):1e9; }
+function calSort(xs){ const tm=xs.map(x=>[x,remMin(x)]), rk=calProjRank();
+  return tm.filter(a=>a[1]!==null).sort((a,b)=>a[1]-b[1]).map(a=>a[0]).concat(orderTasks(tm.filter(a=>a[1]===null).map(a=>a[0])).sort((a,b)=>rk(a)-rk(b))); }
+// Decision 79: a project's short name on the cards, its first word (letters and digits) up to 6 characters; 4 in the month
+const projShort = (name, n) => ((String(name||'').match(/[\p{L}\p{N}]+/u)||[''])[0]).slice(0, n||6);
 // A one-line card (kind ''), a month chip ('mc') or an hour block ('hb'); the full title shows on hover. Carried tasks have an orange edge
 function calCardHTML(x, kind, style){ const p=x.projectId?proj(x.projectId):null, m=remMin(x), done=x.status==='done', tm=m!==null?fmtTime(x.reminder):'';
   const wt=x.status==='waiting'?'\nPor confirmar'+(x.waitingFor?', esperando a '+x.waitingFor:''):''; // decision 41
   const dlc=dlLevel(x), dl=x.deadline&&!done?'<span class="cic cdl'+(dlc?' dl-'+dlc:'')+'">'+MI.flag+'</span>':''; // decision 48a: a flag, grey, orange or red
   const tip=x.title+(p?'\n'+p.name:'')+(tm?'\n'+tm:'')+(x.carried&&!done?'\nAplazada':'')+(x.deadline?'\n'+dlText(x.deadline):'')+wt+(x.responsible?'\nResponsable: '+x.responsible:'')+(repParse(x.repeat)?'\n'+repSummary(x.repeat):'')+(stepStats(x.id)?'\n'+stepsCount(x.id)+' pasos':'');
-  return '<div class="wcard'+(kind?' '+kind:'')+(done?' done':'')+(x.carried&&!done?' carried':'')+'" draggable="true" data-id="'+x.id+'" title="'+esc(tip)+'" style="'+(p?'--pc:'+p.color+';':'')+(style||'')+'">'+
+  const sh=p?projShort(p.name, kind==='mc'?4:6):'', cap=sh?'<span class="tag ctag">'+esc(sh)+'</span>':''; // decision 79: the project's capsule before the title, as in the lists
+  return '<div class="wcard'+(kind?' '+kind:'')+(done?' done':'')+(x.carried&&!done?' carried':'')+'" draggable="true" data-id="'+x.id+'" title="'+esc(tip)+'" style="'+(p?tagVars(p.color)+';':'')+(style||'')+'">'+
     (kind==='mc'?'<span class="mdot"></span>':'<button class="check'+(done?' done':x.status==='waiting'?' waiting':'')+'" data-act="wcheck" aria-label="Completar">'+I.check+'</button>')+
-    (/^hb/.test(kind)?'<span class="tm">'+tm+'</span>':'')+'<div class="t">'+(x.priority==='high'?'<span class="pri high">!!!</span>':x.priority==='mid'?'<span class="pri mid">!!</span>':'')+esc(x.title)+'</div>'+
+    (/^hb/.test(kind)?'<span class="tm">'+tm+'</span>':'')+cap+'<div class="t">'+(x.priority==='high'?'<span class="pri high">!!!</span>':x.priority==='mid'?'<span class="pri mid">!!</span>':'')+esc(x.title)+'</div>'+
     dl+(x.focus&&!done?'<span class="cic ist">'+I.starF+'</span>':'')+(repParse(x.repeat)?'<span class="cic irp">'+I.repeat+'</span>':'')+(stepStats(x.id)?'<span class="cic">'+stepProgHTML(x)+'</span>':'')+(tm&&!/^hb/.test(kind)?'<span class="tm">'+tm+'</span>':'')+(/^hb/.test(kind)&&!done?'<span class="hbd"></span><span class="hbr" title="Arrastra para cambiar la duración"></span>':'')+'</div>'; } // decisions 38, 39 and 46: repeats, in Ahora, its steps
 // R12: a day's header: name and date, pending count, high-priority count and a load bar. Decision 60a: the bar measures the estimated hours
 // of the day's open tasks (its line says them too): full at half as much again as the space's working hours, orange from them, red from there

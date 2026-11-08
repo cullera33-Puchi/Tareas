@@ -395,7 +395,7 @@ async function sqlTests(){
   check('sql_check_falta', rows.filter(x=>x.Estado==='FALTA'&&!/\((0011|001[2-9])\)/.test(x.Pieza)).map(x=>x.Pieza).join('|')==='Siri y Atajo: tabla inbox (0010)|Siri y Atajo: tabla shortcut_keys (0010)|Siri y Atajo: inbox en tiempo real (0010)', rows.filter(x=>x.Estado==='FALTA'));
   await db.close();
   const readme = fs.readFileSync(path.join(ROOT, 'supabase/README.md'), 'utf8');
-  check('sql_readme', /`migrations\/0010_inbox\.sql`/.test(readme) && /suma de las (diez|once|doce|trece) en orden/.test(readme) && /`add-task`/.test(readme) && /Verify JWT/.test(readme));
+  check('sql_readme', /`migrations\/0010_inbox\.sql`/.test(readme) && /suma de las (diez|once|doce|trece|catorce) en orden/.test(readme) && /`add-task`/.test(readme) && /Verify JWT/.test(readme));
 }
 
 /* ======================= 5. The Edge Function add-task under Deno ======================= */

@@ -27,6 +27,9 @@ Antes de invitar a nadie:
 
 La función `send-reminders` también avisa de las tareas enviadas con «Avisar a…» y de las sugerencias, y borra los datos de quien perdió el acceso hace más de 30 días: hay que volver a pegarla y pulsar **Deploy** (paso 3). La función `add-task` (paso 4) también cambia: ya no acepta frases de quien perdió el acceso; vuelve a pegarla y pulsa **Deploy**.
 
+## 6. El seguimiento de las tareas enviadas
+Desde la 0014, quien envía una tarea con «Avisar a…» ve si la otra persona la ha añadido, para qué día la tiene prevista y cuándo la ha completado, y recibe el aviso «Víctor ha completado una tarea que le enviaste» (sin nada de la tarea). Hace falta ejecutar `all.sql` (paso 2) y volver a pegar `send-reminders` y pulsar **Deploy** (paso 3). En `check.sql`, las filas 44 a 46 dicen OK.
+
 ## Qué hay en cada migración
 
 | Archivo | Qué crea | Versión |
@@ -44,5 +47,6 @@ La función `send-reminders` también avisa de las tareas enviadas con «Avisar 
 | `migrations/0011_contacts.sql` | Responsable de una tarea y lista de contactos | v0.32.0 |
 | `migrations/0012_encryption.sql` | Cifrado de extremo a extremo: clave de la cuenta y regla que rechaza texto sin cifrar | v0.34.0 |
 | `migrations/0013_team.sql` | Equipo: miembros y administrador, acceso solo para miembros en todas las tablas, Avisar a, sugerencias e incidencias, cupo de almacenamiento, filtro de altas y borrado a los 30 días | v0.36.0 |
+| `migrations/0014_notice_follow.sql` | Seguimiento de las tareas enviadas con Avisar a: fecha prevista y completada, y aviso a quien la envió | v0.37.0 |
 
-`all.sql` es la suma de las trece en orden. Las claves de la app (URL y clave pública) no van aquí: están en los secretos del repositorio de GitHub.
+`all.sql` es la suma de las catorce en orden. Las claves de la app (URL y clave pública) no van aquí: están en los secretos del repositorio de GitHub.

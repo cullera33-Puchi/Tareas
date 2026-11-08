@@ -18,7 +18,7 @@ const shot=(page, name)=>page.screenshot({path:path.join(OUT, name+'.png')});
 const addDays=(d,n)=>{ const x=new Date(d+'T12:00:00'); x.setDate(x.getDate()+n); return x.toISOString().slice(0,10); };
 
 async function run(browser){
-  const fake = new TF.Fake();
+  const fake = new TF.Fake(); fake.follow = false; // a database with 0013 and without 0014: the lines of v0.36.2 (rm-NF follows the tasks with 0014)
   const UE = fake.user('9b2f6d3e-0000-4000-8000-0000000000e1', 'enric@example.com', 'Enric Vidal'), US = fake.user('9b2f6d3e-0000-4000-8000-0000000000e2', 'susana@example.com', 'Susana Gil'),
     UP = fake.user('9b2f6d3e-0000-4000-8000-0000000000e4', 'pablo@example.com', 'Pablo Ruiz');
   fake.bootstrap(); ['susana@example.com','pablo@example.com'].forEach(email=>fake.members.push({id:'m-'+email, email, name:null, role:'member', quota:52428800, invited:new Date().toISOString(), revoked:null, last_access:null, user_id:null}));
@@ -86,7 +86,7 @@ async function run(browser){
   await s2p.evaluate(()=>openDetail('s1')); await s2p.waitForTimeout(700);
   const l0 = await s2p.evaluate(()=>[...document.querySelectorAll('.pushed-screen .ntnote .ntline')].map(x=>x.textContent));
   check('S2_no_answer_yet', l0.length===1 && /^Avisado a Enric hoy a las \d\d:\d\d: sin respuesta todavía$/.test(l0[0]) && await s2p.evaluate(()=>!(task('s1').sentTo||[]).length), l0);
-  check('sent_never_payload', (fake.sentAsked||[]).length>0 && fake.sentAsked.every(c=>c==='id,recipient_id,task_ref,created,taken,dismissed'), fake.sentAsked);
+  check('sent_never_payload', (fake.sentAsked||[]).length>0 && fake.sentAsked.every(c=>/^id,recipient_id,task_ref,created,taken,dismissed(,planned,done)?$/.test(c)), fake.sentAsked);
 
   /* ---------- Enric: Recibidas ---------- */
   check('E_received', await until(ep, ()=>TM.recv.length===2, null, 10000), await ep.evaluate(()=>TM.recv));

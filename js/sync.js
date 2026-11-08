@@ -17,6 +17,7 @@
    - First connection on a device (or with another account): a local backup, then everything is pulled, the initial spaces are
      matched by name, the newest copy of each record wins and the rest goes up (decision 5). */
 const TEAM_SENT_COLS='id,recipient_id,task_ref,created,taken,dismissed'; // a sent notice's columns read by its sender (js/team.js); payload never
+const TEAM_FOLLOW_COLS=',planned,done'; // decision 78 (0014_notice_follow.sql): the recipient's planned date and completion, read too once the columns exist
 const SYNC_KEY='tareas-sync', SUPABASE_JS='vendor/supabase-js-2.117.3.umd.js';
 const SYNC_PAGE=1000, SYNC_CHUNK=200, SYNC_OVERLAP=30e3, SYNC_DEBOUNCE=1500, EPOCH='1970-01-01T00:00:00.000Z';
 const SYNC_TABLES=[{list:'spaces', table:'spaces'},{list:'projects', table:'projects'},{list:'tasks', table:'tasks'},{list:'voiceNotes', table:'voice_notes'},{list:'attachments', table:'attachments'},{list:'subtasks', table:'subtasks'},{list:'projectNotes', table:'project_notes'},{list:'contacts', table:'contacts'}]; // attachments and steps after tasks (decisions 29 and 46); project notes after projects (decision 47); contacts last (decision 48c)
@@ -174,7 +175,9 @@ function supabaseRemote(cfg){
     async noticeSend(row){ const {error}=await db().from('team_notices').insert(row); if(error) throw error; },
     async noticeList(uid){ return rows(await db().from('team_notices').select('id,sender_id,payload,created').eq('recipient_id', uid).is('taken', null).is('dismissed', null).order('created', {ascending:true}).limit(200)); },
     // The notices this account sent (its other devices see them too): their state only, never the payload (a copy only the recipient opens)
-    async noticeSent(uid, since){ return rows(await db().from('team_notices').select(TEAM_SENT_COLS).eq('sender_id', uid).gte('created', since).order('created', {ascending:false}).limit(500)); },
+    async noticeSent(uid, since, cols){ return rows(await db().from('team_notices').select(cols||TEAM_SENT_COLS).eq('sender_id', uid).gte('created', since).order('created', {ascending:false}).limit(500)); },
+    // Decision 78: the recipient's notices behind the given ids (their tasks 'nt-<id>'), to compare with those tasks; never the payload
+    async noticeFollow(uid, ids){ return rows(await db().from('team_notices').select('id,taken,dismissed,planned,done').eq('recipient_id', uid).in('id', ids)); },
     async noticeMark(id, patch){ return rows(await db().from('team_notices').update(patch).eq('id', id).select('id')); },
     async feedbackSend(row){ const {error}=await db().from('team_feedback').insert(row); if(error) throw error; },
     async feedbackList(){ return rows(await db().from('team_feedback').select('id,sender_id,kind,payload,created,status').order('created', {ascending:false}).limit(200)); },

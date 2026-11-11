@@ -42,8 +42,11 @@ class Fake {
       if(Date.parse(r.modified) < Date.parse(ex.modified)) return;
       Object.assign(ex, r, {owner_id:ex.owner_id, server_ts:ts}); out.push({id:r.id}); changed.push(ex); });
     changed.forEach(row=>this.notify(row.owner_id, table, row)); return out; }
+  // Realtime as phoenix does it: a page's channels by topic; an event goes to each live channel of the user, to its own handler
   notify(uid, table, row){ const copy=JSON.parse(JSON.stringify(row));
-    for(const [page, u] of this.subs){ if(u!==uid) continue; setTimeout(()=>{ page.evaluate(([t,r])=>window.__fakeRT&&window.__fakeRT(t,r), [table, copy]).catch(()=>{}); }, 30); } }
+    for(const [page, topics] of this.subs){ for(const [topic, u] of topics){ if(u!==uid) continue;
+      setTimeout(()=>{ page.evaluate(([tp,t,r])=>{ const h=window.__fakeRTs&&window.__fakeRTs[tp]; if(h) h(t,r); }, [topic, table, copy]).catch(()=>{}); }, 30); } } }
+  liveTopics(page){ return [...((this.subs.get(page))||new Map()).keys()]; }
   rows(owner, table){ if(this.team&&!this.role(owner)) return []; return [...this.t[table].values()].filter(r=>r.owner_id===owner); }
   err(message, details){ return {__err:{message, details:details||null}}; }
   handle(page, op, a){ this.calls.push((this.tags.get(page)||'?')+':'+op+(a&&a.table?':'+a.table:''));
@@ -60,8 +63,8 @@ class Fake {
       case 'byIds': return JSON.parse(JSON.stringify(this.rows(own, a.table).filter(r=>a.ids.includes(r.id))));
       case 'upsert': try{ return this.write(own, a.table, a.rows); }catch(e){ return this.err(e.message); }
       case 'markDeleted': try{ return this.write(own, a.table, a.items.map(x=>({id:x.id, deleted:x.ts, modified:x.ts}))); }catch(e){ return this.err(e.message); }
-      case 'subscribe': this.subs.set(page, a.uid); this.subTokens.push(a.tok||null); return true;
-      case 'unsubscribe': this.subs.delete(page); return true;
+      case 'subscribe': { const m=this.subs.get(page)||new Map(); m.set(a.topic||'tareas-'+a.uid, a.uid); this.subs.set(page, m); this.subTokens.push(a.tok||null); return true; }
+      case 'unsubscribe': { const m=this.subs.get(page); if(m){ if(a&&a.topic) m.delete(a.topic); else m.clear(); } return true; }
       case 'cryptoGet': { if(!ok()) return null; const k=this.keys.get(own); return k?JSON.parse(JSON.stringify(k)):null; }
       case 'cryptoPut': if(!ok()) return this.err(RLS('crypto_keys').message); if(this.keys.has(own)) return this.err('duplicate key value violates unique constraint "crypto_keys_pkey"');
         this.keys.set(own, Object.assign({migrated:null, ecdh_pub:null, ecdh_priv:null}, a.row, {owner_id:undefined})); return true;
@@ -130,7 +133,15 @@ function fakeAdapter(){
       if(!force&&s.exp-Date.now()>60e3) return 'ok'; const r=await window.fakeServer('refresh', {uid:s.id}); if(r&&r.__err) return 'failed';
       Object.assign(s, r); localStorage.setItem('fake-session', JSON.stringify(s)); return 'refreshed'; },
     async sessionState(){ const s=JSON.parse(localStorage.getItem('fake-session')||'null'); if(!s) return 'none'; if(!s.exp) return 'fresh'; return s.exp-Date.now()>60e3?'fresh':'expired'; },
-    subscribe(uid, onRow, onStatus){ window.__fakeRT=(t,r)=>onRow(t,r); window.__fakeRTStatus=onStatus; window.fakeServer('subscribe',{uid, tok:sess().token||null}); setTimeout(()=>onStatus('SUBSCRIBED'),0); return ()=>{ window.__fakeRT=null; window.fakeServer('unsubscribe',{}); }; },
+    /* As realtime-js and phoenix do it (v0.37.1 review): channel(topic) returns the channel of that topic while it is still there; leaving a
+       joined channel only marks it 'leaving' and it goes a moment later (FAKE_LEAVE_MS). A channel asked for meanwhile with the same topic is
+       that leaving one: its new handler and its subscribe() are ignored, and once it has gone nothing arrives any more */
+    subscribe(uid, onRow, onStatus){ const topic=typeof syncTopic==='function'?syncTopic(uid):'tareas-'+uid, chs=window.__fakeChs=window.__fakeChs||{};
+      window.__fakeRTs=window.__fakeRTs||{}; window.__fakeRTStatus=onStatus;
+      const live=chs[topic]; if(live&&live.state==='leaving'){ (window.__fakeDead=window.__fakeDead||[]).push(topic); return ()=>{}; }
+      const ch={topic, state:'joined'}; chs[topic]=ch; window.__fakeRTs[topic]=(t,r)=>onRow(t,r); window.__fakeRT=window.__fakeRTs[topic];
+      window.fakeServer('subscribe',{uid, topic, tok:sess().token||null}); setTimeout(()=>onStatus('SUBSCRIBED'),0);
+      return ()=>{ if(ch.state!=='joined') return; ch.state='leaving'; setTimeout(()=>{ ch.state='gone'; if(chs[topic]===ch) delete chs[topic]; delete window.__fakeRTs[topic]; window.fakeServer('unsubscribe',{topic}); }, window.FAKE_LEAVE_MS||300); }; },
     async fileUpload(path, blob, mime){ return call('upload', {owner:owner(), path, b64:await b64(blob), mime}); },
     async fileDownload(path){ const o=await call('download', {owner:owner(), path}); const s=atob(o.b64), u=new Uint8Array(s.length); for(let i=0;i<s.length;i++) u[i]=s.charCodeAt(i); return new Blob([u], {type:o.mime}); },
     inboxList:()=>call('inboxList', {owner:owner()}), inboxTake:(ids, ts, o)=>call('inboxTake', {owner:owner(), ids, ts, o:o||null}), inboxClear:()=>call('inboxClear', {owner:owner()}),

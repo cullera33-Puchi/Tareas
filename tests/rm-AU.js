@@ -36,14 +36,17 @@ async function sessionTests(browser){
   const t1 = await tok();
   check('resume_refreshed_first', fake.refreshes===r0+1 && fake.anonCalls.length===a0 && t1!==t0 && (await since(n0, /Sesión renovada antes de sincronizar/)).length===1
     && !(await since(n0, /se comprueba el acceso|Sincronización falló/)).length && fake.t.tasks.get('a1').title==='Primera, cambiada al volver', {refreshes:fake.refreshes-r0, anon:fake.anonCalls.slice(a0), log:await since(n0, /./)});
-  check('resume_channel_new_token', await until(ep, ()=>true) && fake.subTokens.length>s0 && fake.subTokens[fake.subTokens.length-1]===t1, {subs:fake.subTokens.slice(s0), t1});
+  // The channel is not made again after a refresh (realtime gets the token through setAuth): the one there keeps delivering
+  const writeAs = (id, title) => { const r=Object.assign({}, fake.t.tasks.get(id), {title, modified:new Date().toISOString()}); delete r.server_ts; fake.write(UE.uid, 'tasks', [r]); };
+  await ep.waitForTimeout(500); writeAs('a2', 'Segunda, desde otro dispositivo');
+  check('resume_channel_kept', fake.subTokens.length===s0 && fake.liveTopics(ep).length===1 && await until(ep, ()=>task('a2').title==='Segunda, desde otro dispositivo', null, 4000), {subs:fake.subTokens.slice(s0), live:fake.liveTopics(ep)});
 
   /* ---------- 2. A refusal while the token had expired (a race with the refresh): not lost access, refreshed and repeated once ---------- */
   const race = () => ep.evaluate(()=>{ const real=SY.remote.ensureSession; let n=0; SY.remote.ensureSession=async function(f){ if(n++===0) return 'ok'; SY.remote.ensureSession=real; return real.call(this, f); }; });
   await expire(); await race(); const a1 = fake.anonCalls.length, n1 = await mark();
   await ep.evaluate(()=>{ updTask('a2', {title:'Segunda, con la sesión caducada'}); return syncRun('cambio'); }); await synced(ep);
   check('rls_expired_retried', fake.anonCalls.slice(a1).some(c=>/upsert/.test(c)) && fake.t.tasks.get('a2').title==='Segunda, con la sesión caducada' && await ep.evaluate(()=>TM.state==='admin'&&!document.getElementById('noaccess')&&SY.status==='ok')
-    && (await since(n1, /la sesión había caducado/)).length===1 && !(await since(n1, /se comprueba el acceso|Sincronización falló|tiene acceso/)).length, {anon:fake.anonCalls.slice(a1), log:await since(n1, /./)});
+    && (await since(n1, /la sesión había caducado/)).length===1 && !(await since(n1, /se comprueba el acceso|Sincronización falló|tiene acceso/)).length, {anon:fake.anonCalls.slice(a1), log:await since(n1, /./), a2:fake.t.tasks.get('a2').title, st:await ep.evaluate(()=>({tm:TM.state, st:SY.status, na:!!document.getElementById('noaccess')}))});
   // The access check itself as anon: «permission denied for function tareas_team_me»
   await expire(); await race(); const a2 = fake.anonCalls.length, n2 = await mark();
   await ep.evaluate(()=>{ TM.force=true; return syncRun('vuelta'); }); await synced(ep);
@@ -64,15 +67,32 @@ async function sessionTests(browser){
   fake.members.find(m=>m.email==='susana@example.com').revoked = new Date().toISOString();
   await sp.evaluate(()=>{ if(document.querySelector('#sheet.on')) closeSheet(); TM.force=true; return syncRun('equipo'); });
   check('revoked_denied', await until(sp, ()=>TM.state==='denied'&&!!document.getElementById('noaccess')&&/Esta cuenta no tiene acceso/.test(document.getElementById('noaccess').textContent), null, 10000));
+  // Whatever the result of a pass (here «needkey»), the next refusal may be retried once again
+  check('auth_retried_reset_needkey', await sp.evaluate(async()=>{ SY.authRetried=true; TM.force=true; await syncRun('prueba'); return /needkey|denied/.test(SY.status)&&SY.authRetried===false; })); // denied here: her access was just removed
   await S.ctx.close();
 
   /* ---------- 4. Realtime ---------- */
-  // A channel refused for an expired token: refreshed, and made again with the new token
-  await expire(); const s5 = fake.subTokens.length, n5 = await mark();
-  await ep.evaluate(()=>{ SY.rtFails=0; SY.rtInfoAt=0; SY.rtWarnAt=0; window.__fakeRTStatus('CHANNEL_ERROR', {message:'InvalidJWTToken: Token has expired 9207 seconds ago'}); });
+  // A channel refused for an expired token: refreshed, and made again with the new token on a topic of its own; once the old one has gone
+  // (it lingers while leaving, FAKE_LEAVE_MS), the new one still delivers. At most once every 5 minutes: a second refusal right away does nothing
+  await expire(); const s5 = fake.subTokens.length, n5 = await mark(), r5 = fake.refreshes;
+  await ep.evaluate(()=>{ SY.rtFails=0; SY.rtInfoAt=0; SY.rtWarnAt=0; SY.rtHealAt=0; window.__fakeRTStatus('CHANNEL_ERROR', {message:'InvalidJWTToken: Token has expired 9207 seconds ago'}); });
   const t5 = await (async()=>{ for(let i=0;i<50;i++){ if(fake.subTokens.length>s5) break; await new Promise(r=>setTimeout(r,100)); } return tok(); })();
-  check('rt_token_healed', fake.subTokens.length>s5 && fake.subTokens[fake.subTokens.length-1]===t5 && fake.tokens.get(t5)>Date.now() && (await since(n5, /canal de nuevo/)).length===1
-    && !(await since(n5, /Tiempo real/)).some(l=>/^warn/.test(l)), {subs:fake.subTokens.slice(s5), t5, log:await since(n5, /Tiempo real/)});
+  await ep.waitForTimeout(700); writeAs('a1', 'Primera, tras curar el canal');
+  check('rt_token_healed', fake.subTokens.length===s5+1 && fake.subTokens[fake.subTokens.length-1]===t5 && fake.tokens.get(t5)>Date.now() && fake.refreshes===r5+1 && (await since(n5, /canal de nuevo/)).length===1
+    && fake.liveTopics(ep).length===1 && await until(ep, ()=>task('a1').title==='Primera, tras curar el canal', null, 4000)
+    && !(await since(n5, /Tiempo real/)).some(l=>/^warn/.test(l)), {subs:fake.subTokens.slice(s5), t5, live:fake.liveTopics(ep), log:await since(n5, /Tiempo real/)});
+  await ep.evaluate(()=>{ window.__fakeRTStatus('CHANNEL_ERROR', {message:'InvalidJWTToken: Token has expired'}); window.__fakeRTStatus('CHANNEL_ERROR', {message:'InvalidJWTToken: Token has expired'}); });
+  await ep.waitForTimeout(600);
+  const r6 = fake.refreshes, sub6 = fake.subTokens.length;
+  check('rt_heal_rate_limited', r6===r5+1 && sub6===s5+1, {refreshes:r6-r5, subs:sub6-s5});
+  await ep.evaluate(()=>{ SY.rtHealAt=Date.now()-301e3; window.__fakeRTStatus('CHANNEL_ERROR', {message:'InvalidJWTToken: Token has expired'}); });
+  check('rt_heal_after_5min', await until(ep, n=>true, null, 100) && await (async()=>{ for(let i=0;i<40;i++){ if(fake.refreshes===r6+1&&fake.subTokens.length===sub6+1) return true; await new Promise(r=>setTimeout(r,100)); } return false; })(), {refreshes:fake.refreshes-r6});
+  await ep.waitForTimeout(700);
+  // The fake catches a remake on the same topic (the old code): the channel asked for while the old one leaves is that one, and dies with it
+  const dead = await ep.evaluate(async()=>{ const was=window.syncTopic; window.syncTopic=uid=>'tareas-'+uid; try{ syncRenewChannel(); await new Promise(r=>setTimeout(r, 700)); syncRenewChannel(); await new Promise(r=>setTimeout(r, 700)); return (window.__fakeDead||[]).length; } finally{ window.syncTopic=was; } });
+  const deadLive = fake.liveTopics(ep).length;
+  await ep.evaluate(()=>{ syncRenewChannel(); }); await ep.waitForTimeout(700);
+  check('fake_models_lingering_leave', dead>=1 && deadLive===0 && fake.liveTopics(ep).length===1, {dead, deadLive, live:fake.liveTopics(ep)});
   // Normal disconnects: info, at most once a minute; the third in a row is a warning; anything else is a warning
   const n6 = await mark();
   await ep.evaluate(()=>{ SY.rtFails=0; SY.rtInfoAt=0; SY.rtWarnAt=0; window.__fakeRTStatus('CHANNEL_ERROR', {message:'socket closed 1006'}); window.__fakeRTStatus('TIMED_OUT'); });
@@ -83,28 +103,47 @@ async function sessionTests(browser){
   const l8 = await since(n6, /Tiempo real/);
   check('rt_log_levels', l6.length===1 && /^info Tiempo real: CHANNEL_ERROR socket closed 1006$/.test(l6[0]) && l7.length===2 && /^warn .*1001.*3 fallos seguidos/.test(l7[1])
     && l8.length===3 && /^warn Tiempo real: CHANNEL_ERROR unexpected payload$/.test(l8[2]), {l6, l7, l8});
-  /* ---------- The real adapter's check (supabaseRemote.ensureSession) against a stand-in client ---------- */
-  const unit = await ep.evaluate(async()=>{ const was=window.supabase, now=()=>Math.floor(Date.now()/1000), out={}, setAuth=[];
+  /* ---------- The real adapter (supabaseRemote) against a stand-in client ---------- */
+  const unit = await ep.evaluate(async()=>{ const was=window.supabase, now=()=>Math.floor(Date.now()/1000), out={}, setAuth=[]; let refreshes=0;
     let sess=null, getErr=null, refresh=null;
-    window.supabase={createClient:()=>({auth:{getSession:async()=>({data:{session:sess}, error:getErr}), refreshSession:async()=>refresh(), onAuthStateChange(){}}, realtime:{setAuth:t=>{ setAuth.push(t); }}})};
-    try{ const R=supabaseRemote({url:'https://x.supabase.co', anonKey:'k'}); sess={access_token:'a1', expires_at:now()+3600}; await R.init();
-      out.fresh=await R.ensureSession();
+    // realtime as phoenix: channel(topic) gives the channel of that topic while it is there; removeChannel leaves later
+    const chans=new Map(), made=[];
+    const client={auth:{getSession:async()=>({data:{session:sess}, error:getErr}), refreshSession:async()=>{ refreshes++; return refresh(); }, onAuthStateChange(){}}, realtime:{setAuth:t=>{ setAuth.push(t); }},
+      channel(topic){ let ch=chans.get(topic); if(ch) return ch; ch={topic, state:'closed', binds:0, on(){ if(this.state==='closed') this.binds++; return this; }, subscribe(cb){ if(this.state==='closed'){ this.state='joined'; made.push(this); } return this; }}; chans.set(topic, ch); return ch; },
+      removeChannel(ch){ ch.state='leaving'; return new Promise(r=>setTimeout(()=>{ chans.delete(ch.topic); ch.state='gone'; r('ok'); }, 50)); }};
+    window.supabase={createClient:()=>client};
+    const mk=async()=>{ const R=supabaseRemote({url:'https://x.supabase.co', anonKey:'k'}); sess={access_token:'a1', expires_at:now()+3600}; await R.init(); return R; };
+    try{ let R=await mk();
+      out.fresh=await R.ensureSession(); out.r0=refreshes;
       sess={access_token:'a1', expires_at:now()-9207}; refresh=async()=>({data:{session:{access_token:'a2', expires_at:now()+3600}}, error:null}); out.expired=await R.ensureSession(); out.setAuth=setAuth.slice();
-      // getSession refreshed it by itself: the token it returns replaced one that had expired
-      // (the last check saw a token about to expire; the device slept; getSession came back with another one)
-      sess={access_token:'a5', expires_at:now()+62}; out.near=await R.ensureSession(); await new Promise(r=>setTimeout(r, 2500));
-      sess={access_token:'a3', expires_at:now()+3600}; refresh=async()=>({data:{session:null}, error:{name:'AuthRetryableFetchError', message:'Failed to fetch'}});
-      out.bySelf=await R.ensureSession(); out.setAuth2=setAuth.slice();
-      // an ordinary hourly refresh while the app was open is not a wake-up
-      sess={access_token:'a7', expires_at:now()+3600}; out.hourly=await R.ensureSession();
-      sess=null; getErr={name:'AuthRetryableFetchError', message:'Failed to fetch'}; out.netFail=await R.ensureSession();
+      // Just refreshed here: forced again (a refusal that keeps coming) it is taken as it is, no new refresh
+      out.forcedRecent=await R.ensureSession(true); out.r1=refreshes;
+      // A clock about an hour fast: the server's expiry looks past; the refresh is taken, and the next pass does not refresh again
+      R=await mk(); sess={access_token:'b1', expires_at:now()-10}; refresh=async()=>({data:{session:{access_token:'b2', expires_at:now()-5}}, error:null}); const rc=refreshes;
+      out.fastRefresh=await R.ensureSession(); sess={access_token:'b2', expires_at:now()-5}; out.fastNext=await R.ensureSession(); out.fastRefreshes=refreshes-rc;
+      // Within 4 minutes of the expiry counts as expired
+      R=await mk(); sess={access_token:'c1', expires_at:now()+200}; refresh=async()=>({data:{session:{access_token:'c2', expires_at:now()+3600}}, error:null}); out.margin=await R.ensureSession();
+      R=await mk(); sess=null; getErr={name:'AuthRetryableFetchError', message:'Failed to fetch'}; refresh=async()=>({data:{session:null}, error:{name:'AuthRetryableFetchError', message:'Failed to fetch'}}); out.netFail=await R.ensureSession();
       getErr=null; sess=null; out.none=await R.ensureSession();
       sess={access_token:'a4', expires_at:now()-5}; refresh=async()=>({data:{session:null}, error:{name:'AuthApiError', message:'Invalid Refresh Token: Refresh Token Not Found'}}); out.badRefresh=await R.ensureSession();
-      localStorage.setItem('tareas-auth', JSON.stringify({access_token:'z', expires_at:now()+30})); out.stSoon=await R.sessionState();
+      localStorage.setItem('tareas-auth', JSON.stringify({access_token:'z', expires_at:now()+200})); out.stSoon=await R.sessionState();
       localStorage.setItem('tareas-auth', JSON.stringify({access_token:'z', expires_at:now()+3600})); out.stFresh=await R.sessionState(); localStorage.removeItem('tareas-auth'); out.stNone=await R.sessionState();
+      // A channel made again right away gets a topic of its own: its bindings and its subscribe count
+      const un1=R.subscribe('u1', ()=>{}, ()=>{}); un1(); R.subscribe('u1', ()=>{}, ()=>{}); await new Promise(r=>setTimeout(r, 120));
+      out.topics=made.map(c=>c.topic); out.live=[...chans.values()].filter(c=>c.state==='joined').map(c=>({topic:c.topic, binds:c.binds}));
     } finally{ window.supabase=was; } return out; });
-  check('adapter_ensure_session', unit.fresh==='ok' && unit.expired==='refreshed' && unit.setAuth.includes('a2') && unit.near==='ok' && unit.bySelf==='refreshed' && unit.setAuth2.includes('a3') && unit.hourly==='ok' && unit.netFail==='failed' && unit.none==='none' && unit.badRefresh==='none'
-    && unit.stSoon==='expired' && unit.stFresh==='fresh' && unit.stNone==='none', unit);
+  check('adapter_ensure_session', unit.fresh==='ok' && unit.r0===0 && unit.expired==='refreshed' && unit.setAuth.includes('a2') && unit.forcedRecent==='ok' && unit.r1===1
+    && unit.fastRefresh==='refreshed' && unit.fastNext==='ok' && unit.fastRefreshes===1 && unit.margin==='refreshed'
+    && unit.netFail==='failed' && unit.none==='none' && unit.badRefresh==='none' && unit.stSoon==='expired' && unit.stFresh==='fresh' && unit.stNone==='none', unit);
+  check('adapter_unique_topics', unit.topics.length===2 && unit.topics[0]!==unit.topics[1] && unit.live.length===1 && unit.live[0].topic===unit.topics[1] && unit.live[0].binds>=7, unit);
+  // A pass while offline returns at once and leaves no retry flag behind
+  await ep.context().setOffline(true); const offR = await ep.evaluate(async()=>{ SY.authRetried=true; await syncRun('prueba'); return SY.authRetried; }); await ep.context().setOffline(false); await synced(ep);
+  check('auth_retried_reset_offline', offR===false, offR);
+  /* ---------- 3 bis. Signed out elsewhere before the event came: the pass stops, nothing as anon, the session ends here ---------- */
+  const a9 = fake.anonCalls.length, n9 = await mark();
+  await ep.evaluate(()=>{ localStorage.removeItem('fake-session'); updTask('a1', {title:'Sin sesión'}); return syncRun('vuelta'); });
+  check('no_session_stops', fake.anonCalls.length===a9 && await ep.evaluate(()=>!SY.user&&!!syncState().lost&&SY.status==='idle') && (await since(n9, /La sesión se ha cerrado sin pedirlo/)).length===1
+    && fake.t.tasks.get('a1').title!=='Sin sesión' && await ep.evaluate(()=>/Se ha cerrado la sesión/.test(document.getElementById('toastText').textContent)), {anon:fake.anonCalls.slice(a9), log:await since(n9, /./)});
   await E.ctx.close();
 }
 

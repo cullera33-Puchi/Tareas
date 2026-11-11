@@ -17,7 +17,10 @@ const RLS = t => new Error('new row violates row-level security policy for table
 let nid = 0; const newId = () => '00000000-0000-4000-8000-'+String(++nid).padStart(12, '0');
 class Fake {
   constructor(){ this.t={}; TABLES.forEach(x=>this.t[x]=new Map()); this.last=0; this.subs=new Map(); this.tags=new Map(); this.calls=[]; this.keys=new Map(); this.store=new Map();
-    this.users=new Map(); this.members=[]; this.notices=[]; this.feedback=[]; this.team=true; this.inbox=[]; this.follow=true; this.followMarks=[]; }
+    this.users=new Map(); this.members=[]; this.notices=[]; this.feedback=[]; this.team=true; this.inbox=[]; this.follow=true; this.followMarks=[];
+    // v0.37.1 (rm-AU): sessions with tokens that expire, when jwt is on; a request with an expired token runs as anon (or gets a 401 with jwt401)
+    this.jwt=false; this.jwt401=false; this.tokens=new Map(); this.anonCalls=[]; this.subTokens=[]; this.refreshes=0; this.refreshFail=0; this.tokN=0; }
+  issue(){ const token='tok-'+(++this.tokN), exp=Date.now()+3600e3; this.tokens.set(token, exp); return {token, exp}; }
   // Accounts in creation order: the first one becomes the admin when nobody is (tareas_team_bootstrap)
   user(uid, email, name){ this.users.set(uid, {uid, email, name:name||''}); return {uid, email}; }
   ts(){ this.last=Math.max(Date.now(), this.last+1); return new Date(this.last).toISOString(); }
@@ -43,15 +46,21 @@ class Fake {
     for(const [page, u] of this.subs){ if(u!==uid) continue; setTimeout(()=>{ page.evaluate(([t,r])=>window.__fakeRT&&window.__fakeRT(t,r), [table, copy]).catch(()=>{}); }, 30); } }
   rows(owner, table){ if(this.team&&!this.role(owner)) return []; return [...this.t[table].values()].filter(r=>r.owner_id===owner); }
   err(message, details){ return {__err:{message, details:details||null}}; }
-  handle(page, op, a){ this.calls.push((this.tags.get(page)||'?')+':'+op+(a&&a.table?':'+a.table:'')); const own=a&&a.owner, ok=()=>!this.team||!!this.role(own), admin=()=>this.team&&this.role(own)==='admin';
+  handle(page, op, a){ this.calls.push((this.tags.get(page)||'?')+':'+op+(a&&a.table?':'+a.table:''));
+    if(this.jwt&&!['signIn','refresh','subscribe','unsubscribe'].includes(op)&&!(this.tokens.get(a&&a.tok)>Date.now())){ this.anonCalls.push((this.tags.get(page)||'?')+':'+op);
+      if(this.jwt401) return this.err('JWT expired', 'PGRST301');
+      if(op==='teamMe') return this.err('permission denied for function tareas_team_me');
+      if(['upsert','markDeleted','cryptoPut','noticeSend','noticeMark','feedbackSend','upload'].includes(op)) return this.err(RLS(a&&a.table||'tasks').message);
+      return op==='cryptoGet'?null:[]; } const own=a&&a.owner, ok=()=>!this.team||!!this.role(own), admin=()=>this.team&&this.role(own)==='admin';
     switch(op){
-      case 'signIn': return {id:a.uid, email:a.email};
+      case 'signIn': return Object.assign({id:a.uid, email:a.email}, this.jwt?this.issue():{});
+      case 'refresh': this.refreshes++; if(this.refreshFail>0){ this.refreshFail--; return this.err('Failed to fetch'); } return this.issue();
       case 'pull': { let rs=this.rows(own, a.table); if(a.after) rs=rs.filter(r=>Date.parse(r.server_ts)>Date.parse(a.after));
         rs.sort((x,y)=>x.server_ts<y.server_ts?-1:x.server_ts>y.server_ts?1:x.id<y.id?-1:1); return JSON.parse(JSON.stringify(rs.slice(0,a.limit))); }
       case 'byIds': return JSON.parse(JSON.stringify(this.rows(own, a.table).filter(r=>a.ids.includes(r.id))));
       case 'upsert': try{ return this.write(own, a.table, a.rows); }catch(e){ return this.err(e.message); }
       case 'markDeleted': try{ return this.write(own, a.table, a.items.map(x=>({id:x.id, deleted:x.ts, modified:x.ts}))); }catch(e){ return this.err(e.message); }
-      case 'subscribe': this.subs.set(page, a.uid); return true;
+      case 'subscribe': this.subs.set(page, a.uid); this.subTokens.push(a.tok||null); return true;
       case 'unsubscribe': this.subs.delete(page); return true;
       case 'cryptoGet': { if(!ok()) return null; const k=this.keys.get(own); return k?JSON.parse(JSON.stringify(k)):null; }
       case 'cryptoPut': if(!ok()) return this.err(RLS('crypto_keys').message); if(this.keys.has(own)) return this.err('duplicate key value violates unique constraint "crypto_keys_pkey"');
@@ -103,7 +112,8 @@ class Fake {
 }
 // The page's adapter (added with addInitScript): every call goes through the exposed binding fakeServer; {__err} becomes a thrown error
 function fakeAdapter(){
-  const call=async(op,a)=>{ if(!navigator.onLine) throw new TypeError('Failed to fetch'); const r=await window.fakeServer(op,a); if(r&&r.__err){ const e=new Error(r.__err.message); e.details=r.__err.details; throw e; } return r; };
+  const sess=()=>JSON.parse(localStorage.getItem('fake-session')||'null')||{};
+  const call=async(op,a)=>{ if(!navigator.onLine) throw new TypeError('Failed to fetch'); const r=await window.fakeServer(op,Object.assign({}, a, {tok:sess().token||null})); if(r&&r.__err){ const e=new Error(r.__err.message); e.details=r.__err.details; throw e; } return r; };
   const owner=()=>{ const s=JSON.parse(localStorage.getItem('fake-session')||'null'); return s&&s.id; };
   const b64=async blob=>new Promise((res,rej)=>{ const rd=new FileReader(); rd.onload=()=>res(String(rd.result).split(',')[1]||''); rd.onerror=()=>rej(rd.error); rd.readAsDataURL(blob); });
   window.__tareasRemote = {
@@ -115,7 +125,12 @@ function fakeAdapter(){
     byIds:(table, ids)=>call('byIds',{owner:owner(), table, ids}),
     upsert:(table, rows)=>call('upsert',{owner:owner(), table, rows}),
     markDeleted:(table, items)=>call('markDeleted',{owner:owner(), table, items}),
-    subscribe(uid, onRow, onStatus){ window.__fakeRT=(t,r)=>onRow(t,r); window.fakeServer('subscribe',{uid}); setTimeout(()=>onStatus('SUBSCRIBED'),0); return ()=>{ window.__fakeRT=null; window.fakeServer('unsubscribe',{}); }; },
+    // v0.37.1: the session's token (a session without one, as before rm-AU, is always fresh)
+    async ensureSession(force){ const s=JSON.parse(localStorage.getItem('fake-session')||'null'); if(!s) return 'none'; if(!s.exp) return 'ok';
+      if(!force&&s.exp-Date.now()>60e3) return 'ok'; const r=await window.fakeServer('refresh', {uid:s.id}); if(r&&r.__err) return 'failed';
+      Object.assign(s, r); localStorage.setItem('fake-session', JSON.stringify(s)); return 'refreshed'; },
+    async sessionState(){ const s=JSON.parse(localStorage.getItem('fake-session')||'null'); if(!s) return 'none'; if(!s.exp) return 'fresh'; return s.exp-Date.now()>60e3?'fresh':'expired'; },
+    subscribe(uid, onRow, onStatus){ window.__fakeRT=(t,r)=>onRow(t,r); window.__fakeRTStatus=onStatus; window.fakeServer('subscribe',{uid, tok:sess().token||null}); setTimeout(()=>onStatus('SUBSCRIBED'),0); return ()=>{ window.__fakeRT=null; window.fakeServer('unsubscribe',{}); }; },
     async fileUpload(path, blob, mime){ return call('upload', {owner:owner(), path, b64:await b64(blob), mime}); },
     async fileDownload(path){ const o=await call('download', {owner:owner(), path}); const s=atob(o.b64), u=new Uint8Array(s.length); for(let i=0;i<s.length;i++) u[i]=s.charCodeAt(i); return new Blob([u], {type:o.mime}); },
     inboxList:()=>call('inboxList', {owner:owner()}), inboxTake:(ids, ts, o)=>call('inboxTake', {owner:owner(), ids, ts, o:o||null}), inboxClear:()=>call('inboxClear', {owner:owner()}),

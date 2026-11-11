@@ -110,6 +110,7 @@ function supabaseRemote(cfg){
   // Decisions 29 and 46 published before 0003_attachments.sql or 0005_subtasks.sql ran: the table is not there, the rest syncs as before and
   // the attachments or the steps stay on the device
   const missing=new Set(), absent=(table, error)=>syncAbsent(missing, table, error);
+  let lastTok=null, lastExp=0; // the token the last check saw: one replaced after it had expired (getSession refreshed it itself) counts as refreshed
   return { missing, baseUrl:cfg.url,
     async init(){
       if(!client){ if(!window.supabase) await loadScript(SUPABASE_JS);
@@ -121,6 +122,25 @@ function supabaseRemote(cfg){
       return u; },
     // The callback runs outside the auth lock: calling the client from inside it can wait for ever
     onAuth(cb){ db().auth.onAuthStateChange((ev, session)=>{ if(ev==='SIGNED_IN'||ev==='SIGNED_OUT'||ev==='USER_UPDATED') setTimeout(()=>cb(user(session&&session.user), ev), 0); }); },
+    /* v0.37.1: the session before a pass. A device asleep for hours (its refresh timer did not run) wakes with an expired token, and a
+       request sent then goes out with the public key alone, as role anon: «permission denied for function tareas_team_me», refusals of the
+       row rules. A token that has expired or expires within a minute is refreshed first, and realtime gets the new one. 'ok', 'refreshed',
+       'none' (no session: as before) or 'failed' (the refresh did not answer, as just after waking: the pass waits, never runs as anon) */
+    async ensureSession(force){ const c=db(); let s=null, err=null;
+      try{ const r=await c.auth.getSession(); s=r.data&&r.data.session||null; err=r.error||null; }catch(e){ err=e; }
+      const fresh=x=>!!(x&&x.access_token&&((x.expires_at||0)*1000-Date.now()>60e3));
+      const took=x=>{ const was=lastTok&&x.access_token!==lastTok&&lastExp*1000<Date.now()+60e3; lastTok=x.access_token; lastExp=x.expires_at||0;
+        if(was) try{ Promise.resolve(c.realtime.setAuth(x.access_token)).catch(()=>{}); }catch(e){} return was; };
+      if(!err&&!force&&fresh(s)) return took(s)?'refreshed':'ok';
+      if(!err&&!s) return 'none';
+      let r; try{ r=await c.auth.refreshSession(); }catch(e){ r={error:e}; }
+      const n=r&&r.data&&r.data.session;
+      if(fresh(n)){ lastTok=null; took(n); try{ Promise.resolve(c.realtime.setAuth(n.access_token)).catch(()=>{}); }catch(e){} return 'refreshed'; }
+      const m=String(r&&r.error&&(r.error.name+' '+r.error.message)||'');
+      return /fetch|network|timeout|Retryable|5\d\d/i.test(m)||!m ? 'failed' : 'none'; },
+    // 'fresh', 'expired' (or within a minute of it) or 'none', without refreshing
+    async sessionState(){ try{ const raw=localStorage.getItem('tareas-auth'), s=raw&&JSON.parse(raw); const x=s&&(s.currentSession||s); if(!x||!x.access_token) return 'none';
+      return (x.expires_at||0)*1000-Date.now()>60e3?'fresh':'expired'; }catch(e){ return 'none'; } },
     async signIn(){ const {error}=await db().auth.signInWithOAuth({provider:'google', options:{redirectTo:location.origin+location.pathname}}); if(error) throw error; },
     async signOut(){ const {error}=await db().auth.signOut({scope:'local'}); if(error) throw error; },
     async pull(table, after, limit){ let q=db().from(table).select('*').order('server_ts',{ascending:true}).order('id',{ascending:true}).limit(limit); if(after) q=q.gt('server_ts', after); const res=await q; if(absent(table, res.error)) return []; return rows(res); },
@@ -225,7 +245,10 @@ function syncMerge(W, st, table, rows, stats){
     const dirty=lsig!==known[id], rm=syncTime(row.modified), lm=syncTime(lrow.modified);
     // Back here after its deletion went up (Deshacer, a restored copy): that deletion is older than the return, which wins
     const takeRemote = !(known[id]==='x' && !remote) && (rm>lm || (rm===lm && !dirty));
-    if(dirty && known[id]!=='x') stats.conflicts.push({table, id, won:takeRemote?'servidor':'local'});
+    // A conflict only when the server holds something this device did not know, edited on both sides. Not one: its own last upload pulled
+    // again (the pull overlaps the previous pass) under a newer edit here; nor two copies with the same modified, which differ only by what
+    // every device does on its own without touching it (rollOver, a reminder already past marked as sent). Who wins does not change
+    if(dirty && known[id]!=='x' && rsig!==known[id] && rm!==lm) stats.conflicts.push({table, id, won:takeRemote?'servidor':'local'});
     known[id]=rsig; // what the server holds now: a local copy that stays different goes up afterwards
     // Decision 56: rollOver counts without touching modified, so two copies with the same time can each hold part of the count (a device
     // closed for days counts once from its old copy). With equal times the count never goes down: the higher count and the earlier first day win
@@ -334,6 +357,10 @@ function syncRun(reason){
   if(!navigator.onLine){ SY.status='offline'; syncPaint(); return Promise.resolve(false); }
   SY.running=true; SY.again=false; syncStatus('syncing');
   const body=async()=>{ const t0=Date.now(); const user=SY.user;
+    // v0.37.1: a valid token first (an expired one after the device slept is refreshed); without an answer the pass waits, never runs as anon
+    if(SY.remote.ensureSession){ const ss=await SY.remote.ensureSession();
+      if(ss==='failed'){ const e=new Error('La sesión no se pudo renovar todavía'); e.authWait=true; throw e; }
+      if(ss==='refreshed'){ log('info','Sesión renovada antes de sincronizar'); SY.rtRenew=true; } }
     // Decision 63b: an account without access syncs nothing (js/team.js); the server would refuse it anyway
     const tg=await teamGate(user); if(tg==='denied') return 'denied';
     // This device's data belong to another account (it synced with it before): nothing of them goes up to this one, and nothing of this one
@@ -371,20 +398,47 @@ function syncRun(reason){
     if(ok==='other'){ SY.status='other'; SY.error=''; syncPaint(); syncOtherAsk(); return false; }
     if(ok==='denied'){ SY.status='denied'; SY.error=''; syncPaint(); teamDeniedPaint(); return false; } // decision 63b
     if(ok==='needkey'){ SY.status='needkey'; SY.error=''; syncPaint(); teamAskKey(); return false; } // decision 71.1
-    if(ok){ SY.status='ok'; SY.error=''; pushFlush(); attFlushSoon(0); syncResubscribe(); cryptoResume(); teamAfter(); } syncPaint(); if(SY.again) syncChanged(); return !!ok; }, e=>{
+    if(ok){ SY.status='ok'; SY.error=''; SY.authRetried=false; pushFlush(); attFlushSoon(0); if(SY.rtRenew){ SY.rtRenew=false; syncRenewChannel(); } else syncResubscribe(); cryptoResume(); teamAfter(); } syncPaint(); if(SY.again) syncChanged(); return !!ok; }, e=>{
     SY.running=false;
-    if(cryptoFailed(e)){ syncRetry(); syncPaint(); return false; } // decision 63a: encrypted rows and no key, or plain text refused by the server
-    if(teamRefused(e)){ syncRetry(); syncPaint(); return false; } // decision 63b: refused by the team's rules (access removed): the next pass reads the account again
-    const off=syncOffline(e); SY.status=off?'offline':'error'; SY.error=String(e&&(e.message||e.code)||e);
-    log(off?'warn':'error', 'Sincronización falló ('+reason+'): '+SY.error); syncRetry(); syncPaint(); return false; });
+    // v0.37.1: an expired or missing token (a 401, «JWT expired», «permission denied for function», or a refusal of the row rules while the
+    // token is not fresh) is no lost access: the session is refreshed and the pass repeated once, quietly. A second failure goes on as usual
+    if(SY.remote.ensureSession&&!SY.authRetried&&syncAuthCandidate(e)) return syncAuthLike(e).then(auth=>{ if(!auth) return syncFail(e, reason);
+      SY.authRetried=true; log('info','Sincronización: la sesión había caducado; se renueva y se repite');
+      return SY.remote.ensureSession(true).catch(()=>'failed').then(()=>syncRun(reason)); });
+    return syncFail(e, reason); });
   return SY.runP; }
+// What a failed pass does (cryptoFailed and teamRefused first; then offline or error, retried)
+function syncFail(e, reason){ SY.authRetried=false;
+  if(e&&e.authWait){ SY.status='offline'; SY.error=''; if(Date.now()-(SY.authWaitAt||0)>60e3){ SY.authWaitAt=Date.now(); log('info','Sincronización en espera: la sesión no se pudo renovar todavía'); } syncRetry(); syncPaint(); return false; }
+  if(cryptoFailed(e)){ syncRetry(); syncPaint(); return false; } // decision 63a: encrypted rows and no key, or plain text refused by the server
+  if(teamRefused(e)){ syncRetry(); syncPaint(); return false; } // decision 63b: refused by the team's rules (access removed): the next pass reads the account again
+  const off=syncOffline(e); SY.status=off?'offline':'error'; SY.error=String(e&&(e.message||e.code)||e);
+  log(off?'warn':'error', 'Sincronización falló ('+reason+'): '+SY.error); syncRetry(); syncPaint(); return false; }
+const syncErrText = e => String(e&&(e.message||e.code)||e)+' '+String(e&&e.code||'')+' '+String(e&&e.status||'');
+// An answer that is about the token itself, or a refusal of the row rules (which a request made as anon also gets)
+const SYNC_AUTH=/\b401\b|PGRST30[123]|JWT|jwt expired|token.*expired|permission denied for function/i;
+const syncAuthCandidate = e => SYNC_AUTH.test(syncErrText(e)) || /row-level security|42501/i.test(syncErrText(e));
+async function syncAuthLike(e){ if(SYNC_AUTH.test(syncErrText(e))) return true;
+  try{ return (await SY.remote.sessionState())!=='fresh'; }catch(err){ return false; } }
 // The realtime channel leaves out a table the database lacks (attachments before 0003): once a run finds it missing, the channel is made again
 const syncMissingKey = () => SY&&SY.remote&&SY.remote.missing?[...SY.remote.missing].join():'';
 function syncResubscribe(){ if(SY.unsub&&SY.subKey!==syncMissingKey()){ SY.unsub(); SY.unsub=null; syncSubscribe(); } }
+// The channel made again with the token just refreshed (after the device slept, its old channel rejoins with the expired one)
+function syncRenewChannel(){ if(!SY.unsub) return; SY.unsub(); SY.unsub=null; syncSubscribe(); }
+/* v0.37.1: realtime trouble. A socket closed while the app was away or the network changed (1000, 1001, 1005, 1006, a heartbeat timeout,
+   a closed channel) is normal: said as info, at most once a minute. Three failures in a row, or anything else, as a warning (again after 10
+   minutes at most). A token that has expired: the session is refreshed and the channel made again with the new one */
+function syncRtTrouble(st, err){ const m=st+(err?' '+(err.message||err):''); SY.rtFails=(SY.rtFails||0)+1;
+  const token=/JWT|token.*expired/i.test(m), normal=token||document.visibilityState==='hidden'||/\b(1000|1001|1005|1006)\b|heartbeat|timeout|TIMED_OUT|closed|No channels/i.test(m);
+  if(!normal||SY.rtFails>=3){ if(Date.now()-(SY.rtWarnAt||0)>600e3){ SY.rtWarnAt=Date.now(); log('warn','Tiempo real: '+m+(SY.rtFails>=3?' ('+SY.rtFails+' fallos seguidos)':'')); } }
+  else if(Date.now()-(SY.rtInfoAt||0)>60e3){ SY.rtInfoAt=Date.now(); log('info','Tiempo real: '+m); }
+  if(token) syncRtHeal(); }
+function syncRtHeal(){ if(SY.rtHealing||!SY.user||!SY.remote.ensureSession) return; SY.rtHealing=true;
+  SY.remote.ensureSession(true).then(s=>{ if(s==='refreshed'||s==='ok'){ syncRenewChannel(); log('info','Tiempo real: sesión renovada, canal de nuevo'); } }).catch(()=>{}).finally(()=>{ SY.rtHealing=false; }); }
 function syncSubscribe(){ if(SY.unsub||!SY.user||!SY.remote.subscribe) return; SY.subKey=syncMissingKey();
   let was=false; SY.unsub=SY.remote.subscribe(SY.user.id, (table,row)=>{ if(table==='team_notices'){ teamRecvSoon(); return; } if(table==='inbox'){ clearTimeout(SY.ibT); SY.ibT=setTimeout(()=>syncRun('Siri'), 300); return; } SY.rt.push([table,row]); clearTimeout(SY.rtT); SY.rtT=setTimeout(syncRealtime, 250); }, (st, err)=>{
-    if(st==='SUBSCRIBED'){ if(was) syncRun('tiempo real'); was=true; } // back after a cut: catch up with what came meanwhile
-    else if(st==='CHANNEL_ERROR'||st==='TIMED_OUT') log('warn','Tiempo real: '+st+(err?' '+(err.message||err):'')); }); }
+    if(st==='SUBSCRIBED'){ SY.rtFails=0; if(was) syncRun('tiempo real'); was=true; } // back after a cut: catch up with what came meanwhile
+    else if(st==='CHANNEL_ERROR'||st==='TIMED_OUT') syncRtTrouble(st, err); }); }
 // Changes from another device, a few at a time, through the same merge
 function syncRealtime(){ const ev=SY.rt.splice(0); if(!ev.length||!SY.user) return;
   if(cryptoLocked()) return; // decision 63a: nothing from the server is merged without the key; the run after unlocking pulls it

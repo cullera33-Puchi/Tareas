@@ -622,7 +622,9 @@ function updTask(id, patch){ const x=task(id); if(!x) return; if('date' in patch
    tasks rolled over to today), the reminder stays but is marked as sent, so it never notifies. The one helper every one of those paths uses;
    'extra' joins the patch (carried, status). The Fecha and Recordatorio sheets are manual edits and do not use it.
    Decision 56b: it counts the move too (postPatch), unless 'still' (Eliminar solo esta: the next date of a series is no postponing) */
-const sentStamp = iso => iso && Date.parse(iso)<=Date.now() ? new Date().toISOString() : null;
+// A reminder already past is marked as sent with its own time (v0.37.1: the same value on every device that moves it, as two devices rolling
+// over the same task in the morning, so their copies are equal and no conflict is counted)
+const sentStamp = iso => iso && Date.parse(iso)<=Date.now() ? new Date(Date.parse(iso)).toISOString() : null;
 function dayPatch(x, date, extra, still){ const p=Object.assign({date}, extra||{}); if(!still) Object.assign(p, postPatch(x, date, p.status));
   if(x && x.reminder && x.date && date && date!==x.date && localDay(x.reminder)===x.date){ const r=new Date(x.reminder), d=new Date(date+'T00:00:00');
     d.setHours(r.getHours(), r.getMinutes(), r.getSeconds(), r.getMilliseconds()); p.reminder=d.toISOString(); p.reminderSent=sentStamp(p.reminder); }

@@ -1,5 +1,14 @@
 [
   {
+    "version": "0.37.1",
+    "date": "2026-11-11",
+    "items": [
+      "Al volver al ordenador o al iPhone tras un rato largo, la app renueva la sesión antes de sincronizar, sin rechazos ni reintentos.",
+      "El tiempo real se reconecta con la sesión nueva y los cortes normales ya no salen como avisos en el registro.",
+      "Los cambios seguidos en una misma tarea y el paso de tareas a hoy en dos dispositivos ya no cuentan como conflictos."
+    ]
+  },
+  {
     "version": "0.37.0",
     "date": "2026-11-08",
     "items": [

@@ -110,7 +110,7 @@ function supabaseRemote(cfg){
   // Decisions 29 and 46 published before 0003_attachments.sql or 0005_subtasks.sql ran: the table is not there, the rest syncs as before and
   // the attachments or the steps stay on the device
   const missing=new Set(), absent=(table, error)=>syncAbsent(missing, table, error);
-  let lastTok=null, lastExp=0; // the token the last check saw: one replaced after it had expired (getSession refreshed it itself) counts as refreshed
+  let lastRefresh=0; // when this adapter last refreshed the session itself (ensureSession)
   return { missing, baseUrl:cfg.url,
     async init(){
       if(!client){ if(!window.supabase) await loadScript(SUPABASE_JS);
@@ -124,23 +124,26 @@ function supabaseRemote(cfg){
     onAuth(cb){ db().auth.onAuthStateChange((ev, session)=>{ if(ev==='SIGNED_IN'||ev==='SIGNED_OUT'||ev==='USER_UPDATED') setTimeout(()=>cb(user(session&&session.user), ev), 0); }); },
     /* v0.37.1: the session before a pass. A device asleep for hours (its refresh timer did not run) wakes with an expired token, and a
        request sent then goes out with the public key alone, as role anon: «permission denied for function tareas_team_me», refusals of the
-       row rules. A token that has expired or expires within a minute is refreshed first, and realtime gets the new one. 'ok', 'refreshed',
-       'none' (no session: as before) or 'failed' (the refresh did not answer, as just after waking: the pass waits, never runs as anon) */
+       row rules. A token that has expired or expires within SESSION_MARGIN is refreshed first, and realtime gets the new one (supabase-js
+       also does it on TOKEN_REFRESHED). 'ok', 'refreshed', 'none' (no session) or 'failed' (the refresh did not answer, as just after
+       waking: the pass waits, never runs as anon). A session refreshed here in the last 5 minutes is taken as it is, even forced: a clock
+       that runs fast (the expiry comes from the server) never makes it refresh pass after pass, and a refusal that keeps coming never
+       hits the refresh rate limit (a 429 there would sign the account out) */
     async ensureSession(force){ const c=db(); let s=null, err=null;
       try{ const r=await c.auth.getSession(); s=r.data&&r.data.session||null; err=r.error||null; }catch(e){ err=e; }
-      const fresh=x=>!!(x&&x.access_token&&((x.expires_at||0)*1000-Date.now()>60e3));
-      const took=x=>{ const was=lastTok&&x.access_token!==lastTok&&lastExp*1000<Date.now()+60e3; lastTok=x.access_token; lastExp=x.expires_at||0;
-        if(was) try{ Promise.resolve(c.realtime.setAuth(x.access_token)).catch(()=>{}); }catch(e){} return was; };
-      if(!err&&!force&&fresh(s)) return took(s)?'refreshed':'ok';
+      const fresh=x=>!!(x&&x.access_token&&((x.expires_at||0)*1000-Date.now()>SESSION_MARGIN));
       if(!err&&!s) return 'none';
+      if(!err&&s&&s.access_token&&Date.now()-lastRefresh<300e3) return 'ok';
+      if(!err&&!force&&fresh(s)) return 'ok';
       let r; try{ r=await c.auth.refreshSession(); }catch(e){ r={error:e}; }
       const n=r&&r.data&&r.data.session;
-      if(fresh(n)){ lastTok=null; took(n); try{ Promise.resolve(c.realtime.setAuth(n.access_token)).catch(()=>{}); }catch(e){} return 'refreshed'; }
+      if(n&&n.access_token){ lastRefresh=Date.now(); try{ Promise.resolve(c.realtime.setAuth(n.access_token)).catch(()=>{}); }catch(e){} return 'refreshed'; }
       const m=String(r&&r.error&&(r.error.name+' '+r.error.message)||'');
       return /fetch|network|timeout|Retryable|5\d\d/i.test(m)||!m ? 'failed' : 'none'; },
-    // 'fresh', 'expired' (or within a minute of it) or 'none', without refreshing
+    // 'fresh', 'expired' (or within SESSION_MARGIN of it) or 'none', without refreshing; one refreshed here in the last 5 minutes is fresh
     async sessionState(){ try{ const raw=localStorage.getItem('tareas-auth'), s=raw&&JSON.parse(raw); const x=s&&(s.currentSession||s); if(!x||!x.access_token) return 'none';
-      return (x.expires_at||0)*1000-Date.now()>60e3?'fresh':'expired'; }catch(e){ return 'none'; } },
+      if(Date.now()-lastRefresh<300e3) return 'fresh';
+      return (x.expires_at||0)*1000-Date.now()>SESSION_MARGIN?'fresh':'expired'; }catch(e){ return 'none'; } },
     async signIn(){ const {error}=await db().auth.signInWithOAuth({provider:'google', options:{redirectTo:location.origin+location.pathname}}); if(error) throw error; },
     async signOut(){ const {error}=await db().auth.signOut({scope:'local'}); if(error) throw error; },
     async pull(table, after, limit){ let q=db().from(table).select('*').order('server_ts',{ascending:true}).order('id',{ascending:true}).limit(limit); if(after) q=q.gt('server_ts', after); const res=await q; if(absent(table, res.error)) return []; return rows(res); },
@@ -152,7 +155,7 @@ function supabaseRemote(cfg){
       if(res.error && table==='tasks' && /reminder_sent/.test(res.error.message||'')){ if(!noSent) log('warn','La base de datos no tiene todavía la columna reminder_sent: falta 0002_push.sql'); noSent=true; res=await send(list.map(stripSent)); }
       return rows(res); },
     async markDeleted(table, items){ return rows(await db().from(table).upsert(items.map(x=>({id:x.id, deleted:x.ts, modified:x.ts})), {onConflict:'id', defaultToNull:false}).select('id')); },
-    subscribe(uid, onRow, onStatus){ const c=db(); const ch=c.channel('tareas-'+uid);
+    subscribe(uid, onRow, onStatus){ const c=db(); const ch=c.channel(syncTopic(uid)); // a topic of its own: the one being left may linger
       T.filter(t=>!missing.has(t)).forEach(t=>ch.on('postgres_changes', {event:'*', schema:'public', table:t, filter:'owner_id=eq.'+uid}, p=>{ if(p&&p.new&&p.new.id) onRow(t, p.new); }));
       if(!missing.has('inbox')) ch.on('postgres_changes', {event:'INSERT', schema:'public', table:'inbox', filter:'owner_id=eq.'+uid}, p=>{ if(p&&p.new&&p.new.id) onRow('inbox', p.new); }); // Siri: a phrase just arrived
       if(!missing.has('team_notices')) ch.on('postgres_changes', {event:'INSERT', schema:'public', table:'team_notices', filter:'recipient_id=eq.'+uid}, p=>{ if(p&&p.new&&p.new.id) onRow('team_notices', {id:p.new.id}); }); // decision 63b: a task sent to this member
@@ -353,14 +356,15 @@ function syncRun(reason){
   if(SY.running){ SY.again=true; return SY.runP; }
   if(CR.busy){ SY.again=true; return Promise.resolve(false); } // decision 63a: activating encryption or encrypting the server copy; a run follows
   clearTimeout(SY.timer);
-  if(!SY.ready){ syncInit(); return Promise.resolve(false); }
-  if(!navigator.onLine){ SY.status='offline'; syncPaint(); return Promise.resolve(false); }
+  if(!SY.ready){ SY.authRetried=false; syncInit(); return Promise.resolve(false); }
+  if(!navigator.onLine){ SY.authRetried=false; SY.status='offline'; syncPaint(); return Promise.resolve(false); }
   SY.running=true; SY.again=false; syncStatus('syncing');
   const body=async()=>{ const t0=Date.now(); const user=SY.user;
     // v0.37.1: a valid token first (an expired one after the device slept is refreshed); without an answer the pass waits, never runs as anon
     if(SY.remote.ensureSession){ const ss=await SY.remote.ensureSession();
       if(ss==='failed'){ const e=new Error('La sesión no se pudo renovar todavía'); e.authWait=true; throw e; }
-      if(ss==='refreshed'){ log('info','Sesión renovada antes de sincronizar'); SY.rtRenew=true; } }
+      if(ss==='none') return 'nosession'; // signed out elsewhere before the event came: nothing goes as anon, the session ends here
+      if(ss==='refreshed') log('info','Sesión renovada antes de sincronizar'); }
     // Decision 63b: an account without access syncs nothing (js/team.js); the server would refuse it anyway
     const tg=await teamGate(user); if(tg==='denied') return 'denied';
     // This device's data belong to another account (it synced with it before): nothing of them goes up to this one, and nothing of this one
@@ -393,12 +397,13 @@ function syncRun(reason){
     log('info','Sincronización ('+reason+')', {recibidas:a.added+a.updated, eliminadas:a.removed, conflictos:a.conflicts.length, enviadas:p.pushed, borradas:p.deleted, mantenidas:p.kept, ms:Date.now()-t0});
     return true; };
   const locked=()=>(navigator.locks&&navigator.locks.request) ? navigator.locks.request('tareas-sync', body) : body();
-  SY.runP=locked().then(ok=>{ SY.running=false;
+  SY.runP=locked().then(ok=>{ SY.running=false; SY.authRetried=false; // whatever the result, the next refusal may be retried once again
+    if(ok==='nosession'){ SY.status='idle'; syncSetUser(null, 'sin sesión'); return false; }
     if(ok==='locked'){ SY.status='locked'; SY.error=''; syncPaint(); cryptoAskUnlock(); return false; }
     if(ok==='other'){ SY.status='other'; SY.error=''; syncPaint(); syncOtherAsk(); return false; }
     if(ok==='denied'){ SY.status='denied'; SY.error=''; syncPaint(); teamDeniedPaint(); return false; } // decision 63b
     if(ok==='needkey'){ SY.status='needkey'; SY.error=''; syncPaint(); teamAskKey(); return false; } // decision 71.1
-    if(ok){ SY.status='ok'; SY.error=''; SY.authRetried=false; pushFlush(); attFlushSoon(0); if(SY.rtRenew){ SY.rtRenew=false; syncRenewChannel(); } else syncResubscribe(); cryptoResume(); teamAfter(); } syncPaint(); if(SY.again) syncChanged(); return !!ok; }, e=>{
+    if(ok){ SY.status='ok'; SY.error=''; pushFlush(); attFlushSoon(0); syncResubscribe(); cryptoResume(); teamAfter(); } syncPaint(); if(SY.again) syncChanged(); return !!ok; }, e=>{
     SY.running=false;
     // v0.37.1: an expired or missing token (a 401, «JWT expired», «permission denied for function», or a refusal of the row rules while the
     // token is not fresh) is no lost access: the session is refreshed and the pass repeated once, quietly. A second failure goes on as usual
@@ -409,11 +414,14 @@ function syncRun(reason){
   return SY.runP; }
 // What a failed pass does (cryptoFailed and teamRefused first; then offline or error, retried)
 function syncFail(e, reason){ SY.authRetried=false;
-  if(e&&e.authWait){ SY.status='offline'; SY.error=''; if(Date.now()-(SY.authWaitAt||0)>60e3){ SY.authWaitAt=Date.now(); log('info','Sincronización en espera: la sesión no se pudo renovar todavía'); } syncRetry(); syncPaint(); return false; }
+  // auth-js keeps a failed refresh for 60 s: the next try comes after that, not after the usual 2, 4, 8 s
+  if(e&&e.authWait){ SY.status='offline'; SY.error=''; if(Date.now()-(SY.authWaitAt||0)>60e3){ SY.authWaitAt=Date.now(); log('info','Sincronización en espera: la sesión no se pudo renovar todavía'); }
+    clearTimeout(SY.timer); const ms=Math.max(60e3, Math.min(300e3, 2000*Math.pow(2, SY.retry++))); SY.timer=setTimeout(()=>syncRun('reintento'), ms); syncPaint(); return false; }
   if(cryptoFailed(e)){ syncRetry(); syncPaint(); return false; } // decision 63a: encrypted rows and no key, or plain text refused by the server
   if(teamRefused(e)){ syncRetry(); syncPaint(); return false; } // decision 63b: refused by the team's rules (access removed): the next pass reads the account again
   const off=syncOffline(e); SY.status=off?'offline':'error'; SY.error=String(e&&(e.message||e.code)||e);
   log(off?'warn':'error', 'Sincronización falló ('+reason+'): '+SY.error); syncRetry(); syncPaint(); return false; }
+const SESSION_MARGIN=4*60e3; // a token that expires within 4 minutes counts as expired
 const syncErrText = e => String(e&&(e.message||e.code)||e)+' '+String(e&&e.code||'')+' '+String(e&&e.status||'');
 // An answer that is about the token itself, or a refusal of the row rules (which a request made as anon also gets)
 const SYNC_AUTH=/\b401\b|PGRST30[123]|JWT|jwt expired|token.*expired|permission denied for function/i;
@@ -423,8 +431,11 @@ async function syncAuthLike(e){ if(SYNC_AUTH.test(syncErrText(e))) return true;
 // The realtime channel leaves out a table the database lacks (attachments before 0003): once a run finds it missing, the channel is made again
 const syncMissingKey = () => SY&&SY.remote&&SY.remote.missing?[...SY.remote.missing].join():'';
 function syncResubscribe(){ if(SY.unsub&&SY.subKey!==syncMissingKey()){ SY.unsub(); SY.unsub=null; syncSubscribe(); } }
-// The channel made again with the token just refreshed (after the device slept, its old channel rejoins with the expired one)
+// The channel made again (a heal after a refused token): the old one is left, the new one has a topic of its own (syncTopic)
 function syncRenewChannel(){ if(!SY.unsub) return; SY.unsub(); SY.unsub=null; syncSubscribe(); }
+// A realtime topic per subscription: leaving a channel ends later, and a channel asked for with the same topic meanwhile is the one leaving
+let SYNC_TOPIC_N=0;
+function syncTopic(uid){ return 'tareas-'+uid+'-'+(++SYNC_TOPIC_N); }
 /* v0.37.1: realtime trouble. A socket closed while the app was away or the network changed (1000, 1001, 1005, 1006, a heartbeat timeout,
    a closed channel) is normal: said as info, at most once a minute. Three failures in a row, or anything else, as a warning (again after 10
    minutes at most). A token that has expired: the session is refreshed and the channel made again with the new one */
@@ -433,7 +444,8 @@ function syncRtTrouble(st, err){ const m=st+(err?' '+(err.message||err):''); SY.
   if(!normal||SY.rtFails>=3){ if(Date.now()-(SY.rtWarnAt||0)>600e3){ SY.rtWarnAt=Date.now(); log('warn','Tiempo real: '+m+(SY.rtFails>=3?' ('+SY.rtFails+' fallos seguidos)':'')); } }
   else if(Date.now()-(SY.rtInfoAt||0)>60e3){ SY.rtInfoAt=Date.now(); log('info','Tiempo real: '+m); }
   if(token) syncRtHeal(); }
-function syncRtHeal(){ if(SY.rtHealing||!SY.user||!SY.remote.ensureSession) return; SY.rtHealing=true;
+// At most once every 5 minutes: realtime retries every few seconds, and a refusal that keeps coming must not become a refresh every few seconds
+function syncRtHeal(){ if(SY.rtHealing||!SY.user||!SY.remote.ensureSession||Date.now()-(SY.rtHealAt||0)<300e3) return; SY.rtHealing=true; SY.rtHealAt=Date.now();
   SY.remote.ensureSession(true).then(s=>{ if(s==='refreshed'||s==='ok'){ syncRenewChannel(); log('info','Tiempo real: sesión renovada, canal de nuevo'); } }).catch(()=>{}).finally(()=>{ SY.rtHealing=false; }); }
 function syncSubscribe(){ if(SY.unsub||!SY.user||!SY.remote.subscribe) return; SY.subKey=syncMissingKey();
   let was=false; SY.unsub=SY.remote.subscribe(SY.user.id, (table,row)=>{ if(table==='team_notices'){ teamRecvSoon(); return; } if(table==='inbox'){ clearTimeout(SY.ibT); SY.ibT=setTimeout(()=>syncRun('Siri'), 300); return; } SY.rt.push([table,row]); clearTimeout(SY.rtT); SY.rtT=setTimeout(syncRealtime, 250); }, (st, err)=>{

@@ -1,5 +1,13 @@
 # Registro de cambios
 
+## v0.37.1. Sesión al volver y registro más limpio (11 de noviembre de 2026)
+
+- Antes de cada pasada de sincronización se comprueba la sesión: si ha caducado o caduca en menos de un minuto, se renueva primero (`ensureSession`) y el tiempo real recibe el token nuevo. Ninguna petición sale sin sesión.
+- Un rechazo que es de sesión (401, token caducado, permiso denegado con el token sin renovar) se renueva y se repite una vez en silencio, sin tratarlo como falta de acceso al equipo. Una baja real sigue mostrando «Esta cuenta no tiene acceso».
+- Tiempo real: tras renovar la sesión se rehace el canal con el token nuevo; los cortes normales se anotan como información, como mucho una vez por minuto, y solo los fallos repetidos como aviso.
+- Conflictos: ya no cuentan los cambios seguidos del propio dispositivo ni el paso de tareas a hoy hecho en dos dispositivos (quién gana no cambia). Un recordatorio pasado que se mueve con la fecha se marca con su propia hora, igual en todos los dispositivos.
+- Visto en el registro de Enric del 10 de noviembre. Sin cambios en Supabase. Prueba nueva `rm-AU`.
+
 ## v0.37.0. Seguimiento de las tareas enviadas y proyecto en el calendario (8 de noviembre de 2026)
 
 - Seguimiento (punto 78): «Añadir a mis tareas» crea la tarea enlazada con el aviso (identificador `nt-<aviso>-<aleatorio>`). Cada dispositivo de quien la recibe comunica la fecha prevista y si está completada (o descartada al borrarla). Quien la envió lo ve en el detalle («la ha añadido, prevista para el lunes 10», «la ha completado el martes 11») y, mientras su tarea sigue abierta, «Hecha por Víctor» en verde en la fila. Los avisos enviados antes de esta versión siguen diciendo «la ha añadido a sus tareas».

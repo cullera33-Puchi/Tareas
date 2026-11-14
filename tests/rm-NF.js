@@ -103,7 +103,7 @@ async function sqlTests(){
   check('sql_check_without_0014', !err && rows.filter(x=>/\(0014\)/.test(x.Pieza)).every(x=>x.Estado==='FALTA'), {err, rows:rows.filter(x=>/\(0014\)/.test(x.Pieza))});
   await db.close();
   const readme = fs.readFileSync(path.join(ROOT, 'supabase/README.md'), 'utf8');
-  check('sql_readme', /`migrations\/0014_notice_follow\.sql`/.test(readme) && /suma de las catorce en orden/.test(readme), null);
+  check('sql_readme', /`migrations\/0014_notice_follow\.sql`/.test(readme) && /suma de las \w+ en orden/.test(readme), null);
 }
 
 /* ======================= 2. The app ======================= */

@@ -358,6 +358,9 @@ body:not(.desktop) .row-meta>span+span{margin-left:.75em;} /* decision 27d: the 
 .hbtn:active{opacity:.4;}
 /* While the keyboard is up, room for the floating input bar iOS draws over the page: the icon bar and Añadir of Nueva tarea (R5) sit right above it */
 .kbup .sheet.on:not(.top){padding-bottom:64px;}
+/* v0.37.2: with the keyboard up an iPhone sheet never grows past what shows (Por confirmar came out 11 px over the top) and scrolls inside */
+html.kbup body:not(.desktop) .sheet.on:not(.top){max-height:calc(var(--vvh,85%) - env(safe-area-inset-top,0px) - 12px);}
+html.kbup body:not(.desktop) .wsheet .pplist{max-height:134px;}
 .sheet .titlein{width:100%;background:var(--bg);border:0;border-radius:10px;height:44px;padding:0 12px;outline:0;font-size:max(16px,1rem);}
 .chips{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 4px;}
 .chip{flex:none;display:flex;align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:16px;background:var(--fill);font-size:0.824rem;font-weight:500;white-space:nowrap;}

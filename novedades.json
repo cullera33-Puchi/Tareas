@@ -1,5 +1,16 @@
 [
   {
+    "version": "0.37.2",
+    "date": "2026-11-14",
+    "items": [
+      "La sincronización pide todo al servidor a la vez y tarda menos en cada pasada.",
+      "Cambiar de vista o de filtro ya no lanza una sincronización cuando no hay nada que enviar.",
+      "Con el teclado abierto, las hojas no pasan de la parte visible de la pantalla y la lista de personas de «Por confirmar» es más corta.",
+      "En el detalle, unas notas vacías ocupan dos líneas y dejan más sitio a los datos de la tarea.",
+      "En la Semana del ordenador, las tareas completadas van al final de cada día."
+    ]
+  },
+  {
     "version": "0.37.1",
     "date": "2026-11-11",
     "items": [

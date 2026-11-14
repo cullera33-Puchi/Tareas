@@ -70,10 +70,10 @@ async function run(browser){
   const dayOrder = d => pg.evaluate(d=>[...document.querySelectorAll('#desk .main [data-day="'+d+'"] .wcard')].map(c=>c.dataset.id), d);
   // The rule: the timed ones first by time (h1 8:15, h2 9:30), then the ranks of the sidebar never go back (archived, then no project last);
   // within FLC the high one first (the lists' order)
-  const rank = id => { if(id==='c2') return 2; const x=tasks.find(k=>k.id===id), p=x&&projects.find(q=>q.id===x.projectId); return !x.projectId?99:p.archived?50:p.order; };
+  const rank = id => { if(id==='c2') return 2; if(id==='d4') return 1000; /* v0.37.2: done tasks after the open ones of the day */ const x=tasks.find(k=>k.id===id), p=x&&projects.find(q=>q.id===x.projectId); return !x.projectId?99:p.archived?50:p.order; };
   const ranked = ids => ids.every((id,i)=>i===0||rank(ids[i-1])<=rank(id));
   const o0 = await dayOrder(t);
-  check('week_order_today', o0.slice(0,2).join()==='h1,h2' && ranked(o0.slice(2)) && o0.indexOf('a1')<o0.indexOf('a2') && o0[o0.length-1]==='n1' && o0.length===9, o0);
+  check('week_order_today', o0.slice(0,2).join()==='h1,h2' && ranked(o0.slice(2)) && o0.indexOf('a1')<o0.indexOf('a2') && o0[o0.length-2]==='n1' && o0[o0.length-1]==='d4' && o0.length===9, o0);
   const o1 = await dayOrder(D1);
   check('week_order_tomorrow', o1.join()==='d2,d1', o1);
   await shot(pg, 'pc-desk-light-semana');
@@ -92,7 +92,7 @@ async function run(browser){
   await pg.evaluate(()=>{ DB.settings.calMode='list'; save(); setDeskView('day'); }); await calm(pg);
   const dayList = await pg.evaluate(()=>[...document.querySelectorAll('#desk .main .wcard:not(.wtray .wcard)')].map(c=>c.dataset.id+':'+((c.querySelector('.ctag')||{}).textContent||'')));
   const dIds = dayList.map(x=>x.split(':')[0]), dCap = Object.fromEntries(dayList.map(x=>x.split(':')));
-  check('day_list', dIds.slice(0,2).join()==='h1,h2' && ranked(dIds.slice(2)) && dIds[dIds.length-1]==='n1' && dCap.h1==='' && dCap.h2==='Oca' && dCap.a1==='FLC' && dCap.b1==='Transf' && dCap.c1==='Oca' && dCap.z1==='Archiv' && dCap.n1==='', dayList);
+  check('day_list', dIds.slice(0,2).join()==='h1,h2' && ranked(dIds.slice(2)) && dIds[dIds.length-2]==='n1' && dIds[dIds.length-1]==='d4' && dCap.h1==='' && dCap.h2==='Oca' && dCap.a1==='FLC' && dCap.b1==='Transf' && dCap.c1==='Oca' && dCap.z1==='Archiv' && dCap.n1==='', dayList);
   // Semana in the hours view: the blocks of tomorrow too
   await pg.evaluate(()=>{ DB.settings.calMode='hours'; save(); setDeskView('week'); }); await calm(pg);
   const wh = await pg.evaluate(()=>{ const c=document.querySelector('#desk .main .wcard.hb[data-id=d2]'); return c&&(c.querySelector('.ctag')||{}).textContent; });

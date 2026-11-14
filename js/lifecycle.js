@@ -59,7 +59,8 @@ if(DB.settings.shakeUndo){ armShake(); // iOS asks again per launch: re-request 
 let kbNow=0;
 // iOS 26 can shrink the whole window with the keyboard instead of the visual viewport: the page then already fits above it
 const kbShrunk=()=>!UI.wide && screen.height>0 && innerHeight < screen.height*0.75 && innerWidth < screen.width+2;
-if(window.visualViewport){ const vv=window.visualViewport; const f=()=>{ const kb=Math.max(0, innerHeight - vv.height - vv.offsetTop); kbNow=kb; document.documentElement.style.setProperty('--kb', kb+'px'); document.documentElement.classList.toggle('kbup', kb>=60||kbShrunk()); if(kb>=60) sheet.classList.remove('top'); }; vv.addEventListener('resize',f); vv.addEventListener('scroll',f); }
+// --vvh (v0.37.2): the height that shows, in px; with the keyboard up a bottom sheet is held to it (on iOS a percentage counts from a taller box)
+if(window.visualViewport){ const vv=window.visualViewport; const f=()=>{ const kb=Math.max(0, innerHeight - vv.height - vv.offsetTop); kbNow=kb; document.documentElement.style.setProperty('--kb', kb+'px'); document.documentElement.style.setProperty('--vvh', Math.round(Math.min(innerHeight, vv.height))+'px'); document.documentElement.classList.toggle('kbup', kb>=60||kbShrunk()); if(kb>=60) sheet.classList.remove('top'); }; vv.addEventListener('resize',f); vv.addEventListener('scroll',f); f(); }
 // Some iOS versions do not shrink the visual viewport of an installed web app when the keyboard opens: --kb stays 0 and a
 // bottom sheet stays hidden behind the keyboard. If a field in the sheet has the focus and no keyboard has been reported
 // shortly after, the sheet moves to the top of the screen. The measures are logged once per launch to tune this on the device.

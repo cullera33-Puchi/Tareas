@@ -94,7 +94,7 @@ const rowHidden = (page, title) => page.$eval(rowSel(title), e=>getComputedStyle
   await press(cdp, page, c.x, c.y); await lift(cdp); await page.waitForTimeout(200);
   await tapItem(page, 'Aplazar');
   m = await menuState(page);
-  check('sub_aplazar', m.open && m.head==='Aplazar' && m.items[0]==='Mañana' && m.items.length>=3 && m.items[m.items.length-1]==='Elegir fecha' && m.box.top>=8 && m.box.bottom<=m.vh-8, m);
+  check('sub_aplazar', m.open && m.head==='Aplazar' && m.items[0]==='Mañana' && m.items.length>=3 && m.items[m.items.length-2]==='Elegir fecha' && m.items[m.items.length-1]==='Algún día' && m.box.top>=8 && m.box.bottom<=m.vh-8, m);
   await page.screenshot({path:OUT+'/d-light-sub.png'});
   await tapItem(page, 'Aplazar'); // the header goes back
   m = await menuState(page);
@@ -158,7 +158,7 @@ const rowHidden = (page, title) => page.$eval(rowSel(title), e=>getComputedStyle
   const D='.pushed-screen.detail';
   await page.tap(D+' [data-act=menu]'); await page.waitForTimeout(450);
   m = await menuState(page);
-  check('detail_menu', m.open && JSON.stringify(m.items)===JSON.stringify(['Marcar completada','Por confirmar','Mover a otro espacio','Duplicar','Eliminar tarea']) && m.box.right<=m.vw-8, m);
+  check('detail_menu', m.open && JSON.stringify(m.items)===JSON.stringify(['Marcar completada','Por confirmar','Algún día','Mover a otro espacio','Duplicar','Eliminar tarea']) && m.box.right<=m.vw-8, m);
   await page.screenshot({path:OUT+'/d-light-detailmenu.png'});
   await tapItem(page, 'Mover a otro espacio');
   m = await menuState(page);

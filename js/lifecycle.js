@@ -105,7 +105,7 @@ function returnHome(){
   UI.stack.forEach(s=>{ if(s.kind==='note') noteLeft(s.id); }); // an empty note left open goes, as when its screen is closed
   if(UI.select){ UI.select=null; app.classList.remove('selecting'); } openRow=null; UI.projFilter=null; UI.respFilter=null; UI.searchDone=false; // back to Hoy as on a fresh start
   if(UI.wide){ closeSheet(); setDeskView('hoy'); log('info','Vuelta a Hoy tras más de dos horas fuera'); return; } // the desktop returns through its own view; it has no iPhone stack
-  UI.stack.forEach(s=>s.el.remove()); UI.stack=[]; UI.tab='tareas'; UI.query=''; DB.settings.filter='hoy'; save(); closeSheet(); render(); const sc=rootScreen('tareas').querySelector('.scroll'); if(sc) sc.scrollTop=0; log('info','Vuelta a Hoy tras más de dos horas fuera'); }
+  UI.stack.forEach(s=>s.el.remove()); UI.stack=[]; UI.tab='tareas'; UI.query=''; DB.settings.filter='hoy'; save(); closeSheet(); render(); tuckSearch(); log('info','Vuelta a Hoy tras más de dos horas fuera'); } // v0.37.4: back to the top of the list, the search tucked
 window.addEventListener('pagehide', ()=>{ flushHeld(true); flushEdits(); });
 document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='hidden'){ hiddenAt=Date.now(); closeMenu(true); flushHeld(true); flushEdits(); return; } reloadIfChanged(); const n=rollOver(); if(n) log('info','Tareas pasadas a hoy: '+n); queueDailyBackup();
   const away=hiddenAt && Date.now()-hiddenAt>2*36e5;
@@ -139,7 +139,7 @@ function reloadFromStorage(src){ // src 'sync': the data came from the server (b
   else if(DB.spaces.length&&!DB.spaces.some(sp=>sp.id===DB.settings.activeSpace)){ DB.settings.activeSpace=DB.spaces.slice().sort((a,b)=>a.order-b.order)[0].id; resetListState(); } // decision 28a: the space on screen was deleted elsewhere
   DB.settings.filter=keep.filter;
   const n=UI.stack.length;
-  UI.stack=UI.stack.filter(s=>{ const ok=s.kind==='detail'?!!task(s.id):s.kind==='note'?!!noteRec(s.id):s.kind==='person'?true:(s.id==='none'||!!proj(s.id)); if(!ok) s.el.remove(); return ok; }); // decision 65a: a person's screen stays (empty, it says so)
+  UI.stack=UI.stack.filter(s=>{ const ok=s.kind==='detail'?!!task(s.id):s.kind==='note'?!!noteRec(s.id):s.kind==='person'||s.kind==='settings'?true:(s.id==='none'||!!proj(s.id)); if(!ok) s.el.remove(); return ok; }); // decision 65a: a person's screen stays (empty, it says so)
   if(UI.select) UI.select.ids.forEach(id=>{ if(!task(id)) UI.select.ids.delete(id); });
   if(UI.projFilter && UI.projFilter!=='none' && !proj(UI.projFilter)) UI.projFilter=null;
   if(src!=='sync' && Date.now()-reloadLoggedAt>6e4){ reloadLoggedAt=Date.now(); log('info','Datos recargados: otra ventana los ha cambiado'); }

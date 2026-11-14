@@ -195,14 +195,15 @@ function renderNow(){
   if(UI.stack.length) scheduleRefresh();
 }
 function renderPushed(s){ drawing(()=>renderPushedNow(s)); }
-function renderPushedNow(s){ const osc=s.el.querySelector('.scroll'), ost=osc?osc.scrollTop:0; swapHTML(s.el, s.kind==='detail'?viewDetail(s.id):s.kind==='note'?viewNote(s.id):s.kind==='person'?viewPerson(s.id):viewProject(s.id), s.kind==='project'||s.kind==='person'); // decision 65a: a person's screen
+function renderPushedNow(s){ const osc=s.el.querySelector('.scroll'), ost=osc?osc.scrollTop:0; swapHTML(s.el, s.kind==='detail'?viewDetail(s.id):s.kind==='note'?viewNote(s.id):s.kind==='person'?viewPerson(s.id):s.kind==='settings'?viewAjustes(s.id):viewProject(s.id), s.kind==='project'||s.kind==='person'); // decision 65a: a person's screen
   if(s.kind==='note'){ bindNote(s.el); const sc=s.el.querySelector('.scroll'); if(sc) sc.scrollTop=ost; return; } // decision 47
   if(s.kind==='detail'){ bindDetail(s.el, s.id); const sc=s.el.querySelector('.scroll'); if(sc) sc.scrollTop=ost; attHydrate(s.el); } } // restored once the text areas have their full height, or a long note would clamp it to the top
 // A root put away keeps its scroll in UI.scroll; it is drawn anew when it comes back and gets it back there
 function hideRoot(s){ if(s.classList.contains('hidden-tab')) return; const sc=s.querySelector('.scroll'), pc=s.querySelector('.pchips');
   if(sc) UI.scroll[s.dataset.root]=sc.scrollTop; UI.scroll[s.dataset.root+'.chips']=pc?pc.scrollLeft:null; s.classList.add('hidden-tab'); }
 function restoreRootScroll(scr){ const sc=scr.querySelector('.scroll'), nav=scr.querySelector('.nav'), pc=scr.querySelector('.pchips');
-  if(sc){ sc.scrollTop=UI.scroll[scr.dataset.root]||0; if(nav) nav.classList.toggle('compact', sc.scrollTop>36); }
+  if(sc&&scr.dataset.root==='tareas'&&UI.scroll.tareas==null){ tuckSearch(); if(nav) nav.classList.toggle('compact', sc.scrollTop>36); } // v0.37.4: the first time, the search tucked
+  else if(sc){ sc.scrollTop=UI.scroll[scr.dataset.root]||0; if(nav) nav.classList.toggle('compact', sc.scrollTop>36); }
   if(pc){ const l=UI.scroll[scr.dataset.root+'.chips']; if(l!=null) pc.scrollLeft=l; else chipInView(pc); } }
 // Screens marked while covered are drawn a moment later, off the tap that changed the data, so going back finds them current
 let refreshT=null;
@@ -506,13 +507,19 @@ function viewTareas(){
   if(UI.select && UI.select.scope==='root') return selectNav()+'<div class="scroll">'+listHTML(UI.query?'todas':f)+'</div>';
   focusCheck(); if(focusOn()) return focusViewHTML(); // decision 65d
   return '<header class="nav"><div class="nav-row"><button class="title" data-act="spaceMenu" aria-label="Cambiar espacio">'+esc(space().name)+I.chevD+'</button>'+'<button class="action vopts" data-act="viewMenu" aria-label="Opciones de vista">'+I.more+'</button>'+'</div></header>'+
-   '<div class="scroll">'+(f==='hoy'&&!UI.query?recvBannerHTML():'')+(f==='hoy'&&!UI.query&&!isClosed()?ahoraHTML():'')+ // decision 63b: Recibidas, one line while something waits
+   // v0.37.4 (decision 84, lote C, U3): the search field goes first and is tucked under the bar (tuckSearch), as in Mail: a short pull
+   // down shows it, a second one syncs. The list is never shorter than the screen plus the field (.tlist), so it can always be tucked
+   '<div class="scroll"><div class="tlist">'+
    '<div class="searchbar"><div class="search">'+I.search+'<input type="search" placeholder="Buscar" value="'+esc(UI.query)+'" data-role="search" autocomplete="off"></div>'+(UI.query?'<button class="cancel" data-act="clearSearch">Cancelar</button>':'')+'</div>'+
+   (f==='hoy'&&!UI.query?recvBannerHTML():'')+(f==='hoy'&&!UI.query&&!isClosed()?ahoraHTML():'')+ // decision 63b: Recibidas, one line while something waits
    (UI.query?'':'<div class="seg"><button data-filter="hoy" class="'+(f==='hoy'?'on':'')+'">'+(isClosed()?'Mañana':'Hoy')+'<span class="n">'+nHoy+'</span>'+hoyLoadHTML()+'</button><button data-filter="todas" class="'+(f==='todas'?'on':'')+'">Todas<span class="n">'+nTodas+'</span></button></div>')+
    (!UI.query&&(activeProjects().length||respChipHTML())?'<div class="pchips">'+respChipHTML()+(activeProjects().length?activeProjects().map(p=>'<button class="chip'+(UI.projFilter===p.id?' on':'')+'" data-pf="'+p.id+'"'+(UI.projFilter===p.id?' style="background:'+p.color+'"':'')+'><span class="dot" style="background:'+(UI.projFilter===p.id?'#fff':p.color)+'"></span>'+esc(p.name)+'</button>').join('')+'<button class="chip'+(UI.projFilter==='none'?' on':'')+'" data-pf="none"><span class="dot" style="background:'+(UI.projFilter==='none'?'#fff':'var(--ink3)')+'"></span>Sin proyecto</button>':'')+'</div>':'')+ // decision 48c: the responsible's chip first
-   listHTML(UI.query?'todas':f)+'</div>'+
+   listHTML(UI.query?'todas':f)+'</div></div>'+
    '<button class="fab" data-act="add" aria-label="Añadir tarea">'+I.plus+'</button>';
 }
+// v0.37.4 (U3): Tareas opens with the search field just above the top of its list, hidden under the bar; nothing is tucked while searching
+function tuckSearch(){ if(UI.wide||UI.query) return; const scr=app.querySelector('.screen.root[data-root=tareas]:not(.hidden-tab)'), sc=scr&&scr.querySelector('.scroll'), bar=sc&&sc.querySelector('.tlist > .searchbar'); if(!bar||!bar.offsetHeight) return;
+  sc.scrollTop=Math.max(0, Math.round(bar.getBoundingClientRect().bottom+parseFloat(getComputedStyle(bar).marginBottom||0)-sc.getBoundingClientRect().top+sc.scrollTop)); }
 
 /* ---------- Projects view ---------- */
 function viewProyectos(){
@@ -535,32 +542,52 @@ function viewProject(id){
 }
 
 /* ---------- Settings view ---------- */
-function viewAjustes(){
-  const th=DB.settings.theme||'auto'; const dev=UI.wide?'este dispositivo':'este iPhone'; // the desktop reuses this view
+/* v0.37.4 (decision 84, lote C, U6): on the iPhone Ajustes is an index of a few cells that open subscreens (push('settings', key)); the theme,
+   the shake gesture and the version stay on it. The desktop keeps the whole page. Each section is built by the same code as before, so the
+   subscreens hold exactly what the page held: nothing is removed. SET_SUBS: the subscreens, their titles and the sections they show */
+const SET_SUBS={cuenta:'Cuenta y sincronización', equipo:'Equipo', espacios:'Espacios y horas', contactos:'Contactos', datos:'Datos y copias', registro:'Registro', archivados:'Proyectos archivados'};
+function setSections(dev){ const th=DB.settings.theme||'auto';
+  return {
+   cuenta: ()=>syncAccountHTML(dev)+cryptoSectionHTML(dev)+pushSectionHTML(dev)+shortcutSectionHTML(dev), // decision 63a: Cifrado (js/e2e.js)
+   equipo: ()=>teamSectionHTML(dev),
+   espacios: ()=>'<div class="group-title">Espacios</div><div class="group">'+DB.spaces.slice().sort((a,b)=>a.order-b.order).map(sp=>'<button class="cell" data-edit-space="'+sp.id+'"><span class="lbl">'+esc(sp.name)+'</span>'+(sp.id===space().id?'<span class="val">Activo</span>':'')+I.chev.replace('<svg','<svg class="chev"')+'</button>').join('')+'<button class="cell link" data-act="newSpace">'+I.plus.replace('<svg','<svg style="width:18px;height:18px"')+'<span class="lbl">Nuevo espacio</span></button></div>'+
+     '<div class="footnote">Al eliminar un espacio se eliminan también sus proyectos, tareas y notas de voz.</div>'+
+     '<div class="group-title">Horas de trabajo al día</div><div class="group">'+DB.spaces.slice().sort((a,b)=>a.order-b.order).map(sp=>'<button class="cell" data-day-hours="'+sp.id+'" aria-haspopup="menu"><span class="lbl">'+esc(sp.name)+'</span><span class="val">'+dayHours(sp.id)+' h</span>'+I.chev.replace('<svg','<svg class="chev"')+'</button>').join('')+'</div>'+ // decision 60a
+     '<div class="footnote">Hoy y Semana suman el tiempo estimado de cada día: en naranja al llegar a estas horas y en rojo desde vez y media.</div>',
+   contactos: ()=>contactsSectionHTML(), // decision 48c
+   datos: ()=>'<div class="group-title">Datos</div><div class="group"><button class="cell" data-act="exportFile"><span class="lbl">Exportar a archivo</span><span class="val">JSON</span></button><button class="cell" data-act="exportCSV"><span class="lbl">Exportar a Excel</span><span class="val">CSV</span></button><button class="cell" data-act="importFile"><span class="lbl">Importar desde archivo</span><span class="val">JSON</span></button><button class="cell" data-act="import"><span class="lbl">Importar pegando texto</span></button></div>'+
+     '<div class="footnote">Al importar, lo existente se actualiza si la copia es más reciente.</div>'+
+     '<div class="group-title">Copias de seguridad</div><div class="group bk-group">'+(BACKUPS.length?BACKUPS.map(backupRowHTML).join(''):'<div class="cell"><span class="lbl" style="color:var(--ink2)">Todavía ninguna</span></div>')+'<button class="cell link" data-act="backupNow">'+I.plus.replace('<svg','<svg style="width:18px;height:18px"')+'<span class="lbl">Crear copia ahora</span></button>'+
+     (BACKUPS.length?'<button class="cell" data-act="backupsClear"><span class="lbl" style="color:var(--red)">Borrar todas las copias</span></button>':'')+'</div>'+
+     '<div class="footnote">Una copia automática al día en '+dev+'; se conservan las últimas siete. '+(UI.wide?'Haz clic en una para restaurarla; con el botón derecho, o la papelera, se borra.':'Toca una para restaurarla; desliza a la izquierda para borrarla.')+'</div>'+
+     (demoCount()?'<div class="group-title">Datos de prueba</div><div class="group"><button class="cell" data-act="demoClear"><span class="lbl" style="color:var(--red)">Eliminar datos de prueba</span><span class="val">'+demoCount()+'</span></button></div>'+
+     '<div class="footnote">Se eliminan sin tocar tus datos.</div>':''), // generating them is no longer offered (generateDemo stays for tests); leftovers can still go
+   gestos: ()=>UI.wide?'':'<div class="group-title">Gestos</div><div class="group"><button class="cell" data-act="shakeToggle"><span class="lbl">Agitar para deshacer</span><span class="switch'+(DB.settings.shakeUndo?' on':'')+'"></span></button></div>'+
+     '<div class="footnote">Agita el iPhone mientras se ve el aviso para deshacer la última acción. Pide permiso de movimiento una vez.</div>', // shaking is an iPhone gesture
+   registro: ()=>'<div class="group-title">Registro</div><div class="group"><button class="cell" data-act="log"><span class="lbl">Ver registro</span><span class="val">'+LOG.length+' entradas</span></button><button class="cell" data-act="logCopy"><span class="lbl">Copiar registro</span></button>'+(LOG.length?'<button class="cell" data-act="logClear"><span class="lbl" style="color:var(--red)">Borrar registro</span></button>':'')+'</div>'+
+     '<div class="footnote">Cópialo y pégalo en el chat para depurar. Después puedes borrarlo para empezar de cero.</div>',
+   aspecto: ()=>'<div class="group-title">Aspecto</div><div class="group"><div class="cell"><span class="lbl">Tema</span></div><div style="padding:0 16px 12px"><div class="seg" style="margin:0"><button data-theme="auto" class="'+(th==='auto'?'on':'')+'">Automático</button><button data-theme="light" class="'+(th==='light'?'on':'')+'">Claro</button><button data-theme="dark" class="'+(th==='dark'?'on':'')+'">Oscuro</button></div></div></div>',
+   archivados: ()=>'<div class="group-title">Proyectos archivados</div><div class="group">'+(DB.projects.filter(p=>p.archived&&p.spaceId===space().id).map(p=>'<button class="cell" data-unarchive="'+p.id+'"><span class="pdot" style="background:'+p.color+'"></span><span class="lbl">'+esc(p.name)+'</span><span class="val">Restaurar</span></button>').join('')||'<div class="cell"><span class="lbl" style="color:var(--ink2)">Ninguno en '+esc(space().name)+'</span></div>')+'</div>',
+   version: ()=>'<div class="group-title">Versión</div><div class="group">'+(pendingSW?'<button class="cell link" data-act="update"><span class="lbl">Nueva versión disponible</span><span class="val">Actualizar</span></button>':'')+
+     '<button class="cell" data-act="news"><span class="lbl">Novedades</span><span class="val">v'+APP_VERSION+'</span>'+I.chev.replace('<svg','<svg class="chev"')+'</button></div>'+ // decision 64
+     '<div class="footnote">Tareas v'+APP_VERSION+'. Datos guardados en el dispositivo.</div>' }; }
+const SET_ORDER=['cuenta','equipo','espacios','contactos','datos','gestos','registro','aspecto','archivados','version']; // the desktop page, in the order it always had
+// The index cell of a subscreen: its title and a short value (the sync line says when something needs attention)
+const SET_LABEL={cuenta:'Cuenta'}; // the index cell, shorter than the subscreen's title
+function setCellHTML(k, val, warn){ return '<button class="cell" data-settings="'+k+'"><span class="lbl">'+(SET_LABEL[k]||SET_SUBS[k])+'</span>'+(val?'<span class="val'+(warn?' warn':'')+'">'+esc(val)+'</span>':'')+I.chev.replace('<svg','<svg class="chev"')+'</button>'; }
+function viewAjustes(sub){
+  const dev=UI.wide?'este dispositivo':'este iPhone', S=setSections(dev); // the desktop reuses this view
+  if(UI.wide) return '<header class="nav"><div class="nav-row"><div class="title">Ajustes</div></div></header><div class="scroll">'+SET_ORDER.map(k=>S[k]()).join('')+'</div>';
+  if(sub&&SET_SUBS[sub]) return '<header class="nav"><div class="nav-row"><button class="back" data-act="back">'+I.back+'Ajustes</button><div class="nav-title">'+SET_SUBS[sub]+'</div></div></header>'+
+    '<div class="scroll settings-sub" data-settings-sub="'+sub+'">'+S[sub]()+'</div>';
+  const sl=syncLine(), warn=!!sl&&!/^(Sincronizado|Sincronizando|Pendiente)/.test(sl), acct=SY&&SY.user?(sl||'Sincronizada'):SY?'Sin iniciar sesión':'Solo en este iPhone';
+  const team=teamOn()?setCellHTML('equipo', teamAdmin()?'Administrador':''):'', nArch=DB.projects.filter(p=>p.archived&&p.spaceId===space().id).length;
   return '<header class="nav"><div class="nav-row"><div class="title">Ajustes</div></div></header>'+
-   '<div class="scroll">'+
-   syncAccountHTML(dev)+cryptoSectionHTML(dev)+teamSectionHTML(dev)+pushSectionHTML(dev)+shortcutSectionHTML(dev)+ // decision 63a: Cifrado (js/e2e.js)
-   '<div class="group-title">Espacios</div><div class="group">'+DB.spaces.slice().sort((a,b)=>a.order-b.order).map(sp=>'<button class="cell" data-edit-space="'+sp.id+'"><span class="lbl">'+esc(sp.name)+'</span>'+(sp.id===space().id?'<span class="val">Activo</span>':'')+I.chev.replace('<svg','<svg class="chev"')+'</button>').join('')+'<button class="cell link" data-act="newSpace">'+I.plus.replace('<svg','<svg style="width:18px;height:18px"')+'<span class="lbl">Nuevo espacio</span></button></div>'+
-   '<div class="footnote">Al eliminar un espacio se eliminan también sus proyectos, tareas y notas de voz.</div>'+
-   '<div class="group-title">Horas de trabajo al día</div><div class="group">'+DB.spaces.slice().sort((a,b)=>a.order-b.order).map(sp=>'<button class="cell" data-day-hours="'+sp.id+'" aria-haspopup="menu"><span class="lbl">'+esc(sp.name)+'</span><span class="val">'+dayHours(sp.id)+' h</span>'+I.chev.replace('<svg','<svg class="chev"')+'</button>').join('')+'</div>'+ // decision 60a
-   '<div class="footnote">Hoy y Semana suman el tiempo estimado de las tareas de cada día. La suma se ve en naranja al llegar a estas horas y en rojo a partir de vez y media.</div>'+
-   contactsSectionHTML()+ // decision 48c
-   '<div class="group-title">Datos</div><div class="group"><button class="cell" data-act="exportFile"><span class="lbl">Exportar a archivo</span><span class="val">JSON</span></button><button class="cell" data-act="exportCSV"><span class="lbl">Exportar a Excel</span><span class="val">CSV</span></button><button class="cell" data-act="importFile"><span class="lbl">Importar desde archivo</span><span class="val">JSON</span></button><button class="cell" data-act="import"><span class="lbl">Importar pegando texto</span></button></div>'+
-   '<div class="footnote">Al importar, lo existente se actualiza si la copia es más reciente.</div>'+
-   '<div class="group-title">Copias de seguridad</div><div class="group bk-group">'+(BACKUPS.length?BACKUPS.map(backupRowHTML).join(''):'<div class="cell"><span class="lbl" style="color:var(--ink2)">Todavía ninguna</span></div>')+'<button class="cell link" data-act="backupNow">'+I.plus.replace('<svg','<svg style="width:18px;height:18px"')+'<span class="lbl">Crear copia ahora</span></button>'+
-   (BACKUPS.length?'<button class="cell" data-act="backupsClear"><span class="lbl" style="color:var(--red)">Borrar todas las copias</span></button>':'')+'</div>'+
-   '<div class="footnote">Una copia automática al día en '+dev+'; se conservan las últimas siete. '+(UI.wide?'Haz clic en una para restaurarla; con el botón derecho, o la papelera, se borra.':'Toca una para restaurarla; desliza a la izquierda para borrarla.')+'</div>'+
-   (UI.wide?'':'<div class="group-title">Gestos</div><div class="group"><button class="cell" data-act="shakeToggle"><span class="lbl">Agitar para deshacer</span><span class="switch'+(DB.settings.shakeUndo?' on':'')+'"></span></button></div>'+
-   '<div class="footnote">Agita el iPhone mientras se muestra el aviso para deshacer la última acción. Pide permiso de movimiento una vez.</div>')+ // shaking is an iPhone gesture
-   (demoCount()?'<div class="group-title">Datos de prueba</div><div class="group"><button class="cell" data-act="demoClear"><span class="lbl" style="color:var(--red)">Eliminar datos de prueba</span><span class="val">'+demoCount()+'</span></button></div>'+
-   '<div class="footnote">Se eliminan sin tocar tus datos.</div>':'')+ // generating them is no longer offered (generateDemo stays for tests); leftovers can still go
-   '<div class="group-title">Registro</div><div class="group"><button class="cell" data-act="log"><span class="lbl">Ver registro</span><span class="val">'+LOG.length+' entradas</span></button><button class="cell" data-act="logCopy"><span class="lbl">Copiar registro</span></button>'+(LOG.length?'<button class="cell" data-act="logClear"><span class="lbl" style="color:var(--red)">Borrar registro</span></button>':'')+'</div>'+
-   '<div class="footnote">Cópialo y pégalo en el chat para depurar. Después puedes borrarlo para empezar de cero.</div>'+
-   '<div class="group-title">Aspecto</div><div class="group"><div class="cell"><span class="lbl">Tema</span></div><div style="padding:0 16px 12px"><div class="seg" style="margin:0"><button data-theme="auto" class="'+(th==='auto'?'on':'')+'">Automático</button><button data-theme="light" class="'+(th==='light'?'on':'')+'">Claro</button><button data-theme="dark" class="'+(th==='dark'?'on':'')+'">Oscuro</button></div></div></div>'+
-   '<div class="group-title">Proyectos archivados</div><div class="group">'+(DB.projects.filter(p=>p.archived&&p.spaceId===space().id).map(p=>'<button class="cell" data-unarchive="'+p.id+'"><span class="pdot" style="background:'+p.color+'"></span><span class="lbl">'+esc(p.name)+'</span><span class="val">Restaurar</span></button>').join('')||'<div class="cell"><span class="lbl" style="color:var(--ink2)">Ninguno en '+esc(space().name)+'</span></div>')+'</div>'+
-   '<div class="group-title">Versión</div><div class="group">'+(pendingSW?'<button class="cell link" data-act="update"><span class="lbl">Nueva versión disponible</span><span class="val">Actualizar</span></button>':'')+
-   '<button class="cell" data-act="news"><span class="lbl">Novedades</span><span class="val">v'+APP_VERSION+'</span>'+I.chev.replace('<svg','<svg class="chev"')+'</button></div>'+ // decision 64
-   '<div class="footnote">Tareas v'+APP_VERSION+'. Datos guardados en el dispositivo.</div></div>';
+   '<div class="scroll settings-index">'+
+   '<div class="group">'+setCellHTML('cuenta', acct, warn)+team+'</div>'+
+   '<div class="group">'+setCellHTML('espacios', DB.spaces.length+(DB.spaces.length===1?' espacio':' espacios'))+setCellHTML('contactos', String((DB.contacts||[]).length||''))+setCellHTML('archivados', nArch?String(nArch):'')+'</div>'+
+   '<div class="group">'+setCellHTML('datos', BACKUPS.length?BACKUPS.length+(BACKUPS.length===1?' copia':' copias'):'')+setCellHTML('registro', LOG.length+' entradas')+'</div>'+
+   S.aspecto()+S.gestos()+S.version()+'</div>';
 }
 
 /* ---------- Detail view ---------- */

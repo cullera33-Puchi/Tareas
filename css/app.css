@@ -158,6 +158,9 @@ body.desktop .toast{left:auto;right:28px;bottom:28px;width:360px;}
 
 /* Search and segment */
 .searchbar{display:flex;align-items:center;gap:10px;margin:4px 0 10px;}
+/* v0.37.4 (U3): the Tareas list is at least the screen plus the search field, so the field can always sit tucked under the bar */
+.tlist{min-height:calc(100% + 54px);}
+.app.desktop .tlist{min-height:0;}
 .search{flex:1;min-width:0;display:flex;align-items:center;gap:6px;background:var(--fill);border-radius:10px;height:36px;padding:0 8px;color:var(--ink2);}
 .search svg{width:16px;height:16px;flex:none;}
 .search input{flex:1;min-width:0;width:100%;background:none;border:0;outline:0;height:36px;color:var(--ink);}

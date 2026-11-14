@@ -23,6 +23,7 @@ const srv = http.createServer((req,res)=>{ let p = decodeURIComponent(req.url.sp
   await page.click(T+'[data-filter=hoy]'); await page.waitForTimeout(200);
   // Enter selection from the long-press menu
   await page.evaluate(()=>rowMenu(DB.tasks[0].id)); await page.waitForTimeout(250); r.menu = await page.$$eval('#pmenu .pm-it', b=>b.map(x=>x.textContent.trim()));
+  await page.click('#pmenu .pm-it:has-text("Más")'); await page.waitForTimeout(400); // v0.37.4 (decision 84): Seleccionar is under Más
   await page.click('#pmenu .pm-it:has-text("Seleccionar")'); await page.waitForTimeout(400);
   r.enter = await page.evaluate(()=>({selecting:document.querySelector('#app').classList.contains('selecting'), title:document.querySelector('#selTitle').textContent, selboxes:document.querySelectorAll('.screen.root[data-root=tareas] .selbox').length, selected:document.querySelectorAll('.screen.root[data-root=tareas] .row.selected').length, bar:[...document.querySelectorAll('#selbar button')].map(b=>b.textContent+(b.disabled?'(off)':'')), tabbarHidden:getComputedStyle(document.querySelector('#tabbar')).display==='none'}));
   // Tap another row toggles selection, no detail opens

@@ -1,4 +1,4 @@
-require('./lib/out.js'); // outputs (screenshots, downloads) go to tests/out
+require('./lib/out.js'); const { openSetting, closeSetting } = require('./lib/settings.js'); // v0.37.4: Ajustes in subscreens on the iPhone // outputs (screenshots, downloads) go to tests/out
 // Decision 48c (Responsable), the list of contacts and the length of the hour blocks (R20), approved on 4 November. Ports 10880 to 10899.
 // Screenshots in tests/out/RC.
 //  1. SQL: supabase/migrations/0011_contacts.sql run twice in PGlite after 0001 to 0010: tasks.responsible, the table contacts and its
@@ -264,12 +264,12 @@ async function iphone(browser){
   await ev(page, ()=>{ unWait('a2'); setWaiting('a2', 'luis'); }); check('w_canonical', await ev(page, ()=>task('a2').waitingFor==='Luis' && DB.contacts.length===2));
   await ev(page, ()=>{ unWait('a2'); render(); }); await hideToast(page); await calm(page);
   // --- Ajustes, Contactos
-  await page.tap('.tabbar [data-tab=ajustes]'); await calm(page);
-  x = await ev(page, ()=>{ const g=document.querySelector('.screen.root[data-root=ajustes] .group.contacts'); return g&&{rows:[...g.querySelectorAll('[data-contact]')].map(b=>b.querySelector('.lbl').textContent+':'+b.querySelector('.val').textContent).join('|'), add:!!g.querySelector('[data-act=newContact]'), title:g.previousElementSibling.textContent}; });
+  await openSetting(page, 'contactos'); await calm(page); // v0.37.4
+  x = await ev(page, ()=>{ const g=document.querySelector('.screen.settings .group.contacts'); return g&&{rows:[...g.querySelectorAll('[data-contact]')].map(b=>b.querySelector('.lbl').textContent+':'+b.querySelector('.val').textContent).join('|'), add:!!g.querySelector('[data-act=newContact]'), title:g.previousElementSibling.textContent}; });
   check('s_list', x && x.rows==='Luis:luis@example.com|Marta Ruiz:612 345 678' && x.add && x.title==='Contactos', x);
-  await ev(page, ()=>{ document.querySelector('.screen.root[data-root=ajustes] .group.contacts').scrollIntoView({block:'center'}); }); await sleep(200);
+  await ev(page, ()=>{ document.querySelector('.screen.settings .group.contacts').scrollIntoView({block:'center'}); }); await sleep(200);
   await shot(page, 'i7-ajustes');
-  await page.tap('.screen.root[data-root=ajustes] [data-contact=c1]'); await sheetUp(page);
+  await page.tap('.screen.settings [data-contact=c1]'); await sheetUp(page);
   x = await ev(page, ()=>({h:document.querySelector('#sheet h2').textContent, n:document.querySelector('#sheet [data-role=cname]').value, p:document.querySelector('#sheet [data-role=cphone]').value, hint:document.querySelector('#sheet .hint').textContent}));
   check('s_sheet', x.h==='Editar contacto' && x.n==='Marta Ruiz' && x.p==='612 345 678' && x.hint==='Lo usan 3 tareas. Si cambias el nombre, cambia también en ellas.', x); // a1, a2 and a3
   await shot(page, 'i8-contact');
@@ -282,7 +282,7 @@ async function iphone(browser){
   // A rename of the person waited for, and one to a name another contact has
   await ev(page, ()=>{ saveContact(contactRec('c2'), {name:'Luis Pons', email:'luis@example.com', phone:null}); }); check('s_rename_wait', await ev(page, ()=>task('a3').waitingFor==='Luis Pons' && task('a4').responsible==='Luis Pons'));
   await ev(page, ()=>{ undoFn(); render(); }); await calm(page);
-  await page.tap('.screen.root[data-root=ajustes] [data-contact=c2]'); await sheetUp(page);
+  await page.tap('.screen.settings [data-contact=c2]'); await sheetUp(page);
   await page.fill('#sheet [data-role=cname]', 'marta ruiz'); await page.tap('#sheet [data-x=ok]');
   check('s_dup_name', await ev(page, ()=>document.querySelector('#sheet').classList.contains('on') && document.querySelector('#toastText').textContent==='Ya hay un contacto con ese nombre'));
   // Delete: confirmation, the tasks keep the name, Deshacer
@@ -294,7 +294,7 @@ async function iphone(browser){
   await page.tap('#toastBtn'); await calm(page);
   check('s_del_undo', await ev(page, ()=>!!contactRec('c2') && !!document.querySelector('[data-contact=c2]')));
   // A new contact
-  await page.tap('.screen.root[data-root=ajustes] [data-act=newContact]'); await sheetUp(page);
+  await page.tap('.screen.settings [data-act=newContact]'); await sheetUp(page);
   check('s_new_focus', await ev(page, ()=>document.activeElement===document.querySelector('#sheet [data-role=cname]') && document.querySelector('#sheet h2').textContent==='Nuevo contacto'));
   await page.fill('#sheet [data-role=cname]', 'Sofía'); await page.fill('#sheet [data-role=cphone]', '+44 7700 900123'); await page.tap('#sheet [data-x=ok]'); await sheetGone(page); await calm(page);
   check('s_new', await ev(page, ()=>{ const c=contactByName('sofia'); return !!c && c.phone==='+44 7700 900123' && waDigits(c.phone)==='447700900123' && !!document.querySelector('[data-contact="'+c.id+'"]'); }));
@@ -304,7 +304,7 @@ async function iphone(browser){
     await ev(page, ()=>openDetail('a3')); await calm(page); await shot(page, 'i10-detail-dark');
     await ev(page, ()=>remindSheet(['a3'])); await sheetUp(page); await shot(page, 'i11-remind-dark'); await ev(page, ()=>closeSheet()); await sheetGone(page);
     await page.tap('.pushed-screen.detail [data-act=back]'); await calm(page);
-    await page.tap('.tabbar [data-tab=ajustes]'); await calm(page); await ev(page, ()=>{ document.querySelector('.screen.root[data-root=ajustes] .group.contacts').scrollIntoView({block:'center'}); }); await sleep(200); await shot(page, 'i12-ajustes-dark');
+    await openSetting(page, 'contactos'); await calm(page); // v0.37.4 await ev(page, ()=>{ document.querySelector('.screen.settings .group.contacts').scrollIntoView({block:'center'}); }); await sleep(200); await shot(page, 'i12-ajustes-dark');
     await ctx.close(); }
 }
 

@@ -9,6 +9,8 @@ require('./lib/out.js'); // outputs (screenshots, downloads) go to tests/out
 //  7. Batch B (U1, U2): on the iPhone the grey line keeps the deadline, the estimate and the steps whole, the project capsule shrinks
 //     first; the steps and the small icons are in the grey line and the right keeps only the priority; a row with nothing else keeps them
 //     on the right, in one line.
+//  8. Batch C (decision 84): Tareas opens with the search field tucked under the bar; Ajustes is an index whose cells open subscreens,
+//     with Atrás back to it; the long-press menu keeps Mover a otro espacio, Duplicar and Seleccionar under Más.
 const { chromium } = require('playwright');
 const fs = require('fs'); const path = require('path');
 const TF = require('./lib/team-fake.js'); const { until, synced, signIn, tk, seed } = TF;
@@ -97,11 +99,38 @@ async function iphoneRowTests(browser){
   await P.ctx.close();
 }
 
+async function batchCTests(browser){
+  const d = new Date(); const t = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  const s=seed(Array.from({length:14}, (_,i)=>tk('c'+i, {title:'Tarea '+i, date:t})));
+  s.spaces.push({id:'otro', name:'Otro', order:2});
+  const P = await TF.device(browser, new TF.Fake(), {tag:'C', user:null, seed:s}, PORT, errors); const p=P.page; await p.waitForTimeout(600);
+  const tuck = await p.evaluate(()=>{ const sc=document.querySelector('.screen.root[data-root=tareas] .scroll'), b=sc.querySelector('.tlist > .searchbar').getBoundingClientRect(), top=sc.getBoundingClientRect().top; return {st:sc.scrollTop, hidden:b.bottom<=top+1}; });
+  check('search_tucked', tuck.st>0 && tuck.hidden, tuck);
+  await p.evaluate(()=>{ document.querySelector('.screen.root[data-root=tareas] .scroll').scrollTop=0; }); await p.waitForTimeout(100);
+  check('search_shows_at_top', await p.evaluate(()=>{ const sc=document.querySelector('.screen.root[data-root=tareas] .scroll'), b=sc.querySelector('.tlist > .searchbar').getBoundingClientRect(); return b.top>=sc.getBoundingClientRect().top-1; }));
+  await p.tap('[data-tab=ajustes]'); await p.waitForTimeout(500);
+  const idx = await p.evaluate(()=>({cells:[...document.querySelectorAll('.screen.root[data-root=ajustes] [data-settings]')].map(c=>c.dataset.settings), backup:!!document.querySelector('.screen.root[data-root=ajustes] [data-act=backupNow]'), theme:!!document.querySelector('.screen.root[data-root=ajustes] button[data-theme]'), news:!!document.querySelector('.screen.root[data-root=ajustes] [data-act=news]')}));
+  check('settings_index', idx.cells.join()==='cuenta,espacios,contactos,archivados,datos,registro' && !idx.backup && idx.theme && idx.news, idx);
+  await p.tap('.screen.root[data-root=ajustes] [data-settings=datos]'); await p.waitForTimeout(800);
+  const sub = await p.evaluate(()=>{ const s=document.querySelector('.screen.pushed-screen.settings'); return s&&{title:s.querySelector('.nav-title').textContent, back:s.querySelector('[data-act=back]').textContent, backup:!!s.querySelector('[data-act=backupNow]'), exp:!!s.querySelector('[data-act=exportFile]')}; });
+  check('settings_subscreen', !!sub && sub.title==='Datos y copias' && /Ajustes/.test(sub.back) && sub.backup && sub.exp, sub);
+  await p.tap('.screen.pushed-screen.settings [data-act=back]'); await p.waitForTimeout(800);
+  check('settings_back', await p.evaluate(()=>!UI.stack.length && !!document.querySelector('.screen.root[data-root=ajustes] [data-settings=datos]')));
+  await p.tap('[data-tab=tareas]'); await p.waitForTimeout(500);
+  await p.evaluate(()=>rowMenu('c1', {row:visibleRow('c1'), x:200, y:300})); await p.waitForTimeout(600);
+  const m1 = await p.evaluate(()=>[...document.querySelectorAll('#pmenu .pm-it .pm-l')].map(e=>e.textContent));
+  await p.evaluate(()=>{ const it=[...document.querySelectorAll('#pmenu .pm-it')].find(e=>e.querySelector('.pm-l').textContent==='Más'); it.click(); }); await p.waitForTimeout(600);
+  const m2 = await p.evaluate(()=>[...document.querySelectorAll('#pmenu .pm-it .pm-l')].map(e=>e.textContent));
+  check('menu_mas', m1.includes('Más') && !m1.includes('Duplicar') && !m1.includes('Seleccionar') && !m1.includes('Mover a otro espacio') && ['Mover a otro espacio','Duplicar','Seleccionar'].every(k=>m2.includes(k)), {m1, m2});
+  await P.ctx.close();
+}
+
 (async()=>{
   const srv = await TF.serve(PORT); const browser = await chromium.launch();
   try { await syncTests(browser); } catch(e){ errors.push('sync: '+(e.stack||e.message)); }
   try { await calendarTests(browser); } catch(e){ errors.push('calendar: '+(e.stack||e.message)); }
   try { await iphoneRowTests(browser); } catch(e){ errors.push('iphone rows: '+(e.stack||e.message)); }
+  try { await batchCTests(browser); } catch(e){ errors.push('batch C: '+(e.stack||e.message)); }
   await browser.close(); srv.close();
   console.log(JSON.stringify({r, fails, errors}, null, 1)); process.exit(fails.length||errors.length?1:0);
 })();

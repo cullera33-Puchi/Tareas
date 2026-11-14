@@ -160,7 +160,7 @@ function dropMany(ids, z){ if(ids.length===1) return dropTask(ids[0], z); const 
   toast(bulkN(xs.length)+msg, ()=>batch(()=>prev.forEach(undoDay))); }
 function applyWide(){ const w=wideMQ.matches; if(w===UI.wide) return; closeMenu(true); UI.wide=w; document.documentElement.classList.toggle('wide', w); document.body.classList.toggle('desktop', w); app.classList.toggle('desktop', w);
   if(w){ // the pushed iPhone screens map onto the desktop: a project becomes the view and the last detail the pane
-    let pr=null; UI.deskDetail=null; UI.stack.forEach(s=>{ if(s.kind==='project') pr=s.id; else if(s.kind==='person') pr={person:s.id}; else if(s.kind==='note'){ const n=noteRec(s.id); if(n){ pr=n.projectId; UI.projTab[pr]='notes'; UI.noteOpen=n.id; } } else UI.deskDetail=s.id; s.el.remove(); }); UI.stack=[]; // decision 47: a note opens in its project's Notas
+    let pr=null; UI.deskDetail=null; UI.stack.forEach(s=>{ if(s.kind==='project') pr=s.id; else if(s.kind==='person') pr={person:s.id}; else if(s.kind==='note'){ const n=noteRec(s.id); if(n){ pr=n.projectId; UI.projTab[pr]='notes'; UI.noteOpen=n.id; } } else if(s.kind==='settings'){} /* the desktop shows Ajustes whole */ else UI.deskDetail=s.id; s.el.remove(); }); UI.stack=[]; // decision 47: a note opens in its project's Notas
     if(UI.select){ UI.select=null; app.classList.remove('selecting'); closeSheet(); } // an open bulk menu would act on nothing
     Object.assign(UI.dsel, {ids:new Set(), mode:false, edit:null, follow:false});
     if(pr&&pr.person) UI.deskView='person:'+pr.person; else if(pr) UI.deskView='project:'+pr; else if(UI.tab==='ajustes') UI.deskView='settings';

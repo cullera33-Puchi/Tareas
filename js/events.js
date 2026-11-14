@@ -36,7 +36,7 @@ function bindSearch(s, around){
 // iPhone: the Tareas screen is merged around the live field (R18): rows that still match stay where they are, the others go,
 // and Ahora, filters, Cancelar and the count follow; the field is never touched
 function searchAround(s){ return drawing(()=>searchAroundNow(s)); }
-function searchAroundNow(s){ const bar=s.closest('.searchbar'), sc=bar&&bar.parentElement, scr=sc&&sc.closest('.screen.root'); if(!scr||!sc.classList.contains('scroll')) return false;
+function searchAroundNow(s){ const bar=s.closest('.searchbar'), sc=bar&&bar.closest('.scroll'), scr=sc&&sc.closest('.screen.root'); if(!scr||!sc.classList.contains('scroll')) return false;
   const html=lazyRows(viewTareas(), sc.scrollTop, innerHeight), stash=rowStash; if(!morphInto(scr, html, {keep:s})||!s.isConnected||!sc.isConnected) return false; rowStash=stash;
   armRows(sc); delete scr.dataset.dirty; scr.dataset.ver=dataVer;
   if(openRow&&!openRow.isConnected) openRow=null;
@@ -47,6 +47,7 @@ function onClick(e){
   const entry=UI.wide?null:UI.stack.find(x=>x.el===scr); if(!UI.wide&&scr.classList.contains('pushed-screen')&&!entry) return; // a popped screen still sliding out takes no taps
   if(noteClick(e)) return; // decision 47: the segment Tareas and Notas, the notes' rows, boxes and buttons
   const f=e.target.closest('[data-filter]'); if(f){ DB.settings.filter=f.dataset.filter; if(UI.wide) UI.deskView=f.dataset.filter; save(); render(); return; }
+  const st=e.target.closest('[data-settings]'); if(st){ if(!UI.wide) push('settings', st.dataset.settings); return; } // v0.37.4: a subscreen of Ajustes
   const th=e.target.closest('button[data-theme]'); if(th){ DB.settings.theme=th.dataset.theme; save(); applyTheme(); render(); return; } // only the Tema buttons: <html> carries data-theme too
   const op=e.target.closest('[data-open-project]'); if(op){ if(UI.wide){ setDeskView('project:'+op.dataset.openProject); } else push('project', op.dataset.openProject); return; }
   const opp=e.target.closest('[data-open-person]'); if(opp){ if(UI.wide) setDeskView('person:'+opp.dataset.openPerson); else push('person', opp.dataset.openPerson); return; } // decision 65a

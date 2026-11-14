@@ -47,7 +47,7 @@ async function run(browser){
   await sp.evaluate(()=>{ TM.used0=TM.me.used; TM.me.used=TM.me.quota; }); await sp.click('.pushed-screen [data-act=attPhoto]');
   check('photo_refused', await until(sp, ()=>document.getElementById('toastText').textContent==='No queda espacio. Borra adjuntos o pide más al administrador'&&!document.getElementById('attFile')), null);
   await sp.evaluate(()=>{ TM.me.used=TM.used0; });
-  await sp.evaluate(()=>{ while(UI.stack.length) pop(); }); await toSettings(sp);
+  await sp.evaluate(()=>{ while(UI.stack.length) pop(); }); await toSettings(sp, false, 'equipo'); // v0.37.4: Equipo is its own subscreen
   // The count is the larger of the server's and this device's uploads (an answer on its way never lowers it): wait for the real value
   const stCell = ()=>{ const c=[...document.querySelectorAll('.team-acc .cell')].find(x=>/^Almacenamiento/.test(x.textContent)); if(!c) return null; c.scrollIntoView({block:'center'}); return {t:c.textContent, warn:!!c.querySelector('.val.warn')}; };
   await until(sp, ()=>{ const c=[...document.querySelectorAll('.team-acc .cell')].find(x=>/^Almacenamiento/.test(x.textContent)); return !!c&&c.textContent==='Almacenamiento0,8 MB de 1 MB'; }, null, 8000);

@@ -158,13 +158,15 @@ function rowMenu(id, src){ const x=task(id); if(!x) return; releaseHold(id);
   { // R10: the row lifts and the menu opens next to it
     const row=src&&src.row||visibleRow(id), b=row&&row.getBoundingClientRect();
     return popMenu({lift:row, x:src&&src.x||(b?b.left+b.width/2:0), y:src&&src.y||0, prio:{cur:x.priority, fn:pr=>setPriority(id,pr)}, groups:[
-      [{label:'Aplazar', icon:MI.postpone, menu:()=>postponeMenu(id)}].concat(x.status!=='done'?[{label:'Fecha límite', icon:MI.flag, menu:()=>deadlineMenu(id)}, {label:'Tiempo', icon:MI.est, menu:()=>estimateMenu(id)}, {label:'Responsable', icon:MI.person, fn:()=>responsibleSheet(id)}]:[], canSnooze(x)?[{label:'Posponer recordatorio', icon:MI.bell, menu:()=>snoozeMenu(id)}]:[], [{label:'Mover a proyecto', icon:MI.folder, menu:()=>projectPickMenu(id)}]).concat(DB.spaces.length>1?[{label:'Mover a otro espacio', icon:MI.space, menu:()=>spaceMoveMenu(id)}]:[]), // decision 48a: Fecha límite next to Aplazar
+      [{label:'Aplazar', icon:MI.postpone, menu:()=>postponeMenu(id)}].concat(x.status!=='done'?[{label:'Fecha límite', icon:MI.flag, menu:()=>deadlineMenu(id)}, {label:'Tiempo', icon:MI.est, menu:()=>estimateMenu(id)}, {label:'Responsable', icon:MI.person, fn:()=>responsibleSheet(id)}]:[], canSnooze(x)?[{label:'Posponer recordatorio', icon:MI.bell, menu:()=>snoozeMenu(id)}]:[], [{label:'Mover a proyecto', icon:MI.folder, menu:()=>projectPickMenu(id)}]), // decision 48a: Fecha límite next to Aplazar
       [{label:x.status==='done'?'Marcar pendiente':'Completar', icon:x.status==='done'?MI.undo:MI.done, fn:()=>{ leaveRows(id); setTimeout(()=>{ completeTask(id); renderAnimated(); },200); }}]
        .concat(x.status==='pending'?[{label:x.focus?'Quitar de Ahora':'Ahora', icon:x.focus?MI.starOff:MI.star, fn:()=>toggleFocus(id)}]:[]) // decision 39
        .concat(waitItems(x, MI)) // decision 41
        .concat(canRemind(x)?[{label:'Enviar recordatorio', icon:MI.send, fn:()=>remindSheet([id])}]:[]) // decision 48c
        .concat(noticeItems(x, true)) // decision 63b: Avisar a…
-       .concat([{label:'Duplicar', icon:MI.dup, fn:()=>duplicateTask(id)}, {label:'Seleccionar', icon:MI.select, fn:()=>startSelect(id)}]),
+       ,
+      // v0.37.4 (decision 84, lote C, U7): the less used actions under «Más», so the menu fits beside the row
+      [{label:'Más', icon:I.more, menu:()=>({title:'Más', groups:[(DB.spaces.length>1?[{label:'Mover a otro espacio', icon:MI.space, menu:()=>spaceMoveMenu(id)}]:[]).concat([{label:'Duplicar', icon:MI.dup, fn:()=>duplicateTask(id)}, {label:'Seleccionar', icon:MI.select, fn:()=>startSelect(id)}])]})}],
       [{label:'Eliminar', icon:MI.trash, red:true, fn:()=>confirmDelete(id)}] ]}); } }
 /* Desktop sidebar: a project dragged to another place (or moved with Alt and an arrow). The space's projects are numbered again from 0,
    active ones first in their new order, archived ones after; only those whose number changes get a new 'modified', so the order syncs */
@@ -439,7 +441,7 @@ const BK = {
 let BACKUPS=[];
 async function refreshBackups(){ try{ BACKUPS=await BK.list(); }catch(e){ BACKUPS=[]; } }
 // Ajustes is on screen: the desktop settings view, or the iPhone tab with nothing pushed on top
-function onSettings(){ return UI.wide ? UI.deskView==='settings' : (UI.tab==='ajustes'&&!UI.stack.length); }
+function onSettings(){ if(UI.wide) return UI.deskView==='settings'; const top=UI.stack[UI.stack.length-1]; return UI.tab==='ajustes'&&(!top||top.kind==='settings'); } // v0.37.4: a subscreen of Ajustes counts
 /* Decision 34: a copy can be deleted (an iPhone row slides to Eliminar, or its menu; the desktop has the right click and a bin on hover), and all
    of them at once. Always confirmed, never undone. A copy of today deleted by hand is not made again until tomorrow ('tareas-bk-skip') */
 const BK_SKIP='tareas-bk-skip';

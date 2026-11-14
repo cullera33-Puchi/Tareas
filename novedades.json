@@ -1,5 +1,15 @@
 [
   {
+    "version": "0.37.4",
+    "date": "2026-11-14",
+    "items": [
+      "En el iPhone, el buscador de Hoy queda recogido bajo la cabecera y la lista empieza más arriba. Aparece al deslizar un poco hacia abajo.",
+      "Ajustes cabe en una pantalla: Cuenta, Espacios y horas, Contactos, Datos y copias, y Registro abren cada uno su propia pantalla, sin quitar ninguna opción.",
+      "La entrada Cuenta muestra el estado de la sincronización y se ve en naranja si algo requiere tu atención.",
+      "El menú de pulsación larga es más corto: Mover a otro espacio, Duplicar y Seleccionar están en «Más»."
+    ]
+  },
+  {
     "version": "0.37.3",
     "date": "2026-11-14",
     "items": [

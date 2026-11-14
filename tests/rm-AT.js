@@ -1,4 +1,4 @@
-require('./lib/out.js'); // outputs (screenshots, downloads) go to tests/out
+require('./lib/out.js'); const { openSetting, closeSetting } = require('./lib/settings.js'); // v0.37.4: Ajustes in subscreens on the iPhone // outputs (screenshots, downloads) go to tests/out
 // Decision 29 (photos and recorded audio attached to tasks), port 9910 (fake Storage 9911, fake PostgREST 9912, send-reminders under Deno 9913).
 //  1. SQL: supabase/migrations/0003_attachments.sql run twice in PGlite after 0001 and 0002, with stand-ins for auth, pg_cron, pg_net and Storage
 //     (buckets, objects with row level security, foldername): the table, its rules, realtime, the private bucket, the per-user folder
@@ -256,8 +256,8 @@ async function appTests(browser){
   await new Promise(res=>stoSrv.listen(STO, res));
   /* ---------- A (iPhone) signs in; a photo taken offline ---------- */
   const A = await device(browser, {tag:'A', fake:true});
-  await A.page.click('[data-tab=ajustes]'); await A.page.waitForTimeout(300); await A.page.click('[data-act=signIn]'); check('A_signedIn', await synced(A.page));
-  await A.page.click('[data-tab=tareas]'); await A.page.waitForTimeout(300);
+  await openSetting(A.page, 'cuenta'); await A.page.waitForTimeout(300); await A.page.click('[data-act=signIn]'); check('A_signedIn', await synced(A.page));
+  await (await closeSetting(A.page), A.page.click('[data-tab=tareas]')); await A.page.waitForTimeout(300);
   fake.down.add(A.page); await A.ctx.setOffline(true); await A.page.waitForTimeout(200);
   await A.page.evaluate(()=>openDetail('t1')); await A.page.waitForTimeout(700);
   await addPhoto(A.page, await exifPhoto(A.page), 'IMG_0001.jpg', 'image/jpeg');
@@ -466,7 +466,7 @@ async function appTests(browser){
   const cn = await C.page.evaluate(()=>(document.querySelector('.screen.pushed-screen.detail .att-note')||{}).textContent);
   check('signedout_note', cn==='Se guardan en este iPhone y se subirán a tu cuenta al iniciar sesión.' && !(await C.page.evaluate(()=>window.__uploads||0)), cn);
   await C.page.screenshot({path:path.join(OUT,'c-signedout.png')});
-  await C.page.evaluate(()=>pop()); await C.page.waitForTimeout(600); await C.page.click('[data-tab=ajustes]'); await C.page.waitForTimeout(300); await C.page.click('[data-act=signIn]');
+  await C.page.evaluate(()=>pop()); await C.page.waitForTimeout(600); await openSetting(C.page, 'cuenta'); await C.page.waitForTimeout(300); await C.page.click('[data-act=signIn]');
   const cid = await C.page.evaluate(()=>DB.attachments[0].id);
   check('signedout_then_upload', await synced(C.page) && STORE.has(USER.uid+'/t2/'+cid+'.jpg') && fake.t.attachments.has(cid));
   await C.ctx.close();

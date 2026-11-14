@@ -379,7 +379,7 @@ async function appTests(browser){
   check('S_uploaded_encrypted', sRows.length===2 && sRows.every(r=>TF.isEnc(r.title)) && TF.isEnc(sRows.find(r=>r.id==='s1').notes) && !fake.keys.get(US.uid).ecdh_pub===false, {n:sRows.length, k:fake.keys.get(US.uid)});
   check('S_keys', await until(sp, ()=>!!TM.priv, null, 10000) && /^[A-Za-z0-9_-]{87}$/.test(fake.keys.get(US.uid).ecdh_pub||''));
   await sp.evaluate(()=>{ if(document.querySelector('#sheet.on')) closeSheet(); }); await settled(sp);
-  await toSettings(sp); const ss = await sec(sp);
+  await toSettings(sp, false, 'equipo'); const ss = await sec(sp); // v0.37.4: Equipo is its own subscreen
   check('S_section', ss && ss.length===2 && ss[0]==='Almacenamiento0 MB de 50 MB' && ss[1]==='Enviar sugerencia o incidencia', ss);
   await shot(sp, 'ip-dark-equipo-miembro');
   // The rules refuse a change while the account still has access: once it is read again quietly; the second time it is an ordinary

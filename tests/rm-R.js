@@ -1,4 +1,4 @@
-require('./lib/out.js'); // outputs (screenshots, downloads) go to tests/out
+require('./lib/out.js'); const { openSetting, closeSetting } = require('./lib/settings.js'); // v0.37.4: Ajustes in subscreens on the iPhone // outputs (screenshots, downloads) go to tests/out
 // Decisions 31 to 34 (2 November), port 9920.
 //  31. The desktop add bar opens into a composer: notes, Fecha, Proyecto, Prioridad, Recordatorio and Nota de voz (a stand-in recognizer, and the
 //      written fallback); title words still count and show on the buttons, a button chosen by hand takes its word out; Intro adds everything,
@@ -325,8 +325,8 @@ const aligned = o => Math.abs(o.icon[0]-o.icon[1])<=1 && Math.abs(o.text[0]-o.te
   ({ctx, page} = await open(browser, {tag:'MB'}));
   const cdp = await ctx.newCDPSession(page);
   await page.evaluate(async d=>{ for(const x of d) await BK.put(x); await refreshBackups(); }, [today, addD(today,-1), addD(today,-2)]);
-  await page.click('[data-tab=ajustes]'); await page.waitForTimeout(500);
-  const row = async d => page.evaluate(d=>{ const e=document.querySelector('.screen.root[data-root=ajustes] .vn[data-bk="'+d+'"]'); e.scrollIntoView({block:'center'}); const q=e.getBoundingClientRect(); return {x:q.x, y:q.y, w:q.width, cy:q.y+q.height/2}; }, d);
+  await openSetting(page, 'datos'); // v0.37.4: Datos y copias
+  const row = async d => page.evaluate(d=>{ const e=document.querySelector('.screen.settings .vn[data-bk="'+d+'"]'); e.scrollIntoView({block:'center'}); const q=e.getBoundingClientRect(); return {x:q.x, y:q.y, w:q.width, cy:q.y+q.height/2}; }, d);
   let q = await row(addD(today,-2));
   await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:q.x+q.w-30,y:q.cy}]}); for(let i=1;i<=8;i++){ await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:q.x+q.w-30-i*16,y:q.cy}]}); await page.waitForTimeout(16); } await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]}); await page.waitForTimeout(500);
   const so = await page.evaluate(d=>{ const e=document.querySelector('.vn[data-bk="'+d+'"]'); return {open:e.dataset.open, bg:getComputedStyle(e.querySelector('.vn-bg.r')).display, tab:UI.tab}; }, addD(today,-2));
@@ -336,7 +336,7 @@ const aligned = o => Math.abs(o.icon[0]-o.icon[1])<=1 && Math.abs(o.text[0]-o.te
   const ia = await page.evaluate(()=>({on:document.querySelector('#asheet').classList.contains('on'), t:(document.querySelector('#asheet .t')||{}).textContent, b:[...document.querySelectorAll('#asheet .it')].map(x=>x.textContent)}));
   check('bk_iphone_confirm', ia.on && /se borrará de este iPhone\. No se puede deshacer\./.test(ia.t) && ia.b.join('|')==='Borrar copia|Cancelar', ia);
   await page.click('#asheet .it.red'); await page.waitForTimeout(600);
-  check('bk_iphone_deleted', await page.evaluate(()=>BACKUPS.length===2 && document.querySelectorAll('.screen.root[data-root=ajustes] .vn[data-bk]').length===2));
+  check('bk_iphone_deleted', await page.evaluate(()=>BACKUPS.length===2 && document.querySelectorAll('.screen.settings .vn[data-bk]').length===2));
   q = await row(addD(today,-1));
   await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:q.x+60,y:q.cy}]}); await page.waitForTimeout(700); await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]}); await page.waitForTimeout(500);
   const im = await page.evaluate(()=>[...document.querySelectorAll('#pmenu .pm-it, #pmenu button')].map(x=>x.textContent.trim()).filter(Boolean));

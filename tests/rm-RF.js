@@ -305,7 +305,7 @@ async function iphone(browser){
   await menuItem(page, 'Ahora').tap(); await sleep(600);
   x = await ev(page, L=>{ const sc=document.querySelector(L+' .scroll'), ah=sc.querySelector('.ahora'), su=sc.querySelector('.searchbar');
     return {focus:!!task('a1').focus, block:!!ah, before:!!(ah&&su&&(ah.compareDocumentPosition(su)&Node.DOCUMENT_POSITION_FOLLOWING)), n:ah&&ah.querySelector('.gn').textContent, t:document.querySelector('#toastText').textContent}; }, L);
-  check('ahora_from_menu', mi.includes('Ahora') && x.focus && x.block && x.before && x.n==='1' && x.t==='Añadida a Ahora', {mi, x});
+  check('ahora_from_menu', mi.includes('Ahora') && x.focus && x.block && !x.before && x.n==='1' && x.t==='Añadida a Ahora', {mi, x}); // v0.37.4 (U3): the search field, tucked, comes before Ahora
   for(const id of ['a2','a3','a4','a5']){ await ev(page, id=>toggleFocus(id), id); await sleep(30); }
   await ev(page, ()=>rowMenu('a6')); await sleep(600); await menuItem(page, 'Ahora').tap(); await sleep(500);
   x = await ev(page, L=>({a6:task('a6').focus||null, t:document.querySelector('#toastText').textContent, ids:[...document.querySelectorAll(L+' .ahora .row')].map(e=>e.dataset.id), n:document.querySelector(L+' .ahora .gn').textContent}), L);

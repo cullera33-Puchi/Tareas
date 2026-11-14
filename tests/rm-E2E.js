@@ -232,11 +232,11 @@ async function device(browser, o){
 const until = async (page, fn, arg, ms=10000)=>{ const t0=Date.now(); for(;;){ let v=false; try{ v=await page.evaluate(fn, arg); }catch(e){} if(v) return true; if(Date.now()-t0>ms) return false; await page.waitForTimeout(100); } };
 const synced = (page, ms) => until(page, ()=>SY&&SY.user&&!SY.running&&SY.status==='ok'&&!CR.busy&&!CR.migrating&&syncCollect(true).count===0, null, ms||15000);
 const settled = page => until(page, ()=>!document.querySelector('#sheet.on')&&!document.querySelector('#asheet.on'), null, 3000);
-async function toSettings(page, desk){ if(desk) await page.evaluate(()=>setDeskView('settings')); else { await page.evaluate(()=>{ if(UI.stack.length) pop(); }); await page.click('[data-tab=ajustes]'); } await page.waitForTimeout(400); }
+async function toSettings(page, desk){ await require('./lib/settings.js').openSetting(page, desk?null:'cuenta'); } // v0.37.4: Cuenta on the iPhone
 const section = page => page.evaluate(()=>{ const t=[...document.querySelectorAll('.group-title')].find(x=>x.textContent==='Cifrado'); if(!t) return null; const g=t.nextElementSibling, f=g.nextElementSibling;
   t.scrollIntoView({block:'start'}); return {cells:[...g.querySelectorAll('.cell')].map(c=>c.textContent.trim()), foot:f&&f.classList.contains('footnote')?f.textContent:''}; });
 const account = page => page.evaluate(()=>syncLine());
-const signIn = async (page, desk) => { await toSettings(page, desk); await page.click('[data-act=signIn]'); };
+const signIn = async (page, desk) => { await toSettings(page, desk); await page.click('[data-act=signIn]:visible'); };
 // Every encrypted column of every row the fake holds: empty or 'e1:'
 const plainLeft = () => { const out=[]; for(const t of Object.keys(ENC)) for(const row of fake.t[t].values()) ENC[t].forEach(c=>{ const v=row[c]; if(v!=null&&v!==''&&!isEnc(v)) out.push(t+'.'+c+'.'+row.id+'='+v); }); return out; };
 const sheetShot = async (page, name, js) => { await page.evaluate(()=>{ const t=document.getElementById('toast'); t.classList.remove('on'); }); await page.evaluate(js); await page.waitForTimeout(650); await shot(page, name); await page.evaluate(()=>{ CR.prog=null; closeSheet(); }); await settled(page); };

@@ -9,7 +9,7 @@ DB.settings.filter='hoy'; // the app always opens on Hoy; the filter is kept onl
 // Voice notes saved without a task (an old desktop pane bug) never show anywhere: drop them
 { const n=DB.voiceNotes.length; DB.voiceNotes=DB.voiceNotes.filter(v=>v.taskId&&task(v.taskId)); if(DB.voiceNotes.length!==n){ save(); log('info','Notas de voz sin tarea eliminadas: '+(n-DB.voiceNotes.length)); } }
 if(foldVoiceNotes(DB)) save(); // decision 49: dictated voice notes go into their task's Notas, before the first screen
-{ const n=rollOver(); if(n) log('info','Tareas pasadas a hoy: '+n); } if(wideMQ.matches) applyWide(); else render(); // a desktop start never builds the iPhone screens
+{ const n=rollOver(); if(n) log('info','Tareas pasadas a hoy: '+n); } if(wideMQ.matches) applyWide(); else { render(); tuckSearch(); } // a desktop start never builds the iPhone screens; v0.37.4: Tareas opens with the search tucked
 backupChain=refreshBackups().then(()=>{ if(onSettings()) render(); return dailyBackup(false); }).catch(()=>{});
 (function(){ // Entry from the iOS Shortcut: ?add=texto opens the new-task sheet with the text
   try{ const q=new URLSearchParams(location.search), op=q.get('open'); if(op==='received'||op==='feedback'){ history.replaceState(null,'',location.pathname); setTimeout(()=>teamOpenFrom(op),300); return; } }catch(e){} // decision 63b: a notification of the team tapped with the app closed

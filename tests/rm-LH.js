@@ -1,4 +1,4 @@
-require('./lib/out.js'); // outputs (screenshots, downloads) go to tests/out
+require('./lib/out.js'); const { openSetting, closeSetting } = require('./lib/settings.js'); // v0.37.4: Ajustes in subscreens on the iPhone // outputs (screenshots, downloads) go to tests/out
 // Batch LH (owner, 3 November), port 10810:
 //  1. Carga del día en horas (decision 60a): the format, the hours of Hoy beside its count (iPhone segment, desktop title), the working hours
 //     per space in Ajustes (orange from them, red from half as much again) and the Semana day head (its bar, line and tooltip).
@@ -78,7 +78,7 @@ async function iphone(browser){ let x;
   x = await seg(page); check('hoy_hours', x && x.label==='Hoy' && x.n==='6' && x.lh==='5 h 45' && x.cls==='lh' && /5 h 45 estimadas en 6 tareas; 6 h de trabajo al día/.test(x.tip), x);
   await shot(page, 'i-hoy-light');
   // Ajustes: Horas de trabajo al día per space
-  await page.click('#tabbar [data-tab=ajustes]'); await calm(page);
+  await openSetting(page, 'espacios'); await calm(page); // v0.37.4: Espacios y horas
   x = await ev(page, ()=>[...document.querySelectorAll('[data-day-hours]')].map(c=>c.dataset.dayHours+':'+c.querySelector('.lbl').textContent+':'+c.querySelector('.val').textContent));
   check('settings_rows', x.join()==='trabajo:Trabajo:6 h,personal:Personal:6 h', x);
   await page.evaluate(()=>document.querySelector('[data-day-hours=trabajo]').scrollIntoView({block:'center'}));
@@ -88,7 +88,7 @@ async function iphone(browser){ let x;
   await clickItem(page, '5 h'); await calm(page);
   x = await ev(page, ()=>({set:DB.settings.dayHours, val:document.querySelector('[data-day-hours=trabajo] .val').textContent, log:LOG.some(e=>/Horas de trabajo al día: 5/.test(e.m))}));
   check('settings_set', x.set && x.set.trabajo===5 && !('personal' in x.set) && x.val==='5 h' && x.log, x);
-  await page.click('#tabbar [data-tab=tareas]'); await calm(page);
+  await (await closeSetting(page), page.click('#tabbar [data-tab=tareas]')); await calm(page);
   x = await seg(page); check('hoy_orange', x.cls==='lh orange', x); // 345 >= 300, < 450
   await ev(page, ()=>{ setDayHours('trabajo', 4); }); x = await seg(page); check('hoy_orange_4', x.cls==='lh orange', x); // 345 < 360
   await ev(page, ()=>{ updTask('h4', {estimate:15}); render(); }); x = await seg(page); check('hoy_red', x.cls==='lh red' && x.lh==='6 h', x); // 360 = 4 h and a half again
@@ -192,7 +192,7 @@ async function iphone(browser){ let x;
   await page.click('#sheet [data-cd=all]'); await sheetGone(page); await calm(page);
   x = await ev(page, ()=>({closed:space().closedDay, isC:isClosed(), mod:space().modified>'2026-11-04', h1:task('h1').date, toast:document.querySelector('#toastText').textContent,
     head:(document.querySelector('.screen.root .dayclosed .dcl')||{}).textContent, link:(document.querySelector('.screen.root .dayclosed .gx')||{}).textContent,
-    ahora:!!document.querySelector('.screen.root .ahora'), rows:[...document.querySelectorAll('.screen.root .scroll > .group .row')].map(r=>r.dataset.id), cell:!!document.querySelector('.screen.root .closecell'), prev:!!document.querySelector('.screen.root .preview'), log:LOG.some(e=>e.m==='Día cerrado')}));
+    ahora:!!document.querySelector('.screen.root .ahora'), rows:[...document.querySelectorAll('.screen.root .scroll > .group .row, .screen.root .scroll > .tlist > .group .row')].map(r=>r.dataset.id), cell:!!document.querySelector('.screen.root .closecell'), prev:!!document.querySelector('.screen.root .preview'), log:LOG.some(e=>e.m==='Día cerrado')}));
   const sg = await seg(page);
   check('close_sets', x.closed==='2026-11-04' && x.isC && x.mod && x.h1==='2026-11-05' && /pasadas a mañana, día cerrado$/.test(x.toast) && x.log, x);
   check('close_view', x.head==='Día cerrado. Mañana, jueves 5' && x.link==='Reabrir hoy' && !x.ahora && !x.cell && !x.prev && ['m1','m2','h1','w1','a1'].every(k=>x.rows.includes(k)) && !x.rows.includes('f1') && !x.rows.includes('x1'), x);

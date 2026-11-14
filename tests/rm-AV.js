@@ -38,7 +38,7 @@ async function run(browser){
   await settled(sp);
 
   /* ---------- Susana: Avisar a… in the long press menu and in the detail ---------- */
-  await sp.evaluate(()=>{ UI.tab='tareas'; DB.settings.filter='todas'; render(); }); await sp.waitForTimeout(400);
+  await sp.evaluate(()=>{ UI.stack.forEach(x=>x.el.remove()); UI.stack=[]; /* v0.37.4: the sign-in left the Cuenta subscreen open */ UI.tab='tareas'; DB.settings.filter='todas'; render(); }); await sp.waitForTimeout(400);
   await sp.evaluate(()=>rowMenu('s1', {row:visibleRow('s1'), x:200, y:300})); await until(sp, ()=>!!document.querySelector('.pm.open'));
   const lp = await sp.evaluate(()=>[...document.querySelectorAll('.pm.open .pm-list *')].map(b=>b.textContent.trim()).filter(Boolean));
   check('S_longpress_item', lp.some(t=>t==='Avisar a…'), lp);

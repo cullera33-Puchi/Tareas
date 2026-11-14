@@ -116,7 +116,7 @@ function openStepAdd(id){ if(!task(id)) return; openDetail(id); const scope=UI.w
 // Deshacer of a review: a task completed in it takes back the next one of its series (decision 38)
 /* What a review (and Planificar el día) changed, put back: prev holds each task as it was (a task completed in it takes back the next one of
    its series, decision 38), removed the tasks it deleted */
-function restorePrev(prev, removed){ prev.forEach((o,id)=>{ const x=task(id); if(!x) return; if(x.status==='done'&&o.status!=='done') dropNext(x); updTask(id, o); }); removed.forEach(r=>{ if(!task(r.x.id)){ DB.tasks.push(r.x); DB.voiceNotes.push(...r.vn); putAttachments(r.at); putSteps(r.ss); } }); }
+function restorePrev(prev, removed){ prev.forEach((o,id)=>{ const x=task(id); if(!x) return; if(x.status==='done'&&o.status!=='done') dropNext(x); const p=Object.assign({}, o); Object.keys(p).forEach(k=>{ if(p[k]==null&&x[k]==null&&!(k in x)) delete p[k]; }); /* an empty field the task never had is not added */ updTask(id, p); }); removed.forEach(r=>{ if(!task(r.x.id)){ DB.tasks.push(r.x); DB.voiceNotes.push(...r.vn); putAttachments(r.at); putSteps(r.ss); } }); }
 function reviewEnd(st, asSheet){ const T=st.tally, decided=Object.keys(T).some(k=>k!=='skip'&&T[k]);
   if(st.after){ sheetOnClose=null; log('info','Repaso de aplazadas en Planificar el día', T); render(); st.after(asSheet); return; } // decision 86: no balance of its own, the walk goes on (or ends with the sheet)
   const closing=st.kind==='close'&&asSheet; if(closing) setClosedDay(true, 'Cerrar el día una a una'); // walked to its end or Terminar: the day is closed; a sheet dismissed is not

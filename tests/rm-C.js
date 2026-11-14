@@ -50,7 +50,7 @@ const realClock = page => page.evaluate(()=>{ if(window.__RD) window.Date=window
   await page.tap(HOY+' .seg button[data-filter=hoy]'); await page.waitForTimeout(300);
   await page.tap(HOY+' .nav .vopts'); await page.waitForTimeout(350);
   r.menuHoy = await sheetItems(page);
-  check('R13_menuHoy', JSON.stringify(r.menuHoy.slice(0,4))===JSON.stringify(['Seleccionar tareas','Mostrar completadas','Agrupar por fecha  ✓','Agrupar por proyecto']) && r.menuHoy[4]==='¿Qué hago ahora?' && r.menuHoy[5]==='Compartir estado de la semana' && r.menuHoy.length===6, r.menuHoy); // decision 56: ¿Qué hago ahora?; decision 52: no Mostrar resumen del día; M4: Compartir estado de la semana
+  check('R13_menuHoy', JSON.stringify(r.menuHoy.slice(0,4))===JSON.stringify(['Seleccionar tareas','Mostrar completadas','Agrupar por fecha  ✓','Agrupar por proyecto']) && r.menuHoy[4]==='¿Qué hago ahora?' && r.menuHoy[5]==='Planificar el día' && r.menuHoy[6]==='Compartir estado de la semana' && r.menuHoy.length===7, r.menuHoy); // decision 56: ¿Qué hago ahora?; decision 52: no Mostrar resumen del día; M4: Compartir estado de la semana
   // Hoy by project
   await clickItem(page, 'Agrupar por proyecto');
   r.hoyByProj = await page.evaluate(()=>{ const sc=document.querySelector('.screen.root[data-root=tareas] .scroll'); return {settings:[DB.settings.hoyGroup, DB.settings.allGroup],
@@ -255,7 +255,7 @@ const realClock = page => page.evaluate(()=>{ if(window.__RD) window.Date=window
   check('D_R13_button', !!r.dMopts, r.dMopts);
   await page.click('#desk .mhead .mopts'); await page.waitForTimeout(350); r.dMenu = await sheetItems(page);
   // Batch G (R16) gives the desktop its own multiple selection, so its view menu now starts with Seleccionar tareas too
-  check('D_R13_menu', r.dMenu[0]==='Seleccionar tareas' && r.dMenu[1]==='Mostrar completadas' && r.dMenu[2]==='Agrupar por fecha  ✓' && r.dMenu[3]==='Agrupar por proyecto' && r.dMenu[4]==='¿Qué hago ahora?' && r.dMenu[5]==='Compartir estado de la semana…' && r.dMenu.length===6, r.dMenu); // decision 56
+  check('D_R13_menu', r.dMenu[0]==='Seleccionar tareas' && r.dMenu[1]==='Mostrar completadas' && r.dMenu[2]==='Agrupar por fecha  ✓' && r.dMenu[3]==='Agrupar por proyecto' && r.dMenu[4]==='¿Qué hago ahora?' && r.dMenu[5]==='Planificar el día…' && r.dMenu[6]==='Compartir estado de la semana…' && r.dMenu.length===7, r.dMenu); // decision 56
   await clickItem(page, 'Agrupar por proyecto');
   r.dHoyProj = await page.$$eval('#desk .gsec > .group-title', h=>h.map(x=>x.textContent.trim()));
   check('D_R13_hoyByProject', r.dHoyProj.length===2 && /^FLC/.test(r.dHoyProj[0]), r.dHoyProj);

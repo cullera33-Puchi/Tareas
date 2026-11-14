@@ -72,7 +72,7 @@ function calCardHTML(x, kind, style){ const p=x.projectId?proj(x.projectId):null
   const wt=x.status==='waiting'?'\nPor confirmar'+(x.waitingFor?', esperando a '+x.waitingFor:''):''; // decision 41
   const dlc=dlLevel(x), dl=x.deadline&&!done?'<span class="cic cdl'+(dlc?' dl-'+dlc:'')+'">'+MI.flag+'</span>':''; // decision 48a: a flag, grey, orange or red
   const tip=x.title+(p?'\n'+p.name:'')+(tm?'\n'+tm:'')+(x.carried&&!done?'\nAplazada':'')+(x.deadline?'\n'+dlText(x.deadline):'')+wt+(x.responsible?'\nResponsable: '+x.responsible:'')+(repParse(x.repeat)?'\n'+repSummary(x.repeat):'')+(stepStats(x.id)?'\n'+stepsCount(x.id)+' pasos':'');
-  const sh=p?projShort(p.name, kind==='mc'?4:6):'', cap=sh?'<span class="tag ctag">'+esc(sh)+'</span>':''; // decision 79: the project's capsule, as in the lists
+  const sh=p?projShort(p.name, kind==='mc'?4:40):'', cap=sh?'<span class="tag ctag">'+esc(sh)+'</span>':''; // decision 79: the project's capsule, as in the lists; v0.37.2 (E3): the whole first word, the stylesheet ends it in «…» when it does not fit (Mes keeps 4 letters)
   const hb=/^hb/.test(kind), two=kind===''&&(!!p||!!tm), k=kind==='ad'?'':kind;
   const title='<div class="t">'+(x.priority==='high'?'<span class="pri high">!!!</span>':x.priority==='mid'?'<span class="pri mid">!!</span>':'')+esc(x.title)+'</div>';
   const inds=dl+(x.focus&&!done?'<span class="cic ist">'+I.starF+'</span>':'')+(repParse(x.repeat)?'<span class="cic irp">'+I.repeat+'</span>':'')+(stepStats(x.id)?'<span class="cic">'+stepProgHTML(x)+'</span>':''); // decisions 38, 39 and 46: repeats, in Ahora, its steps
@@ -91,9 +91,11 @@ function dayHeadHTML(d, xs){ const t=todayStr(), dd=new Date(d+'T00:00:00'), pen
 // Past days are narrower (only their done tasks show); one day alone takes the width
 function calCols(days){ const t=todayStr(); return days.map(d=>days.length>1&&d<t?'minmax(0,.55fr)':'minmax(0,1fr)').join(' '); }
 function dayCls(d){ const t=todayStr(); return (d===t?' today':'')+(d<t?' past':''); }
+// v0.37.2 (E3): a day of Semana with this many tasks or fewer lets each title take two lines; a fuller day keeps one line per card
+const WEEK_FEW=8;
 function weekListHTML(days){ const xs=calTasks(days[0], days[days.length-1]);
   return '<div class="wgrid" style="grid-template-columns:'+calCols(days)+'">'+days.map(d=>{ const l=calSort(xs.filter(x=>x.date===d));
-    return '<div class="wday'+dayCls(d)+'" data-day="'+d+'">'+dayHeadHTML(d,l)+'<div class="wl" data-keep="wl'+d+'">'+l.map(x=>calCardHTML(x,'')).join('')+'</div></div>'; }).join('')+'</div>'; }
+    return '<div class="wday'+dayCls(d)+(l.length<=WEEK_FEW?' few':'')+'" data-day="'+d+'">'+dayHeadHTML(d,l)+'<div class="wl" data-keep="wl'+d+'">'+l.map(x=>calCardHTML(x,'')).join('')+'</div></div>'; }).join('')+'</div>'; }
 // How long a block lasts: the task's estimate, or half an hour. Its height in the grid, which ends at H1
 const blockMin = x => EST_VALUES.includes(+x.estimate) ? +x.estimate : SLOT;
 const blockPx = (m, dur) => Math.max(4, (Math.min(m+dur, H1)-m)/SLOT*SH-2);

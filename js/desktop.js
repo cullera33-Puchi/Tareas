@@ -212,8 +212,28 @@ function colWidths(){ const c=DB.settings.colWidths; if(!c||typeof c!=='object'|
   Object.keys(c).forEach(k=>{ const l=COL_LIMITS[k], w=c[k]; if(!l||typeof w!=='number'||!isFinite(w)||w<l[0]||w>l[1]) delete c[k]; else c[k]=Math.round(w); }); return c; }
 function applyColWidths(d){ const c=colWidths(); Object.keys(COL_LIMITS).forEach(k=>{ if(c[k]) d.style.setProperty('--col-'+k, c[k]+'px'); else d.style.removeProperty('--col-'+k); });
   d.classList.toggle('colw-rem', !!c.rem); } // a resized reminder column shows its time with the inspector open too
-function colHeadHTML(){ const g=k=>'<i class="colgrip" data-col="'+k+'" title="Arrastra para cambiar el ancho. Doble clic: ancho inicial"></i>', c=(k,l)=>'<span class="rc rc-'+k+'">'+g(k)+(k==='rem'?I.bell:'')+'<span class="chl">'+l+'</span></span>';
-  return '<div class="colhead" aria-hidden="true"><span class="ch-check"></span><span class="pcol"><span class="chl">Proyecto</span>'+g('proj')+'</span><span class="row-text"><span class="chl">Tarea</span></span>'+c('per','Persona')+'<span class="inds">'+indSlotsHTML()+'</span><span class="rsteps"><span class="chl">Pasos</span></span><span class="row-meta">'+c('date','Fecha')+c('dl','Entrega')+c('rem','Recordatorio')+c('est','Tiempo')+'</span><span class="pri"></span><span class="rowmore"></span></div>'; }
+function colHeadHTML(){ const g=k=>'<i class="colgrip" data-col="'+k+'" title="Arrastra para cambiar el ancho. Doble clic: ancho inicial"></i>', c=(k,l)=>'<span class="rc rc-'+k+'"'+(k==='rem'?' title="Recordatorio"':'')+'>'+g(k)+(k==='rem'?I.bell:'')+(l?'<span class="chl">'+l+'</span>':'')+'</span>';
+  return '<div class="colhead" aria-hidden="true"><span class="ch-check"></span><span class="pcol"><span class="chl">Proyecto</span>'+g('proj')+'</span><span class="row-text"><span class="chl">Tarea</span></span>'+c('per','Persona')+'<span class="inds">'+indSlotsHTML()+'</span><span class="rsteps"><span class="chl">Pasos</span></span><span class="row-meta">'+c('date','Fecha')+c('dl','Entrega')+c('rem','')+c('est','Tiempo')+'</span><span class="pri"></span><span class="rowmore"></span></div>'; }
+/* v0.37.2 (E1): a list's columns fit their content, and the title keeps at least 40 % of the row.
+   1. Each column the person has not resized (colWidths) takes the width of its widest cell or of its header, between FIT_MIN and the width
+      the stylesheet gives it (never wider than before). The widths go on .main as --col-<column>, over the defaults.
+   2. While the title has less than 40 % of the row, the columns go under the title one by one in HIDE_ORDER: the class hc-<column> on
+      .main hides the column and shows its value in the row's grey line (.rsub, deskRowHTML). Nothing is lost, only moved.
+   Run after every drawing of the desktop column and when the window changes width (ResizeObserver in bindDeskEvents). */
+const FIT_COLS=['proj','per','date','dl','rem','est'], FIT_MIN={proj:48, per:56, date:40, dl:56, rem:40, est:34};
+const HIDE_ORDER=['est','steps','rem','per','dl','date'];
+const colSel = k => k==='proj'?'.pcol':k==='steps'?'.rsteps':'.rc-'+k;
+function fitCols(d){ const main=d&&d.querySelector(':scope > .main'); if(!main) return;
+  HIDE_ORDER.forEach(k=>main.classList.remove('hc-'+k)); FIT_COLS.forEach(k=>main.style.removeProperty('--col-'+k));
+  const head=main.querySelector('.colhead'); if(!head||!head.offsetWidth||!main.querySelector('.mbody .row')) return;
+  const user=colWidths(), keys=FIT_COLS.filter(k=>!(k in user)), cap={}, want={};
+  keys.forEach(k=>{ const h=head.querySelector(colSel(k)); cap[k]=h?h.offsetWidth:0; });
+  main.classList.add('colmeasure');
+  try{ keys.forEach(k=>{ if(!cap[k]) return; let w=0; main.querySelectorAll('.mbody .row '+colSel(k)+', .colhead '+colSel(k)).forEach(c=>{ if(c.offsetWidth>w) w=c.offsetWidth; }); want[k]=w; }); }
+  finally{ main.classList.remove('colmeasure'); }
+  keys.forEach(k=>{ if(!cap[k]) return; const w=Math.min(cap[k], Math.max(FIT_MIN[k], want[k]+2)); if(w<cap[k]) main.style.setProperty('--col-'+k, w+'px'); });
+  const title=head.querySelector('.row-text'), short=()=>title.offsetWidth < .4*head.clientWidth;
+  for(const k of HIDE_ORDER){ if(!short()) break; const h=head.querySelector(colSel(k)); if(h&&h.offsetWidth) main.classList.add('hc-'+k); } }
 /* A handle drags the width of its column: Proyecto's sits on its right edge (the title takes the rest); a right-hand column's on its left
    edge, so dragging left widens it. Limits in COL_LIMITS; the width is written once per frame and saved on the drop; a double click resets */
 function bindColResize(d){

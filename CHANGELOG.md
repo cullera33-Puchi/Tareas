@@ -1,5 +1,15 @@
 # Registro de cambios
 
+## v0.37.2. Pulido de sincronización, hojas y calendario (14 de noviembre de 2026)
+
+- Sincronización: las ocho tablas se piden al servidor a la vez, no una detrás de otra (`syncPull`); las páginas de una misma tabla siguen en orden.
+- Un guardado que no deja nada por enviar (un filtro, una opción de vista, un cambio deshecho) no lanza pasada si la anterior fue bien (`syncChanged`); lo que cambia en otros dispositivos llega por tiempo real y al volver a la app. Una pasada pedida mientras otra corría se hace siempre.
+- Tiempo real: el corte «transport failure» que da iOS al volver de segundo plano se anota como información, como los demás cortes normales.
+- iPhone: con el teclado abierto, una hoja no pasa de la altura visible (`--vvh`) y se desplaza por dentro; la lista de personas de «Esperando a» baja a 134 px. Visto en el registro de Enric del 10 de noviembre (la hoja «Por confirmar» salía 11 px por arriba).
+- Detalle: unas notas vacías abren a dos líneas y toman la altura de siempre al tocarlas; no vuelven a encogerse al salir, para que las filas de debajo no se muevan bajo el dedo.
+- Escritorio: en Semana, Día, la vista por horas y Mes, las tareas completadas van al final de cada día (`calDoneLast`); en Mes y «Todo el día», las que se ven se eligen primero entre las abiertas.
+- Lote A de la revisión de usabilidad y rendimiento del 14 de noviembre. Sin cambios en Supabase.
+
 ## v0.37.1. Sesión al volver y registro más limpio (11 de noviembre de 2026)
 
 - Antes de cada pasada de sincronización se comprueba la sesión: si ha caducado o caduca en menos de un minuto, se renueva primero (`ensureSession`) y el tiempo real recibe el token nuevo. Ninguna petición sale sin sesión.

@@ -50,10 +50,14 @@ function inGrid(x){ const m=remMin(x); return m!==null&&m>=H0&&m<H1; }
 /* Tasks with a time first, by time; the rest grouped by project (decision 79), in the sidebar's order (archived projects after, no project
    last), each project in the lists' fixed order, with no headers */
 function calProjRank(){ const m=new Map(); activeProjects().forEach((p,i)=>m.set(p.id, i)); return x=>!x.projectId?2e9:m.has(x.projectId)?m.get(x.projectId):1e9; }
-function calSort(xs){ const tm=xs.map(x=>[x,remMin(x)]), rk=calProjRank();
+// v0.37.2: what is done goes after what is open, in each day (it was mixed in by project); each part keeps its own order
+const calDoneLast = (xs, f) => f(xs.filter(x=>x.status!=='done')).concat(f(xs.filter(x=>x.status==='done')));
+function calSort(xs){ return calDoneLast(xs, calSortOpen); }
+function calSortOpen(xs){ const tm=xs.map(x=>[x,remMin(x)]), rk=calProjRank();
   return tm.filter(a=>a[1]!==null).sort((a,b)=>a[1]-b[1]).map(a=>a[0]).concat(orderTasks(tm.filter(a=>a[1]===null).map(a=>a[0])).sort((a,b)=>rk(a)-rk(b))); }
 // The order before decision 79: with a time first by time, then the lists' order (priority first)
-function calTimeSort(xs){ const tm=xs.map(x=>[x,remMin(x)]); return tm.filter(a=>a[1]!==null).sort((a,b)=>a[1]-b[1]).map(a=>a[0]).concat(orderTasks(tm.filter(a=>a[1]===null).map(a=>a[0]))); }
+function calTimeSort(xs){ return calDoneLast(xs, calTimeSortOpen); }
+function calTimeSortOpen(xs){ const tm=xs.map(x=>[x,remMin(x)]); return tm.filter(a=>a[1]!==null).sort((a,b)=>a[1]-b[1]).map(a=>a[0]).concat(orderTasks(tm.filter(a=>a[1]===null).map(a=>a[0]))); }
 /* A day that shows only n of its tasks (Mes, «Todo el día»): which ones is chosen in that order, so the grouping by project never puts a
    high priority behind «N más»; those n are then shown grouped by project */
 function calPick(xs, n){ return xs.length<=n ? calSort(xs) : calSort(calTimeSort(xs).slice(0, n)); }

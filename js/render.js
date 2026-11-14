@@ -620,7 +620,10 @@ function bindDetail(el, id){
   ti.addEventListener('input',()=>{ const v=ti.value.replace(/\n/g,' '); if(v.trim()){ saveEdit(x,{title:v}); showTitle(); } growT(); });
   ti.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); ti.blur(); } });
   ti.addEventListener('blur',()=>{ const v=ti.value.replace(/\n/g,' ').trim(); if(v&&v!==x.title){ x.title=v; x.modified=new Date().toISOString(); save(); showTitle(); } else flushEdits(); if(ti.value!==x.title){ ti.value=x.title; growT(); } });
-  const grow=()=>fit(no,()=>Math.max(100, no.scrollHeight+2)); grow();
+  // v0.37.2: empty notes open at two lines, not four, and take the usual height once tapped. They do not shrink back on leaving: the
+  // rows below would move up under the finger that is tapping one of them
+  const grow=()=>fit(no,()=>Math.max(no.value||document.activeElement===no||no.dataset.opened?100:0, no.scrollHeight+2)); grow(); // empty: its two rows
+  no.addEventListener('focus', ()=>{ no.dataset.opened='1'; grow(); });
   // The link and phone chips under the notes follow what is typed, a moment after the last key; only the strip changes
   let lt=null; const refreshLinks=()=>{ const ls=detailLinks(x.notes); let box=$('.links',el); const cur=box?[...box.querySelectorAll('a')].map(a=>a.getAttribute('href')).join(' '):'';
     if(cur===ls.map(l=>l.href).join(' ')) return;

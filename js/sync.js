@@ -334,13 +334,14 @@ async function syncPush(c){ const out={pushed:0, deleted:0, kept:0}; const late=
   const got={}; for(const table of Object.keys(late)){ got[table]=[]; for(let i=0;i<late[table].length;i+=100){ got[table].push(...await SY.remote.byIds(table, late[table].slice(i,i+100))); } out.kept+=late[table].length; }
   if(out.kept) syncApply(got, {});
   return out; }
+// v0.37.2: the tables are asked for at once, not one after another (each answer waited for the one before); the pages of one table still go in order
 async function syncPull(cursor){ const out={};
-  for(const {table} of SYNC_TABLES){ if(syncMissing(table)){ out[table]=[]; continue; } let after=cursor&&cursor[table]?new Date(syncTime(cursor[table])-SYNC_OVERLAP).toISOString():null; const rows=[];
+  await Promise.all(SYNC_TABLES.map(async ({table})=>{ if(syncMissing(table)){ out[table]=[]; return; } let after=cursor&&cursor[table]?new Date(syncTime(cursor[table])-SYNC_OVERLAP).toISOString():null; const rows=[];
     for(;;){ const page=await SY.remote.pull(table, after, SYNC_PAGE); if(page.length<SYNC_PAGE){ rows.push(...page); break; }
       // A full page: the rows of its last instant may continue on the next one, so they are asked for again from the one before
       const last=page[page.length-1].server_ts, keep=page.filter(r=>r.server_ts!==last);
       if(!keep.length){ rows.push(...page); after=last; continue; } rows.push(...keep); after=keep[keep.length-1].server_ts; }
-    out[table]=rows; }
+    out[table]=rows; }));
   return out; }
 
 /* ---------- Runs ---------- */
@@ -348,7 +349,11 @@ function syncPaint(){ if(!SY) return; if(SY.user && !SY.running){ try{ SY.pendin
   if(onSettings() && !busyEditing() && !touchDrag) render(); }
 function syncStatus(s){ if(!SY||SY.status===s) return; SY.status=s; syncPaint(); }
 // Called by save(): the change goes up a moment after the last one
-function syncChanged(){ if(!SY||!SY.user||SY.quiet||SY.switching) return; clearTimeout(SY.timer); SY.timer=setTimeout(()=>syncRun('cambio'), SYNC_DEBOUNCE); }
+/* v0.37.2: a save that leaves nothing to send (a view setting, the filter, a change undone) runs no pass, once the last one went well: what
+   other devices change arrives by realtime and on every return to the app. force: a pass was asked for while another ran (SY.again) */
+function syncChanged(force){ if(!SY||!SY.user||SY.quiet||SY.switching) return; clearTimeout(SY.timer); SY.timer=setTimeout(()=>{
+    if(!force&&SY.status==='ok'&&!SY.running&&!SY.again){ let n=-1; try{ n=syncCollect(true).count; }catch(e){} if(n===0){ syncPaint(); return; } }
+    syncRun('cambio'); }, SYNC_DEBOUNCE); }
 function syncRetry(){ clearTimeout(SY.timer); const ms=Math.min(300e3, 2000*Math.pow(2, SY.retry++)); SY.timer=setTimeout(()=>syncRun('reintento'), ms); }
 // One run: pull, merge, push. Resolves true when it reached the server. Runs one at a time (and one per device with Web Locks)
 function syncRun(reason){
@@ -403,7 +408,7 @@ function syncRun(reason){
     if(ok==='other'){ SY.status='other'; SY.error=''; syncPaint(); syncOtherAsk(); return false; }
     if(ok==='denied'){ SY.status='denied'; SY.error=''; syncPaint(); teamDeniedPaint(); return false; } // decision 63b
     if(ok==='needkey'){ SY.status='needkey'; SY.error=''; syncPaint(); teamAskKey(); return false; } // decision 71.1
-    if(ok){ SY.status='ok'; SY.error=''; pushFlush(); attFlushSoon(0); syncResubscribe(); cryptoResume(); teamAfter(); } syncPaint(); if(SY.again) syncChanged(); return !!ok; }, e=>{
+    if(ok){ SY.status='ok'; SY.error=''; pushFlush(); attFlushSoon(0); syncResubscribe(); cryptoResume(); teamAfter(); } syncPaint(); if(SY.again) syncChanged(true); return !!ok; }, e=>{
     SY.running=false;
     // v0.37.1: an expired or missing token (a 401, «JWT expired», «permission denied for function», or a refusal of the row rules while the
     // token is not fresh) is no lost access: the session is refreshed and the pass repeated once, quietly. A second failure goes on as usual
@@ -437,10 +442,10 @@ function syncRenewChannel(){ if(!SY.unsub) return; SY.unsub(); SY.unsub=null; sy
 let SYNC_TOPIC_N=0;
 function syncTopic(uid){ return 'tareas-'+uid+'-'+(++SYNC_TOPIC_N); }
 /* v0.37.1: realtime trouble. A socket closed while the app was away or the network changed (1000, 1001, 1005, 1006, a heartbeat timeout,
-   a closed channel) is normal: said as info, at most once a minute. Three failures in a row, or anything else, as a warning (again after 10
+   a closed channel, and since v0.37.2 the «transport failure» iOS gives for a socket it dropped in the background) is normal: said as info, at most once a minute. Three failures in a row, or anything else, as a warning (again after 10
    minutes at most). A token that has expired: the session is refreshed and the channel made again with the new one */
 function syncRtTrouble(st, err){ const m=st+(err?' '+(err.message||err):''); SY.rtFails=(SY.rtFails||0)+1;
-  const token=/JWT|token.*expired/i.test(m), normal=token||document.visibilityState==='hidden'||/\b(1000|1001|1005|1006)\b|heartbeat|timeout|TIMED_OUT|closed|No channels/i.test(m);
+  const token=/JWT|token.*expired/i.test(m), normal=token||document.visibilityState==='hidden'||/\b(1000|1001|1005|1006)\b|heartbeat|timeout|TIMED_OUT|closed|No channels|transport failure/i.test(m);
   if(!normal||SY.rtFails>=3){ if(Date.now()-(SY.rtWarnAt||0)>600e3){ SY.rtWarnAt=Date.now(); log('warn','Tiempo real: '+m+(SY.rtFails>=3?' ('+SY.rtFails+' fallos seguidos)':'')); } }
   else if(Date.now()-(SY.rtInfoAt||0)>60e3){ SY.rtInfoAt=Date.now(); log('info','Tiempo real: '+m); }
   if(token) syncRtHeal(); }

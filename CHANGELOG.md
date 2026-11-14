@@ -1,5 +1,13 @@
 # Registro de cambios
 
+## v0.37.3. Más sitio para el título (14 de noviembre de 2026)
+
+- Escritorio (E1): cada columna de las listas que no se ha ajustado a mano mide lo que ocupa su contenido, nunca más que antes (`fitCols`, en cada dibujo y con `ResizeObserver` al cambiar el ancho). Si el título queda por debajo del 40 % de la fila, las columnas pasan bajo el título por este orden: Tiempo, Pasos, Recordatorio, Persona, Entrega y Fecha (clases `hc-*` en `.main`); sus valores salen en una línea gris (`.rsub`). Una columna ajustada a mano nunca se mueve. «Aplazada 4 veces» y «Desde el martes 27» van siempre en esa línea, en naranja, y la columna Fecha ya no se ensancha para ellas. La cabecera del recordatorio es solo la campana.
+- Corregido durante la revisión: arrastrar el borde de una columna partía del ancho ajustado y queda guardado; el doble clic vuelve al ancho ajustado.
+- iPhone (U1, U2): la línea gris es una fila flexible en la que se encogen primero la etiqueta del proyecto y los nombres de personas; fecha, entrega, recordatorio, tiempo y pasos no se cortan. Orden: proyecto, día, entrega, «Hecha por», recordatorio, tiempo, pasos, personas e iconos (notas, adjuntos, repetición). A la derecha solo la estrella de «Ahora» y la prioridad; una fila sin línea gris conserva sus pasos e iconos a la derecha y sigue en una línea.
+- Semana (E3): la etiqueta lleva la primera palabra entera del proyecto, con «…» si no cabe (Mes sigue con 4 letras); en los días con 8 tareas o menos (`WEEK_FEW`) el título ocupa hasta dos líneas, con guiones.
+- Lote B de la revisión del 14 de noviembre, aprobado por Enric con capturas del antes y el después. Sin cambios en Supabase. Pruebas actualizadas al nuevo diseño (`rm-A`, `rm-AT`, `rm-COL`, `rm-E`, `rm-EP`, `rm-F`, `rm-PC`, `rm-RC`, `rm-RF`, `rm-ST`, `rm-VN2`, `batch5`) y comprobaciones nuevas en `rm-LA`.
+
 ## v0.37.2. Pulido de sincronización, hojas y calendario (14 de noviembre de 2026)
 
 - Sincronización: las ocho tablas se piden al servidor a la vez, no una detrás de otra (`syncPull`); las páginas de una misma tabla siguen en orden.

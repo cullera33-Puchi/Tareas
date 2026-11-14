@@ -387,7 +387,9 @@ async function desktop(browser){
   const col = (id, c) => ev(page, ([id,c])=>{ const e=document.querySelector('#desk .main .row[data-id="'+id+'"]:not(.first .row) .'+c); return e&&{text:e.textContent, cls:e.className, shown:getComputedStyle(e).display!=='none', w:Math.round(e.getBoundingClientRect().width), color:getComputedStyle(e).color}; }, [id, c]);
   const e1=await col('s1','rc-est'), e14=await col('s14','rc-est'), d5=await col('s5','rc-date'), d7=await col('s7','rc-date'), d14=await col('s14','rc-date');
   check('desk_est_column', e1 && e1.text==='15 min' && e1.shown && e1.w>=50 && e14 && e14.text==='' && e14.shown, {e1, e14});
-  check('desk_drag_column', d5 && d5.text==='Aplazada 4 veces' && /drag/.test(d5.cls) && d5.w>=110 && d7.text==='Desde el martes 27' && d14.text==='', {d5, d7, d14}); // s14 is in Aplazadas: the group says it
+  // v0.37.2 (E1): «Aplazada 4 veces» goes in the grey line under the title, in orange; the Fecha column stays empty for it
+  const g5=await col('s5','rsub .s-drag'), g7=await col('s7','rsub .s-drag'), g14=await col('s14','rsub .s-drag');
+  check('desk_drag_column', g5 && g5.text==='Aplazada 4 veces' && g5.shown && /255, 149, 0|255, 159, 10/.test(g5.color) && g7 && g7.text==='Desde el martes 27' && !g14 && d5 && d5.text==='' && d14.text==='', {g5, g7, g14, d5, d14}); // s14 is in Aplazadas: the group says it
   await shot(page, 'd1-hoy');
   // A list without estimates has no such column
   await ev(page, ()=>{ task('h1').estimate=null; DB.settings.activeSpace='personal'; resetListState(); save(); render(); }); await calm(page);

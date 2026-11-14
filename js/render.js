@@ -317,20 +317,29 @@ function rowHTML(x, opts={}){
       else if(!(opts.noToday&&x.date===t) && x.date!==opts.day && x.date!==x.deadline) meta.push('<span class="'+(x.date<t?'over':'')+'">'+fmtDate(x.date)+'</span>'); } // a date that is the deadline says it once
     if(dl) meta.push(dl);
     const dby=noticeDoneBy(x); if(dby) meta.push('<span class="doneby">'+esc(dby)+'</span>'); // decision 78: done by the person it was sent to, in green
-    if(x.status==='waiting'&&x.waitingFor&&!isViewPerson(x.waitingFor, opts)) meta.push('<span class="waitfor">Esperando a '+esc(x.waitingFor)+'</span>');
-    if(respShown(x)&&!isViewPerson(x.responsible, opts)) meta.push(respMetaHTML(x)); // decision 48c: who does it, in grey; decision 65a: not the person whose view it is
     if(x.reminder) meta.push('<span class="bell">'+I.bell+(x.date&&localDay(x.reminder)===x.date?fmtTime(x.reminder):fmtDateTime(x.reminder))+'</span>'); // the reminder's own day when it is not the task's date (moved task, no date)
-    if(x.estimate) meta.push('<span class="est">'+estLabel(x.estimate)+'</span>'); } // decision 56a
+    if(x.estimate) meta.push('<span class="est">'+estLabel(x.estimate)+'</span>'); // decision 56a
+    // v0.37.2: the people after the day, the reminder and the estimate; their names shrink before those are cut
+    if(x.status==='waiting'&&x.waitingFor&&!isViewPerson(x.waitingFor, opts)) meta.push('<span class="waitfor">Esperando a '+esc(x.waitingFor)+'</span>');
+    if(respShown(x)&&!isViewPerson(x.responsible, opts)) meta.push(respMetaHTML(x)); } // decision 48c: who does it, in grey; decision 65a: not the person whose view it is
   const ind=opts.compact?'':(x.focus&&!done&&!opts.simple&&!opts.inFocus?'<span class="ist" title="En Ahora">'+I.starF+'</span>':'')+(x.notes&&x.notes.trim()?I.note:'')+(hasAtt(x.id)?I.clip:'')+(x.repeat&&repParse(x.repeat)?'<span class="irp" title="'+esc(repSummary(x.repeat))+'">'+I.repeat+'</span>':''); // decision 29: a paperclip when it has photos or audio
   const pri = done?'':x.priority==='high'?'<span class="pri high">!!!</span>':x.priority==='mid'?'<span class="pri mid">!!</span>':'';
   const prog=opts.compact?'':stepProgHTML(x); // decision 46: "3/4" and its ring, next to the indicators; on the desktop a column of its own
   const pc=p?p.color:null;
   const selecting = UI.select && !opts.simple; const selected = selecting && UI.select.ids.has(x.id);
   if(UI.wide) return deskRowHTML(x, opts, {p, t, done, held, shownDone, ind, pri, pc, selecting, selected, prog});
+  /* v0.37.2, batch B (U1, U2): on the iPhone the grey line, when there is one, carries the steps and the small icons (notes, paperclip, repeat) after the
+     project, the day, the deadline, the reminder and the estimate; the people next, then the icons. The right keeps the star of Ahora and
+     the priority, so the title gets the width. The line never wraps: the capsule and the names shrink first (stylesheet) */
+  // A row with nothing else on the grey line keeps its steps and icons on the right, so it stays one line
+  let star=opts.compact?'':(x.focus&&!done&&!opts.simple&&!opts.inFocus?'<span class="ist" title="En Ahora">'+I.starF+'</span>':'');
+  if(!opts.compact){ const pm=meta.findIndex(m=>/class="(waitfor|resp)"/.test(m)), icons=(x.notes&&x.notes.trim()?I.note:'')+(hasAtt(x.id)?I.clip:'')+(x.repeat&&repParse(x.repeat)?'<span class="irp" title="'+esc(repSummary(x.repeat))+'">'+I.repeat+'</span>':'');
+    if(!meta.length) star+=icons+prog;
+    else { if(prog) meta.splice(pm<0?meta.length:pm, 0, prog); if(icons) meta.push('<span class="micons">'+icons+'</span>'); } }
   return '<div class="row'+(done?' done':'')+(held?' held':'')+(opts.byDay?' byday':'')+(selected?' selected':'')+'" data-id="'+x.id+'"'+(pc?' style="'+tagVars(pc)+'"':'')+'>'+
     (opts.simple||selecting?'':'<div class="row-bg left"><span>'+I.check+'</span></div><div class="row-bg right">'+(x.status==='waiting'?'<button class="b-tomorrow b-unwait" data-act="unwait">Pendiente</button>':'<button class="b-tomorrow" data-act="postpone">Aplazar</button>')+'<button class="b-delete" data-act="delete">Eliminar</button></div>')+
     '<div class="row-content">'+(selecting?'<span class="selbox">'+I.check+'</span>':'<button class="check'+(shownDone?' done':x.status==='waiting'?' waiting':'')+'" data-act="check" aria-label="Completar">'+I.check+'</button>')+
-    '<div class="row-text"><div class="row-title">'+esc(x.title||'Sin título')+'</div>'+(meta.length?'<div class="row-meta">'+meta.join('')+'</div>':'')+'</div>'+(ind||prog?'<span class="inds">'+ind+prog+'</span>':'')+pri+(UI.wide&&!selecting&&!opts.simple?'<button class="rowmore" data-act="rowMenu" aria-label="Más">'+I.more+'</button>':'')+'</div></div>';
+    '<div class="row-text"><div class="row-title">'+esc(x.title||'Sin título')+'</div>'+(meta.length?'<div class="row-meta">'+meta.join('')+'</div>':'')+'</div>'+(star?'<span class="inds">'+star+'</span>':'')+pri+'</div></div>';
 }
 /* R11: a desktop row is one line of 32 px: circle, title and project capsule, then right-aligned columns for the notes and voice
    indicators, the date (or "Aplazada", or when it was done), the reminder and the priority. The R3 rules decide what each column says */
@@ -345,11 +354,11 @@ function deskIndHTML(x, v, opts){ if(opts.compact) return '';
 /* v0.33.1: a right-hand column takes room only when some row of the list uses it (the :has rules of the stylesheet). The blocks at the
    foot of a list, Completadas and Por confirmar más adelante, are rows apart (opts.xs, class xs): what they show (the time a task was
    done, a review day) never opens a column in the list above them or in its header; their own rows get the columns of the list plus theirs */
-function deskRowHTML(x, opts, v){ const t=v.t; let date='', dcls='', rem=''; const dl=x.deadline?dlText(x.deadline):'', dlc=dlLevel(x); // decision 48a: a column of its own
+function deskRowHTML(x, opts, v){ const t=v.t; let date='', dcls='', rem='', drag=''; const dl=x.deadline?dlText(x.deadline):'', dlc=dlLevel(x); // decision 48a: a column of its own
   if(v.done){ if(x.completed) date=opts.byDay?fmtTime(x.completed):fmtDateTime(x.completed); }
   else { const dg=x.status==='pending'&&x.date&&x.date<=t?dragText(x):''; // decision 56b, as on the iPhone
     if(waitIn(x)){ if(!opts.noReview){ date='Revisar hoy'; dcls=' review'; } } // decision 51, as on the iPhone
-    else if(dg){ date=dg; dcls=' carried drag'; }
+    else if(dg){ drag=dg; } // v0.37.2 (E1): «Aplazada 4 veces» goes under the title, not in the Fecha column
     else if(x.date){ if(x.carried&&x.date<=t){ if(!opts.hideCarried){ date='Aplazada'; dcls=' carried'; } }
       else if(!(opts.noToday&&x.date===t) && x.date!==opts.day && x.date!==x.deadline){ date=fmtDate(x.date); if(x.date<t) dcls=' over'; } } // a deadline on the same day says it once, as on the iPhone
     if(x.reminder) rem=x.date&&localDay(x.reminder)===x.date?fmtTime(x.reminder):fmtDateTime(x.reminder); }
@@ -358,12 +367,18 @@ function deskRowHTML(x, opts, v){ const t=v.t; let date='', dcls='', rem=''; con
   // R15, R16: the selected row (cur), the multiple selection, the selection mode's boxes and the title edited in place; Ahora repeats rows and shows none of the selection
   const ds=UI.dsel, own=!opts.simple, multi=deskMulti(), sel=own&&multi&&ds.ids.has(x.id), cur=own&&!multi&&ds.cur===x.id, edit=own&&ds.edit&&ds.edit.id===x.id;
   v.selecting=own&&ds.mode;
+  // v0.33.1: Esperando a and the responsible in a column of their own, Persona, right after the title (decisions 41 and 48c)
+  const per=(v.done?'':doneByTagHTML(x))+(x.status==='waiting'&&x.waitingFor&&!v.done&&!isViewPerson(x.waitingFor, opts)?'<span class="wtag" title="Esperando a '+esc(x.waitingFor)+'">'+MI.wait+esc(x.waitingFor)+'</span>':'')+(v.done||isViewPerson(x.responsible, opts)?'':respTagHTML(x));
+  const est=x.estimate&&!v.done?estLabel(x.estimate):'', remH=rem?I.bell+rem:'';
+  /* v0.37.2 (E1): under the title, a grey line with «Aplazada 4 veces» and, when the list is too narrow for them, what the columns hidden by
+     fitCols would show (classes hc-<column> on .main). Without either it takes no height */
+  const sub='<div class="rsub">'+(drag?'<span class="s s-drag">'+drag+'</span>':'')+(date?'<span class="s s-date'+dcls+'">'+date+'</span>':'')+(dl?'<span class="s s-dl'+(dlc?' dl-'+dlc:'')+'">'+dl+'</span>':'')+
+    (rem?'<span class="s s-rem">'+remH+'</span>':'')+(est?'<span class="s s-est">'+est+'</span>':'')+(v.prog?'<span class="s s-steps">'+v.prog+'</span>':'')+(per?'<span class="s s-per">'+per+'</span>':'')+'</div>';
   return '<div class="row'+(v.done?' done':'')+(v.held?' held':'')+(opts.byDay?' byday':'')+(opts.xs?' xs':'')+(sel?' selected':'')+(cur?' cur':'')+'" data-id="'+x.id+'"'+(v.pc?' style="'+tagVars(v.pc)+'"':'')+' role="option" aria-selected="'+(sel||cur)+'" tabindex="'+(own&&ds.cur===x.id?0:-1)+'"'+(edit?'':' draggable="true"')+'>'+
     '<div class="row-content">'+(v.selecting?'<span class="selbox">'+I.check+'</span>':'<button class="check'+(v.shownDone?' done':x.status==='waiting'?' waiting':'')+'" data-act="check" aria-label="Completar" tabindex="-1">'+I.check+'</button>')+pcol+
-    '<div class="row-text">'+(edit?'<input class="rowedit" data-role="rowedit" type="text" value="'+esc(ds.edit.text)+'" aria-label="Título" autocomplete="off" spellcheck="false">':'<div class="row-title" title="'+esc(x.title||'')+'">'+esc(x.title||'Sin título')+'</div>')+'</div>'+
-    // v0.33.1: Esperando a and the responsible in a column of their own, Persona, right after the title (decisions 41 and 48c)
-    '<span class="rc rc-per">'+(v.done?'':doneByTagHTML(x))+(x.status==='waiting'&&x.waitingFor&&!v.done&&!isViewPerson(x.waitingFor, opts)?'<span class="wtag" title="Esperando a '+esc(x.waitingFor)+'">'+MI.wait+esc(x.waitingFor)+'</span>':'')+(v.done||isViewPerson(x.responsible, opts)?'':respTagHTML(x))+'</span>'+
-    '<span class="inds">'+deskIndHTML(x, v, opts)+'</span><span class="rsteps">'+v.prog+'</span><span class="row-meta"><span class="rc rc-date'+dcls+'"'+(date?' title="'+esc(date)+'"':'')+'>'+date+'</span><span class="rc rc-dl'+(dlc?' dl-'+dlc:'')+'"'+(dl?' title="Fecha límite: '+esc(fmtDate(x.deadline))+'"':'')+'>'+dl+'</span><span class="rc rc-rem"'+(rem?' title="Recordatorio: '+esc(rem)+'"':'')+'>'+(rem?I.bell+rem:'')+'</span><span class="rc rc-est"'+(x.estimate&&!v.done?' title="Tiempo estimado: '+esc(estLabel(x.estimate).toLowerCase())+'"':'')+'>'+(x.estimate&&!v.done?estLabel(x.estimate):'')+'</span></span>'+ // decision 56a: a column of its own
+    '<div class="row-text">'+(edit?'<input class="rowedit" data-role="rowedit" type="text" value="'+esc(ds.edit.text)+'" aria-label="Título" autocomplete="off" spellcheck="false">':'<div class="row-title" title="'+esc(x.title||'')+'">'+esc(x.title||'Sin título')+'</div>')+sub+'</div>'+
+    '<span class="rc rc-per">'+per+'</span>'+
+    '<span class="inds">'+deskIndHTML(x, v, opts)+'</span><span class="rsteps">'+v.prog+'</span><span class="row-meta"><span class="rc rc-date'+dcls+'"'+(date?' title="'+esc(date)+'"':'')+'>'+date+'</span><span class="rc rc-dl'+(dlc?' dl-'+dlc:'')+'"'+(dl?' title="Fecha límite: '+esc(fmtDate(x.deadline))+'"':'')+'>'+dl+'</span><span class="rc rc-rem"'+(rem?' title="Recordatorio: '+esc(rem)+'"':'')+'>'+remH+'</span><span class="rc rc-est"'+(est?' title="Tiempo estimado: '+esc(est.toLowerCase())+'"':'')+'>'+est+'</span></span>'+ // decision 56a: a column of its own
     '<span class="pri'+(v.pri?(x.priority==='high'?' high':' mid'):'')+'">'+(v.pri?(x.priority==='high'?'!!!':'!!'):'')+'</span>'+
     (v.selecting?'':opts.simple?'<span class="rowmore" aria-hidden="true"></span>':'<button class="rowmore" data-act="rowMenu" aria-label="Más" title="Más" tabindex="-1">'+I.more+'</button>')+'</div></div>'; } // Ahora keeps the columns aligned with the list
 // Decision 78: «Hecha por Víctor» in the Persona column of the desktop, first, in green

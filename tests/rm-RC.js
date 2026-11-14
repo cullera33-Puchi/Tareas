@@ -314,7 +314,7 @@ async function desktop(browser){
   await ev(page, ()=>setDeskView('hoy')); await calm(page);
   // --- The tags in the title cell: the responsible beside Esperando a, the title keeping its room
   x = await ev(page, ()=>{ const row=id=>document.querySelector('#desk .main .row[data-id="'+id+'"]:not(.first .row)'); const b=e=>e&&Math.round(e.getBoundingClientRect().width);
-    const r1=row('a1'), r3=row('a3'), r4=row('a4'); return {t1:r1.querySelector('.rtag').textContent, tip:r1.querySelector('.rtag').title, w1:b(r1.querySelector('.rtag')), wt:b(r3.querySelector('.wtag')), rt:b(r3.querySelector('.rtag')), title:b(r3.querySelector('.row-title')), none:!r4.querySelector('.rtag')}; });
+    const r1=row('a1'), r3=row('a3'), r4=row('a4'), q=(r,s)=>[...r.querySelectorAll(s)].find(e=>e.offsetWidth)||r.querySelector(s); /* v0.37.2: the Persona column, or its copy in the grey line when that column went under the title */ return {t1:q(r1,'.rtag').textContent, tip:q(r1,'.rtag').title, w1:b(q(r1,'.rtag')), wt:b(q(r3,'.wtag')), rt:b(q(r3,'.rtag')), title:b(r3.querySelector('.row-title')), none:!r4.querySelector('.rtag')}; });
   check('d_tags', x.t1==='Marta Ruiz' && x.tip==='Responsable: Marta Ruiz' && x.w1>40 && x.wt>30 && x.rt>40 && x.title>60 && x.none, x);
   await shot(page, 'd1-hoy');
   // --- The inspector: Responsable, a popover with the suggestions, Intro sets it

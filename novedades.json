@@ -1,5 +1,16 @@
 [
   {
+    "version": "0.37.3",
+    "date": "2026-11-14",
+    "items": [
+      "En el ordenador el título de la tarea tiene mucho más sitio: cada columna mide lo que ocupa su contenido.",
+      "Si la ventana es estrecha, los datos que no caben pasan a una línea gris bajo el título, sin perder ninguno. Una columna que hayas ensanchado a mano se queda como columna.",
+      "«Aplazada 4 veces» aparece ahora bajo el título, en naranja.",
+      "En el iPhone se acorta primero el nombre del proyecto, y la entrega, la hora y el tiempo se ven enteros. Los pasos y los iconos pasan a la línea gris.",
+      "En la Semana, la etiqueta muestra la primera palabra entera del proyecto y los días con pocas tareas muestran el título en dos líneas."
+    ]
+  },
+  {
     "version": "0.37.2",
     "date": "2026-11-14",
     "items": [

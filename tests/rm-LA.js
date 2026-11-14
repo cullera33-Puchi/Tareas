@@ -6,6 +6,9 @@ require('./lib/out.js'); // outputs (screenshots, downloads) go to tests/out
 //  4. iPhone, keyboard up: a bottom sheet is held to the height that shows (--vvh) and the person list of Por confirmar is 134 px.
 //  5. Detail: empty notes open at two lines, take the usual height on focus and do not shrink on leaving.
 //  6. Desktop calendar: done tasks go after the open ones of the day, also in Mes's choice of what shows.
+//  7. Batch B (U1, U2): on the iPhone the grey line keeps the deadline, the estimate and the steps whole, the project capsule shrinks
+//     first; the steps and the small icons are in the grey line and the right keeps only the priority; a row with nothing else keeps them
+//     on the right, in one line.
 const { chromium } = require('playwright');
 const fs = require('fs'); const path = require('path');
 const TF = require('./lib/team-fake.js'); const { until, synced, signIn, tk, seed } = TF;
@@ -74,10 +77,31 @@ async function calendarTests(browser){
   await D.ctx.close();
 }
 
+async function iphoneRowTests(browser){
+  const d = new Date(); const t = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  const tm = (()=>{ const x=new Date(d); x.setDate(x.getDate()+1); return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0'); })();
+  const now=new Date().toISOString();
+  const projects=[{id:'pl', spaceId:'trabajo', name:'Transformación digital del área financiera', color:'#FF9500', order:0, archived:false, created:now, modified:now}];
+  const s=seed([tk('l1', {title:'Revisar SOW con legal', projectId:'pl', date:t, deadline:tm, estimate:30, priority:'high', notes:'algo'}), tk('l2', {title:'Solo con notas', date:t, notes:'algo'})], {projects});
+  s.subtasks=[{id:'s1', taskId:'l1', title:'Uno', done:true, order:1000, created:now, modified:now},{id:'s2', taskId:'l1', title:'Dos', done:false, order:2000, created:now, modified:now}];
+  const P = await TF.device(browser, new TF.Fake(), {tag:'P', user:null, seed:s}, PORT, errors); const p=P.page; await p.waitForTimeout(500);
+  const x = await p.evaluate(()=>{ const row=document.querySelector('.screen.root[data-root=tareas] .group .row[data-id=l1]'), m=row.querySelector('.row-meta'), mr=m.getBoundingClientRect();
+    const box=sel=>{ const e=m.querySelector(sel); if(!e) return null; const b=e.getBoundingClientRect(); return {l:Math.round(b.left), r:Math.round(b.right), w:Math.round(b.width), cut:e.scrollWidth>e.clientWidth+1}; };
+    const two=document.querySelector('.screen.root[data-root=tareas] .group .row[data-id=l2]');
+    return {meta:Math.round(mr.right), tag:box('.tag'), dl:box('.dl'), est:box('.est'), steps:box('.sprog'), icons:!!m.querySelector('.micons svg'), right:[...row.querySelectorAll('.row-content > .inds, .row-content > .pri')].map(e=>e.className),
+      l2meta:!!two.querySelector('.row-meta'), l2right:!!two.querySelector('.row-content > .inds svg'), l2h:Math.round(two.getBoundingClientRect().height)}; });
+  check('iphone_line_order', x.tag&&x.tag.cut && x.dl&&!x.dl.cut&&x.dl.r<=x.meta && x.est&&x.est.r<=x.meta && x.steps&&x.steps.r<=x.meta+1 && x.icons, x);
+  check('iphone_right_only_priority', x.right.join()==='pri high', x.right);
+  check('iphone_no_extra_line', !x.l2meta && x.l2right && x.l2h<=53, x);
+  await p.screenshot({path:path.join(OUT, 'iphone-rows.png')});
+  await P.ctx.close();
+}
+
 (async()=>{
   const srv = await TF.serve(PORT); const browser = await chromium.launch();
   try { await syncTests(browser); } catch(e){ errors.push('sync: '+(e.stack||e.message)); }
   try { await calendarTests(browser); } catch(e){ errors.push('calendar: '+(e.stack||e.message)); }
+  try { await iphoneRowTests(browser); } catch(e){ errors.push('iphone rows: '+(e.stack||e.message)); }
   await browser.close(); srv.close();
   console.log(JSON.stringify({r, fails, errors}, null, 1)); process.exit(fails.length||errors.length?1:0);
 })();

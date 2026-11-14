@@ -13,6 +13,9 @@ require('./lib/out.js'); // outputs (screenshots, downloads) go to tests/out
 //  7. v0.33.1: Persona (Esperando a, the responsible) is a column after Tarea, resizable and saved like the others; every right-hand column
 //     (Persona, indicators, Pasos, Fecha, Entrega, Recordatorio, Tiempo, priority) is 0 wide when no row of the list uses it; the rows of
 //     Completadas never open a column in the list or its header; header labels within 2 px of their cells.
+//  8. v0.37.2 (decision 82, E1): a column the person has not resized fits its content (never wider than before); while the title has less
+//     than 40 % of the row, columns go under the title (hc-<column> on .main) and their values show in the row's grey line; a column the
+//     person resized is never moved there. The reminder column is headed by the bell alone.
 const { chromium } = require('playwright');
 const http = require('http'); const fs = require('fs'); const path = require('path');
 const ROOT = path.resolve(__dirname, '..'), PORT = 10700, URL0 = 'http://localhost:'+PORT+'/';
@@ -83,11 +86,11 @@ async function widths(browser){
     await openPane(page, 'a1'); g=await geo(page); res[w].open=g.rows.a1['row-text'].w; res[w].overOpen=g.scrollW>g.clientW; res[w].badOpen=aligned(g).length; res[w].mainOpen=g.mainW;
     await ctx.close(); }
   // At 1280 the main column is 1060 px: the row takes it minus the padding (no 900 px cap)
-  check('grows_closed', res[1920].closed - res[1280].closed >= 600 && res[1920].hoy - res[1280].hoy >= 300, res);
-  check('grows_open', res[1920].open - res[1280].open >= 450, res); // v0.33.1: at 1280 with the inspector the title is at its 120 px floor
+  check('grows_closed', res[1920].closed - res[1280].closed >= 550 && res[1920].hoy - res[1280].hoy >= 300, res); // v0.37.2: at 1280 the fitted columns already give the title more
+  check('grows_open', res[1920].open - res[1280].open >= 400 && res[1280].open>=.4*(res[1280].mainOpen-48), res); // v0.37.2: at 1280 with the inspector the title keeps 40 %, columns go under it
   check('no_cap', res[1920].closed > 750, res[1920]); // the old list stopped at 900 px, its title at about 310 (v0.33.1: Persona takes 160)
   check('no_overflow', [1000,1280,1600,1920].every(w=>!res[w].over&&!res[w].overOpen), res);
-  check('two_lines', [1000,1280,1600,1920].every(w=>res[w].longH>res[w].shortH&&res[w].longH<=48&&res[w].shortH===32), res); // v0.33.1
+  check('two_lines', [1000,1280,1600,1920].every(w=>res[w].longH>=res[w].shortH&&res[w].longH<=48&&res[w].shortH<=44) && [1600,1920].every(w=>res[w].shortH===32), res); // v0.33.1; v0.37.2: a narrow list moves a1's estimate under its title
   check('title_min', [1000,1280,1600,1920].every(w=>res[w].closed>=120&&res[w].open>=120), res); // v0.33.1: in a narrow list the right-hand columns are clipped, not the title
   check('aligned_all_widths', [1000,1280,1600,1920].every(w=>!res[w].bad&&!res[w].badOpen), res);
 }
@@ -97,7 +100,7 @@ async function main(browser){
   await ev(page, ()=>setDeskView('hoy')); await calm(page);
   g = await geo(page);
   check('head_once', g.n===1 && g.above, {n:g.n, above:g.above});
-  check('head_labels_hoy', JSON.stringify(g.labels)===JSON.stringify(['Proyecto','Tarea','Persona','Fecha','Entrega','Recordatorio','Tiempo']), g.labels);
+  check('head_labels_hoy', JSON.stringify(g.labels)===JSON.stringify(['Proyecto','Tarea','Persona','Fecha','Entrega','Tiempo']) && !!g.head['rc-rem'].shown && await ev(page, ()=>document.querySelector('#desk .main .colhead .rc-rem').title==='Recordatorio'), {labels:g.labels, rem:g.head['rc-rem']}); // v0.37.2: the bell heads the reminder column
   check('tooltip_full', g.rows.a2.title===LONG, g.rows.a2.title);
   x = await ev(page, ()=>{ const t=document.querySelector('#desk .main .row[data-id=a2]:not(.first .row) .row-title'), cs=getComputedStyle(t); return {clamp:cs.webkitLineClamp, ws:cs.whiteSpace, h:Math.round(t.getBoundingClientRect().height), lh:parseFloat(cs.lineHeight)}; });
   check('title_two_lines', x.clamp==='2' && x.ws==='normal' && x.h===2*x.lh, x);
@@ -110,7 +113,7 @@ async function main(browser){
   x = await ev(page, ()=>{ const h=document.querySelector('#desk .main .colhead'), bad=[]; ['pcol','row-text','rc-per','rsteps','rc-date','rc-dl','rc-rem','rc-est'].forEach(k=>{ const a=h.querySelector('.'+k); if(!a||getComputedStyle(a).display==='none') return;
     document.querySelectorAll('#desk .main .mbody .row[data-id]:not(.xs)').forEach(r=>{ const b=r.querySelector('.'+k); if(!b||getComputedStyle(b).display==='none'){ bad.push(r.dataset.id+' '+k+' hidden'); return; } const A=a.getBoundingClientRect(), B=b.getBoundingClientRect(); if(Math.abs(A.left-B.left)>2||Math.abs(A.right-B.right)>2) bad.push(r.dataset.id+' '+k); }); }); return bad; });
   check('labels_over_cells', !x.length, x);
-  x = await ev(page, ()=>{ const r=document.querySelector('#desk .main .row[data-id=a7]:not(.first .row) .rc-per'), q=document.querySelector('#desk .main .row[data-id=a9] .rc-per'); return {a7:r&&r.textContent, a9:q&&q.textContent, inTitle:!!document.querySelector('#desk .main .row-text .wtag, #desk .main .row-text .rtag')}; });
+  x = await ev(page, ()=>{ const r=document.querySelector('#desk .main .row[data-id=a7]:not(.first .row) .rc-per'), q=document.querySelector('#desk .main .row[data-id=a9] .rc-per'); return {a7:r&&r.textContent, a9:q&&q.textContent, inTitle:[...document.querySelectorAll('#desk .main .row-text .wtag, #desk .main .row-text .rtag')].some(e=>e.offsetWidth>0)}; }); // v0.37.2: the grey line keeps a hidden copy
   check('persona_column', x.a7==='Cliente' && x.a9==='Marta Ruiz' && !x.inTitle, x);
   check('ahora_review_rows', !!g.rows['a6@ahora'] && !!g.rows.a7, Object.keys(g.rows));
   check('aligned_closed', aligned(g).length===0, aligned(g));
@@ -131,7 +134,7 @@ async function main(browser){
   check('done_own_scope', JSON.stringify(g.labels)===JSON.stringify(['Proyecto','Tarea']) && /^\d{1,2}:\d{2}$/.test(x.done) && x.pending===0, {labels:g.labels, x});
   await ev(page, ()=>{ DB.settings.doneOpen=false; save(); render(); }); await calm(page);
   await ev(page, ()=>{ task('h1').reminder=new Date(2026,10,4,18,0).toISOString(); save(); render(); }); await calm(page);
-  g = await geo(page); check('head_labels_rem', JSON.stringify(g.labels)===JSON.stringify(['Proyecto','Tarea','Recordatorio']) && aligned(g).length===0, {labels:g.labels, bad:aligned(g)});
+  g = await geo(page); check('head_labels_rem', JSON.stringify(g.labels)===JSON.stringify(['Proyecto','Tarea']) && !!g.head['rc-rem'].shown && aligned(g).length===0, {labels:g.labels, rem:g.head['rc-rem'], bad:aligned(g)}); // v0.37.2: the bell alone
   // An empty list has no header
   await ev(page, ()=>{ task('h1').status='done'; task('h1').completed=new Date().toISOString(); save(); render(); }); await calm(page);
   g = await geo(page); x = await ev(page, ()=>{ const h=document.querySelector('#desk .main .colhead'); return h?getComputedStyle(h).display:'absent'; });
@@ -146,58 +149,53 @@ async function main(browser){
   for(const v of ['week','month','day','settings']){ await ev(page, v=>setDeskView(v), v); await calm(page); x=await ev(page, ()=>document.querySelectorAll('#desk .colhead').length); check('nohead_'+v, x===0, x); }
   x = await ev(page, ()=>Math.round(document.querySelector('#desk .main .inner.settings').getBoundingClientRect().width)); check('settings_width', x<=900, x);
 
-  // Dragging: Proyecto right edge, Fecha left edge (to the left widens it), the limits, double click
+  // Dragging: Proyecto right edge, Fecha left edge (to the left widens it), the limits, double click. v0.37.2: each drag starts from the
+  // width on screen (fitted to the content) and a double click goes back to it; after each check the column is reset, so the next one
+  // is not moved under the title by the room the previous one took
   await ev(page, ()=>setDeskView('hoy')); await calm(page);
+  const reset = async col => { const p=await grip(page, col); await page.mouse.dblclick(p.x, p.y); await calm(page); };
   await drag(page, 'proj', 60); g = await geo(page);
   check('drag_proj', g.head.pcol.w===h0.pcol.w+60 && W(g,'a1','pcol')===h0.pcol.w+60 && W(g,'a6@ahora','pcol')===h0.pcol.w+60 && aligned(g).length===0, {head:g.head.pcol, row:g.rows.a1.pcol, h0:h0.pcol});
   x = await ev(page, ()=>JSON.stringify(DB.settings.colWidths)+'|'+JSON.parse(localStorage.getItem('tareas-v1')).settings.colWidths.proj);
-  check('drag_saved', x===JSON.stringify({proj:192})+'|192', x);
+  check('drag_saved', x===JSON.stringify({proj:h0.pcol.w+60})+'|'+(h0.pcol.w+60), x);
+  await reset('proj'); g = await geo(page);
+  check('dblclick_reset', g.head.pcol.w===h0.pcol.w && W(g,'a1','pcol')===h0.pcol.w && await ev(page, ()=>!('proj' in DB.settings.colWidths)), {now:g.head.pcol, h0:h0.pcol});
   await drag(page, 'date', -40); g = await geo(page);
-  check('drag_date', g.head['rc-date'].w===h0['rc-date'].w+40 && W(g,'a5','rc-date')===h0['rc-date'].w+40 && W(g,'a7','rc-date')===h0['rc-date'].w+40 && aligned(g).length===0, {head:g.head['rc-date'], row:g.rows.a5['rc-date']});
-  check('title_shrinks', W(g,'a1','row-text') <= Math.max(120, h0['row-text'].w-100+1), {now:W(g,'a1','row-text'), was:h0['row-text'].w}); // v0.33.1: down to its 120 px floor
+  check('drag_date', g.head['rc-date'].w===h0['rc-date'].w+40 && W(g,'a5','rc-date')===h0['rc-date'].w+40 && W(g,'a7','rc-date')===h0['rc-date'].w+40 && aligned(g).length===0, {head:g.head['rc-date'], row:g.rows.a5['rc-date'], h0:h0['rc-date']});
+  check('title_room', W(g,'a1','row-text') >= Math.min(.4*(g.mainW-56), h0['row-text'].w), {now:W(g,'a1','row-text'), was:h0['row-text'].w, main:g.mainW}); // v0.37.2: columns go under the title instead of squeezing it
+  await reset('date');
   // v0.33.1: Persona, its handle on its left edge as the right-hand columns
   await drag(page, 'per', -50); g = await geo(page);
-  check('drag_per', g.head['rc-per'].w===h0['rc-per'].w+50 && W(g,'a7','rc-per')===h0['rc-per'].w+50 && W(g,'a9','rc-per')===h0['rc-per'].w+50 && aligned(g).length===0 && await ev(page, ()=>DB.settings.colWidths.per===200), {head:g.head['rc-per'], h0:h0['rc-per']});
+  check('drag_per', g.head['rc-per'].w===h0['rc-per'].w+50 && W(g,'a7','rc-per')===h0['rc-per'].w+50 && W(g,'a9','rc-per')===h0['rc-per'].w+50 && aligned(g).length===0 && await ev(page, w=>DB.settings.colWidths.per===w, h0['rc-per'].w+50), {head:g.head['rc-per'], h0:h0['rc-per']});
   await drag(page, 'per', -1000); g = await geo(page); const permax=g.head['rc-per'].w; await drag(page, 'per', 1000); g = await geo(page); const permin=g.head['rc-per'].w;
-  const gper=await grip(page, 'per'); await page.mouse.dblclick(gper.x, gper.y); g = await geo(page);
-  check('per_limits_reset', permax===320 && permin===70 && g.head['rc-per'].w===150 && W(g,'a9','rc-per')===150 && await ev(page, ()=>!('per' in DB.settings.colWidths)), {permax, permin, now:g.head['rc-per']});
+  await reset('per'); g = await geo(page);
+  check('per_limits_reset', permax===320 && permin===70 && g.head['rc-per'].w===h0['rc-per'].w && W(g,'a9','rc-per')===h0['rc-per'].w && await ev(page, ()=>!('per' in DB.settings.colWidths)), {permax, permin, now:g.head['rc-per'], h0:h0['rc-per']});
   await drag(page, 'proj', 1000); g = await geo(page); const pmax=g.head.pcol.w;
-  await drag(page, 'proj', -1000); g = await geo(page); const pmin=g.head.pcol.w;
-  await drag(page, 'date', -1000); g = await geo(page); const dmax=g.head['rc-date'].w;
+  await drag(page, 'proj', -1000); g = await geo(page); const pmin=g.head.pcol.w; await reset('proj');
+  await drag(page, 'date', -1000); g = await geo(page); const dmax=g.head['rc-date'].w; await reset('date');
   await drag(page, 'est', 1000); g = await geo(page); const emin=g.head['rc-est'].w;
   check('limits', pmax===300 && pmin===60 && dmax===200 && emin===44 && W(g,'a1','rc-est')===44, {pmax, pmin, dmax, emin});
-  const gp=await grip(page, 'proj'); await page.mouse.dblclick(gp.x, gp.y); g = await geo(page);
-  check('dblclick_reset', g.head.pcol.w===132 && W(g,'a1','pcol')===132 && await ev(page, ()=>!('proj' in DB.settings.colWidths)), g.head.pcol);
   x = await ev(page, ()=>({sel:UI.dsel.cur, pane:UI.deskDetail})); check('head_no_row_action', !x.pane, x);
 
-  // Kept across a reload: Proyecto 180, Fecha 120, Tiempo 44 (from above)
-  await drag(page, 'proj', 48); await ev(page, ()=>{ flushEdits&&flushEdits(); });
+  // Kept across a reload: Proyecto 180 and Tiempo 44 (from above)
+  await drag(page, 'proj', 180-h0.pcol.w); await ev(page, ()=>{ flushEdits&&flushEdits(); });
   await page.reload(); await until(page, ()=>typeof DB!=='undefined'&&!!document.querySelector('#desk .main')); await ev(page, ()=>setDeskView('hoy')); await calm(page);
   g = await geo(page); x = await ev(page, ()=>DB.settings.colWidths);
-  check('reload_kept', g.head.pcol.w===180 && W(g,'a1','pcol')===180 && g.head['rc-date'].w===200 && g.head['rc-est'].w===44 && x.proj===180, {pcol:g.head.pcol, date:g.head['rc-date'], x});
+  check('reload_kept', g.head.pcol.w===180 && W(g,'a1','pcol')===180 && g.head['rc-est'].w===44 && x.proj===180 && x.est===44, {pcol:g.head.pcol, est:g.head['rc-est'], x});
 
-  // The inspector open: the user's widths stay, the others take the narrower defaults of point 22; the reminder shows its bell only
-  await page.setViewportSize({width:1600, height:800}); // v0.33.1: Persona and the title's 120 px need a wider window for every column with the inspector
+  // The inspector open at 1280: the person's widths stay; the columns that do not fit go under the title, their values in the grey line
   await openPane(page, 'a1'); g = await geo(page);
-  check('pane_widths', g.head.pcol.w===180 && g.head['rc-per'].w===120 && g.head['rc-date'].w===200 && g.head['rc-dl'].w===100 && g.head['rc-rem'].w===18 && g.head['rc-est'].w===44 && aligned(g).length===0, {head:g.head, bad:aligned(g)});
-  // v0.33.1: the title keeps 120 px, so with Proyecto 180 and Fecha 200 the right-hand columns are clipped: Fecha back to its default
-  const gd=await grip(page, 'date'); await page.mouse.dblclick(gd.x, gd.y); await calm(page);
-  x = await ev(page, ()=>getComputedStyle(document.querySelector('#desk .main .row[data-id=a4] .rc-rem')).fontSize); check('pane_rem_bell', x==='0px', x);
-  await drag(page, 'rem', -20); g = await geo(page);
-  x = await ev(page, ()=>({fs:getComputedStyle(document.querySelector('#desk .main .row[data-id=a4] .rc-rem')).fontSize, w:DB.settings.colWidths.rem}));
-  check('pane_rem_resized', g.head['rc-rem'].w===60 && W(g,'a4','rc-rem')===60 && x.fs!=='0px' && x.w===60 && aligned(g).length===0, {head:g.head['rc-rem'], x});
-  await drag(page, 'dl', -30); g = await geo(page);
-  check('pane_drag_dl', g.head['rc-dl'].w===130 && W(g,'a3','rc-dl')===130 && aligned(g).length===0, g.head['rc-dl']);
-  await drag(page, 'per', -30); g = await geo(page);
-  check('pane_drag_per', g.head['rc-per'].w===150 && W(g,'a9','rc-per')===150 && aligned(g).length===0, g.head['rc-per']);
-  const gp2=await grip(page, 'per'); await page.mouse.dblclick(gp2.x, gp2.y); await calm(page);
-  await closePane(page); await page.setViewportSize({width:1280, height:800}); await calm(page); g = await geo(page);
-  check('closed_keeps_user', g.head['rc-dl'].w===130 && g.head['rc-rem'].w===60 && g.head.pcol.w===180 && g.head['rc-per'].w===150 && aligned(g).length===0, g.head);
+  x = await ev(page, ()=>{ const m=document.querySelector('#desk .main'), hc=[...m.classList].filter(c=>c.startsWith('hc-')), s=document.querySelector('#desk .main .row[data-id=a4]:not(.first .row) .rsub .s-rem'), d=document.querySelector('#desk .main .row[data-id=a3]:not(.first .row) .rsub .s-dl');
+    return {hc, rem:s&&s.offsetWidth>0&&s.textContent, dl:d&&d.offsetWidth>0&&d.textContent, title:Math.round(m.querySelector('.colhead .row-text').getBoundingClientRect().width), main:m.querySelector('.colhead').clientWidth}; });
+  check('pane_widths', g.head.pcol.w===180 && g.head['rc-est'].w===44 && !x.hc.includes('hc-est') && x.hc.length>0 && aligned(g).length===0, {head:g.head, x, bad:aligned(g)});
+  check('pane_moved_values', (!x.hc.includes('hc-rem')||x.rem==='16:30') && (!x.hc.includes('hc-dl')||x.dl==='Entrega hoy') && (x.title>=.4*x.main-1 || ['hc-rem','hc-per','hc-dl','hc-date'].every(c=>x.hc.includes(c))), x); // with Proyecto and Tiempo kept by the person, every other column has gone under the title
+  await closePane(page); g = await geo(page);
+  check('closed_keeps_user', g.head.pcol.w===180 && g.head['rc-est'].w===44 && aligned(g).length===0, g.head);
   // Bad saved values are dropped on load
   await ev(page, ()=>{ const d=JSON.parse(localStorage.getItem('tareas-v1')); d.settings.colWidths={proj:5000, date:'x', foo:90, est:50, dl:-3}; localStorage.setItem('tareas-v1', JSON.stringify(d)); });
   await page.reload(); await until(page, ()=>typeof DB!=='undefined'&&!!document.querySelector('#desk .main')); await ev(page, ()=>setDeskView('hoy')); await calm(page);
   g = await geo(page); x = await ev(page, ()=>DB.settings.colWidths);
-  check('bad_dropped', JSON.stringify(x)==='{"est":50}' && g.head.pcol.w===132 && g.head['rc-est'].w===50 && g.head['rc-date'].w===84, {x, head:g.head});
+  check('bad_dropped', JSON.stringify(x)==='{"est":50}' && g.head.pcol.w===h0.pcol.w && g.head['rc-est'].w===50 && g.head['rc-date'].w===h0['rc-date'].w, {x, head:g.head, h0}); // v0.37.2: the others fitted, as at the start
   check('no_iphone_style_leak', await ev(page, ()=>!document.querySelector('.app:not(.desktop)')), true);
   await ctx.close();
 }

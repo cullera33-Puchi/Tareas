@@ -62,6 +62,7 @@ function renderDesktop(again){
   const b2=d.querySelector('.mbody'); if(b2) b2.scrollTop=UI.deskScroll[key]||0; UI.deskKey=key;
   const s2=d.querySelector('.side'); if(s2) s2.scrollTop=sst;
   pitFit(); // decision 59: the post-its that fit the column's height
+  fitCols(d); // v0.37.2 (E1): columns to their content, the title at least 40 %
   ariaList(d); if(syncSel(paneWas)&&!again) return renderDesktop(true); paintSel(); // R15, R16: a selected row that left the list hands over to its neighbour
   if(fr){ const n=$('#desk [data-role='+fr.role+']'); if(n){ n.focus({preventScroll:true}); try{ n.setSelectionRange(fr.a, fr.b); }catch(e){} } }
   else if(UI.dsel.edit){ const n=$('#desk [data-role=rowedit]'); if(n){ n.focus({preventScroll:true}); if(UI.dsel.edit.fresh){ n.select(); UI.dsel.edit.fresh=false; } } }
@@ -94,7 +95,7 @@ function deskResultsNow(d){ const main=d.querySelector(':scope > .main'), ob=mai
   else { const t=document.createElement('div'); t.innerHTML=html; const oi=ob.querySelector('.inner'), ni=t.querySelector('.mbody .inner'), bar=s.closest('.searchbar'), nbar=t.querySelector('.mhead .searchbar'); if(!oi||!ni||!bar||!nbar) return false;
     oi.replaceWith(ni); const sb=bar.querySelector('.search'); [...bar.children].forEach(c=>{ if(c!==sb) c.remove(); }); [...nbar.children].forEach(c=>{ if(!c.querySelector('[data-role=search]')) bar.appendChild(c); });
     const os=main.querySelector('.mhead .pfslot'), ns=t.querySelector('.mhead .pfslot'); if(os&&ns) os.replaceWith(ns); }
-  rowStash=stash; armRows(ob);
+  rowStash=stash; armRows(ob); fitCols(d);
   bindAddBar(d); if(deskNotesOn()) bindNotesDesk(d); pitFit(); if(isCalView(UI.deskView)&&UI.deskDetail) placeWeekPop(d); ariaList(d); syncSel(UI.deskDetail); paintSel(); return true; }
 function bindAddBar(d){
   const ab=$('[data-role=addbar]',d); if(!ab) return; const base=()=>deskAddBase(ab.dataset.project);

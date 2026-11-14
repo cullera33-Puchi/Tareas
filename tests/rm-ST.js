@@ -124,10 +124,10 @@ const paste = (page, sel, text) => ev(page, ([s,t])=>{ const ta=document.querySe
 async function iphone(browser){
   const {ctx, page} = await open(browser, {tag:'M'});
   const L='.screen.root[data-root=tareas]', D='.screen.pushed-screen.detail';
-  // The rows: "2/4" and the ring on the right, next to the other indicators; nothing for a task without steps
-  let x = await ev(page, L=>{ const row=id=>document.querySelector(L+' .group .row[data-id='+id+']:not(.first .row)'); const p=id=>{ const e=row(id).querySelector('.inds .sprog'); return e?e.textContent+'|'+!!e.querySelector('svg .sr-fg')+'|'+e.getAttribute('aria-label'):null; };
-    return {t1:p('t1'), t2:p('t2'), t3:p('t3'), t4:p('t4'), last:row('t1').querySelector('.inds').lastElementChild.className, ahead:!!document.querySelector('.cerrar,[data-act=closeDay]')}; }, L);
-  check('m_row_progress', x.t1==='2/4|true|2 de 4 pasos' && x.t2===null && x.t3==='0/1|false|0 de 1 pasos' && x.t4==='1/2|true|1 de 2 pasos' && x.last==='sprog', x);
+  // The rows: "2/4" and the ring after the other data (v0.37.2, U2: in the grey line, before the small icons; on the right in a row without one); nothing for a task without steps
+  let x = await ev(page, L=>{ const row=id=>document.querySelector(L+' .group .row[data-id='+id+']:not(.first .row)'); const p=id=>{ const e=row(id).querySelector('.sprog'); return e?e.textContent+'|'+!!e.querySelector('svg .sr-fg')+'|'+e.getAttribute('aria-label'):null; };
+    return {t1:p('t1'), t2:p('t2'), t3:p('t3'), t4:p('t4'), last:(sp=>!sp.nextElementSibling||sp.nextElementSibling.classList.contains('micons'))(row('t1').querySelector('.sprog')), ahead:!!document.querySelector('.cerrar,[data-act=closeDay]')}; }, L);
+  check('m_row_progress', x.t1==='2/4|true|2 de 4 pasos' && x.t2===null && x.t3==='0/1|false|0 de 1 pasos' && x.t4==='1/2|true|1 de 2 pasos' && x.last===true, x);
   await shot(page, 'm1-list');
   // The detail: the group Pasos with its count, the steps in order and Añadir paso
   await page.tap(L+' .group .row[data-id=t1]:not(.first .row) .row-title'); await calm(page);

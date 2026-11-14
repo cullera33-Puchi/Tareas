@@ -238,6 +238,15 @@ body.desktop .toast{left:auto;right:28px;bottom:28px;width:360px;}
 .row-meta{display:block;font-size:0.765rem;color:var(--ink2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .row-meta .dot{display:inline-block;width:8px;height:8px;border-radius:50%;vertical-align:middle;margin-right:5px;position:relative;top:-1px;}
 body:not(.desktop) .row-meta>span+span{margin-left:.75em;} /* decision 27d: the items are kept apart by space, with no middle dot */
+/* v0.37.2 (U1): on the iPhone the grey line is one flex row: the day, deadline, reminder, estimate and steps keep their width; the project
+   capsule and the names shrink first, with an ellipsis, so the important items are never cut off */
+body:not(.desktop) .row-meta{display:flex;align-items:center;min-width:0;}
+body:not(.desktop) .row-meta>span{flex:none;white-space:nowrap;}
+body:not(.desktop) .row-meta>.tag{flex:0 1 auto;min-width:3.4em;max-width:none;}
+body:not(.desktop) .row-meta>:is(.waitfor,.resp){flex:0 1 auto;min-width:2.6em;overflow:hidden;text-overflow:ellipsis;}
+body:not(.desktop) .row-meta .micons{display:inline-flex;align-items:center;gap:4px;color:var(--ink3);}
+body:not(.desktop) .row-meta .micons svg,body:not(.desktop) .row-meta .micons .irp{width:12px;height:12px;display:block;}
+body:not(.desktop) .row-meta .sprog svg{width:11px;height:11px;}
 .tag{display:inline-block;padding:1px 7px;border-radius:6px;font-size:0.706rem;font-weight:500;color:var(--tagl,var(--pc));background:var(--tagbg);vertical-align:1px;max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 /* R3: text and background colours of a project capsule come from tagVars, above 4.4:1 in both themes */
 @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .tag{color:var(--tagd,var(--pc));background:var(--tagbgd,var(--tagbg));} }
@@ -610,7 +619,23 @@ body.pdragging,body.pdragging *{cursor:grabbing !important;user-select:none;-web
 .app.desktop .check{width:16px;height:16px;border-width:1.2px;}
 .app.desktop .check svg{width:9px;height:9px;}
 .app.desktop .check::after{width:32px;height:32px;margin:-16px 0 0 -16px;}
-.app.desktop .row-text{display:flex;align-items:center;gap:8px;}
+.app.desktop .row-text{display:flex;flex-direction:column;align-items:stretch;justify-content:center;gap:1px;}
+/* v0.37.2 (E1): the grey line under a desktop title: «Aplazada 4 veces» always, and the values of the columns fitCols moved there (hc-*) */
+.app.desktop .rsub{display:flex;align-items:center;gap:8px;min-width:0;font-size:11px;line-height:14px;color:var(--ink2);white-space:nowrap;overflow:hidden;}
+.app.desktop .rsub .s{display:none;flex:none;align-items:center;gap:3px;min-width:0;}
+.app.desktop .rsub .s-drag{display:inline-flex;color:var(--orange);font-weight:500;}
+.app.desktop .rsub .s-date.over{color:var(--red);}
+.app.desktop .rsub .s-date:is(.carried,.review){color:var(--orange);font-weight:500;}
+.app.desktop .rsub svg{width:10px;height:10px;flex:none;}
+.app.desktop .rsub .s-per{flex:0 1 auto;gap:4px;overflow:hidden;}
+.app.desktop .rsub .s-per :is(.wtag,.rtag,.dtag){max-width:none;flex:0 1 auto;}
+.app.desktop .main.hc-date .rsub .s-date,.app.desktop .main.hc-dl .rsub .s-dl,.app.desktop .main.hc-rem .rsub .s-rem,.app.desktop .main.hc-est .rsub .s-est,
+.app.desktop .main.hc-steps .rsub .s-steps,.app.desktop .main.hc-per .rsub .s-per{display:inline-flex;}
+.app.desktop .main.hc-date .rc-date,.app.desktop .main.hc-dl .rc-dl,.app.desktop .main.hc-rem .rc-rem,.app.desktop .main.hc-est .rc-est,
+.app.desktop .main.hc-steps .rsteps,.app.desktop .main.hc-per .rc-per{display:none;}
+/* fitCols measures each column at its content's width */
+.app.desktop .main.colmeasure :is(.pcol,.rc-per,.rc-date,.rc-dl,.rc-rem,.rc-est){width:max-content !important;}
+.app.desktop .main.colmeasure .pcol .tag{max-width:none;}
 .app.desktop .row-title{flex:0 1 auto;min-width:0;font-size:14px;line-height:18px;-webkit-line-clamp:2;} /* v0.33.1: a long title wraps to two lines instead of ending in an ellipsis */
 .app.desktop .row-text{padding:4px 0;min-width:120px;} /* a one-line row keeps its 32 px; two lines get some air. The title never goes below 120 px: in a narrow list the right-hand columns are clipped (below) */
 .app.desktop .row-text{flex:1 1 auto;}
@@ -770,7 +795,11 @@ body.desktop .stsheet .sttext{height:min(460px, calc(80svh - 170px));font-size:1
 .app.desktop .wcard .check svg{width:8px;height:8px;}
 .wcard .t{flex:1;min-width:0;font-size:12px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .wcard .t .pri{display:inline;width:auto;min-width:0;margin-right:4px;letter-spacing:-1px;font-size:11px;}
-.wcard .ctag{flex:none;max-width:none;font-size:10px;line-height:15px;padding:0 4px;border-radius:4px;vertical-align:0;} /* decision 79: the project's short name */
+.wcard .ctag{flex:0 1 auto;min-width:2.6em;max-width:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;line-height:15px;padding:0 4px;border-radius:4px;vertical-align:0;} /* decision 79: the project's short name; v0.37.2 (E3): the whole first word, «…» when it does not fit */
+.wcard.mc .ctag{flex:none;}
+/* v0.37.2 (E3): a day of Semana with few tasks gives each title two lines */
+.wday.few .wcard .t{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:break-word;-webkit-hyphens:auto;hyphens:auto;} /* a long word is hyphenated (the page is in Spanish) rather than cut anywhere */
+.wday.few .wcard:not(.two){height:auto;min-height:28px;padding-top:5px;padding-bottom:5px;}
 .wcard.done .ctag{opacity:.55;}
 .wcard.two{height:auto;min-height:40px;padding:4px 7px 5px 6px;} /* decision 79: capsule, indicators and time over the title */
 .wcard .wc2{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;}
@@ -1409,8 +1438,6 @@ body.sdragging,body.sdragging *{cursor:grabbing !important;-webkit-user-select:n
 .app.desktop.has-pane .rc-est{width:var(--col-est,54px);}
 /* Decision 56b: a task put off again and again says it in orange where Aplazada goes; the desktop date column widens for it */
 .row-meta .drag{color:var(--orange);font-weight:500;}
-.app.desktop .main:has(.row .rc-date.drag) .rc-date{width:var(--col-date,124px);}
-.app.desktop.has-pane .main:has(.row .rc-date.drag) .rc-date{width:var(--col-date,96px);}
 .rvdrag{text-align:center;color:var(--orange);font-weight:500;font-size:0.824rem;margin:-6px 0 8px;}
 /* Decision 56c: Sugerir in the head of Ahora, and the sheet (iPhone) or popover (desktop) ¿Qué hago ahora? */
 .ahead .grow{flex:1;}

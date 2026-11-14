@@ -337,7 +337,7 @@ async function appTests(browser){
 
   /* ---------- the paperclip in the rows ---------- */
   await A.page.evaluate(()=>pop()); await A.page.waitForTimeout(700);
-  const clip = await A.page.evaluate(()=>{ const has=id=>{ const r=document.querySelector('.screen.root:not(.hidden-tab) .row[data-id="'+id+'"] .inds'); return !!r&&r.innerHTML.includes('M20.5 11.5'); }; return {t1:has('t1'), t2:has('t2')}; });
+  const clip = await A.page.evaluate(()=>{ const has=id=>{ const r=document.querySelector('.screen.root:not(.hidden-tab) .row[data-id="'+id+'"] .row-content'); /* v0.37.2: in the grey line, or on the right without one */ return !!r&&r.innerHTML.includes('M20.5 11.5'); }; return {t1:has('t1'), t2:has('t2')}; });
   check('clip_iphone', clip.t1 && !clip.t2, clip);
   await A.page.screenshot({path:path.join(OUT,'a-light-list-clip.png')});
 

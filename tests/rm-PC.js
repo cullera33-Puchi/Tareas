@@ -60,9 +60,10 @@ async function run(browser){
   const a1=await card('a1'), b1=await card('b1'), n1=await card('n1'), h1=await card('h1'), z1=await card('z1'), d1=await card('d1'), u1=await card('u1');
   // Two lines with a project or a time: the capsule (and the time on the right) over the title, which takes the card's whole width;
   // none of either: one line (7 days and the Sin fecha tray open at 1440 px)
-  check('two_lines', a1.two && !n1.two && n1.h<32 && a1.h>=38 && h1.two && h1.tm==='08:15' && h1.cap===null && u1&&u1.two&&u1.cap==='Transf'
+  check('two_lines', a1.two && !n1.two && n1.h<32 && a1.h>=38 && h1.two && h1.tm==='08:15' && h1.cap===null && u1&&u1.two&&u1.cap==='Transformación'
     && [a1, b1, d1, u1].every(c=>Math.abs(c.tw-c.inner)<=2) && a1.tw>=70, {a1, n1, h1, u1});
-  check('week_caps', a1&&a1.cap==='FLC'&&a1.two&&a1.inTop&&a1.second&&b1.cap==='Transf'&&d1.cap==='2026'&&z1.cap==='Archiv'&&n1&&n1.cap===null&&h1.cap===null, {a1, b1, n1, h1, z1, d1});
+  // v0.37.2 (E3): Semana, Día and the hours show the whole first word (the stylesheet ends it in «…» when it does not fit); Mes keeps 4 letters
+  check('week_caps', a1&&a1.cap==='FLC'&&a1.two&&a1.inTop&&a1.second&&b1.cap==='Transformación'&&d1.cap==='2026'&&z1.cap==='Archivado'&&n1&&n1.cap===null&&h1.cap===null, {a1, b1, n1, h1, z1, d1});
   check('week_tooltip_drag', /\nFLC Comité/.test(a1.tip) && /\nTransformación digital/.test(b1.tip) && a1.drag==='true', {a1, b1});
   // The list capsule's colors: the project's tag colors, not a plain grey
   const tagC = await pg.evaluate(()=>{ const s=document.createElement('span'); s.className='tag'; s.textContent='x'; const w=document.createElement('div'); w.setAttribute('style', tagVars('#FF9500')); w.appendChild(s); document.body.appendChild(w); const o={c:getComputedStyle(s).color, b:getComputedStyle(s).backgroundColor}; w.remove(); return o; });
@@ -92,11 +93,11 @@ async function run(browser){
   await pg.evaluate(()=>{ DB.settings.calMode='list'; save(); setDeskView('day'); }); await calm(pg);
   const dayList = await pg.evaluate(()=>[...document.querySelectorAll('#desk .main .wcard:not(.wtray .wcard)')].map(c=>c.dataset.id+':'+((c.querySelector('.ctag')||{}).textContent||'')));
   const dIds = dayList.map(x=>x.split(':')[0]), dCap = Object.fromEntries(dayList.map(x=>x.split(':')));
-  check('day_list', dIds.slice(0,2).join()==='h1,h2' && ranked(dIds.slice(2)) && dIds[dIds.length-2]==='n1' && dIds[dIds.length-1]==='d4' && dCap.h1==='' && dCap.h2==='Oca' && dCap.a1==='FLC' && dCap.b1==='Transf' && dCap.c1==='Oca' && dCap.z1==='Archiv' && dCap.n1==='', dayList);
+  check('day_list', dIds.slice(0,2).join()==='h1,h2' && ranked(dIds.slice(2)) && dIds[dIds.length-2]==='n1' && dIds[dIds.length-1]==='d4' && dCap.h1==='' && dCap.h2==='Oca' && dCap.a1==='FLC' && dCap.b1==='Transformación' && dCap.c1==='Oca' && dCap.z1==='Archivado' && dCap.n1==='', dayList);
   // Semana in the hours view: the blocks of tomorrow too
   await pg.evaluate(()=>{ DB.settings.calMode='hours'; save(); setDeskView('week'); }); await calm(pg);
   const wh = await pg.evaluate(()=>{ const c=document.querySelector('#desk .main .wcard.hb[data-id=d2]'); return c&&(c.querySelector('.ctag')||{}).textContent; });
-  check('week_hours_block_cap', wh==='Transf', wh);
+  check('week_hours_block_cap', wh==='Transformación', wh);
 
   /* ---------- Mes: 4 letters ---------- */
   await pg.evaluate(()=>{ DB.settings.calMode='list'; save(); setDeskView('month'); }); await calm(pg);

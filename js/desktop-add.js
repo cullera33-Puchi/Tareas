@@ -149,6 +149,8 @@ function dropTask(id, z){ const x=task(id); if(!x) return; const old=daySnap(x);
   releaseHold(id); updTask(id, patch); haptic(6); renderAnimated(); log('info','Tarea movida en el calendario', {date:patch.date, time:!!patch.reminder});
   toast(msg, ()=>undoDay(old)); }
 function bindDeskEvents(d){
+  // v0.37.2 (E1): a new width (the window, the inspector, the sidebar) fits the list's columns again, once per frame and only when it changed
+  if(window.ResizeObserver){ let w=0, raf=0; new ResizeObserver(()=>{ if(raf) return; raf=requestAnimationFrame(()=>{ raf=0; const m=d.querySelector(':scope > .main'), nw=m?m.clientWidth:0; if(nw&&nw!==w){ w=nw; fitCols(d); } }); }).observe(d); }
   attBindDrop(d); bindColResize(d); bindBlockResize(d); // decision 58; R20: a block's length
   axBind(d); // decision 31: the add bar's composer // decision 29: photos dragged from the computer onto the inspector
   // Right click opens the row menu, and on a sidebar project the project menu (the iPhone long press)

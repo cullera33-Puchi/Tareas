@@ -1,5 +1,12 @@
 # Registro de cambios
 
+## v0.37.4. Buscador recogido, Ajustes en subpantallas y menú más corto (14 de noviembre de 2026)
+
+- iPhone (U3): el buscador de Tareas va el primero de la lista y la app lo deja recogido bajo la cabecera al abrir, al volver a Hoy tras dos horas y la primera vez que se muestra la pestaña (`tuckSearch`). Un deslizamiento corto lo muestra y otro sincroniza, como antes. La lista mide al menos la pantalla más el buscador (`.tlist`), para que pueda recogerse aunque haya pocas tareas. Mientras se busca no se recoge.
+- iPhone (U6): Ajustes es un índice con Cuenta (sincronización, cifrado, notificaciones y Atajo de iOS), Equipo si se usa, Espacios y horas, Contactos, Proyectos archivados, Datos y copias, y Registro, cada una en su subpantalla (`push('settings', clave)`, `SET_SUBS`, `setSections`). El tema, «Agitar para deshacer» y la versión con Novedades siguen en el índice. Cuenta muestra la línea de sincronización, en naranja si requiere atención. El escritorio sigue con la página entera. `onSettings` cuenta las subpantallas, para que se redibujen al cambiar copias, cifrado o cuenta.
+- iPhone (U7): en el menú de pulsación larga, Mover a otro espacio, Duplicar y Seleccionar pasan al submenú «Más».
+- Lote C de la revisión del 14 de noviembre, aprobado por Enric con capturas del antes y el después. Sin cambios en Supabase. Ayuda común para las pruebas en `tests/lib/settings.js` (`openSetting`, `closeSetting`); comprobaciones nuevas en `rm-LA`.
+
 ## v0.37.3. Más sitio para el título (14 de noviembre de 2026)
 
 - Escritorio (E1): cada columna de las listas que no se ha ajustado a mano mide lo que ocupa su contenido, nunca más que antes (`fitCols`, en cada dibujo y con `ResizeObserver` al cambiar el ancho). Si el título queda por debajo del 40 % de la fila, las columnas pasan bajo el título por este orden: Tiempo, Pasos, Recordatorio, Persona, Entrega y Fecha (clases `hc-*` en `.main`); sus valores salen en una línea gris (`.rsub`). Una columna ajustada a mano nunca se mueve. «Aplazada 4 veces» y «Desde el martes 27» van siempre en esa línea, en naranja, y la columna Fecha ya no se ensancha para ellas. La cabecera del recordatorio es solo la campana.

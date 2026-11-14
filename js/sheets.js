@@ -4,7 +4,7 @@
    listeners run at load; the start itself (first screen, timers, sync, service worker) is in boot.js, the last file. */
 /* Multi-select: entered from the long-press menu; a bottom bar replaces the tab bar */
 function renderSelbar(){ const n=UI.select?UI.select.ids.size:0; const b=(act,ic,l,red)=>'<button data-act="'+act+'"'+(n?'':' disabled')+(red?' class="red"':'')+'>'+ic+'<span>'+l+'</span></button>'; $('#selbar').innerHTML=b('bulkComplete',I.check,'Completar')+b('bulkPostpone',I.cal,'Aplazar')+b('bulkMove',I.folder,'Mover')+(n&&bulkRemindOn()?b('bulkRemind',MI.send,'Recordar'):'')+b('bulkDelete',I.trash,'Eliminar',true); } // decision 48c: Recordar when every selected task has the same person
-function startSelect(id){ flushHeld(true); const top=UI.stack[UI.stack.length-1]; UI.select={scope: top&&(top.kind==='project'||top.kind==='person')?'project':'root', ids:new Set(id?[id]:[]), all:false}; if(openRow) closeRow(openRow); app.classList.add('selecting'); render(); renderSelbar(); haptic(6); }
+function startSelect(id){ flushHeld(true); const top=UI.stack[UI.stack.length-1]; UI.select={scope: top&&(top.kind==='project'||top.kind==='person'||top.kind==='someday')?'project':'root', ids:new Set(id?[id]:[]), all:false}; if(openRow) closeRow(openRow); app.classList.add('selecting'); render(); renderSelbar(); haptic(6); }
 function endSelect(){ if(UI.wide){ endDeskSelect(); return; } UI.select=null; app.classList.remove('selecting'); render(); } // the desktop's own selection (R16) ends the same way
 function visibleRowIds(){ const scr=UI.select.scope==='project'?UI.stack[UI.stack.length-1].el:rootScreen('tareas'); return [...scr.querySelectorAll('.scroll .row[data-id], .scroll .rph[data-id]')].filter(r=>!r.closest('.first')).map(r=>r.dataset.id); } // rows of a long list not drawn yet count too
 function updateSelectUI(){ const n=UI.select.ids.size; const t=$('#selTitle'); if(t) t.textContent=n?n+(n===1?' seleccionada':' seleccionadas'):'Seleccionar'; const b=$('[data-act=selAll]'); if(b) b.textContent=UI.select.all?'Ninguna':'Todas'; renderSelbar(); } // the label always says what a tap will do
@@ -70,24 +70,25 @@ function closeDaySheet(){ flushHeld(true); const t=todayStr(), tm=addDays(t,1); 
    with Añadir paso ready, inside the same tap so the iPhone keyboard comes up (decision 18) */
 /* Decision 60b: kind 'forgot' walks the forgotten tasks of Sin fecha (isForgot) with the same steps: a quick day or one of the calendar,
    Completar, Eliminar, Saltar, Terminar, and the balance with Deshacer. It offers no Sin fecha: they have none already */
-function reviewStart(kind){ flushHeld(true); let xs=kind==='carried'?pendingFor('hoy').filter(carriedOn):kind==='forgot'?pendingFor('todas').filter(isForgot):pendingFor('hoy');
-  if(kind!=='close'&&filterOn()) xs=xs.filter(passFilter); // the project filter and the responsible's (decision 48c)
-  if(!xs.length) return; log('info', kind==='carried'?'Repasar aplazadas':kind==='forgot'?'Repasar olvidadas':'Cerrar el día una a una', {n:xs.length});
-  reviewStep(xs.map(x=>x.id), 0, {kind, prev:new Map(), removed:[], tally:{}}); }
-const REVIEW_OUT=[['hoy','para hoy','para hoy'],['man','a mañana','a mañana'],['vie','al viernes','al viernes'],['nsem','a la próxima semana','a la próxima semana'],['none','sin fecha','sin fecha'],['done','completada','completadas'],['del','eliminada','eliminadas'],['cal','a otro día','a otro día'],['skip','saltada','saltadas']];
+function reviewStart(kind, o){ flushHeld(true); let xs=kind==='carried'?pendingFor('hoy').filter(carriedOn):kind==='forgot'?pendingFor('todas').filter(isForgot):pendingFor('hoy');
+  if(kind!=='close'&&!(o&&o.all)&&filterOn()) xs=xs.filter(passFilter); // the project filter and the responsible's (decision 48c); Planificar el día takes the whole day (o.all)
+  if(!xs.length){ if(o&&o.after) o.after(true); return; } log('info', kind==='carried'?'Repasar aplazadas':kind==='forgot'?'Repasar olvidadas':'Cerrar el día una a una', {n:xs.length});
+  reviewStep(xs.map(x=>x.id), 0, {kind, prev:o&&o.prev||new Map(), removed:o&&o.removed||[], tally:{}, after:o&&o.after}); } // decision 86: inside Planificar el día its changes join the walk's Deshacer and the walk goes on after it
+const REVIEW_OUT=[['hoy','para hoy','para hoy'],['man','a mañana','a mañana'],['vie','al viernes','al viernes'],['nsem','a la próxima semana','a la próxima semana'],['none','sin fecha','sin fecha'],['done','completada','completadas'],['del','eliminada','eliminadas'],['cal','a otro día','a otro día'],['some','a Algún día','a Algún día'],['skip','saltada','saltadas']]; // decision 85: Algún día
 function reviewStep(ids, i, st){
   if(i>=ids.length){ sheetOnClose=null; reviewEnd(st, true); return; }
   const x=task(ids[i]); if(!x||x.status!=='pending'){ reviewStep(ids, i+1, st); return; } // completed or removed meanwhile
   const t=todayStr(), fg=st.kind==='forgot'; const opts=uniqueBy([['hoy',t,'Hoy'],['man',addDays(t,1),'Mañana'],['vie',nextWeekday(5,true),'Viernes'],['nsem',nextWeekday(1,true),'Próxima semana']], o=>o[1]).concat(fg?[]:[['none',null,'Sin fecha']]);
   let ym=t.slice(0,7); // decision 60b: the forgotten ones may take any day of the calendar too
   const p=x.projectId?proj(x.projectId):null; const tally=k=>{ st.tally[k]=(st.tally[k]||0)+1; };
-  const keep=()=>{ if(!st.prev.has(x.id)) st.prev.set(x.id, Object.assign({date:x.date, carried:x.carried, reminder:x.reminder||null, status:x.status, completed:x.completed, postponed:x.postponed||null, carriedSince:x.carriedSince||null}, x.focus?{focus:x.focus}:{}, x.repeat?{repeat:x.repeat}:{})); }; // decision 65e: Eliminar solo esta moves the count of a series on; // decision 56b: the counters too
+  const keep=()=>{ if(!st.prev.has(x.id)) st.prev.set(x.id, Object.assign({date:x.date, carried:x.carried, reminder:x.reminder||null, status:x.status, completed:x.completed, postponed:x.postponed||null, carriedSince:x.carriedSince||null}, x.focus?{focus:x.focus}:{}, x.repeat?{repeat:x.repeat}:{}, {someday:x.someday||null})); }; // decision 85: Deshacer takes it out of Algún día again // decision 65e: Eliminar solo esta moves the count of a series on; // decision 56b: the counters too
   const next=()=>{ haptic(6); render(); reviewStep(ids, i+1, st); };
   const dg=dragText(x);
   openSheet('<h2>'+(st.kind==='close'?'Cerrar el día':fg?'Repasar olvidadas':'Repasar aplazadas')+'</h2><div class="hint" style="margin-top:-6px">'+(i+1)+' de '+ids.length+(p?', '+esc(p.name):'')+'</div><div class="plan-title">'+esc(x.title||'Sin título')+'</div>'+(dg?'<div class="rvdrag">'+esc(dg)+'</div>':'')+
     (fg?'<div class="hint rvsince">'+esc(forgotSince(x))+'</div>':'')+
     '<div class="chips rvchips">'+opts.map(o=>'<button class="chip" data-rv="'+o[0]+'">'+o[2]+'</button>').join('')+'</div>'+(fg?'<div id="calwrap">'+calendarHTML(ym, null)+'</div>':'')+
     '<div class="sheet-actions"><button class="btn" data-x="done">'+I.check+'Completar</button><button class="btn redtext" data-x="del">'+I.trash+'Eliminar</button></div>'+
+    (fg&&canSomeday(x)?'<div class="sheet-actions" style="margin-top:10px"><button class="btn" data-x="some">'+MI.someday+'Algún día</button></div>':'')+ // decision 85
     (dg?'<div class="sheet-actions" style="margin-top:10px"><button class="btn" data-x="split">'+I.list+'Partir en pasos</button></div>':'')+
     '<div class="sheet-actions" style="margin-top:10px"><button class="btn" data-x="skip">Saltar</button><button class="btn" data-x="end">Terminar</button></div>', s=>{
     sheetOnClose=()=>{ st.tally.skip=(st.tally.skip||0)+ids.length-i; reviewEnd(st, false); }; // closed with a tap outside or a drag: as Terminar, the balance as a toast
@@ -96,6 +97,7 @@ function reviewStep(ids, i, st){
       const c=e.target.closest('[data-rv]'); if(c){ const o=opts.find(q=>q[0]===c.dataset.rv); keep(); updTask(x.id, dayPatch(x, o[1], {carried:false})); tally(o[0]); next(); return; } // Hoy confirms the task and clears its Aplazada mark
       const b=e.target.closest('[data-x]'); if(!b) return; const k=b.dataset.x;
       if(k==='done'){ keep(); applyDone(x.id, true); tally('done'); next(); }
+      else if(k==='some'){ keep(); setSomeday(x.id, true, true); tally('some'); next(); } // decision 85
       else if(k==='del'){ const go=()=>{ const j=DB.tasks.indexOf(x); if(j>=0){ DB.tasks.splice(j,1); const vn=DB.voiceNotes.filter(v=>v.taskId===x.id); DB.voiceNotes=DB.voiceNotes.filter(v=>v.taskId!==x.id); st.removed.push({x, vn, at:cutAttachments(new Set([x.id])), ss:cutSteps(new Set([x.id]))}); save(); } tally('del'); haptic(10); next(); };
         if(repGoesOn(x)) askRepeatDelete({n:1, title:x.title}, ()=>{ keep(); skipOccurrence(x.id, true); tally('del'); haptic(10); next(); }, go); else go(); } // decision 38: only this one, or the series
       else if(k==='skip'){ tally('skip'); reviewStep(ids, i+1, st); }
@@ -112,9 +114,13 @@ function openStepAdd(id){ if(!task(id)) return; openDetail(id); const scope=UI.w
   const sc=ta.closest('.scroll'); if(sc){ const a=sc.getBoundingClientRect(), b=ta.getBoundingClientRect(); if(b.bottom>a.bottom-24||b.top<a.top) sc.scrollTop+=b.top-a.top-Math.round(a.height/3); }
   return true; }
 // Deshacer of a review: a task completed in it takes back the next one of its series (decision 38)
+/* What a review (and Planificar el día) changed, put back: prev holds each task as it was (a task completed in it takes back the next one of
+   its series, decision 38), removed the tasks it deleted */
+function restorePrev(prev, removed){ prev.forEach((o,id)=>{ const x=task(id); if(!x) return; if(x.status==='done'&&o.status!=='done') dropNext(x); const p=Object.assign({}, o); Object.keys(p).forEach(k=>{ if(p[k]==null&&x[k]==null&&!(k in x)) delete p[k]; }); /* an empty field the task never had is not added */ updTask(id, p); }); removed.forEach(r=>{ if(!task(r.x.id)){ DB.tasks.push(r.x); DB.voiceNotes.push(...r.vn); putAttachments(r.at); putSteps(r.ss); } }); }
 function reviewEnd(st, asSheet){ const T=st.tally, decided=Object.keys(T).some(k=>k!=='skip'&&T[k]);
+  if(st.after){ sheetOnClose=null; log('info','Repaso de aplazadas en Planificar el día', T); render(); st.after(asSheet); return; } // decision 86: no balance of its own, the walk goes on (or ends with the sheet)
   const closing=st.kind==='close'&&asSheet; if(closing) setClosedDay(true, 'Cerrar el día una a una'); // walked to its end or Terminar: the day is closed; a sheet dismissed is not
-  const undo=()=>batch(()=>{ if(closing) setClosedDay(false, 'Deshacer'); st.prev.forEach((o,id)=>{ const x=task(id); if(!x) return; if(x.status==='done'&&o.status!=='done') dropNext(x); updTask(id, o); }); st.removed.forEach(r=>{ if(!task(r.x.id)){ DB.tasks.push(r.x); DB.voiceNotes.push(...r.vn); putAttachments(r.at); putSteps(r.ss); } }); save(); });
+  const undo=()=>batch(()=>{ if(closing) setClosedDay(false, 'Deshacer'); restorePrev(st.prev, st.removed); save(); });
   const parts=REVIEW_OUT.filter(o=>T[o[0]]).map(o=>T[o[0]]+' '+(T[o[0]]===1?o[1]:o[2]));
   log('info', st.kind==='carried'?'Repaso de aplazadas':st.kind==='forgot'?'Repaso de olvidadas':'Día cerrado una a una', T);
   if(!decided){ if(asSheet) closeSheet(); renderAnimated(); if(closing) toast('Día cerrado', ()=>setClosedDay(false, 'Deshacer')); return; }
@@ -136,7 +142,7 @@ function viewMenu(src){ const top=UI.stack[UI.stack.length-1]; const inProject=U
   popMenu({anchor:src, align:UI.wide?'right':undefined, groups:[
     [{label:'Seleccionar tareas', icon:MI.select, fn:()=>UI.wide?startDeskSelect():startSelect(null)}].concat([{label:DB.settings.doneOpen?'Ocultar completadas':'Mostrar completadas', icon:DB.settings.doneOpen?MI.eyeOff:MI.eye, fn:()=>{ DB.settings.doneOpen=!DB.settings.doneOpen; save(); render(); }}]),
     f==='hoy'||f==='todas'?[{label:'Agrupar por fecha', icon:MI.cal, on:g==='date', fn:()=>setGrouping(k,'date')}, {label:'Agrupar por proyecto', icon:MI.folder, on:g==='project', fn:()=>setGrouping(k,'project')}]:[],
-    f==='hoy'?[{label:'¿Qué hago ahora?', icon:MI.bulb, fn:()=>suggestSheet(src)}]:[], // decision 56c
+    f==='hoy'?[{label:'¿Qué hago ahora?', icon:MI.bulb, fn:()=>suggestSheet(src)}].concat(isClosed()?[]:[{label:UI.wide?'Planificar el día…':'Planificar el día', icon:MI.sunrise, fn:()=>planDayStart()}]):[], // decision 56c; decision 86
     statusItems(inProject?(UI.wide?UI.deskView.slice(8):top.id):undefined) ]}); }
 // Roadmap M4: Compartir estado for a real project (pid), Compartir estado de la semana for the space (pid undefined); nothing for Sin proyecto
 const statusItems = pid => pid===undefined ? [{label:UI.wide?'Compartir estado de la semana…':'Compartir estado de la semana', icon:MI.share, fn:()=>statusSheet(null)}]
@@ -343,9 +349,9 @@ function shiftMonth(ym, d){ let [y,m]=ym.split('-').map(Number); m+=d; if(m<1){ 
 function pickProjectSheet(id, src){ const x=task(id); if(!x) return; const m=projectPickMenu(id); m.title=''; popMenu(Object.assign(m, src?{anchor:src, align:UI.wide?'left':'right'}:taskAnchor(id, 'pickProject')||{})); }
 function dateSheet(id, src){ const x=task(id); if(!x) return; const t=todayStr(); const dow=new Date(t+'T00:00:00').getDay(); const chips=[[t,'Hoy'],[addDays(t,1),'Mañana']]; if(dow>=1&&dow<=4) chips.push([nextWeekday(5,true),'Este viernes']); chips.push([nextWeekday(1,true),'Próxima semana'],['','Sin fecha']);
   let ym=(x.date||t).slice(0,7);
-  pickerPanel('Fecha', '<div class="chips" style="margin-top:0">'+uniqueBy(chips, c=>c[0]).map(c=>'<button class="chip'+(x.date===c[0]?' on':'')+'" data-d="'+c[0]+'">'+c[1]+'</button>').join('')+'</div><div id="calwrap">'+calendarHTML(ym, x.date)+'</div>', id, src, 'pickDate', (s, done)=>{
+  pickerPanel('Fecha', '<div class="chips" style="margin-top:0">'+uniqueBy(chips, c=>c[0]).map(c=>'<button class="chip'+(x.date===c[0]||!c[0]&&!x.date&&!isSomeday(x)?' on':'')+'" data-d="'+c[0]+'">'+c[1]+'</button>').join('')+(isSomeday(x)||canSomeday(x)?'<button class="chip'+(isSomeday(x)?' on':'')+'" data-d="" data-sd="1">Algún día</button>':'')+'</div><div id="calwrap">'+calendarHTML(ym, x.date)+'</div>', id, src, 'pickDate', (s, done)=>{
     s.onclick=e=>{ const nav=e.target.closest('[data-cal]'); if(nav){ ym=shiftMonth(ym,+nav.dataset.cal); $('#calwrap',s).innerHTML=calendarHTML(ym, x.date); return; }
-      const c=e.target.closest('[data-d]'); if(c){ if(pickFresh(e)){ log('warn','Toque en el calendario ignorado justo al abrir'); return; } releaseHold(id); setManualDate(id, c.dataset.d||null); haptic(6); done(); render(); } }; }); }
+      const c=e.target.closest('[data-d]'); if(c){ if(pickFresh(e)){ log('warn','Toque en el calendario ignorado justo al abrir'); return; } releaseHold(id); if(c.dataset.sd){ done(); if(!isSomeday(x)) setSomeday(id, true); return; } if(!c.dataset.d&&isSomeday(x)){ done(); setSomeday(id, false); return; } /* decision 85 */ setManualDate(id, c.dataset.d||null); haptic(6); done(); render(); } }; }); }
 /* Decision 48a: the Fecha límite picker, a sheet on the iPhone and a popover on the desktop (the inspector's control, or the row): quick days,
    the calendar (no past day) and Quitar when it has one */
 function deadlineSheet(id, src){ const x=task(id); if(!x) return; const t=todayStr(), dow=new Date(t+'T00:00:00').getDay(); const chips=[[t,'Hoy'],[addDays(t,1),'Mañana']]; if(dow>=1&&dow<=4) chips.push([nextWeekday(5,true),'Este viernes']); chips.push([nextWeekday(1,true),'Próxima semana']); if(x.deadline) chips.push(['','Quitar']);
@@ -374,17 +380,17 @@ function reminderSheet(id, src){ const x=task(id); if(!x) return; const t=todayS
 
 /* Plan the undated tasks one by one */
 function planStart(){ let ids=pendingFor('todas').filter(x=>!x.date&&!dlDue(x)); /* decision 48a: one whose deadline has come is in Hoy, not in Sin fecha */ if(filterOn()) ids=ids.filter(passFilter); ids=ids.map(x=>x.id); if(!ids.length) return; planStep(ids, 0, {done:0, skipped:0}); }
-function planEnd(st){ renderAnimated(); toast(st.done+(st.done===1?' planificada':' planificadas')+(st.skipped?', '+st.skipped+(st.skipped===1?' saltada':' saltadas'):'')); log('info','Planificar sin fecha', st); }
+function planEnd(st){ renderAnimated(); toast(st.done+(st.done===1?' planificada':' planificadas')+(st.some?', '+st.some+' a Algún día':'')+(st.skipped?', '+st.skipped+(st.skipped===1?' saltada':' saltadas'):'')); log('info','Planificar sin fecha', st); }
 function planStep(ids, i, st){
   if(i>=ids.length){ sheetOnClose=null; closeSheet(); planEnd(st); return; }
   const x=task(ids[i]); if(!x){ planStep(ids, i+1, st); return; }
   const t=todayStr(); const dow=new Date(t+'T00:00:00').getDay(); const chips=[[t,'Hoy'],[addDays(t,1),'Mañana']]; if(dow>=1&&dow<=4) chips.push([nextWeekday(5,true),'Este viernes']); chips.push([nextWeekday(1,true),'Próxima semana']);
   let ym=t.slice(0,7); const p=x.projectId?proj(x.projectId):null;
-  openSheet('<h2>Planificar</h2><div class="hint" style="margin-top:-6px">'+(i+1)+' de '+ids.length+(p?', '+esc(p.name):'')+'</div><div class="plan-title">'+esc(x.title)+'</div><div class="chips" style="margin-top:0">'+uniqueBy(chips, c=>c[0]).map(c=>'<button class="chip" data-d="'+c[0]+'">'+c[1]+'</button>').join('')+'</div><div id="calwrap">'+calendarHTML(ym, null)+'</div><div class="sheet-actions"><button class="btn" data-x="skip">Saltar</button><button class="btn" data-x="end">Terminar</button></div>', s=>{
+  openSheet('<h2>Planificar</h2><div class="hint" style="margin-top:-6px">'+(i+1)+' de '+ids.length+(p?', '+esc(p.name):'')+'</div><div class="plan-title">'+esc(x.title)+'</div><div class="chips" style="margin-top:0">'+uniqueBy(chips, c=>c[0]).map(c=>'<button class="chip" data-d="'+c[0]+'">'+c[1]+'</button>').join('')+'</div><div id="calwrap">'+calendarHTML(ym, null)+'</div>'+(canSomeday(x)?'<div class="sheet-actions"><button class="btn" data-x="some">'+MI.someday+'Algún día</button></div>':'')+'<div class="sheet-actions"'+(canSomeday(x)?' style="margin-top:10px"':'')+'><button class="btn" data-x="skip">Saltar</button><button class="btn" data-x="end">Terminar</button></div>', s=>{ // decision 85: Algún día
     sheetOnClose=()=>{ st.skipped+=ids.length-i; planEnd(st); }; // closed with a tap outside or a drag: as Terminar
     s.onclick=e=>{ const nav=e.target.closest('[data-cal]'); if(nav){ ym=shiftMonth(ym,+nav.dataset.cal); $('#calwrap',s).innerHTML=calendarHTML(ym, null); return; }
       const d=e.target.closest('[data-d]'); if(d){ updTask(x.id, dayPatch(x, d.dataset.d)); st.done++; haptic(6); render(); planStep(ids, i+1, st); return; } // the list behind stays current
-      const b=e.target.closest('[data-x]'); if(!b) return; if(b.dataset.x==='skip'){ st.skipped++; planStep(ids, i+1, st); } else { st.skipped+=ids.length-i; planStep(ids, ids.length, st); } }; });
+      const b=e.target.closest('[data-x]'); if(!b) return; if(b.dataset.x==='some'){ setSomeday(x.id, true, true); st.some=(st.some||0)+1; haptic(6); render(); planStep(ids, i+1, st); return; } if(b.dataset.x==='skip'){ st.skipped++; planStep(ids, i+1, st); } else { st.skipped+=ids.length-i; planStep(ids, ids.length, st); } }; });
 }
 
 /* Decision 49: the dictated voice note is gone (dictation is the keyboard's microphone in Notas). stopRec is set by the recording
@@ -493,7 +499,7 @@ function exportJSON(){ const t=JSON.stringify(exportData(),null,2); if(navigator
 function csvText(){ const q=v=>{ let s=String(v==null?'':v).replace(/"/g,'""').replace(/\r?\n/g,' '); if(/^[=+\-@\t\r]/.test(s)) s="'"+s; return '"'+s+'"'; }; const sp=Object.fromEntries(DB.spaces.map(s=>[s.id,s.name])); const pr={high:'Alta',mid:'Media',none:''};
   const head=['Espacio','Proyecto','Título','Fecha','Fecha límite','Prioridad','Tiempo estimado','Estado','Completada','Recordatorio','Se repite','Esperando a','Responsable','Aplazada','Notas','Pasos','Creada']; // decision 49: no Notas de voz column, they are in Notas; decision 38: Se repite, the rule in words; decision 46: Pasos, each with its box
   const rows=DB.tasks.slice().sort((a,b)=>(a.spaceId+(a.date||'9999')+a.created)<(b.spaceId+(b.date||'9999')+b.created)?-1:1).map(x=>{ const p=x.projectId?proj(x.projectId):null; const ps=stepsOf(x.id).map(o=>'['+(o.done?'x':' ')+'] '+o.title).join(' | ');
-    return [sp[x.spaceId]||'', p?p.name:'', x.title, x.date||'', x.deadline||'', pr[x.priority]||'', x.estimate?estLabel(x.estimate).toLowerCase():'', x.status==='done'?'Hecha':x.status==='waiting'?'Por confirmar':'Pendiente', x.completed?localDay(x.completed)+' '+fmtTime(x.completed):'', x.reminder?localDay(x.reminder)+' '+fmtTime(x.reminder):'', repSummary(x.repeat), x.waitingFor||'', x.responsible||'', x.carried?'Sí':'', x.notes||'', ps, localDay(x.created)].map(q).join(';'); });
+    return [sp[x.spaceId]||'', p?p.name:'', x.title, x.date||'', x.deadline||'', pr[x.priority]||'', x.estimate?estLabel(x.estimate).toLowerCase():'', x.status==='done'?'Hecha':x.status==='waiting'?'Por confirmar':isSomeday(x)?'Algún día':'Pendiente', x.completed?localDay(x.completed)+' '+fmtTime(x.completed):'', x.reminder?localDay(x.reminder)+' '+fmtTime(x.reminder):'', repSummary(x.repeat), x.waitingFor||'', x.responsible||'', x.carried?'Sí':'', x.notes||'', ps, localDay(x.created)].map(q).join(';'); });
   return '﻿'+head.map(q).join(';')+'\r\n'+rows.join('\r\n')+'\r\n'; }
 async function exportCSV(){
   const name='tareas-'+todayStr()+'.csv'; const blob=new Blob([csvText()],{type:'text/csv;charset=utf-8'});

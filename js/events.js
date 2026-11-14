@@ -51,6 +51,7 @@ function onClick(e){
   const th=e.target.closest('button[data-theme]'); if(th){ DB.settings.theme=th.dataset.theme; save(); applyTheme(); render(); return; } // only the Tema buttons: <html> carries data-theme too
   const op=e.target.closest('[data-open-project]'); if(op){ if(UI.wide){ setDeskView('project:'+op.dataset.openProject); } else push('project', op.dataset.openProject); return; }
   const opp=e.target.closest('[data-open-person]'); if(opp){ if(UI.wide) setDeskView('person:'+opp.dataset.openPerson); else push('person', opp.dataset.openPerson); return; } // decision 65a
+  const osd=e.target.closest('[data-open-someday]'); if(osd){ if(UI.wide) setDeskView('someday'); else push('someday', null); return; } // decision 85
   const dv=e.target.closest('[data-view]'); if(dv){ setDeskView(dv.dataset.view); return; }
   const wk=e.target.closest('[data-week]'); if(wk){ calNav(wk.dataset.week); return; }
   const cv=e.target.closest('[data-cal-view]'); if(cv){ if(UI.deskView!==cv.dataset.calView) setDeskView(cv.dataset.calView); return; } // R19, R20: Día, Semana, Mes
@@ -137,6 +138,7 @@ function onClick(e){
     case 'pickDeadline': if(detailId) deadlineSheet(detailId, act); break; // decision 48a
     case 'pickEstimate': if(detailId) estimatePick(detailId, UI.wide?act:act.querySelector('.val')||act); break; // decision 56a
     case 'suggest': suggestSheet(act); break; // decision 56c: Sugerir, in the head of Ahora
+    case 'planDay': planDayStart(); break; // decision 86
     case 'focusOn': setFocusMode(true); break; case 'focusOff': setFocusMode(false); break; // decision 65d: Foco in the head of Ahora, Salir del foco in its bar
     case 'pickWaiting': if(detailId) waitingMenu(detailId, UI.wide?act:act.querySelector('.val')||act); break; // decision 41
     case 'toggleWaiting': UI.waitOpen=!UI.waitOpen; render(); break;

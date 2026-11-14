@@ -8,7 +8,7 @@ App web personal de gestión de tareas para iPhone (PWA instalada en pantalla de
 
 ## 2. Estado actual (2 de noviembre de 2026)
 
-- Versión publicada: **v0.37.4**. El repositorio `tareas` está en GitHub y se publica con GitHub Pages desde la rama `main`. Enric la usa instalada en el iPhone (pantalla de inicio) y en el navegador del ordenador.
+- Versión publicada: **v0.38.0**. El repositorio `tareas` está en GitHub y se publica con GitHub Pages desde la rama `main`. Enric la usa instalada en el iPhone (pantalla de inicio) y en el navegador del ordenador.
 - Sigue sin build ni dependencias de interfaz: HTML, CSS y JavaScript que se publican tal cual. El antiguo `index.html` de un solo archivo está repartido en `css/app.css` y en scripts clásicos dentro de `js/`, con el mismo comportamiento y el mismo aspecto.
 - Hecho: bloques 1 a 7 (v0.1), roadmap R1 a R20 (v0.15.0), escritorio a partir de 900 px con barra lateral, inspector, Semana, Día, Mes y vista por horas (v0.13.0 y v0.15.0), sincronización con Supabase e inicio de sesión con Google (bloque 8, v0.16.0), recordatorios con Web Push y la función `send-reminders` (bloque 9, v0.17.0), fotos y audios adjuntos en Supabase Storage (v0.19.0) y el lote de v0.20.0 (puntos 31 a 36 de la sección 8).
 - Datos: `localStorage` del dispositivo (clave `tareas-v1`) como verdad para la interfaz; copias diarias y archivos adjuntos en IndexedDB; Supabase sincroniza cuando hay sesión.
@@ -37,6 +37,7 @@ tareas/
 │   ├── notes.js               notas de proyecto
 │   ├── status.js              resumen de estado para compartir
 │   ├── suggest.js             «¿Qué hago ahora?»: tres tareas sugeridas según el tiempo disponible
+│   ├── planday.js             Planificar el día: aplazadas, entregas próximas, carga y Ahora (punto 86)
 │   ├── inbox.js               bandeja de Siri y del Atajo de iOS (punto 62)
 │   ├── people.js              responsable, contactos, vista «Por persona» y recordatorios a personas
 │   ├── team.js                equipo: acceso por invitación, «Avisar a…», Recibidas, cupo, sugerencias y sección Equipo
@@ -57,7 +58,7 @@ tareas/
 ├── sw.js                      service worker: caché de la app (SHELL), aviso de actualización y notificaciones
 ├── icons/                     192, 512 y apple-touch-icon
 ├── vendor/                    supabase-js 2.117.3 (UMD), servida y cacheada con la app
-├── supabase/                  migraciones SQL (0001 a 0014), all.sql (todas seguidas), check.sql (comprobación), README.md y la función send-reminders
+├── supabase/                  migraciones SQL (0001 a 0015), all.sql (todas seguidas), check.sql (comprobación), README.md y la función send-reminders
 ├── tests/                     pruebas de regresión con Playwright (sección 7 bis)
 ├── package.json               solo para las pruebas; la app no tiene build
 ├── .github/workflows/pages.yml   pruebas y publicación
@@ -108,6 +109,7 @@ Los datos: `DB` es un objeto único en `localStorage` bajo la clave `tareas-v1` 
 - `js/notes.js`: notas de proyecto, lista `DB.projectNotes` (`addNote`, `saveNoteEdit`, `deleteNote`, `togglePin`, `toggleNoteCheck`, `noteBodyHTML`, `notesListHTML`, `viewNote`, `deskNotesHTML`, `projSegHTML`, `noteHits`, `noteTasksSheet`, `noteMakeTasks`, `shareNote`, `noteMenu`).
 - `js/status.js`: resumen de estado para compartir (M4): `statusText`, `spaceStatusText`, `stSections`, `stLine`, `stPeriod`, `statusSheet`, `statusShare`, `statusCopy`.
 - `js/suggest.js`: sugerencias del punto 56 (`suggestPool`, `sgFits`, `sgTier`, `sgReason`, `suggestFor`, `suggestSheet`).
+- `js/planday.js`: Planificar el día del punto 86 (`pdShown`, `planDayStart`, `pdStep`, `pdLoadPick`, `pdAhoraPick`, `pdEnd`). «Algún día» (punto 85) vive en `js/core.js` (`isSomeday`, `canSomeday`, `somedayList`, `setSomeday`), `js/render.js` (`somedayCellHTML`, `somedayListHTML`, `viewSomeday`) y `js/menus.js` (`somedayItems`).
 - `js/sync.js`: adaptador `supabaseRemote` (sustituible en pruebas con `SY.remote`); `syncMerge`, `syncPull`, `syncPush`, `syncRun`, `syncRealtime`; arranque `syncBoot`; sesión (`syncSignIn`, `syncSignOutSheet`); sección Cuenta (`syncAccountHTML`).
 - `js/crypto.js`: primitivas sin DOM, compartidas con el service worker (`cryptoDerive`, `cryptoSeal`, `cryptoOpen`, `cryptoEnc`, `cryptoDec`, `cryptoSealRow`, `cryptoDecRow`, `cryptoEncFile`, `cryptoDecFile`, `cryptoKeyLoad`, `cryptoKeySave`, `cryptoKeyForget`, `cryptoPushPayload`; columnas en `CRYPTO_COLS`).
 - `js/e2e.js`: envoltura `cryptoRemote` sobre `SY.remote` (cifra al subir y descifra al bajar, también archivos y tiempo real); `cryptoGate` al empezar cada pasada (off, on o bloqueado); `cryptoActivate`, `cryptoMigrate`, `cryptoUnlockSheet`, `cryptoChangePassword`, `cryptoSectionHTML`.
@@ -243,6 +245,10 @@ Cambios acordados con Enric sobre el diseño de abajo. Mandan sobre el texto del
 
 84. **v0.37.4, lote C (Enric, 14 de noviembre, aprobado con capturas del antes y el después; solo iPhone).** (1) Buscador recogido: primero de la lista de Tareas y oculto bajo la cabecera al abrir, al volver a Hoy y la primera vez que se muestra la pestaña (`tuckSearch`); un deslizamiento corto lo muestra y otro sincroniza; `.tlist` da a la lista al menos la altura de la pantalla más el buscador. (2) Ajustes como índice con subpantallas (`push('settings', clave)`; claves en `SET_SUBS`: cuenta, equipo, espacios, contactos, datos, registro y archivados; secciones en `setSections`, el mismo HTML de antes); en el índice quedan Aspecto, Gestos y Versión; Cuenta muestra `syncLine()` en naranja si requiere atención; el escritorio conserva la página entera (`SET_ORDER`). Las subpantallas tapan la barra de pestañas como cualquier pantalla apilada. (3) Menú de pulsación larga: Mover a otro espacio, Duplicar y Seleccionar en el submenú «Más». Pruebas: ayuda `tests/lib/settings.js` (`openSetting` abre la subpantalla que contiene un selector, `closeSetting` la cierra) y comprobaciones en `rm-LA`.
 
+85. **v0.38.0, «Algún día» (punto 72b; diseño aprobado por Enric el 14 de noviembre).** Campo nuevo `someday` en Tarea: el día en que se apartó (en Supabase `tasks.someday`, `0015_someday.sql`, aplicada por Claude). Está en Algún día una tarea pendiente con `someday`, sin fecha, fuera de Ahora y sin entrega llegada (`isSomeday`). No sale en Hoy, Todas, Sin fecha, los contadores de proyectos, las olvidadas, Sugerir, Planificar, Por persona ni el resumen de estado; la búsqueda la encuentra y su fila dice «Algún día». Se pasa desde Aplazar, la hoja Fecha, el menú del detalle, el submenú Fecha del escritorio, el repaso de olvidadas y Planificar las sin fecha (`setSomeday`, con Deshacer); al pasarla pierde fecha, recordatorio y Ahora, y conserva proyecto, notas, pasos y entrega (si la entrega llega, vuelve a Hoy). Una fecha, un recordatorio, Ahora o Por confirmar la sacan (`updTask` vacía `someday`); Deshacer de una fecha la devuelve (`daySnap`, `undoDay`). No se ofrece a tareas que se repiten ni por confirmar. Elegido por Enric: en el iPhone, celda «Algún día (N)» en Proyectos bajo Sin proyecto, con su pantalla agrupada por proyecto; en el escritorio, entrada en la barra lateral bajo Por confirmar; las dos solo con alguna tarea. Campo y no estado nuevo, para que un dispositivo con versión anterior la vea como tarea sin fecha. Prueba `rm-SD`.
+
+86. **v0.38.0, Planificar el día (punto 72a; diseño aprobado por Enric el 14 de noviembre).** Desde el menú de tres puntos de Hoy y, elegido por Enric, desde una celda arriba de Hoy hasta las 12:00 mientras no se haya hecho ese día (`settings.planDay`, del dispositivo; abrirlo cuenta como hecho). Pasos: Aplazadas (repaso una a una o todas para hoy), Entregas próximas (3 días, botón «Hoy»), Carga de hoy (tiempo de un toque para las que no lo tienen; por encima del tope, elegido por Enric, se marcan las no prioritarias desde el final, sin más de las necesarias, y «Pasar N a mañana» cuenta como aplazamiento) y Ahora (de 3 a 5, propuestas como «¿Qué hago ahora?»). Al final, una línea con lo que queda en Ahora y las horas frente al tope, con Deshacer de todo. Sin cambios de datos. Código en `js/planday.js`; prueba `rm-PD`.
+
 ## 9. Decisiones pendientes de Enric (revisión del 1 de noviembre)
 
 1. ~~Atajo de iOS (`?add=`).~~ Resuelta el 4 de noviembre con la opción (c): bandeja en Supabase (punto 62 de la sección 8). Texto original: Opciones: (a) avisar en Safari de que la tarea no llegará a la app instalada; (b) el Atajo copia el texto y Nueva tarea ofrece "Pegar"; (c) con el bloque 8, el Atajo envía el texto a una bandeja en Supabase que la app recoge al sincronizar. (a) y (b) añaden interfaz.
@@ -337,7 +343,7 @@ Orden fijado por Enric el 2 de noviembre y revisado el 3 de noviembre: tras el r
 | 22b | Cifrado de extremo a extremo y equipo con acceso por invitación y «Avisar a…» (punto 63 de la sección 8) | cifrado hecho en v0.34.0; equipo hecho en v0.36.0 | máximo |
 | 22c | Vista «Por persona», repetir desde que se completa, resumen de la mañana, modo foco y repeticiones con inicio, fin y sin acumular (punto 65 de la sección 8) | modo foco, repetir desde que se completa y repeticiones con fin hechos en v0.33.0; «Por persona» hecha en v0.35.0; queda el resumen de la mañana (2 h) | medio |
 | 22c bis | Correcciones de «Por persona»: elegir qué tareas recordar y mensaje con viñetas (punto 73 de la sección 8) | hecho en v0.35.1 | medio |
-| 22d | Planificar el día, «Algún día» y fases dentro de un proyecto (punto 72 de la sección 8) | 2 a 3 h, 1 a 2 h y 3 a 4 h | medio |
+| 22d | Planificar el día, «Algún día» y fases dentro de un proyecto (punto 72 de la sección 8) | Planificar el día y «Algún día» hechos en v0.38.0 (puntos 85 y 86); quedan las fases, 3 a 4 h | medio |
 | 22e | Seguimiento de las tareas enviadas con «Avisar a…»: fecha prevista, completada y aviso al remitente (punto 78 de la sección 8) | hecho en v0.37.0 | alto |
 | 22f | Proyecto visible en las tarjetas del calendario del escritorio (punto 79 de la sección 8), en la misma versión que 22e | hecho en v0.37.0 | medio |
 | 23 | Fase 2, tareas compartidas entre personas (punto 43, diseño cerrado; después del punto 63) | muy alto, 2 a 3 días | máximo | En pausa: el punto 78 cubre lo que Enric necesita (6 de noviembre).

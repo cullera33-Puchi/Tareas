@@ -1,5 +1,16 @@
 [
   {
+    "version": "0.38.0",
+    "date": "2026-11-14",
+    "items": [
+      "Nuevo «Planificar el día»: por la mañana, arriba de Hoy (o en el menú de tres puntos), un repaso corto de aplazadas, entregas próximas, horas del día y lo que vas a hacer primero.",
+      "Si las horas de Hoy pasan de tu jornada, te marca lo que puede esperar a mañana. También puedes poner el tiempo estimado de un toque.",
+      "Nuevo «Algún día»: aparta ideas y tareas sin fecha que no quieres ver a diario. Se pasan desde Aplazar o desde la fecha de la tarea.",
+      "Las tienes en Proyectos (en el ordenador, en la barra lateral) y vuelven a tu lista en cuanto les pones una fecha.",
+      "Todo tiene Deshacer, también el día planificado entero."
+    ]
+  },
+  {
     "version": "0.37.4",
     "date": "2026-11-14",
     "items": [

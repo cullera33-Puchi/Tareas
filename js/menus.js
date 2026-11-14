@@ -35,6 +35,7 @@ const MI = {
   pencil:mi('<path d="M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4"/>'),
   up:mi('<path d="M12 19V5M6 11l6-6 6 6"/>'),
   down:mi('<path d="M12 5v14M6 13l6 6 6-6"/>'),
+  someday:mi('<path d="M7 18.5h10.5a4 4 0 00.4-7.98A6 6 0 006.3 11.1 3.7 3.7 0 007 18.5z"/>'), // decision 85: Algún día, a cloud
   archive:mi('<rect x="3" y="4" width="18" height="5" rx="1.5"/><path d="M5 9v9a2 2 0 002 2h10a2 2 0 002-2V9M10 13h4"/>'),
   check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5l5 5L19.5 6.5"/></svg>',
   wait:mi('<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>'),
@@ -235,14 +236,18 @@ function projectPickMenu(id){ const x=task(id); if(!x) return null; const dot=c=
 const DATE_ICON={'Mañana':MI.sunrise, 'Fin de semana':MI.weekend, 'Próxima semana':MI.postpone, 'En una semana':MI.cal, 'Sin fecha':MI.p0};
 const dateItem = (l, d, fn) => ({label:l, sub:l==='Mañana'||!d?'':fmtDate(d), icon:DATE_ICON[l]||MI.cal, fn});
 function postponeMenu(id){ const t=todayStr(); const opts=uniqueBy([['Mañana',addDays(t,1)],['Fin de semana',weekendDay()],['Próxima semana',nextWeekday(1,true)]], o=>o[1]);
-  return {title:'Aplazar', groups:[opts.map(([l,d])=>dateItem(l, d, ()=>{ leaveRows(id); setTimeout(()=>{ rescheduleTask(id,d,l.toLowerCase()); renderAnimated(); },200); })), [{label:'Elegir fecha', icon:MI.calPick, key:'F', fn:()=>dateSheet(id)}]]}; }
+  return {title:'Aplazar', groups:[opts.map(([l,d])=>dateItem(l, d, ()=>{ leaveRows(id); setTimeout(()=>{ rescheduleTask(id,d,l.toLowerCase()); renderAnimated(); },200); })), [{label:'Elegir fecha', icon:MI.calPick, key:'F', fn:()=>dateSheet(id)}].concat(somedayItems(id, MI))]}; }
+/* Decision 85: Algún día in the menus of a task: put it there (not a task that repeats or waits) or take it out to Sin fecha */
+function somedayItems(id, icons){ const x=task(id); if(!x) return [];
+  if(isSomeday(x)) return [{label:'Sacar de Algún día', icon:icons&&icons.p0, fn:()=>setSomeday(id, false)}];
+  return canSomeday(x) ? [{label:'Algún día', icon:icons&&icons.someday, fn:()=>{ leaveRows(id); setTimeout(()=>setSomeday(id, true), 200); }}] : []; }
 // R17: a date chosen from a desktop menu, with Deshacer; choosing the date it already has confirms a carried task for today
 function setTaskDate(id, d){ const x=task(id); if(!x||(x.date===d&&!x.carried)) return; releaseHold(id); const old=daySnap(x); updTask(id, dayPatch(x, d)); haptic(8); renderAnimated();
   toast(d?'Movida a '+fmtDate(d).toLowerCase():'Sin fecha', ()=>undoDay(old)); }
 // R17: the Fecha submenu of the desktop: the quick dates with their keys (H, M, V, S), Sin fecha and the calendar popover (F)
 function dateMenu(id){ const x=task(id); if(!x) return null; const t=todayStr();
   const ds=uniqueBy([['Hoy',t,'H'],['Mañana',addDays(t,1),'M'],['Viernes',nextWeekday(5,true),'V'],['Próxima semana',nextWeekday(1,true),'S']], o=>o[1]);
-  return {title:'Fecha', groups:[ds.map(([l,d,k])=>({label:l, key:k, on:x.date===d, fn:()=>setTaskDate(id,d)})), [{label:'Sin fecha', on:!x.date, fn:()=>setTaskDate(id,null)}], [{label:'Elegir fecha…', key:'F', fn:()=>dateSheet(id)}]]}; }
+  return {title:'Fecha', groups:[ds.map(([l,d,k])=>({label:l, key:k, on:x.date===d, fn:()=>setTaskDate(id,d)})), [{label:'Sin fecha', on:!x.date&&!isSomeday(x), fn:()=>isSomeday(x)?setSomeday(id,false):setTaskDate(id,null)}].concat(isSomeday(x)||canSomeday(x)?[{label:'Algún día', on:isSomeday(x), fn:()=>{ if(!isSomeday(x)){ leaveRows(id); setTimeout(()=>setSomeday(id, true), 200); } }}]:[]), [{label:'Elegir fecha…', key:'F', fn:()=>dateSheet(id)}]]}; }
 /* Decision 48a: the Fecha límite submenu (iPhone row menu, desktop menu): the quick days with a check on the current one, the calendar and Quitar */
 function deadlineMenu(id){ const x=task(id); if(!x) return null; const t=todayStr();
   const ds=uniqueBy([['Hoy',t],['Mañana',addDays(t,1)],['Viernes',nextWeekday(5,true)],['Próxima semana',nextWeekday(1,true)]], o=>o[1]);
@@ -285,7 +290,7 @@ function askRepeatDelete(o, onlyFn, seriesFn){ const one=o.n===1, k=o.rep||1;
 function detailMenu(id, src){ const x=task(id); if(!x) return;
   popMenu({anchor:src, align:'right', groups:[
     [{label:x.status==='done'?'Marcar pendiente':'Marcar completada', icon:x.status==='done'?MI.undo:MI.done, key:'C', fn:()=>{ completeTask(id,true); render(); }}].concat(waitItems(x, MI, src)), // decision 41
-    (canRemind(x)?[{label:UI.wide?'Enviar recordatorio…':'Enviar recordatorio', icon:MI.send, fn:()=>remindSheet([id])}]:[]).concat(noticeItems(x, true), DB.spaces.length>1?[{label:'Mover a otro espacio', icon:MI.space, menu:()=>spaceMoveMenu(id)}]:[], [{label:'Duplicar', icon:MI.dup, fn:()=>duplicateTask(id)}]), // decision 48c
+    (canRemind(x)?[{label:UI.wide?'Enviar recordatorio…':'Enviar recordatorio', icon:MI.send, fn:()=>remindSheet([id])}]:[]).concat(noticeItems(x, true), somedayItems(id, MI), DB.spaces.length>1?[{label:'Mover a otro espacio', icon:MI.space, menu:()=>spaceMoveMenu(id)}]:[], [{label:'Duplicar', icon:MI.dup, fn:()=>duplicateTask(id)}]), // decision 48c
     [{label:'Eliminar tarea', icon:MI.trash, red:true, key:'Supr', fn:()=>confirmDelete(id, closeDetailOf(id))}] ]}); }
 // After a delete from the detail, close that task's detail only if it is still the one showing: Atrás may have been tapped meanwhile
 const closeDetailOf = id => ()=>{ if(detailTaskId()===id) pop(); else renderAnimated(); };

@@ -12,7 +12,7 @@ function setDeskView(v){ if(v==='project:none') v='project:none'; if(UI.pitOpen)
    order and idx remember the list as last drawn, so a row that leaves it (done, moved, deleted) hands the selection to its neighbour.
    The iPhone keeps its own selection mode (UI.select) */
 function deskMulti(){ return UI.wide && (UI.dsel.mode || UI.dsel.ids.size>1); }
-function deskListView(){ const v=UI.deskView; return v==='hoy'||v==='todas'||v==='ahora'||v==='waiting'||v.startsWith('person:')||(v.startsWith('project:')&&!deskNotesOn()); } // decision 65a: a person's view // decision 47: a project's Notas is not a list of tasks // decisions 39 and 41: Ahora and Por confirmar are lists too
+function deskListView(){ const v=UI.deskView; return v==='hoy'||v==='todas'||v==='ahora'||v==='waiting'||v==='someday'||v.startsWith('person:')||(v.startsWith('project:')&&!deskNotesOn()); } // decision 65a: a person's view // decision 47: a project's Notas is not a list of tasks // decisions 39 and 41: Ahora and Por confirmar are lists too
 // The rows of the visible list in order, with the placeholders of a long one; Ahora repeats rows and is left out
 function deskOrder(){ return [...document.querySelectorAll('#desk .main .mbody .row[data-id], #desk .main .mbody .rph[data-id]')].filter(r=>!r.closest('.first')).map(r=>r.dataset.id); }
 function deskRow(id){ return id?document.querySelector('#desk .main .mbody .row[data-id="'+CSS.escape(id)+'"]:not(.first .row)'):null; }
@@ -160,28 +160,29 @@ function dropMany(ids, z){ if(ids.length===1) return dropTask(ids[0], z); const 
   toast(bulkN(xs.length)+msg, ()=>batch(()=>prev.forEach(undoDay))); }
 function applyWide(){ const w=wideMQ.matches; if(w===UI.wide) return; closeMenu(true); UI.wide=w; document.documentElement.classList.toggle('wide', w); document.body.classList.toggle('desktop', w); app.classList.toggle('desktop', w);
   if(w){ // the pushed iPhone screens map onto the desktop: a project becomes the view and the last detail the pane
-    let pr=null; UI.deskDetail=null; UI.stack.forEach(s=>{ if(s.kind==='project') pr=s.id; else if(s.kind==='person') pr={person:s.id}; else if(s.kind==='note'){ const n=noteRec(s.id); if(n){ pr=n.projectId; UI.projTab[pr]='notes'; UI.noteOpen=n.id; } } else if(s.kind==='settings'){} /* the desktop shows Ajustes whole */ else UI.deskDetail=s.id; s.el.remove(); }); UI.stack=[]; // decision 47: a note opens in its project's Notas
+    let pr=null; UI.deskDetail=null; UI.stack.forEach(s=>{ if(s.kind==='project') pr=s.id; else if(s.kind==='person') pr={person:s.id}; else if(s.kind==='someday') pr={someday:true}; else if(s.kind==='note'){ const n=noteRec(s.id); if(n){ pr=n.projectId; UI.projTab[pr]='notes'; UI.noteOpen=n.id; } } else if(s.kind==='settings'){} /* the desktop shows Ajustes whole */ else UI.deskDetail=s.id; s.el.remove(); }); UI.stack=[]; // decision 47: a note opens in its project's Notas
     if(UI.select){ UI.select=null; app.classList.remove('selecting'); closeSheet(); } // an open bulk menu would act on nothing
     Object.assign(UI.dsel, {ids:new Set(), mode:false, edit:null, follow:false});
-    if(pr&&pr.person) UI.deskView='person:'+pr.person; else if(pr) UI.deskView='project:'+pr; else if(UI.tab==='ajustes') UI.deskView='settings';
+    if(pr&&pr.someday) UI.deskView='someday'; else if(pr&&pr.person) UI.deskView='person:'+pr.person; else if(pr) UI.deskView='project:'+pr; else if(UI.tab==='ajustes') UI.deskView='settings';
     else if(!isCalView(UI.deskView)) UI.deskView=DB.settings.filter; // the list the iPhone showed; the calendar has no iPhone screen, so it is kept
     app.querySelectorAll('.screen.root').forEach(s=>s.remove()); } // hidden on the desktop; render() rebuilds them on the way back
   else { const d=$('#desk'); if(d) d.remove(); app.classList.remove('has-pane'); Object.assign(UI.dsel, {ids:new Set(), mode:false, edit:null, follow:false}); // the iPhone has its own selection mode
-    const v=UI.deskView; UI.tab = v==='settings'?'ajustes' : v.startsWith('project:')||v.startsWith('person:')?'proyectos' : 'tareas';
+    const v=UI.deskView; UI.tab = v==='settings'?'ajustes' : v.startsWith('project:')||v.startsWith('person:')||v==='someday'?'proyectos' : 'tareas';
     // The desktop project view and pane become pushed screens, already in place (no slide-in)
     const put=(kind,id)=>{ const el=document.createElement('div'); el.className='screen pushed-screen shown '+kind; el.dataset.kind=kind; app.appendChild(el); UI.stack.push({kind,id,el}); };
     if(v.startsWith('person:')) put('person', v.slice(7)); // decision 65a
+    if(v==='someday') put('someday', null); // decision 85
     if(v.startsWith('project:')){ const id=v.slice(8); if(id==='none'||proj(id)) put('project', id); const n=projTab(id)==='notes'&&noteRec(UI.noteOpen); if(n&&n.projectId===id&&proj(id)) put('note', n.id); } // decision 47: the open note stays open
     if(UI.deskDetail&&task(UI.deskDetail)) put('detail', UI.deskDetail);
     UI.deskDetail=null; } // the stack holds it now; a later widen maps it back
   log('info', w?'Modo escritorio':'Modo móvil'); render(); }
 function deskSide(){
-  const ps=activeProjects(); const pend=spaceTasks().filter(x=>x.status==='pending'); const cnt=id=>pend.filter(x=> id===null?!x.projectId:x.projectId===id).length; const v=UI.deskView;
+  const ps=activeProjects(); const pend=spaceTasks().filter(x=>x.status==='pending'&&!isSomeday(x)); /* decision 85 */ const cnt=id=>pend.filter(x=> id===null?!x.projectId:x.projectId===id).length; const v=UI.deskView;
   // R16: Hoy takes dropped rows and cards as today (data-day), a project or Sin proyecto as that project (data-drop-project)
   const it=(view,ic,label,n,on,attr)=>'<button class="it'+(on?' on':'')+'" data-view="'+view+'"'+(attr||'')+'>'+ic+'<span>'+label+'</span>'+(n!==undefined?'<span class="n">'+n+'</span>':'')+'</button>';
   return '<aside class="side"><button class="sp" data-act="spaceMenu">'+esc(space().name)+I.chevD+'</button>'+
     it('ahora',I.star,'Ahora',ahoraTasks().length,v==='ahora',' data-drop-ahora=""')+ // decision 39: above Hoy, and rows dropped on it go into Ahora
-    it('hoy',I.list,isClosed()?'Mañana':'Hoy',hoyShown().length,v==='hoy',' data-day="'+(isClosed()?addDays(todayStr(),1):todayStr())+'"')+it('todas',I.inbox.replace('viewBox="0 0 48 48"','viewBox="0 0 48 48" stroke-width="3"'),'Todas',pendingFor('todas').filter(x=>x.status!=='waiting').length,v==='todas')+it('waiting',MI.wait,'Por confirmar',spaceTasks().filter(x=>x.status==='waiting').length,v==='waiting')+recvSideHTML()+ /* decision 63b */it('week',I.cal,'Semana',undefined,isCalView(v))+miniMonthHTML()+ // decision 41
+    it('hoy',I.list,isClosed()?'Mañana':'Hoy',hoyShown().length,v==='hoy',' data-day="'+(isClosed()?addDays(todayStr(),1):todayStr())+'"')+it('todas',I.inbox.replace('viewBox="0 0 48 48"','viewBox="0 0 48 48" stroke-width="3"'),'Todas',pendingFor('todas').filter(x=>x.status!=='waiting').length,v==='todas')+it('waiting',MI.wait,'Por confirmar',spaceTasks().filter(x=>x.status==='waiting').length,v==='waiting')+(()=>{ const n=somedayList().length; return n||v==='someday'?it('someday',MI.someday,'Algún día',n,v==='someday'):''; })()+ /* decision 85 */recvSideHTML()+ /* decision 63b */it('week',I.cal,'Semana',undefined,isCalView(v))+miniMonthHTML()+ // decision 41
     '<div class="sec">Proyectos</div>'+ps.map(p=>'<button class="it'+(v==='project:'+p.id?' on':'')+'" data-view="project:'+p.id+'" data-drop-project="'+p.id+'" aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown"><span class="dot" style="background:'+p.color+'"></span><span>'+esc(p.name)+'</span><span class="n">'+cnt(p.id)+'</span></button>').join('')+
     '<button class="it'+(v==='project:none'?' on':'')+'" data-view="project:none" data-drop-project=""><span class="dot" style="background:var(--ink3)"></span><span>Sin proyecto</span><span class="n">'+cnt(null)+'</span></button>'+
     '<button class="it add" data-act="newProject">'+I.plus+'<span>Nuevo proyecto</span></button>'+peopleSideHTML()+ // decision 65a: Personas, under Proyectos
@@ -259,6 +260,7 @@ function deskMain(){
       listHTML(UI.query?'todas':f); }
   else if(v==='ahora'){ title='Ahora'; body=colHeadHTML()+ahoraViewHTML(); } // decision 39
   else if(v==='waiting'){ title='Por confirmar'; body=colHeadHTML()+waitingViewHTML(); } // decision 41
+  else if(v==='someday'){ title='Algún día'; body=colHeadHTML()+somedayListHTML(); } // decision 85
   else if(v==='received'){ title='Recibidas'; search=false; body='<div class="recvview">'+recvListHTML()+'</div>'; } // decision 63b: tasks sent with Avisar a…
   else if(v.startsWith('person:')){ ph=personHeadHTML(v.slice(7)); title=personLabel(v.slice(7)); body=colHeadHTML()+personListHTML(v.slice(7)); } // decision 65a
   else if(isCalView(v)){ title={day:'Día',week:'Semana',month:'Mes'}[v]; pf=true; body=weekHTML(); } // the project filter applies here too, so it stays visible and clearable

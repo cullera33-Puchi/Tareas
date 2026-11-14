@@ -1,9 +1,9 @@
 /* Service worker: app shell cache and update notice.
    Bump CACHE on every release so installed devices pick up the new version. */
-const CACHE = 'tareas-v0.37.4';
+const CACHE = 'tareas-v0.38.0';
 // Every file the app loads: a missing one would leave the installed app unable to start offline (index.html lists the scripts in order)
 const SHELL = ['./', './index.html', './css/app.css',
-  './js/core.js', './js/render.js', './js/events.js', './js/menus.js', './js/sheets.js', './js/attachments.js', './js/steps.js', './js/notes.js', './js/status.js', './js/suggest.js', './js/crypto.js', './js/sync.js', './js/e2e.js', './js/push.js', './js/inbox.js', './js/people.js', './js/team.js', './js/lifecycle.js', './js/desktop.js', './js/desktop-calendar.js', './js/desktop-render.js', './js/desktop-add.js', './js/boot.js',
+  './js/core.js', './js/render.js', './js/events.js', './js/menus.js', './js/sheets.js', './js/attachments.js', './js/steps.js', './js/notes.js', './js/status.js', './js/suggest.js', './js/planday.js', './js/crypto.js', './js/sync.js', './js/e2e.js', './js/push.js', './js/inbox.js', './js/people.js', './js/team.js', './js/lifecycle.js', './js/desktop.js', './js/desktop-calendar.js', './js/desktop-render.js', './js/desktop-add.js', './js/boot.js',
   './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png', './vendor/supabase-js-2.117.3.umd.js'];
 // Decision 63a: the encryption primitives, to show the title of a reminder whose text arrives encrypted (cryptoPushPayload)
 importScripts('./js/crypto.js');

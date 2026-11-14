@@ -128,7 +128,7 @@ setInterval(placeNow, 3e4);
 // A grid shown for the first time scrolls to an hour before now (or to 8:00)
 function scrollHours(sc){ const y=nowY(); sc.scrollTop=Math.max(0, (y===null?SH*2:y-SH*2)); }
 // R12: the undated tasks in a tray beside the days, folding to a narrow strip; open or folded it takes a drop to clear the date
-function trayHTML(){ const pf=calFilter(), u=orderTasks(spaceTasks().filter(x=>x.status==='pending'&&!x.date).filter(pf)), open=DB.settings.weekTray!==false;
+function trayHTML(){ const pf=calFilter(), u=orderTasks(spaceTasks().filter(x=>x.status==='pending'&&!x.date&&!isSomeday(x)).filter(pf)), open=DB.settings.weekTray!==false;
   return '<aside class="wundated wtray'+(open?'':' shut')+'" data-day=""><button class="trh" data-act="toggleTray" aria-expanded="'+open+'" title="'+(open?'Plegar':'Desplegar')+' Sin fecha">'+I.chevD+'<span class="l">Sin fecha</span><span class="n">'+u.length+'</span></button>'+
     (open?'<div class="wl" data-keep="tray">'+(u.length?u.map(x=>calCardHTML(x,'')).join(''):'')+'<p class="trhint">Arrastra aquí para quitar la fecha</p></div>':'')+'</aside>'; }
 // R19: Mes. Six weeks from the Monday before the 1st; up to four tasks a day and, in the day's head, "N más", which opens the day

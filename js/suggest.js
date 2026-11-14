@@ -16,7 +16,7 @@
    - Rules on the device only, nothing stored. */
 const SG_TIMES=[[15,'15 min'],[30,'30 min'],[60,'1 h'],[240,'Medio día']], SG_DEFAULT=30;
 // The candidates of the space, in the order of the lists
-function suggestPool(){ return orderTasks(spaceTasks().filter(x=>!x.focus && !HELD.has(x.id) && ((x.status==='pending' && (inHoy(x) || !x.date)) || (x.status==='waiting' && waitIn(x))))); }
+function suggestPool(){ return orderTasks(spaceTasks().filter(x=>!x.focus && !HELD.has(x.id) && ((x.status==='pending' && (inHoy(x) || (!x.date && !isSomeday(x)))) || (x.status==='waiting' && waitIn(x))))); }
 const sgFits = (x, min) => x.estimate ? +x.estimate<=min : min>=60;
 // The tier of a candidate: 0 deadline today or past, 1 high priority, 2 put off again and again, 3 the rest
 const sgTier = x => dlDue(x)?0:x.priority==='high'?1:isDrag(x)?2:3;

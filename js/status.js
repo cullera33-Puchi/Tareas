@@ -44,7 +44,7 @@ function stSections(spaceId, pid, per){ const t=todayStr(), end=addDays(t,14);
   const wait=xs.filter(x=>x.status==='waiting').sort((a,b)=>(a.date||'9999')<(b.date||'9999')?-1:(a.date||'9999')>(b.date||'9999')?1:a.created<b.created?-1:1);
   const rest=pend.filter(x=>!now.includes(x)), byDate=(a,b)=>a.date<b.date?-1:a.date>b.date?1:0;
   const soon=orderTasks(rest.filter(x=>x.date&&x.date>t&&x.date<=end)).sort(byDate); // stable: the app's order inside a day
-  const undated=orderTasks(rest.filter(x=>!x.date)).slice(0,5);
+  const undated=orderTasks(rest.filter(x=>!x.date&&!isSomeday(x))).slice(0,5); // decision 85: not Algún día
   return [['Hecho', done.map(x=>stLine(x,'done'))], ['En curso', now.map(x=>stLine(x,'now'))], ['Por confirmar', wait.map(x=>stLine(x,'wait'))],
     ['Próximos pasos', soon.map(x=>stLine(x,'next')).concat(undated.map(x=>stLine(x,'next')))]].filter(s=>s[1].length); }
 const stBlock = secs => secs.map(s=>s[0]+'\n'+s[1].join('\n')).join('\n\n');

@@ -49,6 +49,7 @@ with checks(orden, pieza, ok) as (
   union all select 44, 'Seguimiento: fecha prevista y completada en team_notices (0014)', (select count(*) from information_schema.columns where table_schema='public' and table_name='team_notices' and column_name in ('planned','done','done_seen','done_pushed','followed')) = 5
   union all select 45, 'Seguimiento: quien recibe la tarea puede marcarlas (0014)', case when (select count(*) from information_schema.columns where table_schema='public' and table_name='team_notices' and column_name in ('planned','done')) < 2 then false else has_column_privilege('authenticated', 'public.team_notices', 'done', 'UPDATE') and has_column_privilege('authenticated', 'public.team_notices', 'planned', 'UPDATE') end
   union all select 46, 'Seguimiento: regla de los cambios y aviso al completar otra vez (0014)', (select count(*) from pg_trigger where tgname in ('tareas_notice_follow','tareas_notice_followed') and not tgisinternal) = 2
+  union all select 47, 'Algún día: columna someday en tasks (0015)', exists (select 1 from information_schema.columns where table_schema='public' and table_name='tasks' and column_name='someday')
 )
 select orden as "N.º", pieza as "Pieza", case when ok then 'OK' else 'FALTA' end as "Estado"
 from checks order by orden;

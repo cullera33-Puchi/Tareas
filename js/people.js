@@ -205,13 +205,13 @@ function confirmDeleteContact(id){ const c=contactRec(id); if(!c) return; const 
 const personOrder = xs => xs.slice().sort((a,b)=>{ const da=a.date||'~', db=b.date||'~'; if(da!==db) return da<db?-1:1;
   const pa=PRI[a.priority]??2, pb=PRI[b.priority]??2; if(pa!==pb) return pa-pb; return a.created<b.created?-1:a.created>b.created?1:0; });
 // The open names of a task: its responsible and, while it waits, whom it waits for (one entry per person)
-function openPeople(x){ const out=[]; if(!isOpen(x)) return out; [x.responsible, x.status==='waiting'?x.waitingFor:null].forEach(n=>{ const s=String(n||'').replace(/\s+/g,' ').trim(), k=personKey(s); if(k&&!out.some(o=>o.k===k)) out.push({k, s}); }); return out; }
+function openPeople(x){ const out=[]; if(!isOpen(x)||isSomeday(x)) return out; /* decision 85 */ [x.responsible, x.status==='waiting'?x.waitingFor:null].forEach(n=>{ const s=String(n||'').replace(/\s+/g,' ').trim(), k=personKey(s); if(k&&!out.some(o=>o.k===k)) out.push({k, s}); }); return out; }
 // [{key, name, n}] of the active space, the most open tasks first, then by name. A name with no contact keeps the spelling of its oldest task
 function peopleList(){ const by=new Map();
   spaceTasks().slice().sort((a,b)=>a.created<b.created?-1:a.created>b.created?1:0).forEach(x=>openPeople(x).forEach(({k, s})=>{ let e=by.get(k); if(!e){ const c=contactByName(s); e={key:k, name:c?c.name:s, n:0}; by.set(k, e); } e.n++; }));
   return [...by.values()].sort((a,b)=>b.n-a.n||nameCmp(a.name, b.name)); }
 // The two groups of a person's view (UI.query, when the desktop search has one, filters them)
-function personGroups(name){ const k=personKey(name); if(!k) return {mine:[], wait:[]}; let xs=spaceTasks().filter(isOpen); if(UI.query) xs=xs.filter(queryMatcher(UI.query));
+function personGroups(name){ const k=personKey(name); if(!k) return {mine:[], wait:[]}; let xs=spaceTasks().filter(x=>isOpen(x)&&!isSomeday(x)); if(UI.query) xs=xs.filter(queryMatcher(UI.query));
   const wait=xs.filter(x=>x.status==='waiting'&&personKey(x.waitingFor)===k), mine=xs.filter(x=>personKey(x.responsible)===k&&!wait.includes(x));
   return {mine:personOrder(mine), wait:personOrder(wait)}; }
 // The name a view shows: the contact's spelling, else the list's, else as it came

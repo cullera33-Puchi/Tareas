@@ -299,6 +299,7 @@ function pendingFor(filter, projectId, query){ if(!PF) return pendingCalc(filter
 function pendingCalc(filter, projectId, query){
   const t=todayStr();
   let list = spaceTasks().filter(x=>x.status==='pending' || (x.status==='waiting' && (query || waitIn(x)))); // decision 41: a task waiting for confirmation joins the lists on its review day (and in a search); decision 48a: or once its deadline has come
+  if(!query) list = list.filter(x=>!isSomeday(x)); // decision 85: Algún día is out of Hoy, Todas, Sin fecha and the projects; a search still finds it
   if(projectId!==undefined) list = list.filter(x=> projectId===null ? !x.projectId : x.projectId===projectId);
   if(filter==='hoy') list = list.filter(x=>(x.date && x.date<=t) || dlDue(x)); // decision 48a: its deadline brings it, once
   if(query) list = list.filter(queryMatcher(query));
@@ -353,7 +354,19 @@ const hoyShown = () => isClosed()?closedHoyList():pendingFor('hoy'); // what the
 /* Decision 60b: Tareas olvidadas. A pending task with no date, no deadline and not in Ahora that nothing has changed for 30 days or more.
    The group Sin fecha of Todas offers "Repasar N olvidadas", the walk of the reviews (reviewStart('forgot')). The rows carry no mark */
 const FORGOT_DAYS=30;
-const isForgot = x => !!x && x.status==='pending' && !x.date && !x.deadline && !x.focus && (x.modified||x.created||'')<=new Date(Date.now()-FORGOT_DAYS*864e5).toISOString();
+const isForgot = x => !!x && x.status==='pending' && !x.date && !x.deadline && !x.focus && !x.someday && (x.modified||x.created||'')<=new Date(Date.now()-FORGOT_DAYS*864e5).toISOString();
+/* Decision 85: Algún día. Task.someday (Supabase tasks.someday, 0015_someday.sql) is the day the task was put aside there; null when it is not.
+   A pending task with it, no date, no deadline that has come and not in Ahora is in Algún día: out of Hoy, Todas, Sin fecha, the projects'
+   counts, the forgotten ones, Sugerir, Planificar and Por persona; a search finds it. Putting it there clears its date, reminder and Ahora;
+   a date, a reminder, Ahora or Por confirmar take it out (updTask). Not offered to a task that repeats or waits. A device on an older version
+   sees it as a task without a date */
+const isSomeday = x => !!x && !!x.someday && x.status==='pending' && !x.date && !x.focus && !dlDue(x);
+const canSomeday = x => !!x && x.status==='pending' && !isSomeday(x) && !repParse(x.repeat);
+function somedayList(){ return orderTasks(spaceTasks().filter(isSomeday)); }
+const sdSnap = x => ({date:x.date, carried:x.carried, reminder:x.reminder||null, focus:x.focus||null, someday:x.someday||null});
+function setSomeday(id, on, quiet){ const x=task(id); if(!x) return false; if(on?!canSomeday(x):!isSomeday(x)) return false; const old=sdSnap(x); releaseHold(id);
+  updTask(id, on?{someday:todayStr(), date:null, carried:false, reminder:null, focus:null}:{someday:null}); haptic(8); log('info', on?'Pasada a Algún día':'Sacada de Algún día');
+  if(!quiet){ renderAnimated(); toast(on?'Pasada a Algún día':'Sacada de Algún día, sin fecha', ()=>updTask(id, old)); } return true; }
 /* Decision 56b: procrastination. Task.postponed (Supabase tasks.postponed) counts the times an open task went to a later day while it was
    already due (its date today or earlier): the start of a day (rollOver), Aplazar, Cerrar el día, Repasar, a drag, the date pickers.
    Task.carriedSince (Supabase tasks.carried_since) is the first day it was due when it was first counted (the earliest one is kept).
@@ -614,6 +627,7 @@ function addTask(data){
   DB.tasks.push(x); save(); return x;
 }
 function updTask(id, patch){ const x=task(id); if(!x) return; if('date' in patch && !('carried' in patch)) patch.carried=false;
+  if(x.someday && !('someday' in patch) && (patch.date || patch.reminder || patch.focus || patch.status==='waiting')) patch.someday=null; // decision 85: a day, a reminder, Ahora or Por confirmar take it out of Algún día
   // Block 9: a reminder that changes notifies once more (reminderSent cleared), unless it is already past: then it is marked as sent and never notifies
   if('reminder' in patch && !('reminderSent' in patch) && (patch.reminder||null)!==(x.reminder||null)) patch.reminderSent=sentStamp(patch.reminder);
   Object.assign(x, patch, {modified:new Date().toISOString()}); save(); }
@@ -631,8 +645,8 @@ function dayPatch(x, date, extra, still){ const p=Object.assign({date}, extra||{
   return p; }
 // What Deshacer needs to put a task back on its day: the date, the Aplazada mark, the reminder (updTask works out reminderSent again)
 // and the counters of decision 56b
-const daySnap = x => ({id:x.id, date:x.date, carried:x.carried, reminder:x.reminder||null, postponed:x.postponed||null, carriedSince:x.carriedSince||null});
-const undoDay = o => updTask(o.id, {date:o.date, carried:o.carried, reminder:o.reminder, postponed:o.postponed||null, carriedSince:o.carriedSince||null});
+const daySnap = x => Object.assign({id:x.id, date:x.date, carried:x.carried, reminder:x.reminder||null, postponed:x.postponed||null, carriedSince:x.carriedSince||null}, x.someday?{someday:x.someday}:{}); // decision 85: Deshacer puts it back in Algún día
+const undoDay = o => updTask(o.id, Object.assign({date:o.date, carried:o.carried, reminder:o.reminder, postponed:o.postponed||null, carriedSince:o.carriedSince||null}, o.someday?{someday:o.someday}:{}));
 /* Decision 65e: where a task of a series that does not pile up (;s) goes when its day has passed (from: today) or when the day is closed
    (from: tomorrow): its first occurrence on or after 'from', as that occurrence (;n moved on), with no Aplazada mark and no postponing counted
    (decision 56b: it is not put off, the occurrence is gone), its reminder at the same time on the new day and its deadline as far from it as

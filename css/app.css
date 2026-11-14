@@ -1858,3 +1858,41 @@ body.desktop .invsheet .inv-acts .btn{height:30px;border-radius:7px;font-size:13
 .intnotes{font-size:12px;color:var(--ink2);line-height:1.35;margin:-2px 0 4px;}
 .intnotes .ntline+.ntline{margin-top:2px;}
 .ppl small.ntago{color:var(--blue);}
+/* Decision 85: Algún día, its cell in Proyectos (a cloud on light blue) */
+.picon.sdicon{background:linear-gradient(180deg,#7CCBF2,#4BA3DB);}
+.picon.sdicon svg{width:19px;height:19px;}
+/* Decision 86: Planificar el día. The cell on top of Hoy (the same as Cerrar el día) and the walk's sheet */
+.pdcell .chev{margin-left:auto;}
+.pdstep{margin-top:-6px;}
+.pdlead{font-size:.9375rem;color:var(--ink2);margin:2px 0 8px;}
+.pdlist{margin:0 0 10px;border-radius:10px;background:var(--card);overflow-y:auto;max-height:calc(var(--vvh, 100dvh) * .42);}
+.pdi{display:flex;align-items:center;gap:10px;min-height:44px;padding:6px 12px;border-top:.5px solid var(--sep);}
+.pdi:first-child{border-top:0;}
+.pdt{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px;text-align:left;}
+.pdt .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink);font-size:.9375rem;}
+.pdt .m{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink2);font-size:.8125rem;}
+.pdt .m .drag{color:var(--orange);}
+.pdi .pdv{flex:none;color:var(--ink2);font-size:.875rem;}
+.pdhoy{flex:none;min-width:56px;height:30px;border-radius:15px;border:1px solid var(--blue);background:none;color:var(--blue);font-size:.875rem;font-weight:500;}
+.pdhoy.on{background:var(--blue);color:#fff;}
+.pdests{display:flex;flex-wrap:wrap;gap:6px;margin-top:5px;}
+.pde{height:26px;padding:0 10px;border-radius:13px;border:0;background:var(--fill);color:var(--blue);font-size:.8125rem;}
+.pdbox{flex:none;width:30px;height:30px;margin:-4px -4px -4px -6px;padding:0;border:0;background:none;display:flex;align-items:center;justify-content:center;}
+.pdbox .rbox{width:22px;height:22px;border-radius:50%;border:1.5px solid var(--ink3);display:flex;align-items:center;justify-content:center;}
+.pdbox .rbox svg{width:13px;height:13px;opacity:0;color:#fff;}
+.pdi.on .pdbox .rbox{background:var(--blue);border-color:var(--blue);}
+.pdi.on .pdbox .rbox svg{opacity:1;}
+.pdload{text-align:center;font-size:1rem;color:var(--ink2);margin:2px 0 4px;}
+.pdload b{font-size:1.6rem;font-weight:700;color:var(--ink);margin-right:2px;}
+.pdload.orange b{color:var(--orange);}
+.pdload.red b{color:var(--red);}
+.pdmoved{display:block;font-size:.8125rem;margin-top:2px;}
+.pdlhint{text-align:center;margin-bottom:10px;}
+.pdahint.full{color:var(--orange);}
+.pdacts{margin-bottom:10px;}
+.pdpick .rpi{min-height:48px;}
+.app.desktop .pdi, body.desktop .pdi{min-height:34px;padding:4px 10px;}
+body.desktop .pdt .t{font-size:13px;}
+body.desktop .pdt .m, body.desktop .pde{font-size:12px;}
+body.desktop .pdhoy{height:24px;font-size:12px;}
+body.desktop .pdcell .chev{width:8px;height:13px;}

@@ -30,6 +30,9 @@ La función `send-reminders` también avisa de las tareas enviadas con «Avisar 
 ## 6. El seguimiento de las tareas enviadas
 Desde la 0014, quien envía una tarea con «Avisar a…» ve si la otra persona la ha añadido, para qué día la tiene prevista y cuándo la ha completado, y recibe el aviso «Víctor ha completado una tarea que le enviaste» (sin nada de la tarea). Hace falta ejecutar `all.sql` (paso 2) y volver a pegar `send-reminders` y pulsar **Deploy** (paso 3). En `check.sql`, las filas 44 a 46 dicen OK.
 
+## 7. Algún día
+Desde la 0015, las tareas que pasas a «Algún día» guardan ese dato en Supabase y se ven así en todos los dispositivos. Basta con ejecutar `all.sql` (paso 2); las funciones no cambian. En `check.sql`, la fila 47 dice OK.
+
 ## Qué hay en cada migración
 
 | Archivo | Qué crea | Versión |
@@ -48,5 +51,6 @@ Desde la 0014, quien envía una tarea con «Avisar a…» ve si la otra persona 
 | `migrations/0012_encryption.sql` | Cifrado de extremo a extremo: clave de la cuenta y regla que rechaza texto sin cifrar | v0.34.0 |
 | `migrations/0013_team.sql` | Equipo: miembros y administrador, acceso solo para miembros en todas las tablas, Avisar a, sugerencias e incidencias, cupo de almacenamiento, filtro de altas y borrado a los 30 días | v0.36.0 |
 | `migrations/0014_notice_follow.sql` | Seguimiento de las tareas enviadas con Avisar a: fecha prevista y completada, y aviso a quien la envió | v0.37.0 |
+| `migrations/0015_someday.sql` | «Algún día»: día en que una tarea se apartó allí | v0.38.0 |
 
-`all.sql` es la suma de las catorce en orden. Las claves de la app (URL y clave pública) no van aquí: están en los secretos del repositorio de GitHub.
+`all.sql` es la suma de las quince en orden. Las claves de la app (URL y clave pública) no van aquí: están en los secretos del repositorio de GitHub.

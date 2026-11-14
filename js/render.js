@@ -195,7 +195,7 @@ function renderNow(){
   if(UI.stack.length) scheduleRefresh();
 }
 function renderPushed(s){ drawing(()=>renderPushedNow(s)); }
-function renderPushedNow(s){ const osc=s.el.querySelector('.scroll'), ost=osc?osc.scrollTop:0; swapHTML(s.el, s.kind==='detail'?viewDetail(s.id):s.kind==='note'?viewNote(s.id):s.kind==='person'?viewPerson(s.id):s.kind==='settings'?viewAjustes(s.id):viewProject(s.id), s.kind==='project'||s.kind==='person'); // decision 65a: a person's screen
+function renderPushedNow(s){ const osc=s.el.querySelector('.scroll'), ost=osc?osc.scrollTop:0; swapHTML(s.el, s.kind==='detail'?viewDetail(s.id):s.kind==='note'?viewNote(s.id):s.kind==='person'?viewPerson(s.id):s.kind==='someday'?viewSomeday():s.kind==='settings'?viewAjustes(s.id):viewProject(s.id), s.kind==='project'||s.kind==='person'||s.kind==='someday'); // decision 65a: a person's screen
   if(s.kind==='note'){ bindNote(s.el); const sc=s.el.querySelector('.scroll'); if(sc) sc.scrollTop=ost; return; } // decision 47
   if(s.kind==='detail'){ bindDetail(s.el, s.id); const sc=s.el.querySelector('.scroll'); if(sc) sc.scrollTop=ost; attHydrate(s.el); } } // restored once the text areas have their full height, or a long note would clamp it to the top
 // A root put away keeps its scroll in UI.scroll; it is drawn anew when it comes back and gets it back there
@@ -316,6 +316,7 @@ function rowHTML(x, opts={}){
     else if(dg) meta.push('<span class="carried drag">'+dg+'</span>'); // in place of Aplazada or of the day: it is due either way
     else if(x.date){ if(x.carried&&x.date<=t){ if(!opts.hideCarried) meta.push('<span class="carried">Aplazada</span>'); }
       else if(!(opts.noToday&&x.date===t) && x.date!==opts.day && x.date!==x.deadline) meta.push('<span class="'+(x.date<t?'over':'')+'">'+fmtDate(x.date)+'</span>'); } // a date that is the deadline says it once
+    if(!opts.inSomeday&&isSomeday(x)) meta.push('<span class="sday">Algún día</span>'); // decision 85: in a search, or Ahora
     if(dl) meta.push(dl);
     const dby=noticeDoneBy(x); if(dby) meta.push('<span class="doneby">'+esc(dby)+'</span>'); // decision 78: done by the person it was sent to, in green
     if(x.reminder) meta.push('<span class="bell">'+I.bell+(x.date&&localDay(x.reminder)===x.date?fmtTime(x.reminder):fmtDateTime(x.reminder))+'</span>'); // the reminder's own day when it is not the task's date (moved task, no date)
@@ -362,6 +363,7 @@ function deskRowHTML(x, opts, v){ const t=v.t; let date='', dcls='', rem='', dra
     else if(dg){ drag=dg; } // v0.37.2 (E1): «Aplazada 4 veces» goes under the title, not in the Fecha column
     else if(x.date){ if(x.carried&&x.date<=t){ if(!opts.hideCarried){ date='Aplazada'; dcls=' carried'; } }
       else if(!(opts.noToday&&x.date===t) && x.date!==opts.day && x.date!==x.deadline){ date=fmtDate(x.date); if(x.date<t) dcls=' over'; } } // a deadline on the same day says it once, as on the iPhone
+    if(!date&&!opts.inSomeday&&isSomeday(x)){ date='Algún día'; dcls=' sday'; } // decision 85
     if(x.reminder) rem=x.date&&localDay(x.reminder)===x.date?fmtTime(x.reminder):fmtDateTime(x.reminder); }
   // The project goes in a fixed column on the left, so titles start aligned and keep the room on the right; a list of one project has no column
   const pcol=opts.noProj?'':'<span class="pcol">'+(v.p?'<span class="tag" title="'+esc(v.p.name)+'">'+esc(v.p.name)+'</span>':'')+'</span>';
@@ -400,7 +402,7 @@ function ahoraViewHTML(){ let xs=ahoraTasks(); if(UI.query) xs=xs.filter(queryMa
   if(!xs.length) return '<div class="empty" data-drop-ahora="">'+I.star.replace('<svg','<svg style="width:44px;height:44px"')+'<b>'+(UI.query?'Sin resultados':'Nada en Ahora')+'</b>'+(UI.query?'Prueba con otra palabra':'Arrastra aquí las tareas que vas a hacer ya, o pulsa A en una tarea. Caben '+AHORA_MAX+'.')+'</div>';
   return '<div class="group ahoralist" data-drop-ahora="">'+xs.map(x=>rowHTML(x)).join('')+'</div><div class="footnote">Hasta '+AHORA_MAX+' tareas. Se vacía al empezar el día; las que queden siguen en su sitio.</div>'; }
 // What Hoy shows that changes with the clock alone (the cell Cerrar el día from 18:30, R8 and the evening rule): the minute timer redraws when it differs
-function clockKey(){ return String(isEvening()); }
+function clockKey(){ return isEvening()+','+(new Date().getHours()<PD_NOON_H); } // decision 86: the link Planificar el día goes at noon
 /* Group headers. R14: in Todas, a project, Hoy by project and Completadas each header sits in a .gsec with its group,
    so it stays at the top of the list (sticky, translucent) while its own rows scroll under it and the next one pushes it away */
 function gtitle(label, n, right, attrs){ return '<div class="group-title gh"'+(attrs||'')+'><span class="gl">'+label+(n!=null?'<span class="gn">'+n+'</span>':'')+'</span>'+(right||'')+'</div>'; }
@@ -448,6 +450,7 @@ function listHTML(filter, projectId){
   if(!UI.query){ if(filter==='hoy'&&!closed){ rv=list.filter(x=>x.status==='waiting'); if(rv.length) list=list.filter(x=>x.status!=='waiting'); }
     else if(!closed) list=list.filter(x=>x.status!=='waiting'); }
   let h=closed?closedHeadHTML():'';
+  if(root && filter==='hoy' && !closed && !UI.query && !UI.select && pdShown()) h += '<div class="group pdgroup"><button class="cell link closecell pdcell" data-act="planDay">'+MI.sunrise+'<span class="lbl">Planificar el día</span>'+I.chev.replace('<svg','<svg class="chev"')+'</button></div>'; // decision 86: in the morning, until it is done
   if(rv.length) h += gtitle('Revisar hoy', rv.length, '', ' data-review-head=""')+'<div class="group" data-review="">'+rv.map(x=>R(x,{noToday:true,noReview:true})).join('')+'</div>'; // decision 36: not a drop target
   if(!list.length){ if(rv.length){} else if(!(UI.query && UI.searchDone && dm.length) && !nm.length){ // the completed matches (or notes) are listed below: no "Sin resultados" above them
     let title, sub, acts; const dt0=filter==='hoy'?spaceTasks().filter(x=>x.status==='done'&&x.completed&&localDay(x.completed)===todayStr()).length:0;
@@ -523,12 +526,12 @@ function tuckSearch(){ if(UI.wide||UI.query) return; const scr=app.querySelector
 
 /* ---------- Projects view ---------- */
 function viewProyectos(){
-  const ps=activeProjects(); const pend=spaceTasks().filter(x=>x.status==='pending');
+  const ps=activeProjects(); const pend=spaceTasks().filter(x=>x.status==='pending'&&!isSomeday(x)); // decision 85: Algún día does not count
   const cnt = id => pend.filter(x=> id===null?!x.projectId:x.projectId===id).length;
   return '<header class="nav"><div class="nav-row"><div class="title">Proyectos</div><button class="action" data-act="newProject" aria-label="Nuevo proyecto">'+I.plus.replace('<svg','<svg style="width:22px;height:22px"')+'</button></div></header>'+
    '<div class="scroll"><div class="group">'+
    ps.map(p=>'<button class="cell" data-open-project="'+p.id+'"><span class="picon" style="background:'+p.color+'">'+I.list+'</span><span class="lbl">'+esc(p.name)+'</span><span class="count">'+cnt(p.id)+'</span>'+I.chev.replace('<svg','<svg class="chev"')+'</button>').join('')+
-   '<button class="cell" data-open-project="none"><span class="picon" style="background:var(--ink3)">'+I.inbox.replace('stroke-width="2.2"','stroke-width="3"')+'</span><span class="lbl">Sin proyecto</span><span class="count">'+cnt(null)+'</span>'+I.chev.replace('<svg','<svg class="chev"')+'</button>'+
+   '<button class="cell" data-open-project="none"><span class="picon" style="background:var(--ink3)">'+I.inbox.replace('stroke-width="2.2"','stroke-width="3"')+'</span><span class="lbl">Sin proyecto</span><span class="count">'+cnt(null)+'</span>'+I.chev.replace('<svg','<svg class="chev"')+'</button>'+somedayCellHTML()+
    '</div><div class="group"><button class="cell link" data-act="newProject">'+I.plus.replace('<svg','<svg style="width:18px;height:18px"')+'<span class="lbl">Nuevo proyecto</span></button></div>'+
    (ps.length?'<div class="footnote">Mantén pulsado un proyecto para renombrarlo, cambiar el color o archivarlo.</div>':'')+peopleSectionHTML()+'</div>'; // decision 65a: Personas, under the projects
 }
@@ -540,6 +543,21 @@ function viewProject(id){
    '<div class="scroll">'+(p?projSegHTML(p):'')+(notes?notesListHTML(p):listHTML('todas', p?p.id:null))+'</div>'+
    (notes?'<button class="fab" data-act="newNote" data-project="'+p.id+'" aria-label="Nueva nota">'+I.plus+'</button>':'<button class="fab" data-act="add" data-project="'+(p?p.id:'')+'" aria-label="Añadir tarea">'+I.plus+'</button>');
 }
+
+/* Decision 85: Algún día. iPhone: a cell under Sin proyecto in Proyectos while it holds something, and its pushed screen (kind 'someday');
+   desktop: an entry in the sidebar under Por confirmar and a list view. Grouped by project, in the order of the Proyectos tab */
+function somedayCellHTML(){ const n=somedayList().length; if(!n) return '';
+  return '<button class="cell" data-open-someday="1"><span class="picon sdicon">'+MI.someday+'</span><span class="lbl">Algún día</span><span class="count">'+n+'</span>'+I.chev.replace('<svg','<svg class="chev"')+'</button>'; }
+function somedayListHTML(){ let xs=somedayList(); if(UI.query) xs=xs.filter(queryMatcher(UI.query));
+  if(!xs.length) return '<div class="empty">'+MI.someday.replace('<svg','<svg style="width:44px;height:44px"')+'<b>'+(UI.query?'Sin resultados':'Nada en Algún día')+'</b>'+(UI.query?'Prueba con otra palabra':'Pasa aquí las ideas y tareas sin fecha que no quieres ver a diario, desde Aplazar o desde su fecha.')+'</div>';
+  const R=(x,o)=>rowHTML(x, Object.assign({inSomeday:true}, o)), ps=activeProjects(), by={}; let h='';
+  xs.forEach(x=>{ const k=!x.projectId||!proj(x.projectId)?'none':ps.some(p=>p.id===x.projectId)?x.projectId:'archived'; (by[k]=by[k]||[]).push(x); });
+  ps.forEach(p=>{ if(by[p.id]) h+=gsec(gtitle('<span class="gdot" style="background:'+p.color+'"></span>'+esc(p.name), by[p.id].length), by[p.id].map(x=>R(x,{noProj:true})).join('')); });
+  if(by.archived) h+=gsec(gtitle('Proyectos archivados', by.archived.length), by.archived.map(x=>R(x)).join(''));
+  if(by.none) h+=gsec(gtitle('Sin proyecto', by.none.length), by.none.map(x=>R(x,{noProj:true})).join(''));
+  return h+'<div class="footnote">No salen en Hoy ni en Sin fecha. Ponles una fecha, o «Sacar de Algún día» desde su menú, cuando quieras retomarlas.</div>'; }
+function viewSomeday(){ if(UI.select&&UI.select.scope==='project') return selectNav()+'<div class="scroll">'+somedayListHTML()+'</div>'; // the selection of the screen on top
+  return '<header class="nav"><div class="nav-row"><button class="back" data-act="back">'+I.back+'Atrás</button><div class="nav-title">Algún día</div><span class="action"></span></div></header><div class="scroll">'+somedayListHTML()+'</div>'; }
 
 /* ---------- Settings view ---------- */
 /* v0.37.4 (decision 84, lote C, U6): on the iPhone Ajustes is an index of a few cells that open subscreens (push('settings', key)); the theme,
@@ -600,7 +618,7 @@ function viewDetail(id){
    '<div class="scroll">'+snoozeBarHTML(x)+
    '<div class="group"><div class="cell input"><textarea class="titlein" data-role="title" rows="1" placeholder="Título" enterkeyhint="done">'+esc(x.title)+'</textarea></div><div class="cell input"><textarea data-role="notes" placeholder="Notas">'+esc(x.notes)+'</textarea></div>'+(links.length?'<div class="links">'+linksHTML(links)+'</div>':'')+convertHTML(x)+'</div>'+
    '<div class="group"><button class="cell" data-act="pickProject"><span class="lbl">Proyecto</span><span class="val">'+(p?'<span class="dot" style="background:'+p.color+'"></span>'+esc(p.name):'Ninguno')+'</span>'+chev+'</button>'+
-   '<button class="cell" data-act="pickDate"><span class="lbl">Fecha</span><span class="val">'+(x.date?fmtDate(x.date):'Sin fecha')+'</span>'+chev+'</button>'+
+   '<button class="cell" data-act="pickDate"><span class="lbl">Fecha</span><span class="val">'+(x.date?fmtDate(x.date):isSomeday(x)?'Algún día':'Sin fecha')+'</span>'+chev+'</button>'+
    (x.status!=='done'||x.deadline?'<button class="cell" data-act="pickDeadline"><span class="lbl">Fecha límite</span><span class="val'+(dlLevel(x)?' dl-'+dlLevel(x):'')+'">'+(x.deadline?fmtDate(x.deadline):'Ninguna')+'</span>'+chev+'</button>':'')+ // decision 48a
    '<button class="cell" data-act="pickReminder"><span class="lbl">Recordatorio</span><span class="val">'+(x.reminder?fmtDateTime(x.reminder):'Ninguno')+'</span>'+chev+'</button>'+
    (x.status==='waiting'?'<button class="cell" data-act="pickWaiting"><span class="lbl">Por confirmar</span><span class="val">'+(x.waitingFor?'Esperando a '+esc(x.waitingFor):'Sí')+'</span>'+chev+'</button>':'')+ // decision 41
@@ -627,7 +645,7 @@ function inspectorHTML(x, p, links){
    '<div class="scroll">'+snoozeBarHTML(x)+
    '<div class="group igroup"><div class="cell input"><textarea class="titlein" data-role="title" rows="1" placeholder="Título" enterkeyhint="done">'+esc(x.title)+'</textarea></div><div class="cell input"><textarea data-role="notes" placeholder="Notas">'+esc(x.notes)+'</textarea></div>'+(links.length?'<div class="links">'+linksHTML(links)+'</div>':'')+convertHTML(x)+'</div>'+
    '<div class="iform"><span class="ilbl">Proyecto</span>'+pop('pickProject', p?esc(p.name):'Ninguno', !p, UPDOWN, p?'<span class="dot" style="background:'+p.color+'"></span>':'')+
-   '<span class="ilbl">Fecha</span>'+pop('pickDate', x.date?(x.carried&&x.date<=todayStr()?'Hoy, aplazada':fmtDate(x.date)):'Sin fecha', !x.date, I.cal)+
+   '<span class="ilbl">Fecha</span>'+pop('pickDate', x.date?(x.carried&&x.date<=todayStr()?'Hoy, aplazada':fmtDate(x.date)):isSomeday(x)?'Algún día':'Sin fecha', !x.date, I.cal)+
    (x.status!=='done'||x.deadline?'<span class="ilbl">Fecha límite</span>'+pop('pickDeadline', x.deadline?'<span class="'+(dlLevel(x)?'dl-'+dlLevel(x):'')+'">'+fmtDate(x.deadline)+'</span>':'Ninguna', !x.deadline, MI.flag):'')+ // decision 48a
    '<span class="ilbl">Recordatorio</span>'+pop('pickReminder', x.reminder?fmtDateTime(x.reminder):'Ninguno', !x.reminder, I.bell)+
    (x.status==='waiting'?'<span class="ilbl">Por confirmar</span>'+pop('pickWaiting', x.waitingFor?'Esperando a '+esc(x.waitingFor):'Sí', false, MI.wait):'')+ // decision 41

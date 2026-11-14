@@ -170,7 +170,7 @@ async function iphone(browser){
   x = await ev(page, ()=>({rep:task('r2').repeat, date:task('r2').date})); const t2 = await toastText(page);
   check('repeat_undated', /^WD@2026-11-04#/.test(x.rep) && x.date==='2026-11-04' && t2==='Se repite: cada día laborable, desde hoy', {x, t2});
   await page.tap('.pushed-screen.detail [data-act=back]'); await sleep(700);
-  check('row_indicator', await ev(page, L=>!!document.querySelector(L+' .row[data-id=r1]:not(.first .row) .inds .irp') && !document.querySelector(L+' .row[data-id=a1] .inds .irp'), L));
+  check('row_indicator', await ev(page, L=>!!document.querySelector(L+' .row[data-id=r1]:not(.first .row) .row-meta .irp') && !document.querySelector(L+' .row[data-id=a1] .row-meta .irp'), L));
 
   // 3b. Completing a task of a series: the circle (R1), then Deshacer
   await ev(page, ()=>{ document.querySelector('#toast').classList.remove('on'); });

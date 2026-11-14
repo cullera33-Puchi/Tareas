@@ -328,13 +328,14 @@ function rowHTML(x, opts={}){
   const pc=p?p.color:null;
   const selecting = UI.select && !opts.simple; const selected = selecting && UI.select.ids.has(x.id);
   if(UI.wide) return deskRowHTML(x, opts, {p, t, done, held, shownDone, ind, pri, pc, selecting, selected, prog});
-  /* v0.37.2, batch B (U1, U2): on the iPhone the grey line carries the steps and the small icons (notes, paperclip, repeat) after the
+  /* v0.37.2, batch B (U1, U2): on the iPhone the grey line, when there is one, carries the steps and the small icons (notes, paperclip, repeat) after the
      project, the day, the deadline, the reminder and the estimate; the people next, then the icons. The right keeps the star of Ahora and
      the priority, so the title gets the width. The line never wraps: the capsule and the names shrink first (stylesheet) */
+  // A row with nothing else on the grey line keeps its steps and icons on the right, so it stays one line
+  let star=opts.compact?'':(x.focus&&!done&&!opts.simple&&!opts.inFocus?'<span class="ist" title="En Ahora">'+I.starF+'</span>':'');
   if(!opts.compact){ const pm=meta.findIndex(m=>/class="(waitfor|resp)"/.test(m)), icons=(x.notes&&x.notes.trim()?I.note:'')+(hasAtt(x.id)?I.clip:'')+(x.repeat&&repParse(x.repeat)?'<span class="irp" title="'+esc(repSummary(x.repeat))+'">'+I.repeat+'</span>':'');
-    if(prog) meta.splice(pm<0?meta.length:pm, 0, prog);
-    if(icons) meta.push('<span class="micons">'+icons+'</span>'); }
-  const star=opts.compact?'':(x.focus&&!done&&!opts.simple&&!opts.inFocus?'<span class="ist" title="En Ahora">'+I.starF+'</span>':'');
+    if(!meta.length) star+=icons+prog;
+    else { if(prog) meta.splice(pm<0?meta.length:pm, 0, prog); if(icons) meta.push('<span class="micons">'+icons+'</span>'); } }
   return '<div class="row'+(done?' done':'')+(held?' held':'')+(opts.byDay?' byday':'')+(selected?' selected':'')+'" data-id="'+x.id+'"'+(pc?' style="'+tagVars(pc)+'"':'')+'>'+
     (opts.simple||selecting?'':'<div class="row-bg left"><span>'+I.check+'</span></div><div class="row-bg right">'+(x.status==='waiting'?'<button class="b-tomorrow b-unwait" data-act="unwait">Pendiente</button>':'<button class="b-tomorrow" data-act="postpone">Aplazar</button>')+'<button class="b-delete" data-act="delete">Eliminar</button></div>')+
     '<div class="row-content">'+(selecting?'<span class="selbox">'+I.check+'</span>':'<button class="check'+(shownDone?' done':x.status==='waiting'?' waiting':'')+'" data-act="check" aria-label="Completar">'+I.check+'</button>')+

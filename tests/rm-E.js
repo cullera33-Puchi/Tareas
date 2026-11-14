@@ -33,15 +33,15 @@ const rowSel = id => '#desk .main .group .row[data-id="'+id+'"]';
   /* ---------- R11: density with the demo data at 1280 x 800 ---------- */
   let {ctx, page} = await open(browser);
   await page.evaluate(()=>{ generateDemo(); render(); }); await page.waitForTimeout(400);
-  r.dens = await page.evaluate(()=>{ const rows=[...document.querySelectorAll('#desk .main .group .row')]; const hs=rows.slice(0,30).map(x=>Math.round(x.getBoundingClientRect().height));
+  r.dens = await page.evaluate(()=>{ const rows=[...document.querySelectorAll('#desk .main .group .row')]; const sub=x=>{ const r=x.querySelector('.rsub'); return !!r&&r.offsetHeight>0; }; const hs=rows.slice(0,30).filter(x=>!sub(x)).map(x=>Math.round(x.getBoundingClientRect().height)), hsub=rows.slice(0,30).filter(sub).map(x=>Math.round(x.getBoundingClientRect().height)); /* v0.37.2 (E1): a row with a grey line under its title («Aplazada 4 veces», or a column moved there) takes two lines */
     const vis=[...document.querySelectorAll('#desk .row')].filter(x=>{ const b=x.getBoundingClientRect(); return b.height&&b.top>=0&&b.bottom<=innerHeight; }).length;
     const t=document.querySelector('#desk .main .row .row-title');
-    return {html:getComputedStyle(document.documentElement).fontSize, hs:[...new Set(hs)], vis, title:getComputedStyle(t).fontSize, clamp:getComputedStyle(t).webkitLineClamp};
+    return {html:getComputedStyle(document.documentElement).fontSize, hs:[...new Set(hs)], hsub:[...new Set(hsub)], vis, title:getComputedStyle(t).fontSize, clamp:getComputedStyle(t).webkitLineClamp};
   });
   check('R11_rem14', r.dens.html==='14px', r.dens.html);
-  check('R11_rows32', r.dens.hs.every(h=>h>=32&&h<=36), r.dens.hs);
+  check('R11_rows32', r.dens.hs.every(h=>h>=32&&h<=36) && r.dens.hsub.every(h=>h<=44), r.dens);
   check('R11_oneLine', r.dens.clamp==='2' && r.dens.title==='14px', r.dens); // v0.33.1: one line of 32 px, a long title wraps to two
-  check('R11_19rows', r.dens.vis>=18, r.dens.vis);
+  check('R11_19rows', r.dens.vis>=16, r.dens.vis); // v0.37.2: some demo rows carry «Aplazada N veces» under the title
   // Columns: the date, reminder and priority columns end at the same x on every row
   r.cols = await page.evaluate(()=>{ const rows=[...document.querySelectorAll('#desk .main .group .row')].slice(0,25); const xs=sel=>[...new Set(rows.map(x=>Math.round(x.querySelector(sel).getBoundingClientRect().right)))];
     return {date:xs('.rc-date'), rem:xs('.rc-rem'), pri:xs('.pri'), hoyDates:rows.map(x=>x.querySelector('.rc-date')).filter(e=>!e.classList.contains('drag')).map(e=>e.textContent).filter(Boolean)}; }); // decision 56b: «Aplazada N veces» and «Desde…» are not a date

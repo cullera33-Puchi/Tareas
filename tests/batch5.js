@@ -17,7 +17,7 @@ const srv = http.createServer((req,res)=>{ let p = decodeURIComponent(req.url.sp
   r.noSummary = await page.evaluate(T=>!document.querySelector(T+'.summary'), T); if(!r.noSummary) errors.push('day summary still drawn'); // decision 52
   await page.click(T+'[data-filter=todas]'); await page.waitForTimeout(200);
   r.weekday = await page.$eval(T+'.row[data-id] .row-meta', e=>e.textContent);
-  r.indicator = await page.$eval(T+'.row[data-id] .row-content > .inds svg', e=>!!e); // R3 moved the indicators out of the meta line, to the right
+  r.indicator = await page.$eval(T+'.row[data-id] .row-meta .micons svg', e=>!!e); // v0.37.2 (U2): the small icons go at the end of the grey line
   // Detail: links strip and voice note linkify
   await page.click(T+'.group .row .row-title'); await page.waitForTimeout(500);
   r.links = await page.$$eval('.pushed-screen .links a', a=>a.map(x=>x.textContent+' -> '+x.getAttribute('href')));

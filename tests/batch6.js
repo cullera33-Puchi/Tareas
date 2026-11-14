@@ -1,4 +1,4 @@
-require('./lib/out.js'); // outputs (screenshots, downloads) go to tests/out
+require('./lib/out.js'); const { openSetting } = require('./lib/settings.js'); // v0.37.4: Ajustes in subscreens on the iPhone // outputs (screenshots, downloads) go to tests/out
 const { chromium } = require('playwright');
 const http = require('http'); const fs = require('fs'); const path = require('path');
 const ROOT = path.resolve(__dirname, '..');
@@ -42,10 +42,10 @@ const srv = http.createServer((req,res)=>{ let p = decodeURIComponent(req.url.sp
   await page.evaluate(()=>{ toast('prueba', ()=>{ window.__undone=true; }); onMotion({accelerationIncludingGravity:{x:0,y:0,z:9.8}}); onMotion({accelerationIncludingGravity:{x:25,y:20,z:9.8}}); }); await page.waitForTimeout(200);
   r.shakeUndid = await page.evaluate(()=>window.__undone===true);
   // 6) Backup now + restore
-  await page.evaluate(()=>document.querySelector('.screen.root[data-root=ajustes] [data-act=backupNow]').scrollIntoView({block:'center'})); await page.click('.screen.root[data-root=ajustes] [data-act=backupNow]'); await page.waitForTimeout(600);
+  await openSetting(page, 'datos'); await page.evaluate(()=>document.querySelector('.screen.settings [data-act=backupNow]').scrollIntoView({block:'center'})); await page.click('.screen.settings [data-act=backupNow]'); await page.waitForTimeout(600);
   const before = await page.evaluate(()=>DB.tasks.length);
   await page.evaluate(()=>{ DB.tasks=[]; save(); render(); }); await page.waitForTimeout(200);
-  await page.evaluate(()=>document.querySelector('.screen.root[data-root=ajustes] [data-restore]').scrollIntoView({block:'center'})); await page.click('.screen.root[data-root=ajustes] [data-restore]'); await page.waitForTimeout(300); await page.click('#asheet .it.red'); await page.waitForTimeout(800);
+  await page.evaluate(()=>document.querySelector('.screen.settings [data-restore]').scrollIntoView({block:'center'})); await page.click('.screen.settings [data-restore]'); await page.waitForTimeout(300); await page.click('#asheet .it.red'); await page.waitForTimeout(800);
   r.restored = (await page.evaluate(()=>DB.tasks.length))===before; r.restoreToast = await page.$eval('#toastText', e=>e.textContent);
   await page.screenshot({path:'31-settings-backups.png'});
   r.errors=errors; console.log(JSON.stringify(r,null,1)); await browser.close(); srv.close();

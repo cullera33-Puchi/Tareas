@@ -52,9 +52,10 @@ const rowHidden = (page, title) => page.$eval(rowSel(title), e=>getComputedStyle
   check('lp_opens', m.open && m.lift, m);
   check('lp_rowHidden', await rowHidden(page, 'Dos'));
   // Updated by decisions 39 (Ahora) and 41 (Por confirmar): two items after Completar; 48a: Fecha límite after Aplazar
-  check('lp_items', JSON.stringify(m.items)===JSON.stringify(['Aplazar','Fecha límite','Tiempo','Responsable','Mover a proyecto','Mover a otro espacio','Completar','Ahora','Por confirmar','Duplicar','Seleccionar','Eliminar']), m.items);
+  // v0.37.4 (decision 84, U7): Mover a otro espacio, Duplicar and Seleccionar under Más
+  check('lp_items', JSON.stringify(m.items)===JSON.stringify(['Aplazar','Fecha límite','Tiempo','Responsable','Mover a proyecto','Completar','Ahora','Por confirmar','Más','Eliminar']), m.items);
   check('lp_prio', JSON.stringify(m.prio)===JSON.stringify(['Alta','Media','Ninguna*']), m.prio);
-  check('lp_groups_icons', m.groups===3 && m.icons, m);
+  check('lp_groups_icons', m.groups===4 && m.icons, m);
   check('lp_onScreen', m.box.top>=8 && m.box.bottom<=m.vh-8 && m.box.left>=8 && m.box.right<=m.vw-8, m.box);
   check('lp_noOverlap', m.box.top>=m.liftBox.bottom-1 || m.box.bottom<=m.liftBox.top+1, {box:m.box, lift:m.liftBox});
   check('lp_blur', await page.$eval('#pmenu', e=>e.classList.contains('lift') && /blur/.test(getComputedStyle(e.querySelector('.pm-back')).backdropFilter||getComputedStyle(e.querySelector('.pm-back')).webkitBackdropFilter||'')));
@@ -66,16 +67,15 @@ const rowHidden = (page, title) => page.$eval(rowSel(title), e=>getComputedStyle
   await page.touchscreen.tap(4, 420); await page.waitForTimeout(450);
   check('tapOutsideCloses', !(await menuState(page)).open && !(await rowHidden(page,'Dos')) && await page.evaluate(()=>!menuOpen()));
 
-  // Slide to choose: long press, slide to Duplicar without lifting, lift
+  // Slide to choose: long press, slide to Ahora without lifting, lift (v0.37.4: Duplicar is under Más now)
   c = await center(page, rowSel('Tres'));
   await press(cdp, page, c.x, c.y);
-  let it = await itemCenter(page, 'Duplicar');
+  let it = await itemCenter(page, 'Ahora');
   await slide(cdp, page, c.x, c.y, it.x, it.y, 8);
   r.hl = await page.evaluate(()=>{ const h=document.querySelector('#pmenu .hl'); return h&&h.textContent.trim(); });
-  check('slide_highlights', r.hl==='Duplicar', r.hl);
-  const n0 = await page.evaluate(()=>DB.tasks.length);
+  check('slide_highlights', r.hl==='Ahora', r.hl);
   await lift(cdp); await page.waitForTimeout(600);
-  check('slide_runs', await page.evaluate(n=>DB.tasks.length===n+1 && DB.tasks.filter(x=>x.title==='Tres').length===2, n0) && !(await menuState(page)).open);
+  check('slide_runs', await page.evaluate(()=>!!DB.tasks.find(x=>x.title==='Tres').focus) && !(await menuState(page)).open);
   // duplicateTask opens the copy: back to Tareas
   await page.evaluate(()=>{ while(UI.stack.length) pop(); }); await page.waitForTimeout(500);
 
@@ -126,7 +126,7 @@ const rowHidden = (page, title) => page.$eval(rowSel(title), e=>getComputedStyle
   await page.waitForTimeout(1700); // the hold timer would have fired: the menu is still there
   check('hold_menuStays', (await menuState(page)).open);
   // Seleccionar enters multi-select with that task
-  await tapItem(page, 'Seleccionar');
+  await tapItem(page, 'Más'); await page.waitForTimeout(400); await tapItem(page, 'Seleccionar'); // v0.37.4: under Más
   check('select_starts', await page.evaluate(()=>!!UI.select && UI.select.ids.size===1 && app.classList.contains('selecting')));
   // Select bar menus hang above the bar
   await page.tap('#selbar [data-act=bulkPostpone]'); await page.waitForTimeout(450);

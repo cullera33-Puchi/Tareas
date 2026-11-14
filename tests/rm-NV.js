@@ -1,4 +1,4 @@
-require('./lib/out.js'); // outputs (screenshots, downloads) go to tests/out
+require('./lib/out.js'); const { openSetting, closeSetting } = require('./lib/settings.js'); // v0.37.4: Ajustes in subscreens on the iPhone // outputs (screenshots, downloads) go to tests/out
 // Batch NV (owner, 4 November, decision 64, v0.33.1), port 8780. Screenshots in tests/out/NV.
 //  1. novedades.json in the repository: well formed, newest first, 3 to 5 plain lines per version, the current APP_VERSION listed.
 //  2. Ajustes: no «Generar datos de prueba»; «Eliminar datos de prueba» only while demo data exist (generateDemo from the page).
@@ -59,8 +59,8 @@ async function openCtx(browser, o={}){
   return {ctx, page}; }
 async function bump(page, v){ ver=v; await page.evaluate(()=>navigator.serviceWorker.getRegistration().then(x=>x.update()));
   await until(page, ()=>document.querySelector('#toast').classList.contains('on') && document.querySelector('#toastBtn').textContent==='Actualizar' && !!pendingSW); }
-const ajustes = async page => { await page.evaluate(()=>{ if(UI.wide) setDeskView('settings'); else switchTab('ajustes'); }); await until(page, ()=>!!document.querySelector('[data-act=news]')); };
-const cell = (page, act) => page.$('.screen.root[data-root=ajustes] [data-act='+act+'], #desk [data-act='+act+']');
+const ajustes = async page => { await closeSetting(page); await page.evaluate(()=>{ if(UI.wide) setDeskView('settings'); else switchTab('ajustes'); }); await until(page, ()=>!!document.querySelector('[data-act=news]')); }; // v0.37.4: Novedades stays on the index
+const cell = (page, act) => page.$('.screen.settings [data-act='+act+'], .screen.root[data-root=ajustes] [data-act='+act+'], #desk [data-act='+act+']');
 
 (async()=>{
   await new Promise(res=>srv.listen(PORT,res));
@@ -79,8 +79,8 @@ const cell = (page, act) => page.$('.screen.root[data-root=ajustes] [data-act='+
   await ajustes(page);
   let x = await page.evaluate(()=>({gen:!!document.querySelector('[data-act=demo]'), clear:!!document.querySelector('[data-act=demoClear]'), news:(document.querySelector('[data-act=news]')||{}).textContent, upd:!!document.querySelector('[data-act=update]')}));
   check('demo_hidden', !x.gen && !x.clear && /Novedades/.test(x.news) && /v0\.33\.1/.test(x.news) && !x.upd, x);
-  await page.evaluate(()=>{ generateDemo(); }); await page.evaluate(()=>render()); await until(page, ()=>!!document.querySelector('.screen.root[data-root=ajustes] [data-act=demoClear]'));
-  x = await page.evaluate(()=>({gen:!!document.querySelector('[data-act=demo]'), n:demoCount(), val:document.querySelector('.screen.root[data-root=ajustes] [data-act=demoClear] .val').textContent}));
+  await page.evaluate(()=>{ generateDemo(); }); await page.evaluate(()=>render()); await openSetting(page, 'datos'); await until(page, ()=>!!document.querySelector('[data-act=demoClear]')); // v0.37.4: Datos y copias
+  x = await page.evaluate(()=>({gen:!!document.querySelector('[data-act=demo]'), n:demoCount(), val:document.querySelector('[data-act=demoClear] .val').textContent}));
   check('demo_clear_only', !x.gen && x.n>100 && x.val===String(x.n), x);
   await (await cell(page,'demoClear')).click(); await until(page, ()=>document.querySelector('#asheet').classList.contains('on'));
   await page.click('#asheet .it:not(.cancel)'); await until(page, ()=>demoCount()===0 && !document.querySelector('[data-act=demoClear]'));

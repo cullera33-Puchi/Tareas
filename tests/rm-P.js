@@ -1,4 +1,4 @@
-require('./lib/out.js'); // outputs (screenshots, downloads) go to tests/out
+require('./lib/out.js'); const { openSetting, closeSetting } = require('./lib/settings.js'); // v0.37.4: Ajustes in subscreens on the iPhone // outputs (screenshots, downloads) go to tests/out
 // Decision 25 and block 9 (Web Push reminders), port 9710 (function 9711, fake PostgREST 9712, fake push service 9713).
 //  1. SQL: supabase/migrations/0002_push.sql run twice in PGlite (PostgreSQL in WebAssembly) after 0001, with stand-ins for auth, pg_cron and
 //     pg_net: backfill, cron job, private keys, the subscribe function, row level security and the reminder_sent trigger rules.
@@ -434,18 +434,18 @@ async function appTests(browser, st){
   PUSHES.length=0; GONE.clear();
 
   // States in Ajustes: not installed (iPhone in Safari), unsupported, no config, signed out
-  { const {ctx, page}=await device(browser, {tag:'S1', ios:true}); await page.click('[data-tab=ajustes]'); await page.waitForTimeout(300);
+  { const {ctx, page}=await device(browser, {tag:'S1', ios:true}); await openSetting(page, 'cuenta'); await page.waitForTimeout(300);
     const s=await pushSection(page); check('N_notInstalled', s.length===1 && s[0].cells[0]==='NotificacionesSin instalar' && /instalada en la pantalla de inicio/.test(s[0].foot), s);
     await page.screenshot({path:path.join(OUT,'p-settings-notinstalled.png')}); await ctx.close(); }
-  { const {ctx, page}=await device(browser, {tag:'S2', push:{noPush:true}}); await page.click('[data-tab=ajustes]'); await page.waitForTimeout(300);
+  { const {ctx, page}=await device(browser, {tag:'S2', push:{noPush:true}}); await openSetting(page, 'cuenta'); await page.waitForTimeout(300);
     const s=await pushSection(page); check('N_unsupported', s.length===1 && s[0].cells[0]==='NotificacionesNo disponibles' && /no puede recibir/.test(s[0].foot), s); await ctx.close(); }
-  { const {ctx, page}=await device(browser, {tag:'S3', ios:true, push:{standalone:true}}); await page.click('[data-tab=ajustes]'); await page.waitForTimeout(300);
+  { const {ctx, page}=await device(browser, {tag:'S3', ios:true, push:{standalone:true}}); await openSetting(page, 'cuenta'); await page.waitForTimeout(300);
     const s=await pushSection(page); check('N_noSync', s.length===1 && s[0].cells[0]==='NotificacionesNo disponibles' && /cuenta/.test(s[0].foot), s); await ctx.close(); }
   const seedA={spaces:SP, projects:[{id:'pa',spaceId:'trabajo',name:'FLC',color:'#007AFF',order:0,archived:false,created:C,modified:C}], voiceNotes:[], settings:{tipsSeen:true}, tasks:[T('n1',{title:'Preparar comité', projectId:'pa'}), T('n2',{title:'Revisar SOW'})]};
-  { const {ctx, page}=await device(browser, {tag:'S4', ios:true, fake:true, push:{standalone:true}, seed:seedA}); await page.click('[data-tab=ajustes]'); await page.waitForTimeout(300);
+  { const {ctx, page}=await device(browser, {tag:'S4', ios:true, fake:true, push:{standalone:true}, seed:seedA}); await openSetting(page, 'cuenta'); await page.waitForTimeout(300);
     const s=await pushSection(page); check('N_signedOut', s.length===1 && s[0].cells[0]==='NotificacionesSin cuenta' && /Inicia sesión/.test(s[0].foot), s);
     // The first reminder, signed out: one sheet that says why it will not notify
-    await page.click('[data-tab=tareas]'); await page.waitForTimeout(300); await page.evaluate(()=>openDetail('n1')); await page.waitForTimeout(700);
+    await (await closeSetting(page), page.click('[data-tab=tareas]')); await page.waitForTimeout(300); await page.evaluate(()=>openDetail('n1')); await page.waitForTimeout(700);
     await page.click('.screen.detail [data-act=pickReminder]'); await page.waitForTimeout(650); await page.locator('#sheet .chip', {hasText:'Mañana a las 9:00'}).click(); await page.waitForTimeout(900);
     const txt=await page.evaluate(()=>document.querySelector('#sheet').textContent);
     check('N_offer_signedOut', (await sheetH2(page))==='Notificaciones' && /Inicia sesión en Ajustes/.test(txt) && !/Permitir/.test(txt), txt);
@@ -461,10 +461,10 @@ async function appTests(browser, st){
   // The installed iPhone app, signed in: the explanation sheet, the permission inside the tap, the subscription stored for the account
   const devA=newDevice();
   const A=await device(browser, {tag:'A', ios:true, fake:true, notify:true, push:{standalone:true, p256dh:devA.p256dh, auth:devA.authB64}, seed:seedA});
-  const ap=A.page; await ap.click('[data-tab=ajustes]'); await ap.waitForTimeout(300); await ap.click('[data-act=signIn]'); check('N_A_synced', await synced(ap));
+  const ap=A.page; await openSetting(ap, 'cuenta'); await ap.waitForTimeout(300); await ap.click('[data-act=signIn]'); check('N_A_synced', await synced(ap));
   let s=await pushSection(ap); check('N_off', s[0] && s[0].cells.join('|')==='PermisoSin pedir|Activar notificaciones' && /aunque la app esté cerrada/.test(s[0].foot), s);
   await ap.screenshot({path:path.join(OUT,'p-settings-off.png')});
-  await ap.click('[data-tab=tareas]'); await ap.waitForTimeout(300); await ap.evaluate(()=>openDetail('n1')); await ap.waitForTimeout(700);
+  await (await closeSetting(ap), ap.click('[data-tab=tareas]')); await ap.waitForTimeout(300); await ap.evaluate(()=>openDetail('n1')); await ap.waitForTimeout(700);
   await ap.click('.screen.detail [data-act=pickReminder]'); await ap.waitForTimeout(650); await ap.locator('#sheet .chip', {hasText:'Mañana a las 9:00'}).click(); await ap.waitForTimeout(900);
   const offer=await ap.evaluate(()=>document.querySelector('#sheet').textContent);
   check('N_offer_sheet', (await sheetH2(ap))==='Notificaciones' && /necesita permiso para enviar notificaciones a este iPhone/.test(offer) && /Permitir/.test(offer) && /Ahora no/.test(offer), offer);
@@ -484,7 +484,7 @@ async function appTests(browser, st){
   check('N_logged', ['Permiso de notificaciones: granted','Suscripción a notificaciones creada','Suscripción guardada en la cuenta'].every(m=>logA.includes(m)), logA.slice(-10));
   // Ajustes when on: this device, the test button, the list with another device of the account
   fake.t.push_subscriptions.set('other', {id:'other', owner_id:USER.uid, endpoint:'http://127.0.0.1:'+PUSH_PORT+'/push/mac', p256dh:newDevice().p256dh, auth:b64u(crypto.randomBytes(16)), device:'Mac con Chrome', created:at(yest,'10:00:00'), modified:at(yest,'10:00:00'), deleted:null});
-  await ap.evaluate(()=>pop()); await ap.waitForTimeout(600); await ap.click('[data-tab=ajustes]'); await ap.evaluate(()=>pushDevices(true)); await ap.waitForTimeout(500);
+  await ap.evaluate(()=>pop()); await ap.waitForTimeout(600); await openSetting(ap, 'cuenta'); await ap.evaluate(()=>pushDevices(true)); await ap.waitForTimeout(500);
   s=await pushSection(ap);
   check('N_on', s[0] && s[0].cells.join('|')==='PermisoConcedido|Este dispositivoiPhone|Probar notificación' && s[1] && s[1].cells.length===2 && s[1].cells.some(c=>c==='Mac con ChromeDesde ayerRevocar') && s[1].cells.some(c=>c==='iPhoneEsteRevocar'), s);
   await ap.screenshot({path:path.join(OUT,'p-settings-on.png')});
@@ -562,14 +562,14 @@ async function appTests(browser, st){
   await cdp.send('ServiceWorker.deliverPushMessage', {origin:URL0, registrationId:String(regId), data:'Hola'}); await ap.waitForTimeout(600);
   const txtN=await sw.evaluate(async()=>(await self.registration.getNotifications()).map(x=>x.title+'|'+x.body)); check('SW_text_push', txtN.includes('Tareas|Hola'), txtN);
   // Denied: Ajustes and the line under Recordatorio say it will not notify here
-  await ap.evaluate(()=>{ window.__push.perm='denied'; pop(); }); await ap.waitForTimeout(600); await ap.click('[data-tab=ajustes]'); await ap.waitForTimeout(300);
+  await ap.evaluate(()=>{ window.__push.perm='denied'; pop(); }); await ap.waitForTimeout(600); await openSetting(ap, 'cuenta'); await ap.waitForTimeout(300);
   s=await pushSection(ap); check('N_denied', s[0] && s[0].cells[0]==='PermisoDenegado' && /Ajustes del iPhone/.test(s[0].foot), s);
   await ap.screenshot({path:path.join(OUT,'p-settings-denied.png')});
-  await ap.click('[data-tab=tareas]'); await ap.evaluate(()=>openDetail('n2')); await ap.waitForTimeout(700);
+  await (await closeSetting(ap), ap.click('[data-tab=tareas]')); await ap.evaluate(()=>openDetail('n2')); await ap.waitForTimeout(700);
   check('N_note_denied', (await ap.evaluate(()=>(document.querySelector('.screen.detail .push-note')||{}).textContent||''))==='Sin permiso de notificaciones: el recordatorio no avisará en este iPhone.');
   await ap.screenshot({path:path.join(OUT,'p-detail-denied.png')});
   // Sign out: this device leaves the account
-  await ap.evaluate(()=>{ window.__push.perm='granted'; pop(); }); await ap.waitForTimeout(600); await ap.click('[data-tab=ajustes]'); await ap.waitForTimeout(300);
+  await ap.evaluate(()=>{ window.__push.perm='granted'; pop(); }); await ap.waitForTimeout(600); await openSetting(ap, 'cuenta'); await ap.waitForTimeout(300);
   await ap.click('[data-act=signOut]'); await ap.waitForTimeout(600); await ap.click('#asheet .it[data-i="0"]'); await ap.waitForTimeout(700);
   check('N_signout_revokes', await ap.evaluate(()=>pushStatus()==='signedOut' && !PS.sub) && !!fake.t.push_subscriptions.get(rowA.id).deleted);
   await A.ctx.close();
@@ -581,7 +581,7 @@ async function appTests(browser, st){
     await page.tap('#sheet [data-x=yes]'); await page.waitForTimeout(500);
     check('N_prompt_denied', /Sin permiso de notificaciones/.test(await toastText(page)) && await page.evaluate(()=>pushStatus()==='denied' && !PS.sub && window.__push.subscribes.length===0) && /no avisará en este iPhone/.test(await page.evaluate(()=>(document.querySelector('.screen.detail .push-note')||{}).textContent||'')));
     await page.waitForTimeout(500); await page.screenshot({path:path.join(OUT,'p-dark-detail-denied.png')});
-    await page.evaluate(()=>pop()); await page.waitForTimeout(600); await page.click('[data-tab=ajustes]'); await page.waitForTimeout(400); await page.screenshot({path:path.join(OUT,'p-dark-settings-denied.png')});
+    await page.evaluate(()=>pop()); await page.waitForTimeout(600); await openSetting(page, 'cuenta'); await page.waitForTimeout(400); await page.screenshot({path:path.join(OUT,'p-dark-settings-denied.png')});
     await ctx.close(); }
 
   // Desktop: Ajustes in the Mac layout, dark

@@ -1,4 +1,4 @@
-require('./lib/out.js'); // outputs (screenshots, downloads) go to tests/out
+require('./lib/out.js'); const { openSetting, closeSetting } = require('./lib/settings.js'); // v0.37.4: Ajustes in subscreens on the iPhone // outputs (screenshots, downloads) go to tests/out
 // Block 8 (Supabase sync), port 9610. Two "devices" (separate browser contexts and storage) against an in-memory fake server that
 // reproduces the SQL of supabase/migrations/0001_init.sql: server_ts set on every write (one per request, as now() per transaction),
 // the "newest modified wins" trigger (older updates skipped and left out of the answer), owner kept, per-owner rows (RLS),
@@ -114,7 +114,7 @@ async function pullDown(page, sel){ const b=await page.evaluate(s=>{ const e=doc
   /* ---------- 1. No config: the app as before ---------- */
   { served.length=0; const {ctx, page} = await device(browser, {tag:'N', seed:SEED_A});
     await page.evaluate(()=>{ addTask({title:'Sin cuenta', date:todayStr()}); render(); });
-    await page.click('[data-tab=ajustes]'); await page.waitForTimeout(300);
+    await openSetting(page, 'cuenta'); await page.waitForTimeout(300);
     const s = await page.evaluate(()=>({SY, cfg:window.TAREAS_CONFIG===undefined, sync:localStorage.getItem('tareas-sync'), ptr:!!document.querySelector('.ptr'), lib:!!window.supabase, ver:document.querySelector('.screen.root[data-root=ajustes] .footnote:last-child').textContent}));
     const a = await acct(page);
     check('noconfig_state', s.SY===null && s.cfg && s.sync===null && !s.ptr && !s.lib && /^Tareas v/.test(s.ver), s);
@@ -128,7 +128,7 @@ async function pullDown(page, sel){ const b=await page.evaluate(s=>{ const e=doc
   /* ---------- 2. Device A (iPhone): signed out, then first connection ---------- */
   const A = await device(browser, {tag:'A', seed:SEED_A, fake:true});
   await A.page.evaluate(()=>{ generateDemo(); }); await A.page.waitForTimeout(500);
-  await A.page.click('[data-tab=ajustes]'); await A.page.waitForTimeout(300);
+  await openSetting(A.page, 'cuenta'); await A.page.waitForTimeout(300);
   let a = await acct(A.page);
   check('A_signedOut_ui', a && a.cells[0]==='Iniciar sesión con Google' && /^Al iniciar sesión, tus tareas se guardan en tu cuenta/.test(a.foot), a);
   check('A_noCallsSignedOut', fake.calls.length===0, fake.calls);
@@ -187,7 +187,7 @@ async function pullDown(page, sel){ const b=await page.evaluate(s=>{ const e=doc
   /* ---------- 6. Offline: changes wait and go up on reconnect ---------- */
   fake.down.add(A.page); await A.ctx.setOffline(true); await A.page.waitForTimeout(300);
   const off = await A.page.evaluate(()=>{ const x=addTask({title:'Hecho sin conexión', date:todayStr()}); updTask('ta-3',{priority:'high'}); deleteTask('ta-2'); return x.id; });
-  await A.page.waitForTimeout(1900); await A.page.click('[data-tab=ajustes]'); await A.page.waitForTimeout(300);
+  await A.page.waitForTimeout(1900); await openSetting(A.page, 'cuenta'); await A.page.waitForTimeout(300);
   a = await acct(A.page);
   check('offline_ui', a && a.cells[1]==='Sin conexión. Se sincronizará al volver' && a.cells[2]==='Cambios pendientes3', a); // new task, edit, deleted task
   await A.page.screenshot({path:path.join(OUT,'s3-offline-iphone.png')});
@@ -214,7 +214,7 @@ async function pullDown(page, sel){ const b=await page.evaluate(s=>{ const e=doc
   }
 
   /* ---------- 7. Realtime while a sheet is open on the iPhone ---------- */
-  await A.page.click('[data-tab=tareas]'); await A.page.waitForTimeout(300);
+  await (await closeSetting(A.page), A.page.click('[data-tab=tareas]')); await A.page.waitForTimeout(300);
   await A.page.click('.screen.root[data-root=tareas] .fab'); await A.page.waitForTimeout(500);
   await A.page.fill('#sheet .titlein', 'Escribiendo algo'); await A.page.waitForTimeout(100);
   await B.page.evaluate(()=>updTask('ta-3',{title:'Llamar al fontanero hoy'}));
@@ -255,7 +255,7 @@ async function pullDown(page, sel){ const b=await page.evaluate(s=>{ const e=doc
   await B.page.screenshot({path:path.join(OUT,'s6-signedout-desktop.png')});
 
   /* ---------- 10. The account section in dark mode, for a look ---------- */
-  await A.page.click('[data-tab=ajustes]'); await A.page.waitForTimeout(400); await A.page.screenshot({path:path.join(OUT,'s7-account-dark.png')});
+  await openSetting(A.page, 'cuenta'); await A.page.waitForTimeout(400); await A.page.screenshot({path:path.join(OUT,'s7-account-dark.png')});
   await A.ctx.close(); await B.ctx.close();
 
   /* ---------- 11. Vendored supabase-js: loads, createClient works, request shapes, ?code= cleanup and ?add= ---------- */

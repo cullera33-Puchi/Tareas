@@ -1,4 +1,4 @@
-require('./lib/out.js'); // outputs (screenshots, downloads) go to tests/out
+require('./lib/out.js'); const { openSetting } = require('./lib/settings.js'); // v0.37.4: Ajustes in subscreens on the iPhone // outputs (screenshots, downloads) go to tests/out
 const { chromium } = require('playwright');
 const http = require('http'); const fs = require('fs'); const path = require('path');
 const ROOT = path.resolve(__dirname, '..');
@@ -18,20 +18,20 @@ const srv = http.createServer((req,res)=>{ let p = decodeURIComponent(req.url.sp
   await page.fill('#sheet .titlein','Deloitte'); await page.click('#sheet [data-x=ok]'); await page.waitForTimeout(400);
   r.activeAfterCreate = await page.$eval('.nav .title', e=>e.textContent.trim());
   // Rename from Settings
-  await page.click('#tabbar [data-tab=ajustes]'); await page.waitForTimeout(200);
-  r.settingsSpaces = await page.$$eval('.screen.root[data-root=ajustes] [data-edit-space] .lbl', l=>l.map(x=>x.textContent));
-  await page.click('.screen.root[data-root=ajustes] [data-edit-space]:nth-child(1)'); await page.waitForTimeout(300);
+  const SS=await openSetting(page, 'espacios');
+  r.settingsSpaces = await page.$$eval(SS+' [data-edit-space] .lbl', l=>l.map(x=>x.textContent));
+  await page.click(SS+' [data-edit-space]:nth-child(1)'); await page.waitForTimeout(300);
   await page.fill('#sheet .titlein','Oficina'); await page.click('#sheet [data-x=ok]'); await page.waitForTimeout(400);
-  r.afterRename = await page.$$eval('.screen.root[data-root=ajustes] [data-edit-space] .lbl', l=>l.map(x=>x.textContent));
+  r.afterRename = await page.$$eval(SS+' [data-edit-space] .lbl', l=>l.map(x=>x.textContent));
   await page.screenshot({path:'13-settings-spaces.png'});
   // Delete the empty new space (it is active) -> falls back to first
-  await page.click('.screen.root[data-root=ajustes] [data-edit-space]:nth-child(3)'); await page.waitForTimeout(300);
+  await page.click(SS+' [data-edit-space]:nth-child(3)'); await page.waitForTimeout(300);
   r.deleteOffered = !!(await page.$('#sheet [data-x=del]'));
   await page.click('#sheet [data-x=del]'); await page.waitForTimeout(300); await page.click('#asheet .it:not(.cancel)'); await page.waitForTimeout(400);
   r.afterDelete = await page.evaluate(()=>({spaces:DB.spaces.map(s=>s.name), active:space().name}));
   // A space with tasks cannot be deleted
   await page.evaluate(()=>{ addTask({title:'x',date:todayStr()}); render(); }); await page.waitForTimeout(200);
-  await page.click('.screen.root[data-root=ajustes] [data-edit-space]:nth-child(1)'); await page.waitForTimeout(300);
+  await page.click(SS+' [data-edit-space]:nth-child(1)'); await page.waitForTimeout(300);
   r.deleteBlocked = !(await page.$('#sheet [data-x=del]')); r.blockHint = await page.$eval('#sheet .hint', e=>e.textContent).catch(()=>null);
   r.errors=errors; console.log(JSON.stringify(r,null,1)); await browser.close(); srv.close();
 })().catch(e=>{ console.error(e); process.exit(1); });

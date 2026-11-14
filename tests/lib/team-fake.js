@@ -170,8 +170,10 @@ const until = async (page, fn, arg, ms=10000)=>{ const t0=Date.now(); for(;;){ l
 const synced = (page, ms) => until(page, ()=>SY&&SY.user&&!SY.running&&SY.status==='ok'&&!CR.busy&&!CR.migrating&&syncCollect(true).count===0, null, ms||15000);
 const settled = page => until(page, ()=>!document.querySelector('#sheet.on')&&!document.querySelector('#asheet.on')&&!document.querySelector('.pm.open'), null, 4000);
 const sheetIn = page => until(page, ()=>{ const s=document.querySelector('#sheet.on'); if(!s) return false; const r=s.getBoundingClientRect(); return getComputedStyle(s).transform==='none'||Math.abs(r.bottom-innerHeight)<2||document.body.classList.contains('desktop'); }, null, 4000).then(()=>page.waitForTimeout(550));
-async function toSettings(page, desk){ if(desk) await page.evaluate(()=>setDeskView('settings')); else { await page.evaluate(()=>{ if(UI.stack.length) pop(); }); await page.click('[data-tab=ajustes]'); } await page.waitForTimeout(400); }
-const signIn = async (page, desk) => { await toSettings(page, desk); await page.click('[data-act=signIn]'); };
+// v0.37.4: on the iPhone, Ajustes, Cuenta (sync, encryption, notifications, the Shortcut) unless another subscreen is named
+async function toSettings(page, desk, what){ await require('./settings.js').openSetting(page, desk?null:(what||'cuenta')); }
+const { openSetting } = require('./settings.js');
+const signIn = async (page, desk) => { const S=await openSetting(page, '[data-act=signIn]'); await page.click(S+' [data-act=signIn]'); }; // v0.37.4: in Cuenta on the iPhone
 // Activation with a password, as the sheet does it (tests of the team, not of the sheet: rm-E2E covers it)
 const activate = (page, pw) => page.evaluate(async p=>{ await cryptoActivate(p); }, pw);
 const hideToast = page => page.evaluate(()=>{ const t=document.getElementById('toast'); t.classList.remove('on'); });

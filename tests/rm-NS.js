@@ -87,7 +87,7 @@ async function iphone(browser, h, m, theme){
   g = await groups(page, L);
   check(tag+'_groups', g[0].t==='Revisar hoy' && g[0].ids.join()==='w1' && g[1].t==='Aplazadas' && g[1].ids.join()==='c1' && g[2].t==='Hoy' && g[2].ids.slice().sort().join()==='a1,d1,h1,n2', g);
   // The Ahora card sits right above the search, where the summary was below it
-  check(tag+'_ahora_above_search', await ev(page, L=>{ const sc=document.querySelector(L); return sc.firstElementChild.classList.contains('ahora') && sc.firstElementChild.nextElementSibling.classList.contains('searchbar'); }, L));
+  check(tag+'_ahora_above_search', await ev(page, L=>{ const sc=document.querySelector(L), t=sc.querySelector(':scope > .tlist')||sc; return t.firstElementChild.classList.contains('searchbar') && t.firstElementChild.nextElementSibling.classList.contains('ahora'); }, L)); // v0.37.4 (U3): the search field first, tucked under the bar, then Ahora
   await shot(page, 'm-hoy-'+(h>=19?'1930':'1000')+'-'+(theme||'light'));
   if(h>=19){ await ev(page, L=>document.querySelector(L+' .closecell').scrollIntoView({block:'center'}), L); await shot(page, 'm-hoy-1930-'+(theme||'light')+'-cell');
     await page.tap(L+' .closecell'); await until(page, ()=>sheet.classList.contains('on') && (document.querySelector('#sheet h2')||{}).textContent==='Cerrar el día');

@@ -1,4 +1,4 @@
-require('./lib/out.js'); // outputs (screenshots, downloads) go to tests/out
+require('./lib/out.js'); const { openSetting, closeSetting } = require('./lib/settings.js'); // v0.37.4: Ajustes in subscreens on the iPhone // outputs (screenshots, downloads) go to tests/out
 // Borrar registro (v0.24.1), port 10600. Screenshots in tests/out/log.
 //  iPhone: Ajustes shows «Borrar registro» only while the log has entries; it asks first (action sheet), empties the log on this device and
 //  in localStorage, and Deshacer brings the entries back with anything logged meanwhile after them. The Borrar of «Ver registro» has Deshacer too.
@@ -30,8 +30,8 @@ const stored = page => page.evaluate(()=>{ const s=localStorage.getItem('tareas-
 
 async function iphone(browser){
   const {ctx, page} = await open(browser, false);
-  await page.evaluate(()=>switchTab('ajustes')); await until(page, ()=>!!document.querySelector('.screen.root[data-root=ajustes] [data-act=logClear]'));
-  const S='.screen.root[data-root=ajustes]';
+  await openSetting(page, 'registro'); await until(page, ()=>!!document.querySelector('.screen.settings [data-act=logClear]'));
+  const S='.screen.settings'; // v0.37.4: the Registro subscreen
   await page.evaluate(S=>document.querySelector(S+' [data-act=logClear]').scrollIntoView({block:'center'}), S); await sleep(200);
   await shot(page, 'm1-ajustes');
   const n0 = await page.evaluate(()=>LOG.length);

@@ -1,4 +1,4 @@
-require('./lib/out.js'); // outputs (screenshots, downloads) go to tests/out
+require('./lib/out.js'); const { openSetting, closeSetting } = require('./lib/settings.js'); // v0.37.4: Ajustes in subscreens on the iPhone // outputs (screenshots, downloads) go to tests/out
 // Batch J (pre-release review of v0.15.0): end-to-end daily flows on the iPhone and the desktop with real touch events,
 // plus the fixes of this batch: the count of the lit segment readable in dark mode, the screen under a pushed one hidden while a sheet
 // scales the app (no column of its text at the edge) and the import summary in the singular. Port 9510. Clock: Wednesday 4 Nov 2026
@@ -110,8 +110,8 @@ const vis = (page,sel)=>page.evaluate(s=>document.querySelector(s).scrollIntoVie
   await page.evaluate(()=>{ document.querySelector('.screen.root:not(.hidden-tab) .scroll').scrollTop=1500; }); await page.waitForTimeout(300);
   check('R14_sticky', await page.evaluate(()=>{ const s=document.querySelector('.screen.root:not(.hidden-tab) .scroll'), st=s.getBoundingClientRect().top; return [...s.querySelectorAll('.gh')].some(h=>Math.abs(h.getBoundingClientRect().top-st)<2); }));
   // Fix: the import summary says "1 nuevo" in the singular
-  await page.evaluate(()=>switchTab('ajustes')); await page.waitForTimeout(500);
-  await page.evaluate(()=>{ [...document.querySelectorAll('.screen.root:not(.hidden-tab) button')].find(x=>/Importar pegando texto/.test(x.textContent)).click(); }); await page.waitForTimeout(800);
+  await openSetting(page, 'datos'); // v0.37.4: Datos y copias
+  await page.evaluate(()=>{ [...document.querySelectorAll('.screen.settings button')].find(x=>/Importar pegando texto/.test(x.textContent)).click(); }); await page.waitForTimeout(800);
   await page.evaluate(()=>{ const ta=document.querySelector('.sheet.on textarea'); ta.value=JSON.stringify({tasks:[{id:'jimp1',title:'Importada',spaceId:space().id,status:'pending',priority:'none',created:new Date().toISOString(),modified:new Date().toISOString()}]}); ta.dispatchEvent(new Event('input',{bubbles:true})); });
   await page.click('.sheet.on [data-x=ok]'); await page.waitForTimeout(900);
   r.imp = await page.evaluate(()=>document.querySelector('#toastText').textContent);

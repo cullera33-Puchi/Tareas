@@ -1,4 +1,4 @@
-require('./lib/out.js'); // outputs (screenshots, downloads) go to tests/out
+require('./lib/out.js'); const { openSetting } = require('./lib/settings.js'); // v0.37.4: Ajustes in subscreens on the iPhone // outputs (screenshots, downloads) go to tests/out
 const { chromium } = require('playwright');
 const http = require('http'); const fs = require('fs'); const path = require('path');
 const ROOT = path.resolve(__dirname, '..');
@@ -35,8 +35,8 @@ const srv = http.createServer((req,res)=>{ let p = decodeURIComponent(req.url.sp
   await page.click('#sheet [data-x=skip]'); await page.waitForTimeout(300); await page.click('#sheet .cal-d.today'); await page.waitForTimeout(500);
   r.planEnd = await page.evaluate(()=>({sheetOpen:document.querySelector('#sheet').classList.contains('on'), toast:document.querySelector('#toastText').textContent, dates:DB.tasks.filter(x=>/^SF/.test(x.title)).map(x=>x.title+':'+(x.date===todayStr()?'today':x.date===addDays(todayStr(),1)?'tomorrow':x.date))}));
   // 4. CSV
-  await page.click('#tabbar [data-tab=ajustes]'); await page.waitForTimeout(200);
-  const [dl] = await Promise.all([ page.waitForEvent('download',{timeout:5000}).catch(()=>null), page.click('.screen.root[data-root=ajustes] [data-act=exportCSV]') ]);
+  const SS=await openSetting(page, 'datos');
+  const [dl] = await Promise.all([ page.waitForEvent('download',{timeout:5000}).catch(()=>null), page.click(SS+' [data-act=exportCSV]') ]);
   if(dl){ const txt=fs.readFileSync(await dl.path(),'utf8'); r.csv={name:dl.suggestedFilename(), bom:txt.charCodeAt(0)===0xFEFF, head:txt.split('\r\n')[0], rows:txt.trim().split('\r\n').length-1, quoted:/"con ""comillas""; y punto y coma"/.test(txt)}; }
   r.errors=errors; console.log(JSON.stringify(r,null,1)); await browser.close(); srv.close();
 })().catch(e=>{ console.error(e); process.exit(1); });

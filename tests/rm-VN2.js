@@ -1,4 +1,4 @@
-require('./lib/out.js'); // outputs (screenshots, downloads) go to tests/out
+require('./lib/out.js'); const { openSetting, closeSetting } = require('./lib/settings.js'); // v0.37.4: Ajustes in subscreens on the iPhone // outputs (screenshots, downloads) go to tests/out
 // Decision 49 (Dictar en Notas y «Nota de voz» para el audio), port 10500.
 //  1. Sync: voice notes on the server (an older device uploaded them) come into a device on this version: each becomes a line at the end
 //     of its task's notes («d/m HH:MM: texto», local time, creation order, a blank line before them when the notes had text), and goes up
@@ -99,7 +99,7 @@ const settled = page => page.waitForFunction(()=>!app.classList.contains('naviga
       vn('v3','t2','Llamar antes de las 10','2026-10-30T07:00:00.000Z'), vn('v4','t3','Repetida','2026-11-02T09:00:00.000Z'),
       vn('vd','t1','Borrada','2026-11-02T10:00:00.000Z','2026-11-02T11:00:00.000Z'), vn('v5','tx-gone','Sin tarea','2026-11-02T12:00:00.000Z')]);
     const A = await device(browser, {tag:'A', fake:true, seed:{spaces:[{id:'trabajo',name:'Trabajo',order:0,created:OLD},{id:'personal',name:'Personal',order:1,created:OLD}], projects:[], tasks:[], voiceNotes:[], settings:{tipsSeen:true}}});
-    await A.page.click('[data-tab=ajustes]'); await A.page.click('[data-act=signIn]'); check('sync_first', await synced(A.page));
+    await openSetting(A.page, 'cuenta'); await A.page.click('[data-act=signIn]'); check('sync_first', await synced(A.page));
     const a = await A.page.evaluate(()=>({t1:task('t1')&&task('t1').notes, t2:task('t2')&&task('t2').notes, t3:task('t3')&&task('t3').notes, t3m:task('t3')&&task('t3').modified, vn:DB.voiceNotes.map(v=>v.id), log:LOG.filter(e=>/^Notas de voz pasadas a Notas/.test(e.m)).map(e=>e.m)}));
     check('sync_lines', a.t1===N1 && a.t2===L3 && a.t3===N3, a);
     check('sync_line_there_untouched', a.t3m===OLD, a.t3m);
@@ -121,7 +121,7 @@ const settled = page => page.waitForFunction(()=>!app.classList.contains('naviga
       DB.voiceNotes.push({id:'v1b', taskId:'t1', text:'Incluir el punto de riesgos', created:'2026-11-02T17:40:00.000Z'}); const n3=foldVoiceNotes(DB); save();
       return {n0, n1, n2, n3, once, twice:W.tasks[0].notes, left:W.voiceNotes.map(v=>v.id).join(), same:task('t1').notes===before, dbvn:DB.voiceNotes.map(v=>v.id).join()}; });
     check('idempotent', st.n0===0 && st.n1===1 && st.once==='Hola\n\n2/11 18:40: Primera' && st.n2===1 && st.twice===st.once && st.left==='x2' && st.n3===1 && st.same && st.dbvn==='v5', st);
-    await A.page.click('[data-tab=tareas]'); await A.page.evaluate(()=>openDetail('t1')); await settled(A.page); await A.page.waitForTimeout(600);
+    await (await closeSetting(A.page), A.page.click('[data-tab=tareas]')); await A.page.evaluate(()=>openDetail('t1')); await settled(A.page); await A.page.waitForTimeout(600);
     await A.page.screenshot({path:path.join(OUT,'vn2-sync-detail.png')});
     await A.ctx.close(); }
 

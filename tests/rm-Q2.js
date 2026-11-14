@@ -1,4 +1,4 @@
-require('./lib/out.js'); // outputs (screenshots, downloads) go to tests/out
+require('./lib/out.js'); const { openSetting, closeSetting } = require('./lib/settings.js'); // v0.37.4: Ajustes in subscreens on the iPhone // outputs (screenshots, downloads) go to tests/out
 // Decision 28 (minor decisions of 2 November), port 9820.
 //  a. Deleting a space takes its projects (archived too), tasks (old completed too) and voice notes (recordings since decision 49), after a confirmation that counts them,
 //     with a local copy first and one Deshacer; the only space still cannot go. Sync: the deletion and its Deshacer reach another device
@@ -118,7 +118,7 @@ const toastOn = page => page.evaluate(()=>document.querySelector('#toast').class
   try{
   /* ================= a. iPhone, local ================= */
   { const {ctx, page} = await device(browser, {tag:'Ma', seed:SEED});
-    await page.click('[data-tab=ajustes]'); await sleep(400);
+    await openSetting(page, 'espacios'); // v0.37.4
     await tap(page, '[data-edit-space="trabajo"]'); await sleep(600);
     check('a_delButton_notEmpty', await page.evaluate(()=>!!document.querySelector('#sheet [data-x=del]')));
     await tap(page, '#sheet [data-x=del]'); await sleep(600);
@@ -318,7 +318,7 @@ const toastOn = page => page.evaluate(()=>document.querySelector('#toast').class
 
   /* ================= a. Sync: the cascade and its Deshacer reach the other device ================= */
   { const A = await device(browser, {tag:'A', seed:Object.assign({}, SEED, {attachments:[]}), fake:true}); // no local recordings to upload: the fake has no storage
-    await A.page.click('[data-tab=ajustes]'); await sleep(300); await A.page.click('[data-act=signIn]'); check('S_A_sync', await synced(A.page));
+    await openSetting(A.page, 'cuenta'); await A.page.click('[data-act=signIn]'); check('S_A_sync', await synced(A.page));
     const B = await device(browser, {tag:'B', seed:{spaces:SEED.spaces, projects:[], tasks:[], voiceNotes:[], settings:{tipsSeen:true}}, fake:true, desk:true});
     await B.page.evaluate(()=>setDeskView('settings')); await sleep(300); await B.page.click('[data-act=signIn]'); check('S_B_sync', await synced(B.page));
     const sid = await A.page.evaluate(()=>DB.spaces.find(s=>s.name==='Trabajo').id);

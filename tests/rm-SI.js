@@ -1,4 +1,4 @@
-require('./lib/out.js'); // outputs (screenshots, downloads) go to tests/out
+require('./lib/out.js'); const { openSetting, closeSetting } = require('./lib/settings.js'); // v0.37.4: Ajustes in subscreens on the iPhone // outputs (screenshots, downloads) go to tests/out
 // Siri and the iOS Shortcut (owner, 4 November), ports 10850 (app), 10851 (fake PostgREST for the function), 10852 (add-task under Deno):
 //  1. The spoken words (spokenParse, inboxTask): «Llamar a Marta mañana a las 9 proyecto PAM urgente», «urgente» kept inside the title,
 //     a project not found or found twice left in the title, accents and case, «media hora», «una hora», «medio día», punctuation of dictation,
@@ -197,7 +197,7 @@ function fakeAdapter(){
   };
 }
 const synced = page => until(page, ()=>SY&&SY.user&&!SY.running&&SY.status==='ok'&&syncCollect(true).count===0);
-const goSettings = async page => { await ev(page, ()=>{ if(UI.wide) setDeskView('settings'); else { switchTab('ajustes'); } }); await calm(page); };
+const goSettings = async page => { await openSetting(page, 'cuenta'); await calm(page); }; // v0.37.4: the Shortcut is in Cuenta on the iPhone
 const goHoy = async page => { await ev(page, ()=>{ if(UI.wide) setDeskView('hoy'); else switchTab('tareas'); }); await calm(page); };
 
 /* ======================= 2 and 3. Pickup and Ajustes ======================= */

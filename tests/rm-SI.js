@@ -236,7 +236,7 @@ async function app(browser){ let x;
 
   /* ---------- Pickup on the iPhone ---------- */
   await goHoy(A.page); await ev(A.page, ()=>{ DB.settings.activeSpace='sp-dlt'; save(); render(); }); await calm(A.page);
-  await A.page.click('.screen.root .seg [data-filter=todas]'); await calm(A.page); // the task is for tomorrow
+  await closeSetting(A.page); await A.page.evaluate(()=>switchTab('tareas')); await A.page.click('.screen.root .seg [data-filter=todas]'); // v0.37.4: out of the Cuenta subscreen await calm(A.page); // the task is for tomorrow
   const said = fake.say('Llamar a Marta mañana a las 9 proyecto PAM urgente');
   const tidA = 'ib-'+said.id;
   check('pick_task', await until(A.page, id=>!!task(id), tidA), await ev(A.page, ()=>LOG.slice(-5)));

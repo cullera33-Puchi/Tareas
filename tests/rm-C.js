@@ -128,7 +128,7 @@ const realClock = page => page.evaluate(()=>{ if(window.__RD) window.Date=window
   check('R8_notBefore19', await page.evaluate(()=>!document.querySelector('.screen.root[data-root=tareas] [data-act=closeDay]')));
   await at1930(page);
   await page.evaluate(()=>render()); await page.waitForTimeout(200);
-  r.r8 = await page.evaluate(()=>{ const sc=document.querySelector('.screen.root[data-root=tareas] .scroll'); const cell=sc.querySelector('.closecell'); const all=[...sc.children]; return {summary:!!sc.querySelector('.summary'), entries:sc.querySelectorAll('[data-act=closeDay]').length, cell:cell&&cell.textContent, cellAfterRows:!!cell&&all.indexOf(cell.closest('.group'))>all.indexOf([...sc.querySelectorAll('.scroll > .group')].find(g=>g.querySelector('.row'))) }; });
+  r.r8 = await page.evaluate(()=>{ const sc=document.querySelector('.screen.root[data-root=tareas] .scroll'); const cell=sc.querySelector('.closecell'); const box=sc.querySelector(':scope > .tlist')||sc, all=[...box.children]; /* v0.37.4: the list sits in .tlist */ return {summary:!!sc.querySelector('.summary'), entries:sc.querySelectorAll('[data-act=closeDay]').length, cell:cell&&cell.textContent, cellAfterRows:!!cell&&all.indexOf(cell.closest('.group'))>all.indexOf(all.find(g=>g.classList.contains('group')&&g.querySelector('.row'))) }; });
   check('R8_entries', !r.r8.summary && r.r8.entries===1 && /^Cerrar el día5 pendientes$/.test(r.r8.cell) && r.r8.cellAfterRows, r.r8);
   await page.screenshot({path:OUT+'/c-light-hoy-1930.png'});
   await page.evaluate(H=>document.querySelector(H+' .closecell').scrollIntoView({block:'center'}), HOY); await page.tap(HOY+' .closecell'); await page.waitForTimeout(400);

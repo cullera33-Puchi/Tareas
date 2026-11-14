@@ -86,6 +86,7 @@ const cell = (page, act) => page.$('.screen.settings [data-act='+act+'], .screen
   await page.click('#asheet .it:not(.cancel)'); await until(page, ()=>demoCount()===0 && !document.querySelector('[data-act=demoClear]'));
   check('demo_cleared', true);
   await page.evaluate(()=>document.querySelector('#toast').classList.remove('on')); // the Datos de prueba eliminados notice
+  await closeSetting(page); // v0.37.4: back from Datos y copias to the index, where Novedades is
   const hits0=nvHits; await (await cell(page,'news')).click(); await sheetOn(page);
   x = await sheetInfo(page); await shot(page, 'M-light-ajustes');
   check('ajustes_list', x.title==='Novedades' && x.vers.join()==='0.34.0,0.33.2,0.33.1,0.33.0' && x.tags.join()===',,Instalada,' && x.items.join()==='4,3,3,3' && x.btns.join()==='Cerrar' && x.listScroll==='auto' && nvHits===hits0+1, x);

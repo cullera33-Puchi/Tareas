@@ -88,7 +88,7 @@ async function iphone(browser){ let x;
   await clickItem(page, '5 h'); await calm(page);
   x = await ev(page, ()=>({set:DB.settings.dayHours, val:document.querySelector('[data-day-hours=trabajo] .val').textContent, log:LOG.some(e=>/Horas de trabajo al día: 5/.test(e.m))}));
   check('settings_set', x.set && x.set.trabajo===5 && !('personal' in x.set) && x.val==='5 h' && x.log, x);
-  await page.click('#tabbar [data-tab=tareas]'); await calm(page);
+  await (await closeSetting(page), page.click('#tabbar [data-tab=tareas]')); await calm(page);
   x = await seg(page); check('hoy_orange', x.cls==='lh orange', x); // 345 >= 300, < 450
   await ev(page, ()=>{ setDayHours('trabajo', 4); }); x = await seg(page); check('hoy_orange_4', x.cls==='lh orange', x); // 345 < 360
   await ev(page, ()=>{ updTask('h4', {estimate:15}); render(); }); x = await seg(page); check('hoy_red', x.cls==='lh red' && x.lh==='6 h', x); // 360 = 4 h and a half again
@@ -192,7 +192,7 @@ async function iphone(browser){ let x;
   await page.click('#sheet [data-cd=all]'); await sheetGone(page); await calm(page);
   x = await ev(page, ()=>({closed:space().closedDay, isC:isClosed(), mod:space().modified>'2026-11-04', h1:task('h1').date, toast:document.querySelector('#toastText').textContent,
     head:(document.querySelector('.screen.root .dayclosed .dcl')||{}).textContent, link:(document.querySelector('.screen.root .dayclosed .gx')||{}).textContent,
-    ahora:!!document.querySelector('.screen.root .ahora'), rows:[...document.querySelectorAll('.screen.root .scroll > .group .row')].map(r=>r.dataset.id), cell:!!document.querySelector('.screen.root .closecell'), prev:!!document.querySelector('.screen.root .preview'), log:LOG.some(e=>e.m==='Día cerrado')}));
+    ahora:!!document.querySelector('.screen.root .ahora'), rows:[...document.querySelectorAll('.screen.root .scroll > .group .row, .screen.root .scroll > .tlist > .group .row')].map(r=>r.dataset.id), cell:!!document.querySelector('.screen.root .closecell'), prev:!!document.querySelector('.screen.root .preview'), log:LOG.some(e=>e.m==='Día cerrado')}));
   const sg = await seg(page);
   check('close_sets', x.closed==='2026-11-04' && x.isC && x.mod && x.h1==='2026-11-05' && /pasadas a mañana, día cerrado$/.test(x.toast) && x.log, x);
   check('close_view', x.head==='Día cerrado. Mañana, jueves 5' && x.link==='Reabrir hoy' && !x.ahora && !x.cell && !x.prev && ['m1','m2','h1','w1','a1'].every(k=>x.rows.includes(k)) && !x.rows.includes('f1') && !x.rows.includes('x1'), x);

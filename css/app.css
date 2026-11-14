@@ -1896,3 +1896,6 @@ body.desktop .pdt .t{font-size:13px;}
 body.desktop .pdt .m, body.desktop .pde{font-size:12px;}
 body.desktop .pdhoy{height:24px;font-size:12px;}
 body.desktop .pdcell .chev{width:8px;height:13px;}
+/* The cell's box: a group's look without the class .group, so the lists' groups are only groups of tasks */
+.pdgroup{background:var(--card);border-radius:12px;overflow:hidden;margin-bottom:16px;}
+.app.desktop .main .pdgroup{background:none;border-radius:0;margin-bottom:12px;}

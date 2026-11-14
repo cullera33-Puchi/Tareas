@@ -450,7 +450,7 @@ function listHTML(filter, projectId){
   if(!UI.query){ if(filter==='hoy'&&!closed){ rv=list.filter(x=>x.status==='waiting'); if(rv.length) list=list.filter(x=>x.status!=='waiting'); }
     else if(!closed) list=list.filter(x=>x.status!=='waiting'); }
   let h=closed?closedHeadHTML():'';
-  if(root && filter==='hoy' && !closed && !UI.query && !UI.select && pdShown()) h += '<div class="group pdgroup"><button class="cell link closecell pdcell" data-act="planDay">'+MI.sunrise+'<span class="lbl">Planificar el día</span>'+I.chev.replace('<svg','<svg class="chev"')+'</button></div>'; // decision 86: in the morning, until it is done
+  if(root && filter==='hoy' && !closed && !UI.query && !UI.select && pdShown()) h += '<div class="pdgroup"><button class="cell link closecell pdcell" data-act="planDay">'+MI.sunrise+'<span class="lbl">Planificar el día</span>'+I.chev.replace('<svg','<svg class="chev"')+'</button></div>'; // decision 86: in the morning, until it is done
   if(rv.length) h += gtitle('Revisar hoy', rv.length, '', ' data-review-head=""')+'<div class="group" data-review="">'+rv.map(x=>R(x,{noToday:true,noReview:true})).join('')+'</div>'; // decision 36: not a drop target
   if(!list.length){ if(rv.length){} else if(!(UI.query && UI.searchDone && dm.length) && !nm.length){ // the completed matches (or notes) are listed below: no "Sin resultados" above them
     let title, sub, acts; const dt0=filter==='hoy'?spaceTasks().filter(x=>x.status==='done'&&x.completed&&localDay(x.completed)===todayStr()).length:0;

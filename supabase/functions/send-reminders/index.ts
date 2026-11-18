@@ -22,6 +22,9 @@
 //                              account). A reminder of an account without access is marked and not sent. Before 0013 runs none of it does.
 //                              Then (decision 78, 0014_notice_follow.sql) «Víctor ha completado una tarea que le enviaste» to the sender of a
 //                              task its recipient has completed, once per completion; nothing of the task. Before 0014 runs it does nothing.
+//                              Then (decision 88, 0016_shared.sql) shared tasks: «Enric ha compartido una tarea contigo» to who was added,
+//                              each person's own reminders of them (shared_views), and «Víctor ha completado (o aplazado) una tarea
+//                              compartida» to the others in it; nothing of the task. Before 0016 runs it does nothing.
 //   POST {test:true, id?} with the user's JWT in Authorization
 //                              A test notification to the caller's own devices (only the one with that id when given).
 //

@@ -1,5 +1,15 @@
 [
   {
+    "version": "0.38.1",
+    "date": "2026-11-18",
+    "items": [
+      "Ahora puedes borrar nombres del desplegable de personas, en Responsable y en «Esperando a».",
+      "En el iPhone, desliza el nombre a la izquierda y toca Eliminar; en el ordenador, aparece una × al pasar el ratón. Te pide confirmarlo y tiene Deshacer.",
+      "Un nombre que usa alguna tarea abierta no se borra: te avisa de cuántas lo usan.",
+      "Las personas que solo aparecen en tareas ya completadas dejan de salir en la lista. Las tareas conservan sus nombres."
+    ]
+  },
+  {
     "version": "0.38.0",
     "date": "2026-11-14",
     "items": [

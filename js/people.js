@@ -30,36 +30,60 @@ function ensureContact(name){ const n=String(name||'').replace(/\s+/g,' ').trim(
 // Deshacer of the action that made c: it goes again while nobody has changed it
 function dropContact(c){ if(!c) return; const cur=contactRec(c.id); if(cur&&cur.modified===c.modified&&!cur.email&&!cur.phone) DB.contacts=DB.contacts.filter(o=>o!==cur); }
 /* ---------- v0.33.1: the person picker, a list with a search field on top (Responsable and Esperando a) ----------
-   The names are the contacts, alphabetically, then those the tasks use (Responsable, Esperando a) that no contact has, with the contact's
-   phone or mail as a grey icon. What is typed filters them (no accents or case); with nothing typed the list starts with the «none» row
+   The names are the contacts, alphabetically, then those the open tasks use (Responsable, Esperando a) that no contact has, with the
+   contact's phone or mail as a grey icon. Decision 87: a name only completed tasks use is not listed, so the people of past work leave the
+   list by themselves. What is typed filters them (no accents or case); with nothing typed the list starts with the «none» row
    (Sin responsable, La tarea es tuya); a typed text that no name matches exactly gives «Añadir «Texto»» at the top. The current value has
    the check mark. Keys: up and down move, Enter chooses; the mouse and the finger choose with one click. A press on a row keeps the focus in
-   the field, so the iPhone keyboard stays up. o: {cur, none:[label, sub], onPick(value or null, 'click'|'enter'), rows (desktop rows shown)} */
+   the field, so the iPhone keyboard stays up. o: {cur, none:[label, sub], onPick(value or null, 'click'|'enter'), rows (desktop rows shown)}
+   Decision 87: a name can be deleted from the list. iPhone: a swipe to the left shows Eliminar; desktop: a × on hover. The first tap asks
+   on the row itself («¿Eliminar «X» de la lista?»), the second deletes the contact, with Deshacer; a tap on the row cancels. A name an open
+   task uses is not deleted: the row says «Lo usa N tareas abiertas» for a moment. The tasks keep their names */
 function pickNames(cur){ const seen=new Set(), out=[]; const add=(n, c)=>{ const v=String(n||'').replace(/\s+/g,' ').trim(), k=personKey(v); if(!v||seen.has(k)) return; seen.add(k); out.push({name:v, c}); };
-  contactsSorted().forEach(c=>add(c.name, c)); const n=out.length;
-  DB.tasks.map(x=>x.responsible).concat(DB.tasks.map(x=>x.waitingFor)).concat([cur]).forEach(v=>add(v, null));
+  contactsSorted().forEach(c=>add(c.name, c)); const n=out.length; const open=DB.tasks.filter(isOpen);
+  open.map(x=>x.responsible).concat(open.map(x=>x.status==='waiting'?x.waitingFor:null)).concat([cur]).forEach(v=>add(v, null));
   return out.slice(0, n).concat(out.slice(n).sort((a,b)=>nameCmp(a.name, b.name))); } // the contacts first, then the other names
+// The open tasks (any space) that use a name as Responsable or Esperando a: such a name stays in the list
+const pickUses = name => { const k=personKey(name); return k ? DB.tasks.filter(x=>isOpen(x)&&(personKey(x.responsible)===k||(x.status==='waiting'&&personKey(x.waitingFor)===k))).length : 0; };
+let ppRepaint=null; // the open picker's redraw, for the Deshacer of a deletion
+// Delete a name from the list: its contact goes (with Deshacer); refused while an open task uses it. Returns the message to show, or ''
+function pickDelete(name){ const n=pickUses(name); if(n) return n===1?'Lo usa 1 tarea abierta':'Lo usan '+n+' tareas abiertas';
+  const c=contactByName(name); if(!c) return ''; const i=DB.contacts.indexOf(c); if(i<0) return ''; DB.contacts.splice(i,1); save(); haptic(14); log('info','Nombre eliminado de la lista de personas');
+  toast('«'+c.name+'» eliminado de la lista', ()=>{ if(!contactRec(c.id)){ c.modified=new Date().toISOString(); DB.contacts.push(c); } save(); if(ppRepaint) ppRepaint(); }); return ''; }
 const personPickHTML = () => '<div class="ppick"><div class="ppsearch">'+I.search+'<input type="text" data-role="ppq" placeholder="Buscar o escribir un nombre" autocomplete="off" autocapitalize="words" enterkeyhint="done" spellcheck="false" aria-label="Buscar o escribir un nombre"'+(UI.wide?' autofocus':'')+'></div><div class="pplist" role="listbox"></div></div>';
-function bindPersonPick(root, o){ const inp=$('[data-role=ppq]', root), box=$('.pplist', root); if(!inp||!box) return null; let rows=[], act=-1;
-  const hl=()=>{ box.querySelectorAll('.pprow').forEach((b,i)=>b.classList.toggle('hl', i===act)); const b=box.children[act]; if(b&&b.scrollIntoView) b.scrollIntoView({block:'nearest'}); };
-  const paint=()=>{ const q=inp.value.replace(/\s+/g,' ').trim(), k=personKey(q), ck=personKey(o.cur), names=pickNames(o.cur);
+function bindPersonPick(root, o){ const inp=$('[data-role=ppq]', root), box=$('.pplist', root); if(!inp||!box) return null; let rows=[], act=-1, open=null, conf=null, msg=null, msgT=0;
+  const hl=()=>{ const bs=box.querySelectorAll('.pprow'); bs.forEach((b,i)=>b.classList.toggle('hl', i===act)); const b=bs[act]; if(b&&b.scrollIntoView) b.scrollIntoView({block:'nearest'}); };
+  const paint=()=>{ if(!box.isConnected) return; const q=inp.value.replace(/\s+/g,' ').trim(), k=personKey(q), ck=personKey(o.cur), names=pickNames(o.cur);
     rows=[]; if(!k) rows.push({none:true}); else if(!names.some(n=>personKey(n.name)===k)) rows.push({add:q});
     names.forEach(n=>{ if(!k||personKey(n.name).includes(k)) rows.push(n); });
-    box.innerHTML=rows.map((r,i)=>{ const on=r.none?!ck:r.add==null&&personKey(r.name)===ck;
+    box.innerHTML=rows.map((r,i)=>{ const on=r.none?!ck:r.add==null&&personKey(r.name)===ck, del=!r.none&&r.add==null, nk=del?personKey(r.name):null;
       const ic=r.add!=null?I.plus:r.c&&r.c.phone?MI.phone:r.c&&r.c.email?MI.mail:'';
-      const lbl=r.none?esc(o.none[0])+'<small>'+esc(o.none[1])+'</small>':r.add!=null?'Añadir «'+esc(r.add)+'»':esc(r.name);
-      return '<button type="button" class="pprow'+(r.add!=null?' ppadd':'')+(r.none?' ppnone':'')+'" data-pp="'+i+'" role="option" aria-selected="'+on+'"'+(r.c&&(r.c.phone||r.c.email)?' title="'+esc(r.c.phone||r.c.email)+'"':'')+'><span class="ppck">'+(on?MI.check:'')+'</span><span class="ppl">'+lbl+'</span><span class="ppic">'+ic+'</span></button>'; }).join('');
-    act=k?0:Math.max(0, rows.findIndex(r=>r.none?!ck:personKey(r.name)===ck)); if(UI.wide) hl(); };
+      const st=del&&msg&&msg.k===nk?'ppmsg':del&&conf===nk?'ppconf':del&&open===nk?'ppopen':'';
+      const lbl=r.none?esc(o.none[0])+'<small>'+esc(o.none[1])+'</small>':r.add!=null?'Añadir «'+esc(r.add)+'»':st==='ppmsg'?esc(r.name)+'<small>'+esc(msg.text)+'</small>':st==='ppconf'?'¿Eliminar «'+esc(r.name)+'» de la lista?':esc(r.name);
+      return '<button type="button" class="pprow'+(r.add!=null?' ppadd':'')+(r.none?' ppnone':'')+(st?' '+st:'')+'" data-pp="'+i+'" role="option" aria-selected="'+on+'"'+(r.c&&(r.c.phone||r.c.email)?' title="'+esc(r.c.phone||r.c.email)+'"':'')+'><span class="ppck">'+(on?MI.check:'')+'</span><span class="ppl">'+lbl+'</span><span class="ppic">'+ic+'</span>'+
+        (del?'<span class="ppdel" role="button" tabindex="-1" data-ppdel="'+i+'" aria-label="Eliminar de la lista" title="Eliminar de la lista">'+(UI.wide&&st!=='ppconf'?XICON:'Eliminar')+'</span>':'')+'</button>'; }).join('');
+    if(act<0||!UI.wide||!open&&!conf) act=k?0:Math.max(0, rows.findIndex(r=>r.none?!ck:personKey(r.name)===ck)); if(UI.wide) hl(); };
   const pick=(i, how)=>{ const r=rows[i]; if(!r) return; haptic(4); o.onPick(r.none?null:r.add!=null?r.add:r.name, how); };
-  paint(); inp.addEventListener('input', paint);
+  const ask=i=>{ const r=rows[i]; if(!r||r.none||r.add!=null) return; const k=personKey(r.name);
+    if(conf!==k){ const t=pickUses(r.name)?pickDelete(r.name):''; if(t){ open=conf=null; msg={k, text:t}; haptic(10); clearTimeout(msgT); msgT=setTimeout(()=>{ msg=null; paint(); }, 2500); paint(); return; } conf=k; open=null; haptic(6); paint(); return; }
+    conf=open=null; pickDelete(r.name); paint(); };
+  ppRepaint=paint; paint(); inp.addEventListener('input', ()=>{ open=conf=null; paint(); });
   inp.addEventListener('keydown', e=>{ if(e.isComposing) return;
     if(e.key==='ArrowDown'||e.key==='ArrowUp'){ e.preventDefault(); if(!rows.length) return; act=e.key==='ArrowDown'?(act+1)%rows.length:(act<=0?rows.length-1:act-1); hl(); return; }
     if(e.key==='Enter'){ e.preventDefault(); pick(act<0?0:act, 'enter'); } });
   box.addEventListener('mousedown', e=>{ if(e.target.closest('.pprow')) e.preventDefault(); });
   box.addEventListener('mousemove', e=>{ if(!UI.wide) return; const b=e.target.closest('.pprow'); if(b&&+b.dataset.pp!==act){ act=+b.dataset.pp; box.querySelectorAll('.pprow').forEach((x,i)=>x.classList.toggle('hl', i===act)); } });
-  box.addEventListener('click', e=>{ const b=e.target.closest('.pprow'); if(!b) return; e.stopPropagation(); pick(+b.dataset.pp, 'click'); });
+  // iPhone: a swipe to the left on a name shows its Eliminar (pan-y on the rows leaves the horizontal move to us)
+  let t0=null; box.addEventListener('touchstart', e=>{ const b=e.target.closest('.pprow'); t0=b&&e.touches.length===1?{b, x:e.touches[0].clientX, y:e.touches[0].clientY, done:false}:null; }, {passive:true});
+  box.addEventListener('touchmove', e=>{ if(!t0||t0.done) return; const dx=e.touches[0].clientX-t0.x, dy=e.touches[0].clientY-t0.y; if(Math.abs(dy)>12&&Math.abs(dy)>Math.abs(dx)){ t0=null; return; }
+    const r=rows[+t0.b.dataset.pp]; if(!r||r.none||r.add!=null) return; const k=personKey(r.name);
+    if(dx<-36){ t0.done=true; if(open!==k){ open=k; conf=null; haptic(6); paint(); } } else if(dx>36&&(open===k||conf===k)){ t0.done=true; open=conf=null; paint(); } }, {passive:true});
+  box.addEventListener('click', e=>{ const d=e.target.closest('.ppdel'); if(d){ e.stopPropagation(); ask(+d.dataset.ppdel); return; }
+    const b=e.target.closest('.pprow'); if(!b) return; e.stopPropagation();
+    if(open||conf){ open=conf=null; paint(); return; } // the first tap elsewhere only closes, as a row's buttons (decision 27c)
+    pick(+b.dataset.pp, 'click'); });
   // The picker inside a sheet that saves later (Esperando a): set the chosen value, clear the search, move the check mark
-  return { set(v){ o.cur=v||''; inp.value=''; paint(); }, typed:()=>inp.value.replace(/\s+/g,' ').trim(), input:inp }; }
+  return { set(v){ o.cur=v||''; inp.value=''; open=conf=null; paint(); }, typed:()=>inp.value.replace(/\s+/g,' ').trim(), input:inp }; }
 
 /* ---------- Responsable ---------- */
 function setResponsible(id, who){ const x=task(id); if(!x) return; const v=personName(who); if((x.responsible||null)===v) return; const old=x.responsible||null; releaseHold(id);

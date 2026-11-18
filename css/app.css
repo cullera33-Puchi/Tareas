@@ -1899,3 +1899,22 @@ body.desktop .pdcell .chev{width:8px;height:13px;}
 /* The cell's box: a group's look without the class .group, so the lists' groups are only groups of tasks */
 .pdgroup{background:var(--card);border-radius:12px;overflow:hidden;margin-bottom:16px;}
 .app.desktop .main .pdgroup{background:none;border-radius:0;margin-bottom:12px;}
+/* Decision 87: a name deleted from the person picker. iPhone: Eliminar shows after a swipe to the left; desktop: a × on hover. The asked row
+   (ppconf) keeps the red Eliminar; a name in use says so under it (ppmsg) */
+.pprow{touch-action:pan-y;}
+.ppdel{position:absolute;right:8px;top:50%;display:flex;align-items:center;justify-content:center;height:30px;padding:0 12px;border-radius:15px;background:var(--red);color:#fff;font-size:.875rem;font-weight:600;opacity:0;pointer-events:none;transform:translate3d(12px,-50%,0);transition:opacity .25s,transform .4s cubic-bezier(.32,.72,0,1);}
+.pprow.ppopen .ppdel,.pprow.ppconf .ppdel{opacity:1;pointer-events:auto;transform:translate3d(0,-50%,0);}
+.pprow.ppopen .ppic,.pprow.ppconf .ppic{opacity:0;}
+.pprow.ppopen .ppl,.pprow.ppconf .ppl{padding-right:96px;}
+.pprow.ppconf .ppl{white-space:normal;color:var(--ink);}
+.pprow.ppmsg .ppl small{color:var(--orange);}
+.pm-pop .ppdel{right:4px;height:18px;width:18px;padding:0;border-radius:9px;background:transparent;color:var(--ink2);transform:translate3d(0,-50%,0);}
+.pm-pop .ppdel svg{width:9px;height:9px;}
+.pm-pop .pprow:hover .ppdel{opacity:1;pointer-events:auto;}
+.pm-pop .pprow .ppdel:hover{background:var(--fill2);color:var(--ink);}
+.pm-pop .pprow.hl .ppdel{color:#fff;}
+.pm-pop .pprow.hl .ppdel:hover{background:rgba(255,255,255,.25);color:#fff;}
+.pm-pop .pprow.ppconf .ppdel{width:auto;height:20px;padding:0 8px;border-radius:5px;background:var(--red);color:#fff;font-size:12px;}
+.pm-pop .pprow:hover .ppic{opacity:0;}
+.pm-pop .pprow.ppconf .ppl{padding-right:70px;}
+.pm-pop .pprow.ppconf .ppdel,.pm-pop .pprow.ppconf .ppdel:hover,.pm-pop .pprow.hl.ppconf .ppdel{background:var(--red);color:#fff;}

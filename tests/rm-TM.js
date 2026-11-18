@@ -305,6 +305,24 @@ async function fnTests(){
     FN.noFollow = true; Object.assign(dn('d1'), {done:iso(-1e4), done_seen:iso(-1e4), done_pushed:null}); FN.pushes.length = 0; const f4 = await call(), f5 = await call(); FN.noFollow = false;
     check('fn_follow_without_0014', f4.status===200 && !f4.json.completed && !f4.json.followFailed && f5.status===200 && FN.pushes.length===0 && (S1.st.out.match(/"event":"follow-skipped"/g)||[]).length===1 && !dn('d1').done_pushed, {f4:f4.json, f5:f5.json});
     FN.t.team_notices = FN.t.team_notices.filter(n => !/^d\d$/.test(n.id));
+    // Decision 88 (0016): shared tasks. Enric shares sh1 with Susana: «Enric ha compartido una tarea contigo» to her; her own reminder of it
+    // with the title as stored ('s1:', opened by her device); she completed it: «Susana ha completado una tarea compartida» to Enric, nothing of
+    // the task. Each once. A task deleted by its owner or a person no longer in it: marked, never told
+    FN.pushes.length = 0;
+    Object.assign(FN.t, { shared_tasks:[{id:'sh1', owner_id:E, title:'s1:SECRETO', status:'pending', deleted:null, date:null}, {id:'sh2', owner_id:E, title:'s1:x', status:'pending', deleted:iso(-5e3), date:null}],
+      shared_members:[{id:'sh1:'+E, task_id:'sh1', user_id:E, owner_id:E, removed:null, left_at:null, deleted:null, pushed:iso(-1e4), created:iso(-1e4), server_ts:iso(-1e4)},
+        {id:'sh1:'+S, task_id:'sh1', user_id:S, owner_id:E, removed:null, left_at:null, deleted:null, pushed:null, created:iso(-5e3), server_ts:iso(-5e3)},
+        {id:'sh2:'+S, task_id:'sh2', user_id:S, owner_id:E, removed:null, left_at:null, deleted:null, pushed:null, created:iso(-5e3), server_ts:iso(-5e3)}],
+      shared_views:[{id:'sh1:'+S, task_id:'sh1', owner_id:S, project_id:null, reminder:iso(-6e4), reminder_sent:null, deleted:null}, {id:'sh2:'+S, task_id:'sh2', owner_id:S, project_id:null, reminder:iso(-6e4), reminder_sent:null, deleted:null}],
+      shared_events:[{id:1, task_id:'sh1', actor_id:S, kind:'done', created:iso(-5e3), pushed:null}, {id:2, task_id:'sh2', actor_id:S, kind:'later', created:iso(-5e3), pushed:null}] });
+    const g1 = await call(), sE = got(dE), sS = got(dS);
+    check('fn_shared', g1.status===200 && g1.json.sharedDue===2 && g1.json.sharedAdded===2 && g1.json.sharedEvents===2 && g1.json.sharedSent===3
+      && sS.some(m => m.body==='Enric ha compartido una tarea contigo' && m.data.url==='./?open=received') && sS.some(m => m.title==='s1:SECRETO' && m.data.taskId==='sh1')
+      && sE.length===1 && sE[0].body==='Susana ha completado una tarea compartida' && sE[0].data.taskId==='sh1' && sE[0].data.follow===true && !JSON.stringify(sE).includes('SECRETO')
+      && FN.t.shared_views.every(v => v.reminder_sent) && FN.t.shared_members.every(m => m.pushed) && FN.t.shared_events.every(e => e.pushed), {j:g1.json, sE, sS});
+    FN.pushes.length = 0; const g2 = await call();
+    check('fn_shared_once', !g2.json.sharedDue && !g2.json.sharedAdded && !g2.json.sharedEvents && FN.pushes.length===0, g2.json);
+    ['shared_tasks','shared_members','shared_views','shared_events'].forEach(t => { delete FN.t[t]; });
     // The allowed answer fails: the reminders still go
     FN.rpcFail = true; FN.t.tasks.push({id:'rE2', owner_id:E, title:'otra', project_id:null, date:null, reminder:iso(-6e4), reminder_sent:null, deleted:null, status:'pending'});
     const c3 = await call(); FN.rpcFail = false;

@@ -8,7 +8,7 @@ App web personal de gestión de tareas para iPhone (PWA instalada en pantalla de
 
 ## 2. Estado actual (2 de noviembre de 2026)
 
-- Versión publicada: **v0.38.1**. El repositorio `tareas` está en GitHub y se publica con GitHub Pages desde la rama `main`. Enric la usa instalada en el iPhone (pantalla de inicio) y en el navegador del ordenador.
+- Versión publicada: **v0.39.0**. El repositorio `tareas` está en GitHub y se publica con GitHub Pages desde la rama `main`. Enric la usa instalada en el iPhone (pantalla de inicio) y en el navegador del ordenador.
 - Sigue sin build ni dependencias de interfaz: HTML, CSS y JavaScript que se publican tal cual. El antiguo `index.html` de un solo archivo está repartido en `css/app.css` y en scripts clásicos dentro de `js/`, con el mismo comportamiento y el mismo aspecto.
 - Hecho: bloques 1 a 7 (v0.1), roadmap R1 a R20 (v0.15.0), escritorio a partir de 900 px con barra lateral, inspector, Semana, Día, Mes y vista por horas (v0.13.0 y v0.15.0), sincronización con Supabase e inicio de sesión con Google (bloque 8, v0.16.0), recordatorios con Web Push y la función `send-reminders` (bloque 9, v0.17.0), fotos y audios adjuntos en Supabase Storage (v0.19.0) y el lote de v0.20.0 (puntos 31 a 36 de la sección 8).
 - Datos: `localStorage` del dispositivo (clave `tareas-v1`) como verdad para la interfaz; copias diarias y archivos adjuntos en IndexedDB; Supabase sincroniza cuando hay sesión.
@@ -41,6 +41,7 @@ tareas/
 │   ├── inbox.js               bandeja de Siri y del Atajo de iOS (punto 62)
 │   ├── people.js              responsable, contactos, vista «Por persona» y recordatorios a personas
 │   ├── team.js                equipo: acceso por invitación, «Avisar a…», Recibidas, cupo, sugerencias y sección Equipo
+│   ├── share.js               tareas compartidas: claves por tarea, parte común y propia, «Compartir con…» (punto 88)
 │   ├── crypto.js              cifrado: claves, valores y archivos (punto 63a); también lo carga sw.js
 │   ├── sync.js                sincronización con Supabase (bloque 8)
 │   ├── e2e.js                 cifrado de la sincronización, activación, migración y sección Cifrado
@@ -58,7 +59,7 @@ tareas/
 ├── sw.js                      service worker: caché de la app (SHELL), aviso de actualización y notificaciones
 ├── icons/                     192, 512 y apple-touch-icon
 ├── vendor/                    supabase-js 2.117.3 (UMD), servida y cacheada con la app
-├── supabase/                  migraciones SQL (0001 a 0015), all.sql (todas seguidas), check.sql (comprobación), README.md y la función send-reminders
+├── supabase/                  migraciones SQL (0001 a 0016), all.sql (todas seguidas), check.sql (comprobación), README.md y la función send-reminders
 ├── tests/                     pruebas de regresión con Playwright (sección 7 bis)
 ├── package.json               solo para las pruebas; la app no tiene build
 ├── .github/workflows/pages.yml   pruebas y publicación
@@ -110,6 +111,7 @@ Los datos: `DB` es un objeto único en `localStorage` bajo la clave `tareas-v1` 
 - `js/status.js`: resumen de estado para compartir (M4): `statusText`, `spaceStatusText`, `stSections`, `stLine`, `stPeriod`, `statusSheet`, `statusShare`, `statusCopy`.
 - `js/suggest.js`: sugerencias del punto 56 (`suggestPool`, `sgFits`, `sgTier`, `sgReason`, `suggestFor`, `suggestSheet`).
 - `js/planday.js`: Planificar el día del punto 86 (`pdShown`, `planDayStart`, `pdStep`, `pdLoadPick`, `pdAhoraPick`, `pdEnd`). «Algún día» (punto 85) vive en `js/core.js` (`isSomeday`, `canSomeday`, `somedayList`, `setSomeday`), `js/render.js` (`somedayCellHTML`, `somedayListHTML`, `viewSomeday`) y `js/menus.js` (`somedayItems`).
+- `js/share.js`: tareas compartidas del punto 88: filas derivadas (`shTaskRecs`, `shViewRecs`, `shDerive`, `shFold`, `shExcluded`, `shMayDelete`), claves por tarea (`shKeysFor`, `shOpenRows`, `shSealRows`), acciones (`shShare`, `shRemove`, `shLeave`, `shAccept`) y pantallas (`shareItems`, `shareCellHTML`, `shareSheet`, `shRecvCardHTML`).
 - `js/sync.js`: adaptador `supabaseRemote` (sustituible en pruebas con `SY.remote`); `syncMerge`, `syncPull`, `syncPush`, `syncRun`, `syncRealtime`; arranque `syncBoot`; sesión (`syncSignIn`, `syncSignOutSheet`); sección Cuenta (`syncAccountHTML`).
 - `js/crypto.js`: primitivas sin DOM, compartidas con el service worker (`cryptoDerive`, `cryptoSeal`, `cryptoOpen`, `cryptoEnc`, `cryptoDec`, `cryptoSealRow`, `cryptoDecRow`, `cryptoEncFile`, `cryptoDecFile`, `cryptoKeyLoad`, `cryptoKeySave`, `cryptoKeyForget`, `cryptoPushPayload`; columnas en `CRYPTO_COLS`).
 - `js/e2e.js`: envoltura `cryptoRemote` sobre `SY.remote` (cifra al subir y descifra al bajar, también archivos y tiempo real); `cryptoGate` al empezar cada pasada (off, on o bloqueado); `cryptoActivate`, `cryptoMigrate`, `cryptoUnlockSheet`, `cryptoChangePassword`, `cryptoSectionHTML`.
@@ -251,6 +253,8 @@ Cambios acordados con Enric sobre el diseño de abajo. Mandan sobre el texto del
 
 87. **v0.38.1, borrar nombres del desplegable de personas (Enric, 18 de noviembre).** Los nombres no se podían quitar: el desplegable juntaba los contactos con todos los nombres usados en cualquier tarea, también las completadas, así que un contacto borrado en Ajustes volvía a salir. (1) El desplegable de Responsable y «Esperando a» solo lista los contactos y los nombres de tareas abiertas (responsable, o «Esperando a» de una por confirmar), de cualquier espacio (`pickNames`). (2) Se borra desde el propio desplegable: en el iPhone deslizando a la izquierda («Eliminar»), en el ordenador con una × al pasar el ratón; primer toque pregunta en la fila, segundo borra el contacto con Deshacer (`pickDelete`, `ppRepaint`). (3) Un nombre que usa una tarea abierta no se borra: la fila dice «Lo usa N tareas abiertas» (`pickUses`). (4) Las tareas conservan sus nombres. Sin cambios de datos. Prueba `rm-PK`.
 
+88. **v0.39.0, tareas compartidas (punto 43 revisado por Enric el 18 de noviembre).** Decidido por Enric: (1) solo con miembros del Equipo; (2) comunes título, notas, pasos, fecha, entrega, prioridad, tiempo y estado, y de cada persona proyecto, espacio, Ahora, recordatorio, responsable y «Esperando a»; (3) fotos y audios en una segunda versión; (4) «Compartir con…» sustituye a «Avisar a…» (lo enviado sigue funcionando). Del punto 43 siguen: editar y completar para todos; solo quien la compartió añade o quita personas y la elimina para todos; los demás salen; avisos solo al completar o aplazar (y al compartirla contigo). Decidido por Claude: la recibida espera en Recibidas («Añadir a mis tareas» con proyecto o «No, gracias»); una tarea compartida no se repite ni pasa a «Algún día»; el Eliminar de quien no la compartió es salir; quitar a alguien o eliminarla le avisa con un mensaje; volver a añadir a quien salió la deja otra vez en Recibidas. Datos: `0016_shared.sql` (`shared_tasks`, `shared_members`, `shared_views`, `shared_events`); en el dispositivo, la tarea compartida es una tarea de `DB.tasks` con `share` (id de quien la compartió) y `vmod` (cambio de la parte propia), y `DB.shareMembers`. Cifrado con clave por tarea (`s1:`), entregada a cada uno con `teamSeal` (tipo `share`). `send-reminders` con `sendShared`. Código en `js/share.js`; pruebas `rm-SH` y `rm-TM`.
+
 ## 9. Decisiones pendientes de Enric (revisión del 1 de noviembre)
 
 1. ~~Atajo de iOS (`?add=`).~~ Resuelta el 4 de noviembre con la opción (c): bandeja en Supabase (punto 62 de la sección 8). Texto original: Opciones: (a) avisar en Safari de que la tarea no llegará a la app instalada; (b) el Atajo copia el texto y Nueva tarea ofrece "Pegar"; (c) con el bloque 8, el Atajo envía el texto a una bandeja en Supabase que la app recoge al sincronizar. (a) y (b) añaden interfaz.
@@ -348,7 +352,7 @@ Orden fijado por Enric el 2 de noviembre y revisado el 3 de noviembre: tras el r
 | 22d | Planificar el día, «Algún día» y fases dentro de un proyecto (punto 72 de la sección 8) | Planificar el día y «Algún día» hechos en v0.38.0 (puntos 85 y 86); quedan las fases, 3 a 4 h | medio |
 | 22e | Seguimiento de las tareas enviadas con «Avisar a…»: fecha prevista, completada y aviso al remitente (punto 78 de la sección 8) | hecho en v0.37.0 | alto |
 | 22f | Proyecto visible en las tarjetas del calendario del escritorio (punto 79 de la sección 8), en la misma versión que 22e | hecho en v0.37.0 | medio |
-| 23 | Fase 2, tareas compartidas entre personas (punto 43, diseño cerrado; después del punto 63) | muy alto, 2 a 3 días | máximo | En pausa: el punto 78 cubre lo que Enric necesita (6 de noviembre).
+| 23 | Fase 2, tareas compartidas entre personas (punto 43, diseño cerrado; después del punto 63) | hecho en v0.39.0 (punto 88); quedan fotos y audios compartidos | máximo |
 | 24 | App aparte o evolución para gestión de proyectos con el equipo (ver abajo) | muy alto, semanas | máximo, por fases |
 
 M7, condición de Enric: **sin ningún coste**. Se descartan los servicios de pago. Vía propuesta: transcripción en el propio dispositivo con un modelo Whisper que se ejecuta en el navegador (gratis y sin que el audio salga del equipo, lo que además encaja con la política de datos de clientes), primero en el ordenador y en el iPhone si el rendimiento lo permite; la descarga del modelo pesa entre 40 y 250 MB según la calidad. Se diseña con Enric antes de construir.

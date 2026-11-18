@@ -41,7 +41,7 @@ async function run(browser){
   await sp.evaluate(()=>{ UI.stack.forEach(x=>x.el.remove()); UI.stack=[]; /* v0.37.4: the sign-in left the Cuenta subscreen open */ UI.tab='tareas'; DB.settings.filter='todas'; render(); }); await sp.waitForTimeout(400);
   await sp.evaluate(()=>rowMenu('s1', {row:visibleRow('s1'), x:200, y:300})); await until(sp, ()=>!!document.querySelector('.pm.open'));
   const lp = await sp.evaluate(()=>[...document.querySelectorAll('.pm.open .pm-list *')].map(b=>b.textContent.trim()).filter(Boolean));
-  check('S_longpress_item', lp.some(t=>t==='Avisar a…'), lp);
+  check('S_longpress_item', !lp.some(t=>/Avisar/.test(t)), lp); // decision 88: «Compartir con…» replaced it; the notices already sent keep working
   await sp.waitForTimeout(500); await shot(sp, 'av-ip-dark-menu');
   // The lifted row keeps the space between its items (Entrega martes  1 h)
   const gap = await sp.evaluate(()=>{ const ss=[...document.querySelectorAll('.pm-lift .row-meta>span')]; return ss.length>1?parseFloat(getComputedStyle(ss[1]).marginLeft):-1; });
@@ -49,8 +49,8 @@ async function run(browser){
   await sp.evaluate(()=>closeMenu(true)); await settled(sp);
   await sp.evaluate(()=>openDetail('s1')); await sp.waitForTimeout(700);
   const cell = await sp.evaluate(()=>{ const b=document.querySelector('.pushed-screen [data-act=tmNotice]'); return b?b.textContent:null; });
-  check('S_detail_cell', cell==='Avisar a…', cell);
-  await sp.click('.pushed-screen [data-act=tmNotice]'); await sheetIn(sp);
+  check('S_detail_cell', cell===null, cell); // decision 88: no «Avisar a…» any more; the sheet itself is still there for the tests of the notices
+  await sp.evaluate(()=>noticeSheet('s1')); await sheetIn(sp);
   const list = await sp.evaluate(()=>[...document.querySelectorAll('#sheet .pprow')].map(b=>({t:b.textContent, off:b.classList.contains('off')})));
   check('S_member_list', list.length===2 && list.some(x=>/^Enric Vidalenric@example\.com$/.test(x.t)&&!x.off) && list.some(x=>/^Pablo RuizTodavía no ha entrado en la app$/.test(x.t)&&x.off) && await sp.evaluate(()=>document.querySelector('#sheet .hbtn.ok').disabled), list);
   await sp.click('#sheet .pprow:not(.off)'); await sp.fill('#sheet [data-role=ntmsg]', 'Lo vemos el lunes a primera hora');
@@ -66,7 +66,7 @@ async function run(browser){
   check('S_note_local', await sp.evaluate(()=>!JSON.stringify(syncToRow('tasks', task('s1'))).includes('sentTo')) && ![...fake.t.tasks.values()].some(x=>JSON.stringify(x).includes('sentTo')));
   await shot(sp, 'av-ip-dark-avisado');
   // The same task to Enric again: the sheet says until when and does not send; the server refuses it too
-  await sp.click('.pushed-screen [data-act=tmNotice]'); await sheetIn(sp); await sp.click('#sheet .pprow:not(.off)');
+  await sp.evaluate(()=>noticeSheet('s1')); await sheetIn(sp); await sp.click('#sheet .pprow:not(.off)');
   const soon = await sp.evaluate(()=>({txt:document.querySelector('#sheet .nt-when').textContent, dis:document.querySelector('#sheet .hbtn.ok').disabled}));
   check('S_too_soon_sheet', /^Ya le avisaste de esta tarea hace un momento\. Podrás volver a avisarle a las \d\d:\d\d\.$/.test(soon.txt) && soon.dis, soon);
   await sp.evaluate(()=>closeSheet()); await settled(sp);
@@ -128,11 +128,11 @@ async function run(browser){
   // Desktop: the context menu and the inspector offer it too
   await ep.evaluate(()=>setDeskView('todas')); await ep.waitForTimeout(300);
   const dm = await ep.evaluate(()=>deskTaskMenu('e1').groups.flat().map(i=>i.label));
-  check('E_desk_menu', dm.includes('Avisar a…'), dm);
+  check('E_desk_menu', !dm.some(l=>/Avisar/.test(l)), dm); // decision 88
   await ep.evaluate(()=>openDetail('e1')); await ep.waitForTimeout(500);
-  check('E_inspector', await ep.evaluate(()=>!!document.querySelector('.pane [data-act=tmNotice], .inspector [data-act=tmNotice], [data-act=tmNotice]')));
+  check('E_inspector', await ep.evaluate(()=>!document.querySelector('[data-act=tmNotice]'))); // decision 88
   await shot(ep, 'av-desk-inspector');
-  await ep.click('[data-act=tmNotice]'); await sheetIn(ep); await ep.click('#sheet .pprow:not(.off)'); await ep.click('#sheet .hbtn.ok');
+  await ep.evaluate(()=>noticeSheet('e1')); await sheetIn(ep); await ep.click('#sheet .pprow:not(.off)'); await ep.click('#sheet .hbtn.ok');
   check('E_sent', await until(ep, ()=>!document.querySelector('#sheet.on')) && fake.notices.length===3 && fake.notices[2].recipient_id===US.uid);
 
   /* ---------- Susana: the line at the top of Hoy and its sheet ---------- */
@@ -152,7 +152,7 @@ async function run(browser){
   const il = await ep.evaluate(()=>[...document.querySelectorAll('.intnotes .ntline')].map(x=>x.textContent));
   check('E_inspector_lines', il.length===1 && /^Avisado a Susana hoy a las \d\d:\d\d: la ha añadido a sus tareas$/.test(il[0]), il);
   await hideToast(ep); await shot(ep, 'av-desk-inspector-avisos');
-  await ep.click('[data-act=tmNotice]'); await sheetIn(ep); await shot(ep, 'av-desk-avisar-avisado');
+  await ep.evaluate(()=>noticeSheet('e1')); await sheetIn(ep); await shot(ep, 'av-desk-avisar-avisado');
   check('E_sheet_ago', await ep.evaluate(()=>[...document.querySelectorAll('#sheet .pprow')].some(b=>/Avisado hace un momento$/.test(b.textContent))));
   await ep.evaluate(()=>closeSheet()); await settled(ep);
   // The server says nothing (no 0013 method answer): this device's own record stands, said once

@@ -10,8 +10,9 @@ function serve(port){ const srv = http.createServer((req,res)=>{ let p = decodeU
     const f=path.join(ROOT,p); if(!fs.existsSync(f)||fs.statSync(f).isDirectory()){ res.writeHead(404,{'Content-Type':'text/html'}); res.end('<h1>404</h1>'); return; }
     res.writeHead(200,{'Content-Type':TYPES[path.extname(f)]||'application/octet-stream'}); res.end(fs.readFileSync(f)); });
   return new Promise(r=>srv.listen(port, ()=>r(srv))); }
-const TABLES = ['spaces','projects','tasks','voice_notes','attachments','subtasks','project_notes','contacts'];
-const ENC = { tasks:['title','notes','waiting_for','responsible'], projects:['name'], spaces:['name'], subtasks:['title'], project_notes:['title','body'], contacts:['name','email','phone'], voice_notes:['text'] };
+const TABLES = ['spaces','projects','tasks','voice_notes','attachments','subtasks','project_notes','contacts','shared_tasks','shared_members','shared_views'];
+const SHT = ['shared_tasks','shared_members','shared_views']; // decision 88 (0016_shared.sql): their own rules, below
+const ENC = { shared_views:['responsible','waiting_for'], tasks:['title','notes','waiting_for','responsible'], projects:['name'], spaces:['name'], subtasks:['title'], project_notes:['title','body'], contacts:['name','email','phone'], voice_notes:['text'] };
 const isEnc = v => typeof v==='string' && v.startsWith('e1:');
 const RLS = t => new Error('new row violates row-level security policy for table "'+t+'"');
 let nid = 0; const newId = () => '00000000-0000-4000-8000-'+String(++nid).padStart(12, '0');
@@ -32,6 +33,7 @@ class Fake {
   writeOk(uid){ const r=this.role(uid); return r==='admin'||(r==='member'&&this.keys.has(uid)); }
   used(uid, except){ let n=0; for(const [p,o] of this.store) if(p.startsWith(uid+'/')&&p!==except) n+=o.size; return n; }
   write(owner, table, rows){ if(!owner) throw new Error('JWT required'); if(this.team&&!this.writeOk(owner)) throw RLS(table);
+    if(SHT.includes(table)&&table!=='shared_views') return this.writeShared(owner, table, rows);
     if(this.failRls>0){ this.failRls--; throw RLS(table); } // a refusal of the rules while the account still has access (a test's switch)
     const ts=this.ts(), out=[], changed=[], m=this.t[table];
     rows.forEach(r=>{ if(!r.id) throw new Error('null id'); if(!r.modified) throw new Error('null value in column "modified"');
@@ -47,7 +49,43 @@ class Fake {
     for(const [page, topics] of this.subs){ for(const [topic, u] of topics){ if(u!==uid) continue;
       setTimeout(()=>{ page.evaluate(([tp,t,r])=>{ const h=window.__fakeRTs&&window.__fakeRTs[tp]; if(h) h(t,r); }, [topic, table, copy]).catch(()=>{}); }, 30); } } }
   liveTopics(page){ return [...((this.subs.get(page))||new Map()).keys()]; }
-  rows(owner, table){ if(this.team&&!this.role(owner)) return []; return [...this.t[table].values()].filter(r=>r.owner_id===owner); }
+  rows(owner, table){ if(this.team&&!this.role(owner)) return [];
+    if(table==='shared_tasks') return [...this.t[table].values()].filter(r=>r.owner_id===owner||this.shIn(r.id, owner));
+    if(table==='shared_members') return [...this.t[table].values()].filter(r=>r.user_id===owner||this.shIn(r.task_id, owner));
+    return [...this.t[table].values()].filter(r=>r.owner_id===owner); }
+  /* Decision 88: the rules of 0016_shared.sql. An active participant (own row, neither left nor removed) or the owner reads the task; the
+     owner creates it and its member rows (members of the team only, keys sealed); anyone in it writes it (newest modified wins); only the
+     owner deletes it; texts sealed with the task's key; the person only leaves, the owner removes and adds again; a person added (again)
+     gets the task touched; completed or postponed with a newer modified makes an event */
+  shOwner(tid){ const t=this.t.shared_tasks.get(tid); return t?t.owner_id:null; }
+  shIn(tid, uid){ if(this.shOwner(tid)===uid) return true; const m=this.t.shared_members.get(tid+':'+uid); return !!m&&!m.left_at&&!m.removed&&!m.deleted; }
+  writeShared(owner, table, rows){ const ts=this.ts(), out=[], changed=[], m=this.t[table]; this.sharedEvents=this.sharedEvents||[];
+    rows.forEach(r=>{ if(!r.id) throw new Error('null id'); if(!r.modified) throw new Error('null value in column "modified"'); const ex=m.get(r.id);
+      if(table==='shared_tasks'){ if(ex&&ex.owner_id!==owner&&!this.shIn(r.id, owner)) throw RLS(table);
+        ['title','notes','steps'].forEach(c=>{ const v=r[c]; if(v!=null&&v!==''&&!String(v).startsWith('s1:')&&!(ex&&ex[c]===v)) throw new Error('tareas_plaintext_refused: shared_tasks.'+c); }); }
+      else { const towner=this.shOwner(r.task_id||(ex&&ex.task_id));
+        if(!ex){ if(towner!==owner||!this.role(r.user_id)) throw RLS(table); if(r.key&&!String(r.key).startsWith('t1:')) throw new Error('tareas_plaintext_refused: shared_members.key'); }
+        else if(ex.user_id!==owner&&towner!==owner) throw RLS(table); } });
+    rows.forEach(r=>{ const ex=m.get(r.id);
+      if(table==='shared_tasks'){
+        if(!ex){ const row=Object.assign({id:r.id, created:null, deleted:null}, r, {owner_id:owner, server_ts:ts}); m.set(r.id,row); out.push({id:r.id}); changed.push(row); return; }
+        if(Date.parse(r.modified)<Date.parse(ex.modified)) return; const old=Object.assign({}, ex);
+        Object.assign(ex, r, {owner_id:ex.owner_id, server_ts:ts}); if(old.deleted!==ex.deleted&&owner!==ex.owner_id) ex.deleted=old.deleted;
+        if(Date.parse(ex.modified)>Date.parse(old.modified)&&!ex.deleted){ if(ex.status==='done'&&old.status!=='done') this.sharedEvents.push({task_id:ex.id, actor_id:owner, kind:'done'}); else if(ex.status!=='done'&&ex.date&&old.date&&ex.date>old.date) this.sharedEvents.push({task_id:ex.id, actor_id:owner, kind:'later'}); }
+        out.push({id:r.id}); changed.push(ex); return; }
+      const towner=this.shOwner(r.task_id||(ex&&ex.task_id));
+      if(!ex){ const row=Object.assign({id:r.id, left_at:null, removed:null, deleted:null, pushed:r.user_id===towner?ts:null, created:null}, r, {owner_id:owner, server_ts:ts}); m.set(r.id,row); out.push({id:r.id}); changed.push(row); this.shTouch(row.task_id); return; }
+      if(Date.parse(r.modified)<Date.parse(ex.modified)) return; const old=Object.assign({}, ex);
+      Object.assign(ex, r, {task_id:old.task_id, user_id:old.user_id, owner_id:old.owner_id, server_ts:ts});
+      if(owner!==towner){ ex.key=old.key; ex.removed=old.removed; ex.deleted=old.deleted; ex.pushed=old.pushed; }
+      if(owner!==old.user_id&&!(owner===towner&&ex.left_at==null)) ex.left_at=old.left_at;
+      if((old.removed&&!ex.removed)||(old.left_at&&!ex.left_at)){ ex.pushed=null; this.shTouch(ex.task_id); }
+      out.push({id:r.id}); changed.push(ex); });
+    changed.forEach(row=>this.shNotify(table, row)); return out; }
+  shTouch(tid){ const t=this.t.shared_tasks.get(tid); if(t){ t.server_ts=this.ts(); this.shNotify('shared_tasks', t); } }
+  // Realtime by the rules: everyone in the task (and the person of a member row)
+  shNotify(table, row){ const tid=table==='shared_tasks'?row.id:row.task_id, who=new Set([this.shOwner(tid)]); [...this.t.shared_members.values()].forEach(m=>{ if(m.task_id===tid&&!m.left_at&&!m.removed) who.add(m.user_id); });
+    if(table==='shared_members') who.add(row.user_id); who.forEach(u=>{ if(u) this.notify(u, table, row); }); }
   err(message, details){ return {__err:{message, details:details||null}}; }
   handle(page, op, a){ this.calls.push((this.tags.get(page)||'?')+':'+op+(a&&a.table?':'+a.table:''));
     if(this.jwt&&!['signIn','refresh','subscribe','unsubscribe'].includes(op)&&!(this.tokens.get(a&&a.tok)>Date.now())){ this.anonCalls.push((this.tags.get(page)||'?')+':'+op);
@@ -119,7 +157,7 @@ function fakeAdapter(){
   const call=async(op,a)=>{ if(!navigator.onLine) throw new TypeError('Failed to fetch'); const r=await window.fakeServer(op,Object.assign({}, a, {tok:sess().token||null})); if(r&&r.__err){ const e=new Error(r.__err.message); e.details=r.__err.details; throw e; } return r; };
   const owner=()=>{ const s=JSON.parse(localStorage.getItem('fake-session')||'null'); return s&&s.id; };
   const b64=async blob=>new Promise((res,rej)=>{ const rd=new FileReader(); rd.onload=()=>res(String(rd.result).split(',')[1]||''); rd.onerror=()=>rej(rd.error); rd.readAsDataURL(blob); });
-  window.__tareasRemote = {
+  window.__tareasRemote = { shared:!!window.__fakeShared, // decision 88: the shared tables, only when the test asks for them
     async init(){ return JSON.parse(localStorage.getItem('fake-session')||'null'); },
     onAuth(cb){ window.__fakeAuth=cb; },
     async signIn(){ const u=await window.fakeServer('signIn', {uid:window.__fakeUser.uid, email:window.__fakeUser.email}); localStorage.setItem('fake-session', JSON.stringify(u)); setTimeout(()=>window.__fakeAuth&&window.__fakeAuth(u,'SIGNED_IN'),0); },
@@ -162,7 +200,7 @@ async function device(browser, fake, o, port, errors){
   if(o.dark) vp.colorScheme='dark';
   const ctx = await browser.newContext(vp); const page = await ctx.newPage(); fake.tags.set(page, o.tag);
   page.on('pageerror', e=>errors.push(o.tag+' pageerror: '+e.message)); page.on('console', m=>{ if(m.type()==='error'&&!/Failed to fetch/.test(m.text())) errors.push(o.tag+' console: '+m.text()); });
-  await page.exposeBinding('fakeServer', (src, op, a)=>fake.handle(src.page, op, a)); await page.addInitScript(fakeAdapter); await page.addInitScript(u=>{ window.__fakeUser=u; }, o.user);
+  await page.exposeBinding('fakeServer', (src, op, a)=>fake.handle(src.page, op, a)); if(fake.shared) await page.addInitScript(()=>{ window.__fakeShared=true; }); await page.addInitScript(fakeAdapter); await page.addInitScript(u=>{ window.__fakeUser=u; }, o.user);
   if(o.init) await page.addInitScript(o.init);
   await page.addInitScript(s=>{ if(!localStorage.getItem('tareas-v1')) localStorage.setItem('tareas-v1', s); }, JSON.stringify(o.seed||seed()));
   await page.goto('http://localhost:'+port+'/'); await page.waitForTimeout(500); return {ctx, page}; }

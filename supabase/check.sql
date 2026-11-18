@@ -34,7 +34,7 @@ with checks(orden, pieza, ok) as (
   union all select 29, 'Contactos: tabla contacts (0011)', to_regclass('public.contacts') is not null
   union all select 30, 'Contactos: contacts en tiempo real (0011)', exists (select 1 from pg_publication_tables where pubname='supabase_realtime' and schemaname='public' and tablename='contacts')
   union all select 31, 'Cifrado: tabla crypto_keys (0012)', to_regclass('public.crypto_keys') is not null
-  union all select 32, 'Cifrado: regla que rechaza texto sin cifrar en las siete tablas (0012)', (select count(*) from pg_trigger where tgname='tareas_require_cipher' and not tgisinternal) = 7
+  union all select 32, 'Cifrado: regla que rechaza texto sin cifrar en las siete tablas (0012)', (select count(*) from pg_trigger where tgname='tareas_require_cipher' and not tgisinternal) >= 7
   union all select 33, 'Cifrado: la app puede vaciar las frases de Siri (0012)', to_regclass('public.inbox') is not null and has_column_privilege('authenticated', 'public.inbox', 'text', 'UPDATE')
   union all select 34, 'Cifrado: columna crypto_keys.migrated (0012)', exists (select 1 from information_schema.columns where table_schema='public' and table_name='crypto_keys' and column_name='migrated')
   union all select 35, 'Equipo: tabla team_members (0013)', to_regclass('public.team_members') is not null

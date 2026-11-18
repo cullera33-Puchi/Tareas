@@ -88,7 +88,7 @@ async function sqlTests(){
   let rows = []; try { rows = (await db.query(fs.readFileSync(path.join(ROOT, 'supabase/check.sql'), 'utf8'))).rows; } catch(e){ err = e.message; }
   check('sql_check_all_ok', rows.length>=23 && rows.every(x=>x.Estado==='OK') && ['tasks\\.estimate \\(0008\\)','tasks\\.postponed \\(0008\\)','tasks\\.carried_since \\(0008\\)'].every(p=>rows.some(x=>new RegExp(p).test(x.Pieza))), {err, bad:rows.filter(x=>x.Estado!=='OK'), n:rows.length});
   const readme = fs.readFileSync(path.join(ROOT, 'supabase/README.md'), 'utf8');
-  check('sql_readme', /`migrations\/0008_estimate_postponed\.sql` \| .* \| v0\.28\.0/.test(readme) && /suma de las \w+ en orden/.test(readme), null);
+  check('sql_readme', /`migrations\/0008_estimate_postponed\.sql` \| .* \| v0\.28\.0/.test(readme) && /suma de las \S+ en orden/.test(readme), null);
   await db.close();
 }
 

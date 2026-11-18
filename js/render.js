@@ -335,7 +335,7 @@ function rowHTML(x, opts={}){
      the priority, so the title gets the width. The line never wraps: the capsule and the names shrink first (stylesheet) */
   // A row with nothing else on the grey line keeps its steps and icons on the right, so it stays one line
   let star=opts.compact?'':(x.focus&&!done&&!opts.simple&&!opts.inFocus?'<span class="ist" title="En Ahora">'+I.starF+'</span>':'');
-  if(!opts.compact){ const pm=meta.findIndex(m=>/class="(waitfor|resp)"/.test(m)), icons=(x.notes&&x.notes.trim()?I.note:'')+(hasAtt(x.id)?I.clip:'')+(x.repeat&&repParse(x.repeat)?'<span class="irp" title="'+esc(repSummary(x.repeat))+'">'+I.repeat+'</span>':'');
+  if(!opts.compact){ const pm=meta.findIndex(m=>/class="(waitfor|resp)"/.test(m)), icons=shIconHTML(x)+(x.notes&&x.notes.trim()?I.note:'')+(hasAtt(x.id)?I.clip:'')+(x.repeat&&repParse(x.repeat)?'<span class="irp" title="'+esc(repSummary(x.repeat))+'">'+I.repeat+'</span>':''); // decision 88: shared
     if(!meta.length) star+=icons+prog;
     else { if(prog) meta.splice(pm<0?meta.length:pm, 0, prog); if(icons) meta.push('<span class="micons">'+icons+'</span>'); } }
   return '<div class="row'+(done?' done':'')+(held?' held':'')+(opts.byDay?' byday':'')+(selected?' selected':'')+'" data-id="'+x.id+'"'+(pc?' style="'+tagVars(pc)+'"':'')+'>'+
@@ -347,11 +347,11 @@ function rowHTML(x, opts={}){
    indicators, the date (or "Aplazada", or when it was done), the reminder and the priority. The R3 rules decide what each column says */
 // Desktop indicators in fixed slots (star of Ahora, notes, paperclip, repeat), so each icon keeps its column from row to row; a slot no row
 // of the list uses takes no room (stylesheet). The column header draws the same empty slots, so its cells stay over the rows'
-const IND_SLOTS=['st','nt','cl','rp'];
+const IND_SLOTS=['st','sh','nt','cl','rp']; // decision 88: sh, a shared task
 const indSlotsHTML = f => IND_SLOTS.map(k=>'<span class="is is-'+k+'">'+(f?f(k):'')+'</span>').join('');
 function deskIndHTML(x, v, opts){ if(opts.compact) return '';
   return indSlotsHTML(k=> k==='st'?(x.focus&&!v.done&&!opts.simple&&!opts.inFocus?'<span class="ist" title="En Ahora">'+I.starF+'</span>':'')
-    : k==='nt'?(x.notes&&x.notes.trim()?I.note:'') : k==='cl'?(hasAtt(x.id)?I.clip:'')
+    : k==='sh'?shIconHTML(x) : k==='nt'?(x.notes&&x.notes.trim()?I.note:'') : k==='cl'?(hasAtt(x.id)?I.clip:'')
     : (x.repeat&&repParse(x.repeat)?'<span class="irp" title="'+esc(repSummary(x.repeat))+'">'+I.repeat+'</span>':'')); }
 /* v0.33.1: a right-hand column takes room only when some row of the list uses it (the :has rules of the stylesheet). The blocks at the
    foot of a list, Completadas and Por confirmar más adelante, are rows apart (opts.xs, class xs): what they show (the time a task was
@@ -628,7 +628,7 @@ function viewDetail(id){
    (x.status!=='done'||x.estimate?'<button class="cell" data-act="pickEstimate"><span class="lbl">Tiempo</span><span class="val">'+(x.estimate?estLabel(x.estimate):'Ninguno')+'</span>'+chev+'</button>':'')+'</div>'+ // decision 56a
    (pushNote(x)?'<div class="footnote push-note">'+pushNote(x)+'</div>':'')+
    (canRemind(x)?'<div class="group"><button class="cell link remcell" data-act="sendRemind">'+MI.send+'<span class="lbl">Enviar recordatorio a '+esc(taskPeople(x)[0])+'</span></button></div>':'')+ // decision 48c
-   noticeCellHTML(x)+ // decision 63b: Avisar a…
+   shareCellHTML(x)+ // decision 88: Compartir con… and who is in it (the lines of Avisar a… under it)
    stepsGroupHTML(x)+ // decision 46
    attWrapHTML(x)+
    '</div>';
@@ -650,7 +650,7 @@ function inspectorHTML(x, p, links){
    '<span class="ilbl">Recordatorio</span>'+pop('pickReminder', x.reminder?fmtDateTime(x.reminder):'Ninguno', !x.reminder, I.bell)+
    (x.status==='waiting'?'<span class="ilbl">Por confirmar</span>'+pop('pickWaiting', x.waitingFor?'Esperando a '+esc(x.waitingFor):'Sí', false, MI.wait):'')+ // decision 41
    (x.status!=='done'||x.responsible?'<span class="ilbl">Responsable</span>'+pop('pickResp', x.responsible?esc(x.responsible):'Ninguno', !x.responsible, I.person):'')+ // decision 48c
-   (canRemind(x)?'<span></span><button class="iremind" data-act="sendRemind">'+MI.send+'Enviar recordatorio</button>':'')+noticeCellHTML(x)+ // decision 63b: Avisar a…
+   (canRemind(x)?'<span></span><button class="iremind" data-act="sendRemind">'+MI.send+'Enviar recordatorio</button>':'')+shareCellHTML(x)+ // decision 88
    '<span class="ilbl">Repetir</span>'+pop('pickRepeat', repParse(x.repeat)?esc(repSummary(x.repeat)):'Nunca', !repParse(x.repeat), I.repeat)+ // decision 38
    '<span class="ilbl">Prioridad</span><div class="seg iseg" role="radiogroup" aria-label="Prioridad">'+seg+'</div>'+
    (x.status!=='done'||x.estimate?'<span class="ilbl">Tiempo</span>'+pop('pickEstimate', x.estimate?estLabel(x.estimate):'Ninguno', !x.estimate, I.est):'')+'</div>'+ // decision 56a

@@ -660,6 +660,7 @@ body.pdragging,body.pdragging *{cursor:grabbing !important;user-select:none;-web
 .app.desktop .main:not(:has(.row:not(.xs) .is-nt:not(:empty))) :is(.colhead,.row:not(.xs)) .is-nt,.app.desktop .main:not(:has(.row .is-nt:not(:empty))) .row.xs .is-nt,
 .app.desktop .main:not(:has(.row:not(.xs) .is-cl:not(:empty))) :is(.colhead,.row:not(.xs)) .is-cl,.app.desktop .main:not(:has(.row .is-cl:not(:empty))) .row.xs .is-cl,
 .app.desktop .main:not(:has(.row:not(.xs) .is-rp:not(:empty))) :is(.colhead,.row:not(.xs)) .is-rp,.app.desktop .main:not(:has(.row .is-rp:not(:empty))) .row.xs .is-rp,
+.app.desktop .main:not(:has(.row:not(.xs) .is-sh:not(:empty))) :is(.colhead,.row:not(.xs)) .is-sh,.app.desktop .main:not(:has(.row .is-sh:not(:empty))) .row.xs .is-sh,
 .app.desktop .main:not(:has(.row:not(.xs) .rsteps:not(:empty))) :is(.colhead,.row:not(.xs)) .rsteps,.app.desktop .main:not(:has(.row .rsteps:not(:empty))) .row.xs .rsteps,
 .app.desktop .main:not(:has(.row:not(.xs) .rc-date:not(:empty))) :is(.colhead,.row:not(.xs)) .rc-date,.app.desktop .main:not(:has(.row .rc-date:not(:empty))) .row.xs .rc-date,
 .app.desktop .main:not(:has(.row:not(.xs) .rc-dl:not(:empty))) :is(.colhead,.row:not(.xs)) .rc-dl,.app.desktop .main:not(:has(.row .rc-dl:not(:empty))) .row.xs .rc-dl,
@@ -1918,3 +1919,9 @@ body.desktop .pdcell .chev{width:8px;height:13px;}
 .pm-pop .pprow:hover .ppic{opacity:0;}
 .pm-pop .pprow.ppconf .ppl{padding-right:70px;}
 .pm-pop .pprow.ppconf .ppdel,.pm-pop .pprow.ppconf .ppdel:hover,.pm-pop .pprow.hl.ppconf .ppdel{background:var(--red);color:#fff;}
+/* Decision 88: shared tasks. The icon of the rows, the cell of the detail and the received cards */
+.inds .ish{display:flex;}
+body:not(.desktop) .row-meta .micons .ish svg{width:13px;height:13px;display:block;}
+.cell.shcell .chev{margin-left:auto;}
+.shrecv .rv-h b{font-weight:600;}
+.shsheet .pplist{margin-bottom:8px;}

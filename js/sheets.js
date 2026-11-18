@@ -169,7 +169,7 @@ function rowMenu(id, src){ const x=task(id); if(!x) return; releaseHold(id);
        .concat(x.status==='pending'?[{label:x.focus?'Quitar de Ahora':'Ahora', icon:x.focus?MI.starOff:MI.star, fn:()=>toggleFocus(id)}]:[]) // decision 39
        .concat(waitItems(x, MI)) // decision 41
        .concat(canRemind(x)?[{label:'Enviar recordatorio', icon:MI.send, fn:()=>remindSheet([id])}]:[]) // decision 48c
-       .concat(noticeItems(x, true)) // decision 63b: Avisar a…
+       .concat(shareItems(x, true)) // decision 88: Compartir con… (it replaced Avisar a…)
        ,
       // v0.37.4 (decision 84, lote C, U7): the less used actions under «Más», so the menu fits beside the row
       [{label:'Más', icon:I.more, menu:()=>({title:'Más', groups:[(DB.spaces.length>1?[{label:'Mover a otro espacio', icon:MI.space, menu:()=>spaceMoveMenu(id)}]:[]).concat([{label:'Duplicar', icon:MI.dup, fn:()=>duplicateTask(id)}, {label:'Seleccionar', icon:MI.select, fn:()=>startSelect(id)}])]})}],

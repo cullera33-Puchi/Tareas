@@ -20,7 +20,8 @@ const TEAM_SENT_COLS='id,recipient_id,task_ref,created,taken,dismissed'; // a se
 const TEAM_FOLLOW_COLS=',planned,done,followed'; // decision 78 (0014_notice_follow.sql): the recipient's planned date and completion, read too once the columns exist
 const SYNC_KEY='tareas-sync', SUPABASE_JS='vendor/supabase-js-2.117.3.umd.js';
 const SYNC_PAGE=1000, SYNC_CHUNK=200, SYNC_OVERLAP=30e3, SYNC_DEBOUNCE=1500, EPOCH='1970-01-01T00:00:00.000Z';
-const SYNC_TABLES=[{list:'spaces', table:'spaces'},{list:'projects', table:'projects'},{list:'tasks', table:'tasks'},{list:'voiceNotes', table:'voice_notes'},{list:'attachments', table:'attachments'},{list:'subtasks', table:'subtasks'},{list:'projectNotes', table:'project_notes'},{list:'contacts', table:'contacts'}]; // attachments and steps after tasks (decisions 29 and 46); project notes after projects (decision 47); contacts last (decision 48c)
+const SYNC_TABLES=[{list:'shareTasks', table:'shared_tasks', virtual:true},{list:'shareMembers', table:'shared_members'},{list:'shareViews', table:'shared_views', virtual:true}, // decision 88: first, so a task shared meanwhile is known as such before the tables below; shared_tasks before shared_members (the key)
+  {list:'spaces', table:'spaces'},{list:'projects', table:'projects'},{list:'tasks', table:'tasks'},{list:'voiceNotes', table:'voice_notes'},{list:'attachments', table:'attachments'},{list:'subtasks', table:'subtasks'},{list:'projectNotes', table:'project_notes'},{list:'contacts', table:'contacts'}]; // attachments and steps after tasks (decisions 29 and 46); project notes after projects (decision 47); contacts last (decision 48c)
 const INITIAL_SPACES=['trabajo','personal'];
 // Local field, column and kind; id, created and modified are common to all.
 // tsOpt (block 9, reminder_sent): sent only when set, so the tasks' signatures from before block 9 stay the same and nothing is sent again;
@@ -42,10 +43,16 @@ const SYNC_FIELDS={
   // Decision 47 (0006_project_notes.sql): the notes of a project, one row each
   project_notes:[['projectId','project_id','id'],['title','title','text'],['body','body','text'],['pinned','pinned','bool']],
   // Decision 48c (0011_contacts.sql): the people of Responsable and Esperando a, one row each
-  contacts:[['name','name','text'],['email','email','textN'],['phone','phone','textN']] };
+  contacts:[['name','name','text'],['email','email','textN'],['phone','phone','textN']],
+  /* Decision 88 (0016_shared.sql): a shared task, in three parts. shared_tasks, the common part (steps as a JSON list, js/share.js); owner_id is
+     read only ('ro': read from the server, never sent nor part of the signature). shared_members, who is in it (owner_id: who added the row,
+     the task's owner). shared_views, this person's own way of keeping it */
+  shared_tasks:[['title','title','text'],['notes','notes','text'],['steps','steps','textN'],['date','date','day'],['deadline','deadline','dayN'],['priority','priority','pri'],['estimate','estimate','intN'],['status','status','status'],['completed','completed','ts'],['carried','carried','bool'],['postponed','postponed','intN'],['carriedSince','carried_since','dayN'],['share','owner_id','ro']],
+  shared_members:[['taskId','task_id','id'],['userId','user_id','id'],['key','key','textN'],['leftAt','left_at','tsN'],['removed','removed','tsN'],['addedBy','owner_id','ro']],
+  shared_views:[['taskId','task_id','id'],['spaceId','space_id','id'],['projectId','project_id','id'],['focus','focus','tsN'],['reminder','reminder','ts'],['reminderSent','reminder_sent','tsOpt'],['responsible','responsible','textN'],['waitingFor','waiting_for','textN']] };
 const syncTs = v => { if(!v) return null; const d=new Date(v); return isNaN(d) ? null : d.toISOString(); };
 const SYNC_TO={ id:v=>v==null||v===''?null:String(v), text:v=>v==null?'':String(v), int:v=>v==null||v===''||isNaN(+v)?null:Math.round(+v), bool:v=>!!v,
-  day:v=>/^\d{4}-\d{2}-\d{2}$/.test(String(v||''))?v:null, dayN:v=>/^\d{4}-\d{2}-\d{2}$/.test(String(v||''))?String(v).slice(0,10):null, ts:syncTs, tsOpt:syncTs, tsN:syncTs, intN:v=>{ const n=v==null||v===''?NaN:Math.round(+v); return isFinite(n)&&n>0?n:null; }, textN:v=>v==null||v===''?null:String(v), pri:v=>['high','mid','none'].includes(v)?v:'none', status:v=>['pending','done','waiting'].includes(v)?v:'pending', kind:v=>['photo','audio'].includes(v)?v:null };
+  day:v=>/^\d{4}-\d{2}-\d{2}$/.test(String(v||''))?v:null, dayN:v=>/^\d{4}-\d{2}-\d{2}$/.test(String(v||''))?String(v).slice(0,10):null, ts:syncTs, tsOpt:syncTs, tsN:syncTs, intN:v=>{ const n=v==null||v===''?NaN:Math.round(+v); return isFinite(n)&&n>0?n:null; }, textN:v=>v==null||v===''?null:String(v), ro:v=>v==null||v===''?null:String(v), pri:v=>['high','mid','none'].includes(v)?v:'none', status:v=>['pending','done','waiting'].includes(v)?v:'pending', kind:v=>['photo','audio'].includes(v)?v:null };
 const syncNullable = k => k==='textN'||k==='tsN'||k==='dayN'||k==='intN';
 // Columns the database turned out not to have (table.column), for this session: 0004_repeat_focus.sql, 0007_deadline.sql or 0008_estimate_postponed.sql not run yet
 const SYNC_NOCOL=new Set();
@@ -53,6 +60,7 @@ const syncNoCol = (table, c) => SYNC_NOCOL.has(table+'.'+c);
 // A local record as a row: always the same keys in the same order, so the signature only changes with the content
 function syncToRow(table, rec){ const row={id:String(rec.id), created:syncTs(rec.created)};
   SYNC_FIELDS[table].forEach(([f,c,k])=>{ let v=SYNC_TO[k](rec[f]); if(k==='status'&&v==='waiting'&&syncNoCol(table,'status:waiting')) v='pending'; // decision 41 on a database that refuses it: pending there, waiting here
+    if(k==='ro') return; // decision 88: read only, the server's alone
     if(syncNullable(k)){ if(v!==null&&!syncNoCol(table,c)) row[c]=v; } else if(k!=='tsOpt'||v!==null) row[c]=v; });
   row.modified=syncTs(rec.modified)||row.created||EPOCH;
   row.deleted=null; // sent every time: a record back after its deletion clears the server's mark
@@ -77,14 +85,15 @@ const syncSkip = (table, rec) => syncDemoId(rec.id) || (table==='spaces'&&INITIA
 // 0006_project_notes.sql): left out of this session's sync
 const SYNC_LATE={attachments:['0003_attachments.sql','Los adjuntos se quedan en este dispositivo'], subtasks:['0005_subtasks.sql','Los pasos se quedan en este dispositivo'], project_notes:['0006_project_notes.sql','Las notas de proyecto se quedan en este dispositivo'], contacts:['0011_contacts.sql','Los contactos se quedan en este dispositivo'],
   inbox:['0010_inbox.sql','Siri y el Atajo de iOS no están disponibles'], shortcut_keys:['0010_inbox.sql','Siri y el Atajo de iOS no están disponibles'], // not synced tables: the Shortcut's inbox and key (js/inbox.js)
-  crypto_keys:['0012_encryption.sql','El cifrado no se puede activar']}; // decision 63a: the account's wrapped data key (js/e2e.js)
+  crypto_keys:['0012_encryption.sql','El cifrado no se puede activar'], // decision 63a: the account's wrapped data key (js/e2e.js)
+  shared_tasks:['0016_shared.sql','Las tareas compartidas no están disponibles'], shared_members:['0016_shared.sql','Las tareas compartidas no están disponibles'], shared_views:['0016_shared.sql','Las tareas compartidas no están disponibles']}; // decision 88 // decision 63a: the account's wrapped data key (js/e2e.js)
 // Whether a request failed because the table is not there: PostgREST's PGRST205 («Could not find the table»), PostgreSQL's 42P01 («relation
 // does not exist»). Nothing else: PGRST002 (a schema cache still loading, as right after all.sql) is a passing error that fails the pass and
 // is retried, never a reason to leave a table out (decision 63a: a table left out would be marked encrypted). The first time it is logged
 function syncAbsent(missing, table, error){ if(!SYNC_LATE[table]||!error) return false; const m=String(error.message||'')+' '+String(error.code||'');
   if(!/42P01|PGRST205|could not find the table|relation .* does not exist/i.test(m)) return false;
   if(!missing.has(table)){ missing.add(table); log('warn','La base de datos no tiene todavía la tabla '+table+': falta '+SYNC_LATE[table][0]+'. '+SYNC_LATE[table][1]); } return true; }
-const syncMissing = table => !!(SY&&SY.remote&&SY.remote.missing&&SY.remote.missing.has(table));
+const syncMissing = table => !!(SY&&SY.remote&&((SY.remote.missing&&SY.remote.missing.has(table))||(SHARE_RT.includes(table)&&!SY.remote.shared))); // decision 88: the shared tables only with an adapter that has them (Supabase; a test's fake says so)
 // The columns this version syncs, per table: a change makes the next run pull that table whole (see syncRun)
 const syncFieldsSig = () => Object.fromEntries(SYNC_TABLES.map(({table})=>[table, (SYNC_FIELDS[table]||[]).map(f=>f[1]).join(',')]));
 function syncState(){ let s=null; try{ s=JSON.parse(localStorage.getItem(SYNC_KEY)||'null'); }catch(e){}
@@ -111,7 +120,7 @@ function supabaseRemote(cfg){
   // the attachments or the steps stay on the device
   const missing=new Set(), absent=(table, error)=>syncAbsent(missing, table, error);
   let lastRefresh=0; // when this adapter last refreshed the session itself (ensureSession)
-  return { missing, baseUrl:cfg.url,
+  return { missing, baseUrl:cfg.url, shared:true, // decision 88: the shared tables (0016_shared.sql; a database without them answers «absent»)
     async init(){
       if(!client){ if(!window.supabase) await loadScript(SUPABASE_JS);
         client=window.supabase.createClient(cfg.url, cfg.anonKey, {auth:{flowType:'pkce', detectSessionInUrl:true, persistSession:true, autoRefreshToken:true, storageKey:'tareas-auth'}}); }
@@ -156,7 +165,7 @@ function supabaseRemote(cfg){
       return rows(res); },
     async markDeleted(table, items){ return rows(await db().from(table).upsert(items.map(x=>({id:x.id, deleted:x.ts, modified:x.ts})), {onConflict:'id', defaultToNull:false}).select('id')); },
     subscribe(uid, onRow, onStatus){ const c=db(); const ch=c.channel(syncTopic(uid)); // a topic of its own: the one being left may linger
-      T.filter(t=>!missing.has(t)).forEach(t=>ch.on('postgres_changes', {event:'*', schema:'public', table:t, filter:'owner_id=eq.'+uid}, p=>{ if(p&&p.new&&p.new.id) onRow(t, p.new); }));
+      T.filter(t=>!missing.has(t)).forEach(t=>ch.on('postgres_changes', Object.assign({event:'*', schema:'public', table:t}, SHARE_RT.includes(t)?{}:{filter:'owner_id=eq.'+uid}), p=>{ if(p&&p.new&&p.new.id) onRow(t, p.new); })); // decision 88: the shared tables by their rules, not by owner
       if(!missing.has('inbox')) ch.on('postgres_changes', {event:'INSERT', schema:'public', table:'inbox', filter:'owner_id=eq.'+uid}, p=>{ if(p&&p.new&&p.new.id) onRow('inbox', p.new); }); // Siri: a phrase just arrived
       if(!missing.has('team_notices')) ch.on('postgres_changes', {event:'INSERT', schema:'public', table:'team_notices', filter:'recipient_id=eq.'+uid}, p=>{ if(p&&p.new&&p.new.id) onRow('team_notices', {id:p.new.id}); }); // decision 63b: a task sent to this member
       ch.subscribe((st, err)=>onStatus(st, err)); return ()=>{ try{ c.removeChannel(ch); }catch(e){} }; },
@@ -232,9 +241,11 @@ function syncRemapSpaces(W, pool){ const out=[], used=new Set();
 // Server rows into the working copy W, newest modified first; st.known learns what the server holds. Returns what changed here
 function syncMerge(W, st, table, rows, stats){
   const list=SYNC_TABLES.find(t=>t.table===table).list, known=st.known[table], dels=st.del[table];
-  const at=new Map(); W[list].forEach((r,i)=>{ if(r&&r.id!=null) at.set(r.id,i); });
+  const ex=shExcluded(W, table); // decision 88: a shared task (and its steps) is not this table's, whatever comes for its id
+  const at=new Map(); W[list].forEach((r,i)=>{ if(r&&r.id!=null&&!(ex&&ex.rec(r))) at.set(r.id,i); });
   let removed=false;
   rows.forEach(row=>{ if(!row||row.id==null||syncDemoId(row.id)) return; const id=row.id;
+    if(ex&&ex.row(row)){ known[id]=row.deleted?'x':'?'; return; } // a copy left from before it was shared: '?' so this device deletes it there
     const i=at.has(id)?at.get(id):-1, local=i>=0?W[list][i]:null;
     const remote=row.deleted?null:crUnread(table, syncFromRow(table,row), local), rsig=remote?syncSig(syncToRow(table,remote)):'x'; // decision 63a: a text that did not open
     if(!local){
@@ -271,31 +282,42 @@ function syncMerge(W, st, table, rows, stats){
    pulled: {table: rows}; o.cursor moves the tables' cursors (a pull; realtime events do not); o.pool runs the space matching */
 function syncApply(pulled, o){ o=o||{};
   const st=syncState(), stats={added:0, updated:0, removed:0, conflicts:[], remaps:[]};
-  const W={spaces:DB.spaces.map(x=>Object.assign({},x)), projects:DB.projects.map(x=>Object.assign({},x)), tasks:DB.tasks.map(x=>Object.assign({},x)), voiceNotes:DB.voiceNotes.map(x=>Object.assign({},x)), attachments:DB.attachments.map(x=>Object.assign({},x)), subtasks:DB.subtasks.map(x=>Object.assign({},x)), projectNotes:DB.projectNotes.map(x=>Object.assign({},x)), contacts:DB.contacts.map(x=>Object.assign({},x)), settings:Object.assign({}, DB.settings)};
+  const W={spaces:DB.spaces.map(x=>Object.assign({},x)), projects:DB.projects.map(x=>Object.assign({},x)), tasks:DB.tasks.map(x=>Object.assign({},x)), voiceNotes:DB.voiceNotes.map(x=>Object.assign({},x)), attachments:DB.attachments.map(x=>Object.assign({},x)), subtasks:DB.subtasks.map(x=>Object.assign({},x)), projectNotes:DB.projectNotes.map(x=>Object.assign({},x)), contacts:DB.contacts.map(x=>Object.assign({},x)), shareMembers:DB.shareMembers.map(x=>Object.assign({},x)), settings:Object.assign({}, DB.settings)};
+  shDerive(W); // decision 88: the shared tasks as the rows of shared_tasks and shared_views, folded back into the tasks after their merge
   if(o.pool || W.spaces.some(s=>INITIAL_SPACES.includes(s.id))) stats.remaps=syncRemapSpaces(W, o.pool||null);
   SYNC_TABLES.forEach(({table})=>{ const rows=pulled[table]||[]; if(rows.length) syncMerge(W, st, table, rows, stats);
-    if(o.cursor) rows.forEach(r=>{ if(syncTime(r.server_ts)>syncTime(st.cursor[table])) st.cursor[table]=r.server_ts; }); });
+    if(o.cursor) rows.forEach(r=>{ if(syncTime(r.server_ts)>syncTime(st.cursor[table])) st.cursor[table]=r.server_ts; });
+    if(table==='shared_views') shFold(W, st, stats); });
+  delete W.shareTasks; delete W.shareViews;
   const folded=stats.folded=foldVoiceNotes(W); // decision 49: voice notes that came from a device on an older version go into Notas, and up as deleted
-  const changed=stats.added+stats.updated+stats.removed+stats.remaps.length+folded;
+  const changed=stats.added+stats.updated+stats.removed+stats.remaps.length+folded+(stats.shared||0);
   if(changed){ const t=todayStr(); W.tasks.forEach(x=>{ if(x.status==='pending'&&x.date&&x.date<t) Object.assign(x, rollPatch(x, t)); if(x.focus&&localDay(x.focus)<t) x.focus=null; }); dedupeSeries(W); dedupeNotices(W); // two devices made the same next task of a series offline, or added the same received task: one stays // as rollOver (a series that does not pile up goes to its next occurrence, decision 65e): never overdue, the reminder goes along (decision 25), Ahora of an earlier day emptied (decision 39), modified untouched
     if(!W.spaces.length) return stats; // never leave the app without a space (load would put Trabajo and Personal back)
     const raw=JSON.stringify(Object.assign({}, DB, W));
     try{ localStorage.setItem(KEY, raw); }catch(e){ log('error','Sincronización: no se pudieron guardar los cambios recibidos: '+(e&&e.message||e)); throw e; }
-    syncWrite(st); reloadFromStorage('sync');
+    syncWrite(st); reloadFromStorage('sync'); shNews(stats); // decision 88: «Enric ha dejado de compartir…»
     stats.conflicts.forEach(c=>log('info','Conflicto resuelto: gana la copia '+(c.won==='servidor'?'del servidor':'local'), {table:c.table, id:c.id}));
     stats.remaps.forEach(r=>log('info','Espacio '+r.name+(r.found?' unido al de la cuenta':' con identificador nuevo'), r));
   } else syncWrite(st);
   return stats; }
 
 /* ---------- Push ---------- */
+// The records of a table as this device has them. Decision 88: the shared tasks are the rows of shared_tasks and shared_views (derived from the
+// tasks, js/share.js), not of tasks; their steps travel inside them, not in subtasks
+function syncRecs(list, table, D){ if(table==='shared_tasks') return shTaskRecs(D.tasks, D.subtasks); if(table==='shared_views') return shViewRecs(D.tasks);
+  if(table==='tasks') return D.tasks.filter(x=>!x||!x.share); if(table==='subtasks'){ const ids=shIds(D.tasks); return ids.size?D.subtasks.filter(x=>!x||!ids.has(x.taskId)):D.subtasks; }
+  return D[list]||[]; }
 // What differs from the server now. dry: only count it (Ajustes), without marking anything
 function syncCollect(dry){ const st=syncState(), now=new Date().toISOString(), up={}, del={}; let n=0, bumped=false;
   SYNC_TABLES.forEach(({list, table})=>{ const known=st.known[table], dels=st.del[table], here=new Set(); up[table]=[]; del[table]=[]; if(syncMissing(table)) return;
-    DB[list].forEach(rec=>{ if(!rec||rec.id==null) return; here.add(rec.id); if(syncSkip(table, rec)) return;
+    if(!dry&&table==='shared_tasks') shStepsBump(DB); // decision 88: a step changed or deleted makes the shared task newer
+    syncRecs(list, table, DB).forEach(rec=>{ if(!rec||rec.id==null) return; here.add(rec.id); if(syncSkip(table, rec)) return;
       if(known[rec.id]==='x' && !dry){ rec.modified=now; bumped=true; } // back after its deletion went up: this copy is the newest
       const row=syncToRow(table, rec), s=syncSig(row); if(s!==known[rec.id]){ const send=syncNoPlaceholder(table, rec, syncSendRow(table, row)); up[table].push({row:send, s, solo:send!==row&&!!rec.cxBad}); n++; }
       if(!dry) delete dels[rec.id]; });
-    Object.keys(known).forEach(id=>{ if(known[id]==='x' || here.has(id) || syncDemoId(id)) return; n++;
+    Object.keys(known).forEach(id=>{ if(known[id]==='x' || here.has(id) || syncDemoId(id)) return;
+      if(table==='shared_tasks'&&!shMayDelete(id, dry, st)) return; // decision 88: only the owner deletes it for everyone; the others leave it
+      n++;
       if(!dry){ if(!dels[id]) dels[id]=now; del[table].push({id, ts:dels[id]}); } }); });
   if(!dry){ syncWrite(st); if(bumped){ SY.quiet=true; try{ save(); } finally{ SY.quiet=false; } } }
   return {up, del, count:n}; }
@@ -532,7 +554,7 @@ const syncWithin = (p, ms) => Promise.race([p, new Promise(r=>setTimeout(()=>r(n
 // when it was still different at the end of that pass (st.dirty), or always when the clock is now before that moment (moved back)
 async function syncOtherPending(){ const st=syncState(), clean=syncTime(st.cleanAt||st.lastSync), since=clean-5000, missing=new Set(st.missing||[]), dirty=new Set(st.dirty||[]), firstOnly=!st.owner||Date.now()<clean; let n=0;
   SYNC_TABLES.forEach(({list, table})=>{ if(missing.has(table)) return; const known=(st.known||{})[table]||{}, here=new Set();
-    DB[list].forEach(rec=>{ if(!rec||rec.id==null) return; here.add(rec.id); if(syncSkip(table, rec)) return; const k=known[rec.id];
+    syncRecs(list, table, DB).forEach(rec=>{ if(!rec||rec.id==null) return; here.add(rec.id); if(syncSkip(table, rec)) return; const k=known[rec.id];
       if(k===undefined||k==='x'){ n++; return; } // never seen by the server, or back after its deletion went up
       if(firstOnly||dirty.has(table+':'+rec.id)||syncTime(rec.modified)>since){ if(syncSig(syncToRow(table, rec))!==k) n++; } });
     Object.keys(known).forEach(id=>{ if(known[id]!=='x'&&!here.has(id)&&!syncDemoId(id)) n++; }); }); // deleted here, not sent

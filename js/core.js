@@ -208,14 +208,14 @@ const KEY = 'tareas-v1';
 let DB = null;
 function blank(){
   const t=new Date().toISOString();
-  return { spaces:[{id:'trabajo',name:'Trabajo',order:0,created:t},{id:'personal',name:'Personal',order:1,created:t}], projects:[], tasks:[], voiceNotes:[], attachments:[], subtasks:[], projectNotes:[], contacts:[], settings:{activeSpace:'trabajo', filter:'hoy', doneOpen:false, theme:'auto', tipsSeen:false, shakeUndo:false, allGroup:'date', hoyGroup:'date'} };
+  return { spaces:[{id:'trabajo',name:'Trabajo',order:0,created:t},{id:'personal',name:'Personal',order:1,created:t}], projects:[], tasks:[], voiceNotes:[], attachments:[], subtasks:[], projectNotes:[], contacts:[], shareMembers:[], settings:{activeSpace:'trabajo', filter:'hoy', doneOpen:false, theme:'auto', tipsSeen:false, shakeUndo:false, allGroup:'date', hoyGroup:'date'} };
 }
 let lastRaw = null; // the stored text this window last read or wrote; another window may have changed it since
 function load(){
   let raw=null; try{ raw=localStorage.getItem(KEY); }catch(e){ log('error','No se pudieron leer los datos: '+(e&&e.message||e)); }
   lastRaw=raw; if(!raw) return blank();
   let d=null; try{ d=JSON.parse(raw); }catch(e){}
-  const b=blank(), lists=['spaces','projects','tasks','voiceNotes','attachments','subtasks','projectNotes','contacts']; // subtasks: decision 46; projectNotes: decision 47; contacts: decision 48c
+  const b=blank(), lists=['spaces','projects','tasks','voiceNotes','attachments','subtasks','projectNotes','contacts','shareMembers']; // subtasks: decision 46; projectNotes: decision 47; contacts: decision 48c
   if(!d || typeof d!=='object' || Array.isArray(d) || !lists.some(k=>Array.isArray(d[k]))){
     // Unreadable data: keep the raw text aside before the first save replaces it
     try{ localStorage.setItem(KEY+'-corrupt', raw); }catch(e){}
@@ -361,7 +361,7 @@ const isForgot = x => !!x && x.status==='pending' && !x.date && !x.deadline && !
    a date, a reminder, Ahora or Por confirmar take it out (updTask). Not offered to a task that repeats or waits. A device on an older version
    sees it as a task without a date */
 const isSomeday = x => !!x && !!x.someday && x.status==='pending' && !x.date && !x.focus && !dlDue(x);
-const canSomeday = x => !!x && x.status==='pending' && !isSomeday(x) && !repParse(x.repeat);
+const canSomeday = x => !!x && x.status==='pending' && !isSomeday(x) && !repParse(x.repeat) && !x.share; // decision 88: not a shared task (its date is everyone's)
 function somedayList(){ return orderTasks(spaceTasks().filter(isSomeday)); }
 const sdSnap = x => ({date:x.date, carried:x.carried, reminder:x.reminder||null, focus:x.focus||null, someday:x.someday||null});
 function setSomeday(id, on, quiet){ const x=task(id); if(!x) return false; if(on?!canSomeday(x):!isSomeday(x)) return false; const old=sdSnap(x); releaseHold(id);
@@ -509,7 +509,7 @@ const repSeriesId = () => uid().replace(/-/g,'').slice(0,8);
    Decision 65e: 'end' ({until, count, skip}, from Personalizada) sets how the series ends and whether it piles up. Without it (the quick
    choices) a series keeps the end and the flag it had, and a new one does not pile up (skip), the default from decision 65 on.
    A count starts at this task (;n1) unless the series already counted; changing only the end keeps the anchor and the rhythm */
-function setRepeat(id, freq, end){ const x=task(id); if(!x) return; const cur=repParse(x.repeat), old={repeat:x.repeat||null, date:x.date, carried:x.carried};
+function setRepeat(id, freq, end){ const x=task(id); if(!x||(freq&&x.share)) return; // decision 88: a shared task never repeats const cur=repParse(x.repeat), old={repeat:x.repeat||null, date:x.date, carried:x.carried};
   if(!freq){ if(!x.repeat) return; updTask(id,{repeat:null}); haptic(6); render(); log('info','Repetición quitada'); toast('Ya no se repite', ()=>updTask(id,{repeat:old.repeat})); return; }
   const r=repParse(freq); if(!r) return; const e=end||(cur?{until:cur.until, count:cur.count, skip:cur.f==='A'||cur.skip}:{skip:true}); // an A rule has no flag of its own: back on the calendar it takes the default
   r.until=e.until||null; r.count=e.count||null; r.skip=!!e.skip&&r.f!=='A'; r.idx=r.count?(cur&&cur.count&&cur.idx||1):null;
@@ -630,6 +630,8 @@ function updTask(id, patch){ const x=task(id); if(!x) return; if('date' in patch
   if(x.someday && !('someday' in patch) && (patch.date || patch.reminder || patch.focus || patch.status==='waiting')) patch.someday=null; // decision 85: a day, a reminder, Ahora or Por confirmar take it out of Algún día
   // Block 9: a reminder that changes notifies once more (reminderSent cleared), unless it is already past: then it is marked as sent and never notifies
   if('reminder' in patch && !('reminderSent' in patch) && (patch.reminder||null)!==(x.reminder||null)) patch.reminderSent=sentStamp(patch.reminder);
+  // Decision 88: a shared task keeps two times, its common part's (modified) and this person's own part's (vmod)
+  if(x.share){ const now=new Date().toISOString(), ks=Object.keys(patch); Object.assign(x, patch); if(ks.some(k=>SH_OWN.includes(k))) x.vmod=now; if(ks.some(k=>!SH_OWN.includes(k)&&k!=='vmod'&&k!=='modified'&&k!=='sentTo')) x.modified=now; save(); return; }
   Object.assign(x, patch, {modified:new Date().toISOString()}); save(); }
 /* Decision 25: a task that changes day through rollOver, Aplazar, Pasar lo pendiente a mañana, the reviews, planning, the desktop quick dates
    or a calendar drag takes a reminder set on its old day to the new day, at the same time. If that time has already passed (yesterday's

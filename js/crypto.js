@@ -13,7 +13,7 @@
 const CRYPTO_ITER=600000, CRYPTO_KDB='tareas-keys', CRYPTO_PREFIX='e1:', CRYPTO_MAGIC='TAREASE1';
 // The encrypted columns of each synced table (server names); everything else stays plain (dates, reminder, priority, status, ids, counts)
 const CRYPTO_COLS={ tasks:['title','notes','waiting_for','responsible'], projects:['name'], spaces:['name'], subtasks:['title'],
-  project_notes:['title','body'], contacts:['name','email','phone'], voice_notes:['text'] };
+  project_notes:['title','body'], contacts:['name','email','phone'], voice_notes:['text'], shared_views:['responsible','waiting_for'] }; // decision 88: the person's own fields of a shared task
 const cryptoTE=new TextEncoder(), cryptoTD=new TextDecoder();
 const cryptoSubtle = () => { const c=self.crypto; if(!c||!c.subtle) throw new Error('Este navegador no permite cifrar'); return c.subtle; };
 function cryptoRandom(n){ const b=new Uint8Array(n); self.crypto.getRandomValues(b); return b; }
@@ -95,6 +95,10 @@ const cryptoKeyForget = () => cryptoKdbDo('readwrite', st=>st.delete('data'));
 // The title (tasks.title) and the project name (projects.name) of a push, opened with the key of this device.
 // Without a key, or when a value does not open, nothing secret is shown: «Recordatorio» as the title and no project
 async function cryptoPushPayload(d){ d=d||{};
+  // Decision 88: the title of a shared task comes sealed with the task's key ('s1:'), kept on the device as 'share:<task id>'
+  if(typeof d.title==='string'&&d.title.startsWith('s1:')){ let t=null; try{ const tid=d.data&&d.data.taskId, r=tid?await cryptoKdbDo('readonly', st=>st.get('share:'+tid)):null;
+      if(r&&r.key){ const b=cryptoUnb64(d.title.slice(3)); t=cryptoTD.decode(await cryptoSubtle().decrypt({name:'AES-GCM', iv:b.subarray(0,12), additionalData:cryptoTE.encode('shared_tasks.title')}, r.key, b.subarray(12))); } }catch(e){ t=null; }
+    d=Object.assign({}, d, {title:t==null?'Recordatorio':t}); }
   if(!cryptoIsEnc(d.title)&&!cryptoIsEnc(d.body)) return d;
   let k=null; try{ k=await cryptoKeyLoad(); }catch(e){}
   const open=async(v, table, col)=>{ if(!cryptoIsEnc(v)) return v; if(!k) return null; try{ return await cryptoDec(k.key, v, cryptoAad(table, col)); }catch(e){ return null; } };

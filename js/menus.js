@@ -301,7 +301,7 @@ function postponeSheet(id, src){ releaseHold(id); const m=postponeMenu(id); if(m
 /* ---------- Decision 38: Repetir ----------
    The Repetir row of the detail (iPhone) and of the inspector (desktop): an anchored menu (a Mac menu on the desktop) with Nunca, the usual
    rules and Personalizada, which opens a sheet on the iPhone and a popover on the desktop (pickerPanel) */
-function repeatMenu(id, src){ const x=task(id); if(!x) return; if(x.share){ toast('Una tarea compartida no se puede repetir'); return; } // decision 88 const k=x.repeat?repPresetOf(x.repeat):'none', b=x.date||todayStr();
+function repeatMenu(id, src){ const x=task(id); if(!x) return; if(x.share){ toast('Una tarea compartida no se puede repetir'); return; } /* decision 88 */ const k=x.repeat?repPresetOf(x.repeat):'none', b=x.date||todayStr();
   const it=(key, label)=>({label, on:k===key, fn:()=>setRepeat(id, key==='none'?null:repPreset(key, b))});
   const at=src?{anchor:src, align:UI.wide?'left':'right'}:taskAnchor(id, 'pickRepeat')||{};
   popMenu(Object.assign(at, {groups:[[it('none','Nunca')], [it('daily','Cada día'), it('work','Cada día laborable'), it('week','Cada semana'), it('week2','Cada 2 semanas'), it('month','Cada mes'), it('year','Cada año')], [it('aweek','Cada semana desde que la hice')], // decision 65b

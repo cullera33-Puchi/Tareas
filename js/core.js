@@ -509,7 +509,7 @@ const repSeriesId = () => uid().replace(/-/g,'').slice(0,8);
    Decision 65e: 'end' ({until, count, skip}, from Personalizada) sets how the series ends and whether it piles up. Without it (the quick
    choices) a series keeps the end and the flag it had, and a new one does not pile up (skip), the default from decision 65 on.
    A count starts at this task (;n1) unless the series already counted; changing only the end keeps the anchor and the rhythm */
-function setRepeat(id, freq, end){ const x=task(id); if(!x||(freq&&x.share)) return; // decision 88: a shared task never repeats const cur=repParse(x.repeat), old={repeat:x.repeat||null, date:x.date, carried:x.carried};
+function setRepeat(id, freq, end){ const x=task(id); if(!x||(freq&&x.share)) return; /* decision 88: a shared task never repeats */ const cur=repParse(x.repeat), old={repeat:x.repeat||null, date:x.date, carried:x.carried};
   if(!freq){ if(!x.repeat) return; updTask(id,{repeat:null}); haptic(6); render(); log('info','Repetición quitada'); toast('Ya no se repite', ()=>updTask(id,{repeat:old.repeat})); return; }
   const r=repParse(freq); if(!r) return; const e=end||(cur?{until:cur.until, count:cur.count, skip:cur.f==='A'||cur.skip}:{skip:true}); // an A rule has no flag of its own: back on the calendar it takes the default
   r.until=e.until||null; r.count=e.count||null; r.skip=!!e.skip&&r.f!=='A'; r.idx=r.count?(cur&&cur.count&&cur.idx||1):null;

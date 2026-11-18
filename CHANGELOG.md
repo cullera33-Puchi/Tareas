@@ -1,5 +1,11 @@
 # Registro de cambios
 
+## v0.38.1. Borrar nombres del desplegable de personas (18 de noviembre de 2026)
+
+- Desplegable de personas de Responsable y «Esperando a» (decisión 87): solo lista los contactos y los nombres que usan las tareas abiertas (pendientes, o por confirmar en el caso de «Esperando a»), de cualquier espacio; un nombre que solo usan tareas completadas ya no sale (`pickNames`).
+- Borrar desde el propio desplegable: en el iPhone, deslizar el nombre a la izquierda muestra «Eliminar»; en el ordenador, una × al pasar el ratón. El primer toque pregunta en la propia fila («¿Eliminar «X» de la lista?»), el segundo borra el contacto, con Deshacer; un toque en otra fila solo cierra. Un nombre que usa alguna tarea abierta no se borra y la fila dice «Lo usa N tareas abiertas» durante unos segundos (`pickUses`, `pickDelete`). Las tareas conservan sus nombres. Sin cambios en el modelo de datos ni en Supabase.
+- Prueba nueva `rm-PK`.
+
 ## v0.38.0. Planificar el día y «Algún día» (14 de noviembre de 2026)
 
 - Planificar el día (decisión 86, punto 72a): recorrido corto en una hoja, desde el menú de tres puntos de Hoy (iPhone y escritorio, con el día abierto) y desde una celda arriba de Hoy hasta las 12:00 mientras no se haya hecho ese día en el dispositivo (`settings.planDay`; abrirlo cuenta como hecho). Pasos, cada uno con Seguir y sin salir si no hay nada que hacer: Aplazadas («Repasar una a una» con el repaso de siempre, que vuelve al recorrido, o «Dejarlas todas para hoy»), Entregas próximas (pendientes con entrega en los próximos 3 días que no están en Hoy, con botón «Hoy» que se puede deshacer en el sitio), Carga de hoy (horas frente al tope, tiempo estimado de un toque para las que no lo tienen y, por encima del tope, casillas en las que se pueden mover, con las no prioritarias marcadas desde el final y sin más de las necesarias; «Pasar N a mañana» cuenta como aplazamiento) y Ahora (de 3 a 5, marcadas las que ya están y, hasta tres, las que propondría «¿Qué hago ahora?»). Al final, «Día planificado: 4 en Ahora, 4 h 15 de 6 h» con Deshacer de todo el recorrido; lo mismo si la hoja se cierra a medias. Código en `js/planday.js` (`planDayStart`, `pdStep`, `pdLoadPick`, `pdAhoraPick`, `pdEnd`); `reviewStart(kind, o)` acepta continuar dentro del recorrido y `restorePrev` deshace un repaso. Sin cambios de datos.

@@ -34,7 +34,7 @@ with checks(orden, pieza, ok) as (
   union all select 29, 'Contactos: tabla contacts (0011)', to_regclass('public.contacts') is not null
   union all select 30, 'Contactos: contacts en tiempo real (0011)', exists (select 1 from pg_publication_tables where pubname='supabase_realtime' and schemaname='public' and tablename='contacts')
   union all select 31, 'Cifrado: tabla crypto_keys (0012)', to_regclass('public.crypto_keys') is not null
-  union all select 32, 'Cifrado: regla que rechaza texto sin cifrar en las siete tablas (0012)', (select count(*) from pg_trigger where tgname='tareas_require_cipher' and not tgisinternal) = 7
+  union all select 32, 'Cifrado: regla que rechaza texto sin cifrar en las siete tablas (0012)', (select count(*) from pg_trigger where tgname='tareas_require_cipher' and not tgisinternal) >= 7
   union all select 33, 'Cifrado: la app puede vaciar las frases de Siri (0012)', to_regclass('public.inbox') is not null and has_column_privilege('authenticated', 'public.inbox', 'text', 'UPDATE')
   union all select 34, 'Cifrado: columna crypto_keys.migrated (0012)', exists (select 1 from information_schema.columns where table_schema='public' and table_name='crypto_keys' and column_name='migrated')
   union all select 35, 'Equipo: tabla team_members (0013)', to_regclass('public.team_members') is not null
@@ -50,6 +50,9 @@ with checks(orden, pieza, ok) as (
   union all select 45, 'Seguimiento: quien recibe la tarea puede marcarlas (0014)', case when (select count(*) from information_schema.columns where table_schema='public' and table_name='team_notices' and column_name in ('planned','done')) < 2 then false else has_column_privilege('authenticated', 'public.team_notices', 'done', 'UPDATE') and has_column_privilege('authenticated', 'public.team_notices', 'planned', 'UPDATE') end
   union all select 46, 'Seguimiento: regla de los cambios y aviso al completar otra vez (0014)', (select count(*) from pg_trigger where tgname in ('tareas_notice_follow','tareas_notice_followed') and not tgisinternal) = 2
   union all select 47, 'Algún día: columna someday en tasks (0015)', exists (select 1 from information_schema.columns where table_schema='public' and table_name='tasks' and column_name='someday')
+  union all select 48, 'Compartidas: tablas shared_tasks, shared_members, shared_views y shared_events (0016)', (select count(*) from information_schema.tables where table_schema='public' and table_name in ('shared_tasks','shared_members','shared_views','shared_events')) = 4
+  union all select 49, 'Compartidas: reglas de acceso por participante (0016)', (select count(*) from pg_policies where schemaname='public' and tablename in ('shared_tasks','shared_members','shared_views')) >= 8
+  union all select 50, 'Compartidas: reglas de escritura y avisos (0016)', (select count(*) from pg_trigger where tgname in ('tareas_shared_task_before','tareas_shared_task_after','tareas_shared_member_before','tareas_shared_member_after','tareas_shared_view_before') and not tgisinternal) = 5
 )
 select orden as "N.º", pieza as "Pieza", case when ok then 'OK' else 'FALTA' end as "Estado"
 from checks order by orden;

@@ -22,6 +22,9 @@
 //                              account). A reminder of an account without access is marked and not sent. Before 0013 runs none of it does.
 //                              Then (decision 78, 0014_notice_follow.sql) «Víctor ha completado una tarea que le enviaste» to the sender of a
 //                              task its recipient has completed, once per completion; nothing of the task. Before 0014 runs it does nothing.
+//                              Then (decision 88, 0016_shared.sql) shared tasks: «Enric ha compartido una tarea contigo» to who was added,
+//                              each person's own reminders of them (shared_views), and «Víctor ha completado (o aplazado) una tarea
+//                              compartida» to the others in it; nothing of the task. Before 0016 runs it does nothing.
 //   POST {test:true, id?} with the user's JWT in Authorization
 //                              A test notification to the caller's own devices (only the one with that id when given).
 //
@@ -174,7 +177,7 @@ const clip = (s: string, n: number) => (s.length > n ? s.slice(0, n - 1) + '…'
 // name; past either, the notification says only «Recordatorio», with no project
 const E_TITLE = 2400, E_PROJECT = 600;
 function pushText(title: string, project: string) {
-  const et = title.startsWith('e1:'), ep = project.startsWith('e1:');
+  const et = title.startsWith('e1:') || title.startsWith('s1:'), ep = project.startsWith('e1:'); // decision 88: 's1:', a shared task's title
   if ((et && title.length > E_TITLE) || (ep && project.length > E_PROJECT)) return { title: 'Recordatorio', body: '' };
   return { title: et ? title : clip(title, 180), body: ep ? project : clip(project, 80) };
 }
@@ -357,6 +360,76 @@ async function sendFollow(c: Conf): Promise<Record<string, number>> {
   const out = jobs.length ? await deliver(c, await vapid(c), jobs) : { sent: 0, failed: 0, gone: 0 };
   return { completed: rows.length, completedSent: out.sent, completedFailed: out.failed };
 }
+/* Decision 88 (0016_shared.sql): shared tasks. Three kinds of notification, each claimed in one statement as the others (a run at the same
+   time finds them marked) and, when the server saw them more than an hour before, marked without notifying:
+   - a reminder of a shared task: from each person's own part (shared_views), only while the task is open and the person still in it; the
+     title goes as stored ('s1:', the task's key, opened by the person's device), the project name as the person's own ('e1:');
+   - «Enric ha compartido una tarea contigo»: a person added to a task (shared_members, pushed empty; the owner's own row is marked at once);
+   - «Víctor ha completado una tarea compartida» and «… ha aplazado una tarea compartida» (shared_events), to everyone else in it.
+   Nothing of the task in the last two. Before 0016 (no such tables): nothing, said once per instance */
+let sharedMissing = false;
+function sharedSkip(e: unknown): boolean {
+  if (!absent(e)) return false;
+  if (!sharedMissing) { sharedMissing = true; console.log(JSON.stringify({ event: 'shared-skipped', reason: '0016_shared.sql not run' })); }
+  return true;
+}
+async function subsOf(c: Conf, ids: string[]): Promise<Sub[]> {
+  if (!ids.length) return [];
+  return (await rest(c, 'GET', 'push_subscriptions?' + qs({ owner_id: inList(ids), deleted: 'is.null', select: 'id,owner_id,endpoint,p256dh,auth' }))).data as Sub[];
+}
+async function sendShared(c: Conf): Promise<Record<string, number>> {
+  const now = new Date(), nowIso = now.toISOString(), fresh = (iso: string) => now.getTime() - Date.parse(iso) <= LATE_LIMIT_MS;
+  let views: { id: string; task_id: string; owner_id: string; project_id: string | null; reminder: string }[] = [];
+  let added: { id: string; task_id: string; user_id: string; owner_id: string; created: string | null; server_ts: string }[] = [];
+  let events: { id: number; task_id: string; actor_id: string | null; kind: string; created: string }[] = [];
+  try {
+    views = (await rest(c, 'PATCH', 'shared_views?' + qs({ reminder: 'lte.' + nowIso, reminder_sent: 'is.null', deleted: 'is.null', select: 'id,task_id,owner_id,project_id,reminder' }), { reminder_sent: nowIso }, 'return=representation')).data || [];
+    added = (await rest(c, 'PATCH', 'shared_members?' + qs({ pushed: 'is.null', removed: 'is.null', left_at: 'is.null', deleted: 'is.null', select: 'id,task_id,user_id,owner_id,created,server_ts' }), { pushed: nowIso }, 'return=representation')).data || [];
+    events = (await rest(c, 'PATCH', 'shared_events?' + qs({ pushed: 'is.null', select: 'id,task_id,actor_id,kind,created' }), { pushed: nowIso }, 'return=representation')).data || [];
+  } catch (e) {
+    if (sharedSkip(e)) return { shared: 0 };
+    throw e;
+  }
+  const dueViews = views.filter(v => fresh(v.reminder)), newMembers = added.filter(m => fresh(m.server_ts || m.created || nowIso)), evs = events.filter(e => fresh(e.created));
+  if (!dueViews.length && !newMembers.length && !evs.length) return { sharedDue: views.length, sharedAdded: added.length, sharedEvents: events.length };
+  // The tasks and who is still in them
+  const tids = [...new Set([...dueViews.map(v => v.task_id), ...evs.map(e => e.task_id), ...newMembers.map(m => m.task_id)])];
+  const tasks = new Map<string, { id: string; title: string | null; status: string | null; deleted: string | null; date: string | null }>();
+  ((await rest(c, 'GET', 'shared_tasks?' + qs({ id: inList(tids), select: 'id,title,status,deleted,date' }))).data as { id: string; title: string | null; status: string | null; deleted: string | null; date: string | null }[]).forEach(t => tasks.set(t.id, t));
+  const members = (await rest(c, 'GET', 'shared_members?' + qs({ task_id: inList(tids), removed: 'is.null', left_at: 'is.null', deleted: 'is.null', select: 'task_id,user_id' }))).data as { task_id: string; user_id: string }[];
+  const inTask = (tid: string, uid: string) => members.some(m => m.task_id === tid && m.user_id === uid);
+  const open = (tid: string) => { const t = tasks.get(tid); return !!t && !t.deleted && (t.status === 'pending' || t.status === 'waiting'); };
+  const jobs: { sub: Sub; msg: Message }[] = [];
+  // Reminders
+  let rems = dueViews.filter(v => open(v.task_id) && inTask(v.task_id, v.owner_id));
+  const remAllowed = await teamAllowed(c, [...new Set(rems.map(v => v.owner_id))]); if (remAllowed) rems = rems.filter(v => remAllowed.has(v.owner_id));
+  // Who told the others (and who shared), for the names
+  const people = [...new Set([...evs.map(e => e.actor_id).filter(Boolean) as string[], ...newMembers.map(m => m.owner_id)])];
+  const names = new Map<string, { name: string | null; email: string | null }>();
+  if (people.length) ((await rest(c, 'GET', 'team_members?' + qs({ user_id: inList(people), select: 'user_id,name,email' }))).data as { user_id: string; name: string | null; email: string | null }[]).forEach(m => names.set(m.user_id, m));
+  const told: { to: string; msg: Message }[] = [];
+  for (const m of newMembers) if (tasks.has(m.task_id) && !tasks.get(m.task_id)!.deleted && m.user_id !== m.owner_id)
+    told.push({ to: m.user_id, msg: { title: 'Tareas', body: firstName(names.get(m.owner_id)) + ' ha compartido una tarea contigo', tag: 'share-' + m.id, data: { open: 'received', url: './?open=received' } } });
+  for (const e of evs) {
+    if (!tasks.has(e.task_id) || tasks.get(e.task_id)!.deleted) continue;
+    const body = firstName(names.get(e.actor_id || '')) + (e.kind === 'done' ? ' ha completado una tarea compartida' : ' ha aplazado una tarea compartida');
+    members.filter(m => m.task_id === e.task_id && m.user_id !== e.actor_id).forEach(m => told.push({ to: m.user_id, msg: { title: 'Tareas', body, tag: 'shev-' + e.id, data: { taskId: e.task_id, follow: true, url: './?task=' + encodeURIComponent(e.task_id) } } }));
+  }
+  const toldAllowed = await teamAllowed(c, [...new Set(told.map(t => t.to))]);
+  const toldOk = toldAllowed ? told.filter(t => toldAllowed.has(t.to)) : told;
+  const subs = await subsOf(c, [...new Set([...rems.map(v => v.owner_id), ...toldOk.map(t => t.to)])]);
+  const pids = [...new Set(rems.map(v => v.project_id).filter(Boolean))] as string[];
+  const pnames = new Map<string, string>();
+  if (pids.length) ((await rest(c, 'GET', 'projects?' + qs({ id: inList(pids), deleted: 'is.null', select: 'id,name' }))).data as { id: string; name: string }[]).forEach(p => pnames.set(p.id, p.name));
+  for (const v of rems) {
+    const t = tasks.get(v.task_id)!;
+    const msg: Message = { ...pushText(t.title || 'Recordatorio', (v.project_id && pnames.get(v.project_id)) || 'Recordatorio'), tag: v.task_id, data: { taskId: v.task_id, projectId: v.project_id || null, url: './?task=' + encodeURIComponent(v.task_id) } };
+    subs.filter(s => s.owner_id === v.owner_id).forEach(sub => jobs.push({ sub, msg }));
+  }
+  for (const t of toldOk) subs.filter(s => s.owner_id === t.to).forEach(sub => jobs.push({ sub, msg: t.msg }));
+  const out = jobs.length ? await deliver(c, await vapid(c), jobs) : { sent: 0, failed: 0, gone: 0 };
+  return { sharedDue: views.length, sharedAdded: added.length, sharedEvents: events.length, sharedSent: out.sent, sharedFailed: out.failed };
+}
 // The removal 30 days after the access was removed (decision 71.4): the files first (a few hundred per run), then the rows, once none is left.
 // tareas_team_remove checks again the 30 days and never touches an admin or an active member
 async function removeMembers(c: Conf): Promise<Record<string, number>> {
@@ -425,7 +498,8 @@ export async function handler(req: Request): Promise<Response> {
     // (the access check, say) never turns the follow-up off for the instance's life
     const teamAbsent = team.teamAbsent === 1; delete team.teamAbsent;
     if (!teamAbsent) { try { Object.assign(team, await sendFollow(c)); } catch (e) { console.error(JSON.stringify({ event: 'follow-failed', error: String((e as Error)?.message || e) })); team.followFailed = 1; } }
-    if (team.notices || team.feedback || team.completed) console.log(JSON.stringify({ event: 'team', ...team, ms: Date.now() - t0 }));
+    if (!teamAbsent) { try { Object.assign(team, await sendShared(c)); } catch (e) { console.error(JSON.stringify({ event: 'shared-failed', error: String((e as Error)?.message || e) })); team.sharedFailed = 1; } } // decision 88
+    if (team.notices || team.feedback || team.completed || team.sharedDue || team.sharedAdded || team.sharedEvents) console.log(JSON.stringify({ event: 'team', ...team, ms: Date.now() - t0 }));
     let removal: Record<string, number> = {};
     try { removal = await removeMembers(c); } catch (e) { console.error(JSON.stringify({ event: 'removal-failed', error: String((e as Error)?.message || e) })); removal = { removalFailed: 1 }; }
     return json({ ...out, ...purge, ...team, ...removal });

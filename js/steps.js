@@ -55,9 +55,9 @@ function toggleStep(sid){ const s=stepRec(sid); if(!s) return; flushEdits(); s.d
 function deleteStep(sid, quiet){ const i=DB.subtasks.findIndex(s=>s&&s.id===sid); if(i<0) return;
   // A step deleted on purpose leaves the screen even if the focus is in it (its Eliminar button, or its title on the iPhone): the focus goes first
   document.querySelectorAll('.step[data-st="'+CSS.escape(sid)+'"]').forEach(el=>{ const ae=document.activeElement; if(ae&&el.contains(ae)&&ae.blur) ae.blur(); if(openVn===el) openVn=null; });
-  const [s]=DB.subtasks.splice(i,1); save(); haptic(quiet?4:14); stepsRefresh(s.taskId);
+  const [s]=DB.subtasks.splice(i,1); stepTouch(s.taskId); save(); haptic(quiet?4:14); stepsRefresh(s.taskId); // decision 88: a shared task is newer
   if(quiet) return; log('info','Paso eliminado');
-  toast('Paso eliminado', ()=>{ if(!DB.subtasks.some(x=>x.id===s.id)) DB.subtasks.push(s); save(); stepsRefresh(s.taskId); }); }
+  toast('Paso eliminado', ()=>{ if(!DB.subtasks.some(x=>x.id===s.id)) DB.subtasks.push(s); stepTouch(s.taskId); save(); stepsRefresh(s.taskId); }); }
 // Moves a step to index i of its task's steps, with Deshacer (the orders of all of them come back)
 function reorderStep(sid, i){ const s=stepRec(sid); if(!s) return false; const all=stepsOf(s.taskId), from=all.indexOf(s); if(i===from||i<0||i>=all.length) return false;
   const prev=all.map(o=>({id:o.id, order:o.order})), list=all.filter(o=>o!==s);
@@ -66,7 +66,7 @@ function reorderStep(sid, i){ const s=stepRec(sid); if(!s) return false; const a
   return true; }
 // Several lines pasted (or one typed) in Añadir paso: one step each, in order, with one Deshacer when there are several (R6's cleaning)
 function addStepLines(taskId, lines, index){ const out=[]; batch(()=>{ lines.forEach((l,k)=>{ if(l) out.push(addStep(taskId, l, index==null?null:index+k)); }); }); stepsRefresh(taskId);
-  if(out.length>1){ haptic(8); log('info','Pasos añadidos desde una lista', {n:out.length}); toast(out.length+' pasos añadidos', ()=>{ const ids=new Set(out.map(s=>s.id)); DB.subtasks=DB.subtasks.filter(s=>!ids.has(s.id)); save(); stepsRefresh(taskId); }); }
+  if(out.length>1){ haptic(8); log('info','Pasos añadidos desde una lista', {n:out.length}); toast(out.length+' pasos añadidos', ()=>{ const ids=new Set(out.map(s=>s.id)); DB.subtasks=DB.subtasks.filter(s=>!ids.has(s.id)); stepTouch(taskId); save(); stepsRefresh(taskId); }); }
   return out; }
 // R17: the desktop menu of a step (its button, or the right button at the pointer); on the iPhone the swipes and the long press do this
 function stepMenu(sid, at){ const s=stepRec(sid); if(!s) return; const all=stepsOf(s.taskId), i=all.indexOf(s);

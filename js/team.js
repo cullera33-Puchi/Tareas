@@ -23,7 +23,8 @@ const TM={ state:undefined, for:null, me:null, at:0, force:false, dir:[], dirAt:
   priv:null, pub:null, keyKid:null, keyOwner:null, keyBusy:false, deniedLogged:false, askedKey:false, noSpace:false, busy:false };
 // Icons: «Avisar a…» (a speaker) and Recibidas (a tray with an arrow into it)
 const TI={ notice:mi('<path d="M3.5 10.5v3a1 1 0 001 1h2l5 4.5V5L6.5 9.5h-2a1 1 0 00-1 1z"/><path d="M15.5 9a4.5 4.5 0 010 6M18.5 6a8.5 8.5 0 010 12"/>'),
-  recv:mi('<path d="M4 13.5v5h16v-5"/><path d="M12 3.5v10M8 9.5l4 4 4-4"/>') };
+  recv:mi('<path d="M4 13.5v5h16v-5"/><path d="M12 3.5v10M8 9.5l4 4 4-4"/>'),
+  share:mi('<circle cx="9" cy="8" r="3.2"/><path d="M3.5 19a5.5 5.5 0 0111 0"/><circle cx="17" cy="9" r="2.6"/><path d="M15.6 14.3a4.6 4.6 0 015 4.7"/>') }; // decision 88: two people
 const TEAM_ABSENT=/PGRST20[25]|42883|42P01|Could not find the (function|table)|does not exist/i;
 const teamAbsentErr = e => !!e && TEAM_ABSENT.test(String(e.message||'')+' '+String(e.code||''));
 const teamOn = () => !!(SY&&SY.user&&TM.for===SY.user.id&&(TM.state==='admin'||TM.state==='member'));
@@ -35,7 +36,7 @@ function teamCache(){ try{ const v=JSON.parse(localStorage.getItem(TEAM_KEY)||'n
 function teamCacheWrite(){ if(!SY||!SY.user||TM.for!==SY.user.id) return;
   try{ localStorage.setItem(TEAM_KEY, JSON.stringify({owner:SY.user.id, state:TM.state, me:TM.me, dir:TM.dir, recv:TM.recv, sent:TM.sent, followGone:[...followGone()]})); }catch(e){} }
 // A new account (or none): what was known of another one goes
-function teamReset(user){ Object.assign(TM, {state:undefined, for:user?user.id:null, me:null, at:0, force:false, dir:[], dirAt:0, recv:[], recvAt:0, list:null, listAt:0, inbox:null, priv:null, pub:null, keyKid:null, keyOwner:null, deniedLogged:false, askedKey:false, noSpace:false, sent:[], sentAt:0, sentForce:false, followSig:null, followAt:0, followOff:0, followErr:false, followSkip:false, followGone:new Set()});
+function teamReset(user){ SHK.raw.clear(); SHK.key.clear(); /* decision 88: the task keys of another account */ Object.assign(TM, {state:undefined, for:user?user.id:null, me:null, at:0, force:false, dir:[], dirAt:0, recv:[], recvAt:0, list:null, listAt:0, inbox:null, priv:null, pub:null, keyKid:null, keyOwner:null, deniedLogged:false, askedKey:false, noSpace:false, sent:[], sentAt:0, sentForce:false, followSig:null, followAt:0, followOff:0, followErr:false, followSkip:false, followGone:new Set()});
   const c=teamCache(); if(user&&c&&c.owner===user.id){ TM.state=['admin','member','denied'].includes(c.state)?c.state:undefined; TM.me=c.me||null; TM.dir=Array.isArray(c.dir)?c.dir:[]; TM.recv=Array.isArray(c.recv)?c.recv:[]; TM.sent=Array.isArray(c.sent)?c.sent:[]; TM.followGone=new Set(Array.isArray(c.followGone)?c.followGone:[]); }
   else { try{ localStorage.removeItem(TEAM_KEY); }catch(e){} } }
 
@@ -158,7 +159,7 @@ async function teamSentFetch(force){ const R=SY&&SY.remote; if(!R||!R.noticeSent
   catch(e){ if(!TM.sentErr){ TM.sentErr=true; log('warn','Equipo: avisos enviados no disponibles, se usa lo de este dispositivo: '+(e&&e.message||e)); } } }
 // Realtime: a task sent to this member, a pass soon reads it
 function teamRecvSoon(){ clearTimeout(TM.recvT); TM.recvT=setTimeout(()=>syncRun('aviso'), 300); }
-const recvCount = () => teamOn()?TM.recv.length:0;
+const recvCount = () => teamOn()?TM.recv.length+shPendingList().length:0; // decision 88: the tasks shared with this person, waiting too
 const recvFrom = o => { const m=teamMember(o.from); return m?teamFirst(m):String(o.fromName||'').split(/\s+/)[0]||'Alguien'; };
 function teamRepaint(){ if(sheet.classList.contains('on')&&sheet.querySelector('.recvsheet')) recvPaintSheet(); if(busyEditing()||touchDrag){ staleView=true; return; } render(); }
 // iPhone: one line at the top of Hoy while something waits
@@ -175,13 +176,13 @@ function recvCardHTML(o){ const when=syncAgo(o.created);
   return '<div class="recv" data-recv="'+esc(o.id)+'"><div class="rv-h"><b>De '+esc(recvFrom(o))+'</b><span>'+esc(when)+'</span></div><div class="rv-t">'+esc(o.title||'Sin título')+'</div>'+
     (o.phrase?'<div class="rv-p">«'+esc(o.phrase)+'»</div>':'')+(meta?'<div class="rv-m">'+esc(meta)+'</div>':'')+(o.notes?'<div class="rv-n">'+esc(o.notes.length>280?o.notes.slice(0,279)+'…':o.notes)+'</div>':'')+
     '<div class="rv-acts"><button class="btn" data-act="tmRecvDrop" data-id="'+esc(o.id)+'">Descartar</button><button class="btn primary" data-act="tmRecvAdd" data-id="'+esc(o.id)+'">Añadir a mis tareas</button></div></div>'; }
-function recvListHTML(){ if(!TM.recv.length) return '<div class="empty recvempty">'+TI.recv.replace('<svg','<svg style="width:44px;height:44px"')+'<b>No hay tareas recibidas</b>Aquí llegan las tareas que te envían con Avisar a.</div>';
+function recvListHTML(){ const sh=shPendingList(); if(sh.length) return '<div class="recvlist">'+sh.map(shRecvCardHTML).join('')+TM.recv.map(recvCardHTML).join('')+'</div>'; if(!TM.recv.length) return '<div class="empty recvempty">'+TI.recv.replace('<svg','<svg style="width:44px;height:44px"')+'<b>No hay tareas recibidas</b>Aquí llegan las tareas que te envían con Avisar a.</div>';
   return '<div class="recvlist">'+TM.recv.map(recvCardHTML).join('')+'</div>'; }
 // iPhone: the sheet of Recibidas; the desktop shows the same list in its column (view 'received')
 function recvSheet(){ if(UI.wide){ setDeskView('received'); return; }
   openSheet('<div class="shead"><span></span><h2>Recibidas</h2><button class="hbtn ok" data-x="cancel">Hecho</button></div><div class="wsheet recvsheet">'+recvListHTML()+'</div>', s=>{
     s.onclick=e=>{ if(e.target.closest('[data-x=cancel]')){ closeSheet(); return; } const a=e.target.closest('[data-act]'); if(a) teamAct(a.dataset.act, a, null, e); }; }); }
-function recvPaintSheet(){ const w=sheet.querySelector('.recvsheet'); if(!w) return; if(!TM.recv.length){ closeSheet(); return; } w.innerHTML=recvListHTML(); }
+function recvPaintSheet(){ const w=sheet.querySelector('.recvsheet'); if(!w) return; if(!TM.recv.length&&!shPendingList().length){ closeSheet(); return; } w.innerHTML=recvListHTML(); }
 // «Añadir a mis tareas»: the project first (the active space's, or none), then an ordinary task of this member with what the copy brought
 function recvAddMenu(id, src){ const o=TM.recv.find(x=>x.id===id); if(!o||o.title==null) return;
   const dot=c=>'<span class="pm-dot" style="background:'+c+'"></span>';
@@ -485,6 +486,9 @@ function teamAct(a, el, detailId, e){
     case 'tmRecvAdd': recvAddMenu(el.dataset.id, el); break;
     case 'tmRecvDrop': recvDrop(el.dataset.id); break;
     case 'tmNotice': if(detailId) noticeSheet(detailId); break;
+    case 'tmShare': if(detailId) shareSheet(detailId); break; // decision 88
+    case 'tmShAdd': shAddMenu(el.dataset.id, el); break;
+    case 'tmShDrop': shLeave(el.dataset.id); teamRepaint(); break;
     case 'tmFeedback': feedbackSheet(); break;
     case 'tmInvite': inviteSheet(); break;
     case 'tmMember': memberSheet(el.dataset.id); break;

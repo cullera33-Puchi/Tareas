@@ -1,5 +1,15 @@
 # Registro de cambios
 
+## v0.39.0. Tareas compartidas (18 de noviembre de 2026)
+
+- Tareas compartidas entre miembros del Equipo (decisión 88, punto 43 revisado con Enric el 18 de noviembre). «Compartir con…» sustituye a «Avisar a…» en la pulsación larga, el clic derecho, el menú del detalle, el detalle y el inspector; lo ya enviado con «Avisar a…» (Recibidas, líneas de seguimiento) sigue igual. Solo con miembros del Equipo que ya tienen sus claves, y no en tareas que se repiten.
+- Una tarea compartida es la misma para todos: título, notas, pasos, fecha, entrega, prioridad, tiempo, estado y la marca de aplazada son comunes; proyecto, espacio, Ahora, recordatorio, responsable y «Esperando a» son de cada persona. Fotos y audios se quedan con quien los añadió (segunda versión). No se puede repetir ni pasar a «Algún día».
+- Quien la comparte añade y quita personas y es el único que la elimina para todos (con «Se eliminará también para Víctor»); los demás «Salen de la tarea» (su Eliminar también es salir). La tarea recibida espera en Recibidas con «Añadir a mis tareas» (eligiendo proyecto) o «No, gracias». Quien es quitado o ve la tarea eliminada recibe «Enric ha dejado de compartir…» o «Enric ha eliminado…».
+- Cifrado: cada tarea compartida tiene su propia clave AES-GCM, entregada a cada persona cifrada con su clave del Equipo (`t1:`); título, notas y pasos van como `s1:`. El servidor no lee nada. El service worker abre el título de un recordatorio con la clave de la tarea guardada en el dispositivo.
+- Supabase: migración `0016_shared.sql` con `shared_tasks` (parte común), `shared_members` (quién está, con la clave de cada uno), `shared_views` (parte de cada persona) y `shared_events` (completada o aplazada), reglas por participante y la puerta del Equipo. `send-reminders` avisa de las tareas compartidas contigo, de tus recordatorios en ellas y de cuando otra persona las completa o aplaza, sin contenido.
+- Sincronización (`js/sync.js`): las tareas compartidas se derivan como filas de `shared_tasks` y `shared_views` y se vuelven a juntar tras la fusión (`shTaskRecs`, `shViewRecs`, `shFold`); las filas antiguas de `tasks` y `subtasks` con su id se ignoran y se borran (`shExcluded`). Código nuevo en `js/share.js`.
+- Página de privacidad actualizada. Pruebas: `rm-SH` nueva (SQL con PGlite y recorrido con dos cuentas), escenario de avisos compartidos en `rm-TM`, `rm-AV` adaptada.
+
 ## v0.38.1. Borrar nombres del desplegable de personas (18 de noviembre de 2026)
 
 - Desplegable de personas de Responsable y «Esperando a» (decisión 87): solo lista los contactos y los nombres que usan las tareas abiertas (pendientes, o por confirmar en el caso de «Esperando a»), de cualquier espacio; un nombre que solo usan tareas completadas ya no sale (`pickNames`).

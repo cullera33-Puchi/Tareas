@@ -1,5 +1,16 @@
 [
   {
+    "version": "0.39.0",
+    "date": "2026-11-18",
+    "items": [
+      "Nuevo «Compartir con…»: comparte una tarea con personas del Equipo. Es la misma tarea para todos: cualquiera la edita y la completa, y los cambios se ven en los dos lados.",
+      "Cada uno la guarda en su proyecto y con su propio recordatorio. Las fotos y audios no se comparten por ahora.",
+      "Te avisa cuando alguien te comparte una tarea (llega a Recibidas), y cuando la completa o la aplaza otra persona.",
+      "Solo quien la compartió añade o quita personas y puede eliminarla para todos; los demás pueden salir de la tarea.",
+      "«Compartir con…» sustituye a «Avisar a…». Lo que ya enviaste con «Avisar a…» sigue funcionando como hasta ahora."
+    ]
+  },
+  {
     "version": "0.38.1",
     "date": "2026-11-18",
     "items": [

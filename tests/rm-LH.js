@@ -422,7 +422,7 @@ async function sqlTests(){
   let rows = []; try { rows = (await db.query(fs.readFileSync(path.join(ROOT, 'supabase/check.sql'), 'utf8'))).rows; } catch(e){ err = e.message; }
   check('sql_check_all_ok', rows.length>=24 && rows.every(x=>x.Estado==='OK') && rows.some(x=>/spaces\.closed_day \(0009\)/.test(x.Pieza)), {err, bad:rows.filter(x=>x.Estado!=='OK'), n:rows.length});
   const readme = fs.readFileSync(path.join(ROOT, 'supabase/README.md'), 'utf8');
-  check('sql_readme', /`migrations\/0009_closed_day\.sql`/.test(readme) && /suma de las \w+ en orden/.test(readme));
+  check('sql_readme', /`migrations\/0009_closed_day\.sql`/.test(readme) && /suma de las \S+ en orden/.test(readme));
   await db.close();
 }
 // The service worker: the actions of a desktop notification and the ?snooze= it opens (read from the source, the worker needs HTTPS push)

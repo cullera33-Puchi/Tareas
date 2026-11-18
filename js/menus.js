@@ -270,7 +270,7 @@ function deskTaskMenu(id){ const x=task(id); if(!x) return null; const done=x.st
   return {groups:[
     [{label:done?'Marcar pendiente':'Completar', key:'C', fn:()=>{ releaseHold(id); leaveRows(id); setTimeout(()=>{ completeTask(id); renderAnimated(); },200); }}].concat(x.status==='pending'?[{label:x.focus?'Quitar de Ahora':'Ahora', key:'A', fn:()=>toggleFocus(id)}]:[]).concat(waitItems(x)), // decisions 39 and 41
     [{label:'Fecha', menu:()=>dateMenu(id)}].concat(x.status!=='done'?[{label:'Fecha límite', menu:()=>deadlineMenu(id)}]:[], canSnooze(x)?[{label:'Posponer recordatorio', menu:()=>snoozeMenu(id)}]:[], [{label:'Prioridad', menu:()=>({title:'Prioridad', groups:[prioItems(x, id)]})}].concat(x.status!=='done'?[{label:'Tiempo', menu:()=>estimateMenu(id)}]:[], [{label:'Proyecto', key:'P', menu:()=>projectPickMenu(id)}])).concat(DB.spaces.length>1?[{label:'Mover a otro espacio', menu:()=>spaceMoveMenu(id)}]:[]),
-    (x.status!=='done'?[{label:'Responsable…', fn:()=>responsibleSheet(id)}]:[]).concat(canRemind(x)?[{label:'Enviar recordatorio…', fn:()=>remindSheet([id])}]:[], noticeItems(x)), // decision 48c; decision 63b: Avisar a…
+    (x.status!=='done'?[{label:'Responsable…', fn:()=>responsibleSheet(id)}]:[]).concat(canRemind(x)?[{label:'Enviar recordatorio…', fn:()=>remindSheet([id])}]:[], shareItems(x)), // decision 88: Compartir con… replaces Avisar a… // decision 48c; decision 63b: Avisar a…
     [{label:'Duplicar', fn:()=>duplicateTask(id)}],
     [{label:'Eliminar', key:'Supr', red:true, fn:()=>confirmDelete(id)}] ]}; }
 function duplicateTask(id){ const x=task(id); if(!x) return; const n=addTask(Object.assign({title:x.title, projectId:x.projectId, priority:x.priority, notes:x.notes, spaceId:x.spaceId}, x.deadline?{deadline:x.deadline}:{}, x.estimate?{estimate:x.estimate}:{}, x.responsible?{responsible:x.responsible}:{})); /* decision 48c: the responsible too; decision 48a: the deadline too; decision 56: the estimate, never the counters */ copySteps(id, n.id); /* decision 46: the steps, unchecked */ haptic(8); renderAnimated(); toast('Tarea duplicada'); openDetail(n.id); }
@@ -278,7 +278,9 @@ function leaveRows(id){ document.querySelectorAll('.row[data-id="'+id+'"]').forE
 function confirmDelete(id, after){ const x=task(id); if(!x) return; releaseHold(id);
   const go=fn=>()=>{ leaveRows(id); setTimeout(()=>{ fn(); after?after():renderAnimated(); },200); };
   if(isOpen(x)&&repGoesOn(x)){ askRepeatDelete({n:1, title:x.title}, go(()=>skipOccurrence(id)), go(()=>deleteTask(id))); return; } // decision 38; decision 65e: the last one of a series that ends is simply deleted
-  confirmSheet('Eliminar tarea', '"'+x.title+'" se eliminará. Podrás deshacerlo durante unos segundos.', go(()=>deleteTask(id))); }
+  if(x.share&&x.share!==shMe()){ shLeaveAsk(id); return; } // decision 88: a task shared with me is left, never deleted for the others
+  const o=x.share?shOthers(x):[]; // decision 88: its owner deletes it for everyone in it
+  confirmSheet('Eliminar tarea', '"'+x.title+'" se eliminará'+(o.length?' también para '+listY(o.map(m=>teamFirst(teamMember(m.userId)))):'')+'. Podrás deshacerlo durante unos segundos.', go(()=>deleteTask(id))); }
 /* Decision 38: a task that repeats (or a selection with some) asks how far the deletion goes: only this one, which moves to the next date of
    its series, or the series. The bottom action sheet on the iPhone, a macOS alert with three buttons on the desktop (Intro: only this one). o: {n, rep, title} */
 function askRepeatDelete(o, onlyFn, seriesFn){ const one=o.n===1, k=o.rep||1;
@@ -290,7 +292,7 @@ function askRepeatDelete(o, onlyFn, seriesFn){ const one=o.n===1, k=o.rep||1;
 function detailMenu(id, src){ const x=task(id); if(!x) return;
   popMenu({anchor:src, align:'right', groups:[
     [{label:x.status==='done'?'Marcar pendiente':'Marcar completada', icon:x.status==='done'?MI.undo:MI.done, key:'C', fn:()=>{ completeTask(id,true); render(); }}].concat(waitItems(x, MI, src)), // decision 41
-    (canRemind(x)?[{label:UI.wide?'Enviar recordatorio…':'Enviar recordatorio', icon:MI.send, fn:()=>remindSheet([id])}]:[]).concat(noticeItems(x, true), somedayItems(id, MI), DB.spaces.length>1?[{label:'Mover a otro espacio', icon:MI.space, menu:()=>spaceMoveMenu(id)}]:[], [{label:'Duplicar', icon:MI.dup, fn:()=>duplicateTask(id)}]), // decision 48c
+    (canRemind(x)?[{label:UI.wide?'Enviar recordatorio…':'Enviar recordatorio', icon:MI.send, fn:()=>remindSheet([id])}]:[]).concat(shareItems(x, true), somedayItems(id, MI), DB.spaces.length>1?[{label:'Mover a otro espacio', icon:MI.space, menu:()=>spaceMoveMenu(id)}]:[], [{label:'Duplicar', icon:MI.dup, fn:()=>duplicateTask(id)}]), // decision 48c
     [{label:'Eliminar tarea', icon:MI.trash, red:true, key:'Supr', fn:()=>confirmDelete(id, closeDetailOf(id))}] ]}); }
 // After a delete from the detail, close that task's detail only if it is still the one showing: Atrás may have been tapped meanwhile
 const closeDetailOf = id => ()=>{ if(detailTaskId()===id) pop(); else renderAnimated(); };
@@ -299,7 +301,7 @@ function postponeSheet(id, src){ releaseHold(id); const m=postponeMenu(id); if(m
 /* ---------- Decision 38: Repetir ----------
    The Repetir row of the detail (iPhone) and of the inspector (desktop): an anchored menu (a Mac menu on the desktop) with Nunca, the usual
    rules and Personalizada, which opens a sheet on the iPhone and a popover on the desktop (pickerPanel) */
-function repeatMenu(id, src){ const x=task(id); if(!x) return; const k=x.repeat?repPresetOf(x.repeat):'none', b=x.date||todayStr();
+function repeatMenu(id, src){ const x=task(id); if(!x) return; if(x.share){ toast('Una tarea compartida no se puede repetir'); return; } /* decision 88 */ const k=x.repeat?repPresetOf(x.repeat):'none', b=x.date||todayStr();
   const it=(key, label)=>({label, on:k===key, fn:()=>setRepeat(id, key==='none'?null:repPreset(key, b))});
   const at=src?{anchor:src, align:UI.wide?'left':'right'}:taskAnchor(id, 'pickRepeat')||{};
   popMenu(Object.assign(at, {groups:[[it('none','Nunca')], [it('daily','Cada día'), it('work','Cada día laborable'), it('week','Cada semana'), it('week2','Cada 2 semanas'), it('month','Cada mes'), it('year','Cada año')], [it('aweek','Cada semana desde que la hice')], // decision 65b

@@ -5,6 +5,10 @@
 - Buzón de sugerencias e incidencias (Equipo): la ficha lleva «Copiar incidencia y registro» («Copiar texto» en una sugerencia), que copia quién, cuándo, versión, dispositivo, el texto y el registro adjunto (`feedbackText`). El registro dentro de la ficha se puede seleccionar: la app bloquea la selección de texto en toda la interfaz y no se podía copiar. Prueba `admin_copies` en `rm-QT`.
 - Incluye en el repositorio la migración `0019_shared_delete_fix.sql`, aplicada en Supabase el mismo día.
 
+## Supabase 0020, recordatorio visto en las tareas compartidas (19 de noviembre de 2026, sin versión nueva de la app)
+
+- Corregido: al marcar como visto un recordatorio por la app, el servidor lo rechazaba («tareas_nudge_to») y se paraba toda la sincronización del dispositivo (iPhone de Jorge, desde las 15:34). PostgreSQL ejecuta el disparador de inserción también cuando el upsert acaba en actualización; con la fila ya existente, `0020_shared_comment_upsert.sql` deja que decidan las reglas de la actualización, y el visto ya no se pierde. Prueba `sql_comment_upsert` en `rm-SH`. La prueba `rm-P` ya no depende de la hora (de 16:55 a 17:00 «En una hora» coincide con «Hoy a las 18:00»).
+
 ## Supabase 0019, borrados en las tablas compartidas (19 de noviembre de 2026, sin versión nueva de la app)
 
 - Corregido: marcar como eliminada una fila de `shared_views`, `shared_members` o `shared_comments` fallaba por NOT NULL y paraba toda la sincronización del dispositivo (iPhone de Enric, de las 11:44 a las 16:01). La migración `0019_shared_delete_fix.sql` rellena esas columnas en los disparadores de inserción. Prueba `sql_delete_marks` en `rm-SH`.

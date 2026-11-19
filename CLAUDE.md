@@ -60,7 +60,7 @@ tareas/
 ├── sw.js                      service worker: caché de la app (SHELL), aviso de actualización y notificaciones
 ├── icons/                     192, 512 y apple-touch-icon
 ├── vendor/                    supabase-js 2.117.3 (UMD), servida y cacheada con la app
-├── supabase/                  migraciones SQL (0001 a 0019), all.sql (todas seguidas), check.sql (comprobación), README.md y la función send-reminders
+├── supabase/                  migraciones SQL (0001 a 0020), all.sql (todas seguidas), check.sql (comprobación), README.md y la función send-reminders
 ├── tests/                     pruebas de regresión con Playwright (sección 7 bis)
 ├── package.json               solo para las pruebas; la app no tiene build
 ├── .github/workflows/pages.yml   pruebas y publicación
@@ -264,6 +264,8 @@ Cambios acordados con Enric sobre el diseño de abajo. Mandan sobre el texto del
 91. **0019, borrados en las tablas compartidas (registro de Enric del 19 de noviembre).** La app marca un registro como eliminado con un upsert que solo lleva `id`, `deleted` y `modified`; PostgreSQL comprueba NOT NULL antes de ver el conflicto, así que en `shared_views`, `shared_members` y `shared_comments` la marca fallaba («null value in column "task_id"») y con ella toda la pasada: el iPhone de Enric no sincronizó nada entre las 11:44 y las 16:01 (la vista de una tarea compartida que había eliminado). `0019_shared_delete_fix.sql` (aplicada por Claude con el visto bueno de Enric) hace que los disparadores de inserción rellenen esas columnas desde la fila existente o desde el id `tarea:usuario`; sin cambios en la app. Comprobación `sql_delete_marks` en `rm-SH`. Lección: el servidor simulado de las pruebas no comprueba NOT NULL; cada tabla compartida nueva necesita su prueba SQL de marca de borrado. Segunda lección (mismo día): un `modified` puesto desde SQL con `now()` lleva microsegundos y la app trabaja con milésimas, así que su copia parece más antigua y el servidor la ignora para siempre («Cambios pendientes 2» en el iPhone de Enric); en SQL, siempre `date_trunc('milliseconds', now())`. Las dos filas de `shared_views` afectadas por la 0017 se corrigieron a mano (más 1 ms).
 
 92. **v0.40.1, copiar una incidencia (Enric, 19 de noviembre).** En la ficha del buzón, «Copiar incidencia y registro» (o «Copiar texto» en una sugerencia) copia quién, cuándo, versión, dispositivo, texto y registro (`feedbackText` en `js/team.js`); el `pre` del registro admite selección. Prueba `admin_copies` en `rm-QT`.
+
+93. **0020, recordatorio visto (registro de Jorge del 19 de noviembre).** Marcar como visto un recordatorio por la app fallaba con «tareas_nudge_to» y paraba toda la sincronización de su iPhone desde las 15:34: PostgreSQL ejecuta el disparador BEFORE INSERT sobre la fila propuesta aunque el upsert acabe en actualización, y ese disparador ponía `owner_id` del que escribe (igual a `to_user`) y vaciaba `seen`. `0020_shared_comment_upsert.sql` (aplicada por Claude con el visto bueno de Enric): si la fila ya existe, el disparador de inserción la deja pasar y deciden las reglas de la actualización. Sin cambios en la app. Prueba `sql_comment_upsert` en `rm-SH`. Lección: en cada tabla, las reglas del disparador de inserción se prueban también con un upsert completo sobre una fila existente, como lo envía la app, no solo con `update`.
 
 ## 9. Decisiones pendientes de Enric (revisión del 1 de noviembre)
 

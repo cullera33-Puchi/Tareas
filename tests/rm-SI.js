@@ -392,7 +392,7 @@ async function sqlTests(){
   // check.sql says FALTA on a database without 0010
   await db.close(); db = await pgSetup(); const upto9 = all.slice(0, all.indexOf('-- ========== migrations/0010_inbox.sql')); await db.exec(upto9);
   rows = (await db.query(fs.readFileSync(path.join(ROOT, 'supabase/check.sql'), 'utf8'))).rows;
-  check('sql_check_falta', rows.filter(x=>x.Estado==='FALTA'&&!/\((0011|001[2-9])\)/.test(x.Pieza)).map(x=>x.Pieza).join('|')==='Siri y Atajo: tabla inbox (0010)|Siri y Atajo: tabla shortcut_keys (0010)|Siri y Atajo: inbox en tiempo real (0010)', rows.filter(x=>x.Estado==='FALTA'));
+  check('sql_check_falta', rows.filter(x=>x.Estado==='FALTA'&&!/\((0011|001[2-9]|002[0-9])\)/.test(x.Pieza)).map(x=>x.Pieza).join('|')==='Siri y Atajo: tabla inbox (0010)|Siri y Atajo: tabla shortcut_keys (0010)|Siri y Atajo: inbox en tiempo real (0010)', rows.filter(x=>x.Estado==='FALTA'));
   await db.close();
   const readme = fs.readFileSync(path.join(ROOT, 'supabase/README.md'), 'utf8');
   check('sql_readme', /`migrations\/0010_inbox\.sql`/.test(readme) && /suma de las (diez|once|doce|trece|catorce|quince|dieciséis|diecisiete|dieciocho|diecinueve|veinte) en orden/.test(readme) && /`add-task`/.test(readme) && /Verify JWT/.test(readme));

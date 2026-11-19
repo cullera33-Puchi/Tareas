@@ -1,5 +1,10 @@
 # Registro de cambios
 
+## v0.40.1. Copiar una incidencia con su registro (19 de noviembre de 2026)
+
+- Buzón de sugerencias e incidencias (Equipo): la ficha lleva «Copiar incidencia y registro» («Copiar texto» en una sugerencia), que copia quién, cuándo, versión, dispositivo, el texto y el registro adjunto (`feedbackText`). El registro dentro de la ficha se puede seleccionar: la app bloquea la selección de texto en toda la interfaz y no se podía copiar. Prueba `admin_copies` en `rm-QT`.
+- Incluye en el repositorio la migración `0019_shared_delete_fix.sql`, aplicada en Supabase el mismo día.
+
 ## Supabase 0019, borrados en las tablas compartidas (19 de noviembre de 2026, sin versión nueva de la app)
 
 - Corregido: marcar como eliminada una fila de `shared_views`, `shared_members` o `shared_comments` fallaba por NOT NULL y paraba toda la sincronización del dispositivo (iPhone de Enric, de las 11:44 a las 16:01). La migración `0019_shared_delete_fix.sql` rellena esas columnas en los disparadores de inserción. Prueba `sql_delete_marks` en `rm-SH`.

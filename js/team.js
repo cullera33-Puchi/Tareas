@@ -473,9 +473,13 @@ function feedbackOpen(id){ const f=(TM.inbox||[]).find(o=>o.id===id); if(!f) ret
   openSheet('<div class="shead"><button class="hbtn" data-x="back">Atrás</button><h2>'+(f.kind==='incidencia'?'Incidencia':'Sugerencia')+'</h2><button class="hbtn ok" data-x="cancel">Hecho</button></div><div class="wsheet fbone">'+
     (b?'<div class="fb-h">'+esc(fbFrom(f)+(b.email?', '+b.email:''))+'<br>'+esc(fmtDateTime(f.created))+'</div><div class="fb-t">'+esc(b.text||'')+'</div><div class="fb-m">v'+esc(b.version||'')+', '+esc(b.device||'')+'</div>'+
       (b.log?'<details class="fb-log"><summary>Registro de la app</summary><pre>'+esc(b.log)+'</pre></details>':''):'<div class="fb-t muted">No se puede leer con la clave de este dispositivo.</div>')+
+    (b?'<button class="wback fbcopy" data-fbcopy>'+(b.log?'Copiar incidencia y registro':'Copiar texto')+'</button>':'')+ // v0.40.1: the whole of it, to paste into a chat (the app does not select text)
     '<button class="wback" data-st="'+(f.status==='resuelta'?'vista':'resuelta')+'">'+(f.status==='resuelta'?'Marcar como no resuelta':'Marcar como resuelta')+'</button></div>', s=>{
-    s.onclick=e=>{ const st=e.target.closest('[data-st]'); if(st){ feedbackStatus(f, st.dataset.st).then(()=>feedbackOpen(id)); return; }
+    s.onclick=e=>{ if(e.target.closest('[data-fbcopy]')){ copyText(feedbackText(f), b.log?'Incidencia y registro copiados':'Copiado'); return; } const st=e.target.closest('[data-st]'); if(st){ feedbackStatus(f, st.dataset.st).then(()=>feedbackOpen(id)); return; }
       const x=e.target.closest('[data-x]'); if(!x) return; if(x.dataset.x==='back') inboxSheet(); else closeSheet(); }; }); }
+// What «Copiar» puts on the clipboard: who, when, version and device, the text and, when it came, the log
+function feedbackText(f){ const b=f.body||{};
+  return [(f.kind==='incidencia'?'Incidencia':'Sugerencia')+' de '+fbFrom(f)+(b.email?', '+b.email:'')+', '+fmtDateTime(f.created), 'v'+(b.version||'')+', '+(b.device||''), '', String(b.text||'')].concat(b.log?['', 'Registro de la app:', String(b.log)]:[]).join('\n'); }
 async function feedbackStatus(f, st, quiet){ try{ await SY.remote.feedbackMark(f.id, st); f.status=st; log('info','Equipo: buzón '+st); if(!quiet) toast(st==='resuelta'?'Resuelta':'Sin resolver'); }
   catch(e){ if(!quiet) toast(syncOffline(e)?'Sin conexión':'No se pudo cambiar'); } }
 

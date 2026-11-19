@@ -92,6 +92,10 @@ async function run(browser){
   const one = await ep.evaluate(()=>({t:document.querySelector('#sheet .fb-t').textContent, m:document.querySelector('#sheet .fb-m').textContent, log:document.querySelector('#sheet .fb-log pre').textContent}));
   check('admin_reads', one.t==='Al pasar la tarea a mañana desaparece el recordatorio' && /^v\d+\.\d+\.\d+, \w+, \w+, 390 x 844$/.test(one.m) && /Inicio v/.test(one.log), one);
   check('marked_vista', await until(ep, ()=>true) && fake.feedback[0].status==='vista');
+  // v0.40.1: Copiar incidencia y registro puts the whole of it on the clipboard
+  const cp = await ep.evaluate(async()=>{ let got=null; const w=navigator.clipboard&&navigator.clipboard.writeText; try{ Object.defineProperty(navigator, 'clipboard', {value:{writeText:async t=>{ got=t; }}, configurable:true}); }catch(e){}
+    document.querySelector('#sheet [data-fbcopy]').click(); await new Promise(r=>setTimeout(r,200)); return {label:document.querySelector('#sheet [data-fbcopy]').textContent, got}; });
+  check('admin_copies', cp.label==='Copiar incidencia y registro' && /^Incidencia de /.test(cp.got||'') && /Al pasar la tarea a mañana/.test(cp.got) && /Registro de la app:\n/.test(cp.got) && /Inicio v/.test(cp.got), {label:cp.label, head:(cp.got||'').slice(0,200)});
   await ep.evaluate(()=>{ document.querySelector('#sheet .fb-log').open=true; }); await ep.waitForTimeout(250); await shot(ep, 'qt-desk-incidencia');
   await ep.click('#sheet [data-st=resuelta]'); check('marked_resuelta', await until(ep, ()=>!!document.querySelector('#sheet [data-st=vista]')) && fake.feedback[0].status==='resuelta');
   await ep.evaluate(()=>closeSheet()); await settled(ep);

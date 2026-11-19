@@ -336,7 +336,7 @@ function rowHTML(x, opts={}){
      the priority, so the title gets the width. The line never wraps: the capsule and the names shrink first (stylesheet) */
   // A row with nothing else on the grey line keeps its steps and icons on the right, so it stays one line
   let star=opts.compact?'':(x.focus&&!done&&!opts.simple&&!opts.inFocus?'<span class="ist" title="En Ahora">'+I.starF+'</span>':'');
-  if(!opts.compact){ const pm=meta.findIndex(m=>/class="(shn|waitfor|resp)"/.test(m)), icons=(done?shIconHTML(x):'')+(x.notes&&x.notes.trim()?I.note:'')+(hasAtt(x.id)?I.clip:'')+(x.repeat&&repParse(x.repeat)?'<span class="irp" title="'+esc(repSummary(x.repeat))+'">'+I.repeat+'</span>':''); // decision 88: shared
+  if(!opts.compact){ const pm=meta.findIndex(m=>/class="(shn|waitfor|resp)"/.test(m)), icons=(done?shIconHTML(x):'')+cmBadgeHTML(x)+(x.notes&&x.notes.trim()?I.note:'')+(hasAtt(x.id)?I.clip:'')+(x.repeat&&repParse(x.repeat)?'<span class="irp" title="'+esc(repSummary(x.repeat))+'">'+I.repeat+'</span>':''); // decision 88: shared
     if(!meta.length) star+=icons+prog;
     else { if(prog) meta.splice(pm<0?meta.length:pm, 0, prog); if(icons) meta.push('<span class="micons">'+icons+'</span>'); } }
   return '<div class="row'+(done?' done':'')+(held?' held':'')+(opts.byDay?' byday':'')+(selected?' selected':'')+'" data-id="'+x.id+'"'+(pc?' style="'+tagVars(pc)+'"':'')+'>'+
@@ -348,11 +348,11 @@ function rowHTML(x, opts={}){
    indicators, the date (or "Aplazada", or when it was done), the reminder and the priority. The R3 rules decide what each column says */
 // Desktop indicators in fixed slots (star of Ahora, notes, paperclip, repeat), so each icon keeps its column from row to row; a slot no row
 // of the list uses takes no room (stylesheet). The column header draws the same empty slots, so its cells stay over the rows'
-const IND_SLOTS=['st','nt','cl','rp']; // v0.39.1: a shared task says its people in the column Persona (shTagHTML), not with an icon
+const IND_SLOTS=['st','cm','nt','cl','rp']; // v0.40.0: cm, unread comments (decision 90) // v0.39.1: a shared task says its people in the column Persona (shTagHTML), not with an icon
 const indSlotsHTML = f => IND_SLOTS.map(k=>'<span class="is is-'+k+'">'+(f?f(k):'')+'</span>').join('');
 function deskIndHTML(x, v, opts){ if(opts.compact) return '';
   return indSlotsHTML(k=> k==='st'?(x.focus&&!v.done&&!opts.simple&&!opts.inFocus?'<span class="ist" title="En Ahora">'+I.starF+'</span>':'')
-    : k==='nt'?(x.notes&&x.notes.trim()?I.note:'') : k==='cl'?(hasAtt(x.id)?I.clip:'')
+    : k==='cm'?cmBadgeHTML(x) : k==='nt'?(x.notes&&x.notes.trim()?I.note:'') : k==='cl'?(hasAtt(x.id)?I.clip:'')
     : (x.repeat&&repParse(x.repeat)?'<span class="irp" title="'+esc(repSummary(x.repeat))+'">'+I.repeat+'</span>':'')); }
 /* v0.33.1: a right-hand column takes room only when some row of the list uses it (the :has rules of the stylesheet). The blocks at the
    foot of a list, Completadas and Por confirmar más adelante, are rows apart (opts.xs, class xs): what they show (the time a task was
@@ -515,7 +515,7 @@ function viewTareas(){
    // down shows it, a second one syncs. The list is never shorter than the screen plus the field (.tlist), so it can always be tucked
    '<div class="scroll"><div class="tlist">'+
    '<div class="searchbar"><div class="search">'+I.search+'<input type="search" placeholder="Buscar" value="'+esc(UI.query)+'" data-role="search" autocomplete="off"></div>'+(UI.query?'<button class="cancel" data-act="clearSearch">Cancelar</button>':'')+'</div>'+
-   (f==='hoy'&&!UI.query?recvBannerHTML():'')+(f==='hoy'&&!UI.query&&!isClosed()?ahoraHTML():'')+ // decision 63b: Recibidas, one line while something waits
+   (f==='hoy'&&!UI.query?recvBannerHTML()+nudgeBannerHTML():'')+(f==='hoy'&&!UI.query&&!isClosed()?ahoraHTML():'')+ // decision 63b: Recibidas, one line while something waits
    (UI.query?'':'<div class="seg"><button data-filter="hoy" class="'+(f==='hoy'?'on':'')+'">'+(isClosed()?'Mañana':'Hoy')+'<span class="n">'+nHoy+'</span>'+hoyLoadHTML()+'</button><button data-filter="todas" class="'+(f==='todas'?'on':'')+'">Todas<span class="n">'+nTodas+'</span></button></div>')+
    (!UI.query&&(activeProjects().length||respChipHTML())?'<div class="pchips">'+respChipHTML()+(activeProjects().length?activeProjects().map(p=>'<button class="chip'+(UI.projFilter===p.id?' on':'')+'" data-pf="'+p.id+'"'+(UI.projFilter===p.id?' style="background:'+p.color+'"':'')+'><span class="dot" style="background:'+(UI.projFilter===p.id?'#fff':p.color)+'"></span>'+esc(p.name)+'</button>').join('')+'<button class="chip'+(UI.projFilter==='none'?' on':'')+'" data-pf="none"><span class="dot" style="background:'+(UI.projFilter==='none'?'#fff':'var(--ink3)')+'"></span>Sin proyecto</button>':'')+'</div>':'')+ // decision 48c: the responsible's chip first
    listHTML(UI.query?'todas':f)+'</div></div>'+
@@ -631,6 +631,7 @@ function viewDetail(id){
    (canRemind(x)?'<div class="group"><button class="cell link remcell" data-act="sendRemind">'+MI.send+'<span class="lbl">Enviar recordatorio a '+esc(taskPeople(x)[0])+'</span></button></div>':'')+ // decision 48c
    shareCellHTML(x)+ // decision 88: Compartir con… and who is in it (the lines of Avisar a… under it)
    stepsGroupHTML(x)+ // decision 46
+   commentsGroupHTML(x)+ // decision 90
    attWrapHTML(x)+
    '</div>';
 }
@@ -656,6 +657,7 @@ function inspectorHTML(x, p, links){
    '<span class="ilbl">Prioridad</span><div class="seg iseg" role="radiogroup" aria-label="Prioridad">'+seg+'</div>'+
    (x.status!=='done'||x.estimate?'<span class="ilbl">Tiempo</span>'+pop('pickEstimate', x.estimate?estLabel(x.estimate):'Ninguno', !x.estimate, I.est):'')+'</div>'+ // decision 56a
    stepsGroupHTML(x)+ // decision 46
+   commentsGroupHTML(x)+ // decision 90
    attWrapHTML(x)+
    '<div class="ifoot">'+[['Creada',x.created],['Modificada',x.modified],['Completada',x.status==='done'&&x.completed]].filter(o=>o[1]).map(o=>{ const w=fmtDateTime(o[1]); return o[0]+' '+w[0].toLowerCase()+w.slice(1)+'<br>'; }).join('')+(pushNote(x)?'<span class="push-note">'+pushNote(x)+'</span>':'')+'</div>'+
    '</div>';
@@ -695,4 +697,5 @@ function bindDetail(el, id){
   no.addEventListener('input',()=>{ saveEdit(x,{notes:no.value}); grow(); clearTimeout(lt); lt=setTimeout(()=>{ refreshLinks(); refreshConvert(); }, 400); });
   no.addEventListener('blur', flushEdits);
   bindSteps(el); // decision 46
+  bindComments(el); // decision 90
 }

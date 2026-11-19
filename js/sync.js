@@ -20,7 +20,7 @@ const TEAM_SENT_COLS='id,recipient_id,task_ref,created,taken,dismissed'; // a se
 const TEAM_FOLLOW_COLS=',planned,done,followed'; // decision 78 (0014_notice_follow.sql): the recipient's planned date and completion, read too once the columns exist
 const SYNC_KEY='tareas-sync', SUPABASE_JS='vendor/supabase-js-2.117.3.umd.js';
 const SYNC_PAGE=1000, SYNC_CHUNK=200, SYNC_OVERLAP=30e3, SYNC_DEBOUNCE=1500, EPOCH='1970-01-01T00:00:00.000Z';
-const SYNC_TABLES=[{list:'shareTasks', table:'shared_tasks', virtual:true},{list:'shareMembers', table:'shared_members'},{list:'shareViews', table:'shared_views', virtual:true}, // decision 88: first, so a task shared meanwhile is known as such before the tables below; shared_tasks before shared_members (the key)
+const SYNC_TABLES=[{list:'shareTasks', table:'shared_tasks', virtual:true},{list:'shareMembers', table:'shared_members'},{list:'shareViews', table:'shared_views', virtual:true},{list:'shareComments', table:'shared_comments'}, // v0.40.0: the comments after the views (decision 90); decision 88: first, so a task shared meanwhile is known as such before the tables below; shared_tasks before shared_members (the key)
   {list:'spaces', table:'spaces'},{list:'projects', table:'projects'},{list:'tasks', table:'tasks'},{list:'voiceNotes', table:'voice_notes'},{list:'attachments', table:'attachments'},{list:'subtasks', table:'subtasks'},{list:'projectNotes', table:'project_notes'},{list:'contacts', table:'contacts'}]; // attachments and steps after tasks (decisions 29 and 46); project notes after projects (decision 47); contacts last (decision 48c)
 const INITIAL_SPACES=['trabajo','personal'];
 // Local field, column and kind; id, created and modified are common to all.
@@ -49,10 +49,11 @@ const SYNC_FIELDS={
      the task's owner). shared_views, this person's own way of keeping it */
   shared_tasks:[['title','title','text'],['notes','notes','text'],['steps','steps','textN'],['date','date','day'],['deadline','deadline','dayN'],['priority','priority','pri'],['estimate','estimate','intN'],['status','status','status'],['completed','completed','ts'],['carried','carried','bool'],['postponed','postponed','intN'],['carriedSince','carried_since','dayN'],['share','owner_id','ro']],
   shared_members:[['taskId','task_id','id'],['userId','user_id','id'],['key','key','textN'],['leftAt','left_at','tsN'],['removed','removed','tsN'],['addedBy','owner_id','ro']],
-  shared_views:[['taskId','task_id','id'],['spaceId','space_id','id'],['projectId','project_id','id'],['focus','focus','tsN'],['reminder','reminder','ts'],['reminderSent','reminder_sent','tsOpt'],['responsible','responsible','textN'],['waitingFor','waiting_for','textN'],['waiting','waiting','bool']] }; // v0.39.1: waiting, this person's Por confirmar (0017_shared_fix.sql)
+  shared_views:[['taskId','task_id','id'],['spaceId','space_id','id'],['projectId','project_id','id'],['focus','focus','tsN'],['reminder','reminder','ts'],['reminderSent','reminder_sent','tsOpt'],['responsible','responsible','textN'],['waitingFor','waiting_for','textN'],['waiting','waiting','bool'],['review','review','dayN'],['readAt','read_at','tsN']], // v0.39.1: waiting, this person's Por confirmar (0017_shared_fix.sql); v0.40.0: their review day and the comments read (0018)
+  shared_comments:[['taskId','task_id','id'],['kind','kind','ckind'],['body','body','textN'],['toUser','to_user','id'],['groupId','group_id','textN'],['seen','seen','tsN'],['addedBy','owner_id','ro']] }; // decision 90 (0018_shared_comments.sql): addedBy is the author // v0.39.1: waiting, this person's Por confirmar (0017_shared_fix.sql)
 const syncTs = v => { if(!v) return null; const d=new Date(v); return isNaN(d) ? null : d.toISOString(); };
 const SYNC_TO={ id:v=>v==null||v===''?null:String(v), text:v=>v==null?'':String(v), int:v=>v==null||v===''||isNaN(+v)?null:Math.round(+v), bool:v=>!!v,
-  day:v=>/^\d{4}-\d{2}-\d{2}$/.test(String(v||''))?v:null, dayN:v=>/^\d{4}-\d{2}-\d{2}$/.test(String(v||''))?String(v).slice(0,10):null, ts:syncTs, tsOpt:syncTs, tsN:syncTs, intN:v=>{ const n=v==null||v===''?NaN:Math.round(+v); return isFinite(n)&&n>0?n:null; }, textN:v=>v==null||v===''?null:String(v), ro:v=>v==null||v===''?null:String(v), pri:v=>['high','mid','none'].includes(v)?v:'none', status:v=>['pending','done','waiting'].includes(v)?v:'pending', kind:v=>['photo','audio'].includes(v)?v:null };
+  day:v=>/^\d{4}-\d{2}-\d{2}$/.test(String(v||''))?v:null, dayN:v=>/^\d{4}-\d{2}-\d{2}$/.test(String(v||''))?String(v).slice(0,10):null, ts:syncTs, tsOpt:syncTs, tsN:syncTs, intN:v=>{ const n=v==null||v===''?NaN:Math.round(+v); return isFinite(n)&&n>0?n:null; }, textN:v=>v==null||v===''?null:String(v), ro:v=>v==null||v===''?null:String(v), pri:v=>['high','mid','none'].includes(v)?v:'none', status:v=>['pending','done','waiting'].includes(v)?v:'pending', kind:v=>['photo','audio'].includes(v)?v:null, ckind:v=>v==='nudge'?'nudge':'comment' };
 const syncNullable = k => k==='textN'||k==='tsN'||k==='dayN'||k==='intN';
 // Columns the database turned out not to have (table.column), for this session: 0004_repeat_focus.sql, 0007_deadline.sql or 0008_estimate_postponed.sql not run yet
 const SYNC_NOCOL=new Set();
@@ -86,7 +87,7 @@ const syncSkip = (table, rec) => syncDemoId(rec.id) || (table==='spaces'&&INITIA
 const SYNC_LATE={attachments:['0003_attachments.sql','Los adjuntos se quedan en este dispositivo'], subtasks:['0005_subtasks.sql','Los pasos se quedan en este dispositivo'], project_notes:['0006_project_notes.sql','Las notas de proyecto se quedan en este dispositivo'], contacts:['0011_contacts.sql','Los contactos se quedan en este dispositivo'],
   inbox:['0010_inbox.sql','Siri y el Atajo de iOS no están disponibles'], shortcut_keys:['0010_inbox.sql','Siri y el Atajo de iOS no están disponibles'], // not synced tables: the Shortcut's inbox and key (js/inbox.js)
   crypto_keys:['0012_encryption.sql','El cifrado no se puede activar'], // decision 63a: the account's wrapped data key (js/e2e.js)
-  shared_tasks:['0016_shared.sql','Las tareas compartidas no están disponibles'], shared_members:['0016_shared.sql','Las tareas compartidas no están disponibles'], shared_views:['0016_shared.sql','Las tareas compartidas no están disponibles']}; // decision 88 // decision 63a: the account's wrapped data key (js/e2e.js)
+  shared_tasks:['0016_shared.sql','Las tareas compartidas no están disponibles'], shared_members:['0016_shared.sql','Las tareas compartidas no están disponibles'], shared_views:['0016_shared.sql','Las tareas compartidas no están disponibles'], shared_comments:['0018_shared_comments.sql','Los comentarios de las tareas compartidas no están disponibles']}; // decision 88 // decision 63a: the account's wrapped data key (js/e2e.js)
 // Whether a request failed because the table is not there: PostgREST's PGRST205 («Could not find the table»), PostgreSQL's 42P01 («relation
 // does not exist»). Nothing else: PGRST002 (a schema cache still loading, as right after all.sql) is a passing error that fails the pass and
 // is retried, never a reason to leave a table out (decision 63a: a table left out would be marked encrypted). The first time it is logged
@@ -282,7 +283,7 @@ function syncMerge(W, st, table, rows, stats){
    pulled: {table: rows}; o.cursor moves the tables' cursors (a pull; realtime events do not); o.pool runs the space matching */
 function syncApply(pulled, o){ o=o||{};
   const st=syncState(), stats={added:0, updated:0, removed:0, conflicts:[], remaps:[]};
-  const W={spaces:DB.spaces.map(x=>Object.assign({},x)), projects:DB.projects.map(x=>Object.assign({},x)), tasks:DB.tasks.map(x=>Object.assign({},x)), voiceNotes:DB.voiceNotes.map(x=>Object.assign({},x)), attachments:DB.attachments.map(x=>Object.assign({},x)), subtasks:DB.subtasks.map(x=>Object.assign({},x)), projectNotes:DB.projectNotes.map(x=>Object.assign({},x)), contacts:DB.contacts.map(x=>Object.assign({},x)), shareMembers:DB.shareMembers.map(x=>Object.assign({},x)), settings:Object.assign({}, DB.settings)};
+  const W={spaces:DB.spaces.map(x=>Object.assign({},x)), projects:DB.projects.map(x=>Object.assign({},x)), tasks:DB.tasks.map(x=>Object.assign({},x)), voiceNotes:DB.voiceNotes.map(x=>Object.assign({},x)), attachments:DB.attachments.map(x=>Object.assign({},x)), subtasks:DB.subtasks.map(x=>Object.assign({},x)), projectNotes:DB.projectNotes.map(x=>Object.assign({},x)), contacts:DB.contacts.map(x=>Object.assign({},x)), shareMembers:DB.shareMembers.map(x=>Object.assign({},x)), shareComments:DB.shareComments.map(x=>Object.assign({},x)), settings:Object.assign({}, DB.settings)};
   shDerive(W); // decision 88: the shared tasks as the rows of shared_tasks and shared_views, folded back into the tasks after their merge
   if(o.pool || W.spaces.some(s=>INITIAL_SPACES.includes(s.id))) stats.remaps=syncRemapSpaces(W, o.pool||null);
   SYNC_TABLES.forEach(({table})=>{ const rows=pulled[table]||[]; if(rows.length) syncMerge(W, st, table, rows, stats);
@@ -295,7 +296,7 @@ function syncApply(pulled, o){ o=o||{};
     if(!W.spaces.length) return stats; // never leave the app without a space (load would put Trabajo and Personal back)
     const raw=JSON.stringify(Object.assign({}, DB, W));
     try{ localStorage.setItem(KEY, raw); }catch(e){ log('error','Sincronización: no se pudieron guardar los cambios recibidos: '+(e&&e.message||e)); throw e; }
-    syncWrite(st); reloadFromStorage('sync'); shNews(stats); // decision 88: «Enric ha dejado de compartir…»
+    syncWrite(st); reloadFromStorage('sync'); shNews(stats); setTimeout(cmNudgeCheck, 600); // decision 88: «Enric ha dejado de compartir…»; decision 90: a reminder's window
     stats.conflicts.forEach(c=>log('info','Conflicto resuelto: gana la copia '+(c.won==='servidor'?'del servidor':'local'), {table:c.table, id:c.id}));
     stats.remaps.forEach(r=>log('info','Espacio '+r.name+(r.found?' unido al de la cuenta':' con identificador nuevo'), r));
   } else syncWrite(st);
@@ -317,6 +318,7 @@ function syncCollect(dry){ const st=syncState(), now=new Date().toISOString(), u
       if(!dry) delete dels[rec.id]; });
     Object.keys(known).forEach(id=>{ if(known[id]==='x' || here.has(id) || syncDemoId(id)) return;
       if(table==='shared_tasks'&&!shMayDelete(id, dry, st)) return; // decision 88: only the owner deletes it for everyone; the others leave it
+      if(table==='shared_comments'&&!cmMayDelete(id, dry, st)) return; // decision 90: a comment goes only when its author deleted it
       n++;
       if(!dry){ if(!dels[id]) dels[id]=now; del[table].push({id, ts:dels[id]}); } }); });
   if(!dry){ syncWrite(st); if(bumped){ SY.quiet=true; try{ save(); } finally{ SY.quiet=false; } } }
@@ -328,8 +330,8 @@ function syncColRefused(table, e){ const m=String(e&&(e.message||e.details||e)||
   if(!/PGRST204|42703|column|schema cache/i.test(m)) return null; return SYNC_NULLCOLS(table).find(c=>!syncNoCol(table,c)&&new RegExp('(^|\\W)'+c+'(\\W|$)').test(m))||null; }
 // The status check of 0001 (pending or done) refuses 'waiting' (decision 41) until 0004 widens it: from then on such tasks go up as pending
 const syncWaitRefused = (table, e) => { const m=String(e&&(e.message||e.details||e)||'')+' '+String(e&&e.code||''); return table==='tasks'&&!syncNoCol(table,'status:waiting')&&/23514|check constraint/i.test(m)&&/status/i.test(m); };
-const NOCOL_WHAT={repeat:'La repetición', focus:'Ahora', waiting_for:'Esperando a', deadline:'La fecha límite', estimate:'El tiempo estimado y las veces que se ha aplazado', closed_day:'El día cerrado', responsible:'El responsable', someday:'Algún día'},
-  NOCOL_FILE={deadline:'0007_deadline.sql', estimate:'0008_estimate_postponed.sql', postponed:'0008_estimate_postponed.sql', carried_since:'0008_estimate_postponed.sql', closed_day:'0009_closed_day.sql', responsible:'0011_contacts.sql', someday:'0015_someday.sql'}; // the migration that adds each column (0004 unless said)
+const NOCOL_WHAT={repeat:'La repetición', focus:'Ahora', waiting_for:'Esperando a', deadline:'La fecha límite', estimate:'El tiempo estimado y las veces que se ha aplazado', closed_day:'El día cerrado', responsible:'El responsable', someday:'Algún día', review:'El día de revisión propio de las compartidas', read_at:'Los comentarios leídos'},
+  NOCOL_FILE={deadline:'0007_deadline.sql', estimate:'0008_estimate_postponed.sql', postponed:'0008_estimate_postponed.sql', carried_since:'0008_estimate_postponed.sql', closed_day:'0009_closed_day.sql', responsible:'0011_contacts.sql', someday:'0015_someday.sql', review:'0018_shared_comments.sql', read_at:'0018_shared_comments.sql'}; // the migration that adds each column (0004 unless said)
 async function syncUpsert(table, rows){ for(;;){ const send=rows.map(r=>{ let o=r; SYNC_NULLCOLS(table).forEach(c=>{ if(syncNoCol(table,c)&&c in o){ if(o===r) o=Object.assign({}, r); delete o[c]; } });
       if(o.status==='waiting'&&syncNoCol(table,'status:waiting')){ if(o===r) o=Object.assign({}, r); o.status='pending'; } return o; });
     try{ return await SY.remote.upsert(table, send); }

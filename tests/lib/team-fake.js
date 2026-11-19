@@ -10,8 +10,8 @@ function serve(port){ const srv = http.createServer((req,res)=>{ let p = decodeU
     const f=path.join(ROOT,p); if(!fs.existsSync(f)||fs.statSync(f).isDirectory()){ res.writeHead(404,{'Content-Type':'text/html'}); res.end('<h1>404</h1>'); return; }
     res.writeHead(200,{'Content-Type':TYPES[path.extname(f)]||'application/octet-stream'}); res.end(fs.readFileSync(f)); });
   return new Promise(r=>srv.listen(port, ()=>r(srv))); }
-const TABLES = ['spaces','projects','tasks','voice_notes','attachments','subtasks','project_notes','contacts','shared_tasks','shared_members','shared_views'];
-const SHT = ['shared_tasks','shared_members','shared_views']; // decision 88 (0016_shared.sql): their own rules, below
+const TABLES = ['spaces','projects','tasks','voice_notes','attachments','subtasks','project_notes','contacts','shared_tasks','shared_members','shared_views','shared_comments'];
+const SHT = ['shared_tasks','shared_members','shared_views','shared_comments']; // decision 88 (0016_shared.sql): their own rules, below
 const ENC = { shared_views:['responsible','waiting_for'], tasks:['title','notes','waiting_for','responsible'], projects:['name'], spaces:['name'], subtasks:['title'], project_notes:['title','body'], contacts:['name','email','phone'], voice_notes:['text'] };
 const isEnc = v => typeof v==='string' && v.startsWith('e1:');
 const RLS = t => new Error('new row violates row-level security policy for table "'+t+'"');
@@ -52,6 +52,7 @@ class Fake {
   rows(owner, table){ if(this.team&&!this.role(owner)) return [];
     if(table==='shared_tasks') return [...this.t[table].values()].filter(r=>r.owner_id===owner||this.shIn(r.id, owner));
     if(table==='shared_members') return [...this.t[table].values()].filter(r=>r.user_id===owner||this.shIn(r.task_id, owner));
+    if(table==='shared_comments') return [...this.t[table].values()].filter(r=>this.shIn(r.task_id, owner));
     return [...this.t[table].values()].filter(r=>r.owner_id===owner); }
   /* Decision 88: the rules of 0016_shared.sql. An active participant (own row, neither left nor removed) or the owner reads the task; the
      owner creates it and its member rows (members of the team only, keys sealed); anyone in it writes it (newest modified wins); only the
@@ -59,7 +60,19 @@ class Fake {
      gets the task touched; completed or postponed with a newer modified makes an event */
   shOwner(tid){ const t=this.t.shared_tasks.get(tid); return t?t.owner_id:null; }
   shIn(tid, uid){ if(this.shOwner(tid)===uid) return true; const m=this.t.shared_members.get(tid+':'+uid); return !!m&&!m.left_at&&!m.removed&&!m.deleted; }
-  writeShared(owner, table, rows){ const ts=this.ts(), out=[], changed=[], m=this.t[table]; this.sharedEvents=this.sharedEvents||[];
+  // Decision 90 (0018_shared_comments.sql): a participant writes their own comments; the person reminded only marks a reminder seen
+  writeComments(owner, rows){ const ts=this.ts(), out=[], changed=[], m=this.t.shared_comments;
+    rows.forEach(r=>{ const ex=m.get(r.id), tid=r.task_id||(ex&&ex.task_id); if(!this.shIn(tid, owner)) throw RLS('shared_comments');
+      if(ex&&ex.owner_id!==owner&&ex.to_user!==owner) throw RLS('shared_comments');
+      if(r.body!=null&&r.body!==''&&!String(r.body).startsWith('s1:')&&!(ex&&ex.body===r.body)) throw new Error('tareas_plaintext_refused: shared_comments.body'); });
+    rows.forEach(r=>{ const ex=m.get(r.id);
+      if(!ex){ if(r.kind==='nudge'&&(!r.to_user||r.to_user===owner)) throw new Error('tareas_nudge_to'); const row=Object.assign({id:r.id, created:null, deleted:null, seen:null, to_user:null, group_id:null}, r, {owner_id:owner, seen:null, server_ts:ts}); m.set(r.id,row); out.push({id:r.id}); changed.push(row); return; }
+      if(Date.parse(r.modified)<Date.parse(ex.modified)) return; const old=Object.assign({}, ex);
+      Object.assign(ex, r, {task_id:old.task_id, owner_id:old.owner_id, kind:old.kind, to_user:old.to_user, group_id:old.group_id, created:old.created, server_ts:ts});
+      if(owner!==old.owner_id){ ex.body=old.body; ex.deleted=old.deleted; if(owner!==old.to_user) ex.seen=old.seen; } else ex.seen=old.seen;
+      out.push({id:r.id}); changed.push(ex); });
+    changed.forEach(row=>this.shNotify('shared_comments', row)); return out; }
+  writeShared(owner, table, rows){ if(table==='shared_comments') return this.writeComments(owner, rows); const ts=this.ts(), out=[], changed=[], m=this.t[table]; this.sharedEvents=this.sharedEvents||[];
     rows.forEach(r=>{ if(!r.id) throw new Error('null id'); if(!r.modified) throw new Error('null value in column "modified"'); const ex=m.get(r.id);
       if(table==='shared_tasks'){ if(ex&&ex.owner_id!==owner&&!this.shIn(r.id, owner)) throw RLS(table);
         ['title','notes','steps'].forEach(c=>{ const v=r[c]; if(v!=null&&v!==''&&!String(v).startsWith('s1:')&&!(ex&&ex[c]===v)) throw new Error('tareas_plaintext_refused: shared_tasks.'+c); }); }

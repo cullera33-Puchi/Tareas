@@ -34,7 +34,7 @@ Desde la 0014, quien envía una tarea con «Avisar a…» ve si la otra persona 
 Desde la 0015, las tareas que pasas a «Algún día» guardan ese dato en Supabase y se ven así en todos los dispositivos. Basta con ejecutar `all.sql` (paso 2); las funciones no cambian. En `check.sql`, la fila 47 dice OK.
 
 ## 8. Tareas compartidas
-Desde la 0016, una tarea se puede compartir con miembros del Equipo: es la misma para todos, cada uno la edita y la completa, y cada uno la guarda en su proyecto y con su recordatorio. Hace falta ejecutar `all.sql` (paso 2) y volver a pegar `send-reminders` y pulsar **Deploy** (paso 3): avisa de las tareas compartidas, de los recordatorios de cada persona y de cuando alguien completa o aplaza una tarea compartida. En `check.sql`, las filas 48 a 51 dicen OK. La 0017 (v0.39.1) corrige el aviso al compartir y hace que «Por confirmar» sea de cada persona.
+Desde la 0016, una tarea se puede compartir con miembros del Equipo: es la misma para todos, cada uno la edita y la completa, y cada uno la guarda en su proyecto y con su recordatorio. Hace falta ejecutar `all.sql` (paso 2) y volver a pegar `send-reminders` y pulsar **Deploy** (paso 3): avisa de las tareas compartidas, de los recordatorios de cada persona y de cuando alguien completa o aplaza una tarea compartida. En `check.sql`, las filas 48 a 52 dicen OK. La 0017 (v0.39.1) corrige el aviso al compartir y hace que «Por confirmar» sea de cada persona. La 0018 (v0.40.0) añade los comentarios, los recordatorios por la app y el día de revisión propio.
 
 ## Qué hay en cada migración
 
@@ -57,5 +57,6 @@ Desde la 0016, una tarea se puede compartir con miembros del Equipo: es la misma
 | `migrations/0015_someday.sql` | «Algún día»: día en que una tarea se apartó allí | v0.38.0 |
 | `migrations/0016_shared.sql` | Tareas compartidas entre miembros del Equipo: parte común cifrada con la clave de la tarea, participantes, parte de cada persona y avisos | v0.39.0 |
 | `migrations/0017_shared_fix.sql` | Tareas compartidas: el aviso «te ha compartido una tarea» sale, y «Por confirmar» pasa a ser de cada persona | v0.39.1 |
+| `migrations/0018_shared_comments.sql` | Tareas compartidas: comentarios, recordatorios por la app y día de revisión propio de «Por confirmar» | v0.40.0 |
 
-`all.sql` es la suma de las diecisiete en orden. Las claves de la app (URL y clave pública) no van aquí: están en los secretos del repositorio de GitHub.
+`all.sql` es la suma de las dieciocho en orden. Las claves de la app (URL y clave pública) no van aquí: están en los secretos del repositorio de GitHub.

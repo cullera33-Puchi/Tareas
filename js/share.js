@@ -19,9 +19,9 @@
    - Received: a task shared with this person waits in Recibidas (with the old notices) until «Añadir a mis tareas» gives it a project in
      the active space (its view), or «No, gracias» leaves it.
    - Never logged: any text of a task or a key. */
-const SHARE_RT=['shared_tasks','shared_members','shared_views'];
+const SHARE_RT=['shared_tasks','shared_members','shared_views','shared_comments']; // v0.40.0: the comments (decision 90)
 const SH_COMMON=['title','notes','date','deadline','priority','estimate','status','completed','carried','postponed','carriedSince'];
-const SH_OWN=['spaceId','projectId','focus','reminder','reminderSent','responsible','waitingFor'];
+const SH_OWN=['spaceId','projectId','focus','reminder','reminderSent','responsible','waitingFor','readAt']; // readAt: the comments read (decision 90)
 const SH_PREFIX='s1:';
 const SHK={raw:new Map(), key:new Map()}; // the opened keys of the shared tasks (SH is the hours grid's slot height)
 const shMe = () => SY&&SY.user?SY.user.id:null;
@@ -44,11 +44,14 @@ const shStepCmp = (a,b) => (+a.order||0)-(+b.order||0) || String(a.id).localeCom
 const shStepsJSON = steps => JSON.stringify((steps||[]).filter(s=>s&&s.id).slice().sort(shStepCmp).map(s=>({id:String(s.id), title:String(s.title||''), done:!!s.done, order:+s.order||0})));
 function shTaskRecs(tasks, subtasks){ const ids=shIds(tasks); if(!ids.size) return []; const by=new Map();
   (subtasks||[]).forEach(s=>{ if(s&&ids.has(s.taskId)){ let a=by.get(s.taskId); if(!a) by.set(s.taskId, a=[]); a.push(s); } });
-  return tasks.filter(x=>x&&x.share).map(x=>{ const r={id:x.id, share:x.share, created:x.created, modified:x.modified, steps:shStepsJSON(by.get(x.id))}; SH_COMMON.forEach(k=>{ r[k]=x[k]; }); r.status=shCommonStatus(r.status); return r; }); }
+  return tasks.filter(x=>x&&x.share).map(x=>{ const r={id:x.id, share:x.share, created:x.created, modified:x.modified, steps:shStepsJSON(by.get(x.id))}; SH_COMMON.forEach(k=>{ r[k]=x[k]; }); r.status=shCommonStatus(r.status); if(x.status==='waiting'&&'cdate' in x) r.date=x.cdate; return r; }); }
 // v0.39.1: Por confirmar is each person's own (shared_views.waiting); the common part says pending. A common 'waiting' (written by v0.39.0) reads as pending
 const shCommonStatus = s => s==='waiting'?'pending':s;
+/* v0.40.0: the review day is this person's own too. While a shared task waits here, x.date is this person's review day (every list reads
+   it as for any task) and x.cdate keeps the common date, which is what goes up; back to pending or done, the common date returns.
+   cdate exists only then. A task that waited before this version has no cdate: its date was the common one and stays so */
 function shViewRecs(tasks){ const me=shMe(); if(!me) return [];
-  return tasks.filter(x=>x&&x.share&&x.spaceId).map(x=>{ const v={id:x.id+':'+me, taskId:x.id, created:x.vcreated||x.created, modified:x.vmod||x.modified}; SH_OWN.forEach(k=>{ v[k]=x[k]==null?null:x[k]; }); v.waiting=x.status==='waiting'; return v; }); }
+  return tasks.filter(x=>x&&x.share&&x.spaceId).map(x=>{ const v={id:x.id+':'+me, taskId:x.id, created:x.vcreated||x.created, modified:x.vmod||x.modified}; SH_OWN.forEach(k=>{ v[k]=x[k]==null?null:x[k]; }); v.waiting=x.status==='waiting'; v.review=x.status==='waiting'&&x.date||null; return v; }); }
 function shDerive(W){ W.shareTasks=shTaskRecs(W.tasks, W.subtasks); W.shareViews=shViewRecs(W.tasks); }
 // A step changed after the task's common part: the task is newer (its steps go up with it). Called before the upload is collected
 function shStepsBump(D){ let n=0; const by=new Map(); const ids=shIds(D.tasks); if(!ids.size) return 0;
@@ -71,9 +74,9 @@ function shFold(W, st, stats){ const me=shMe(); let n=0; const gone=[];
   recs.forEach((r,id)=>{ let x=idx.has(id)?W.tasks[idx.get(id)]:null;
     if(x&&x.share){ const now=shTaskRecs([x], stepsOf(id))[0]; if(syncSig(syncToRow('shared_tasks', now))===syncSig(syncToRow('shared_tasks', r))&&x.modified===r.modified) return; }
     if(!x){ x={id, spaceId:null, projectId:null, reminder:null, notes:'', status:'pending', priority:'none', carried:false, completed:null, created:r.created||r.modified}; W.tasks.push(x); idx.set(id, W.tasks.length-1); }
-    const ow=x.status==='waiting'; // v0.39.1: this person's own Por confirmar stays (the view below may change it)
+    const ow=x.status==='waiting', rd=x.date; // v0.39.1: this person's own Por confirmar stays (the view below may change it); v0.40.0: and their review day
     SH_COMMON.forEach(k=>{ x[k]=r[k]==null?(k==='notes'||k==='title'?'':null):r[k]; }); x.share=r.share||x.share; x.modified=r.modified; if(!x.created) x.created=r.created||r.modified;
-    if(x.status!=='done') x.status=ow?'waiting':'pending';
+    if(x.status!=='done'){ x.status=ow?'waiting':'pending'; if(ow){ x.cdate=x.date; x.date=rd; } } else delete x.cdate;
     if(x.repeat) x.repeat=null; if(x.someday) x.someday=null; // a shared task never repeats nor waits for some day
     let list=null; try{ list=JSON.parse(r.steps||'[]'); }catch(e){ list=null; } // a list that did not open (another key): the steps stay
     if(Array.isArray(list)&&shStepsJSON(stepsOf(id))!==shStepsJSON(list)){ const was=new Map(stepsOf(id).map(s=>[s.id,s]));
@@ -82,9 +85,12 @@ function shFold(W, st, stats){ const me=shMe(); let n=0; const gone=[];
   // Deleted by its owner (the merge took it out of the list)
   W.tasks.forEach((x,i)=>{ if(x&&x.share&&!recs.has(x.id)){ W.tasks[i]=null; W.subtasks=W.subtasks.filter(s=>!s||s.taskId!==x.id); n++; if(x.share!==me&&x.spaceId) gone.push({title:x.title, by:x.share, why:'deleted'}); } });
   views.forEach((v,tid)=>{ const x=idx.has(tid)?W.tasks[idx.get(tid)]:null; if(!x||!x.share) return;
-    const vw=!!v.waiting, wsame=x.status==='done'||(x.status==='waiting')===vw; // v0.39.1: Por confirmar, this person's own
+    const vw=!!v.waiting, wsame=x.status==='done'||((x.status==='waiting')===vw&&(!vw||!v.review||x.date===v.review)); // v0.39.1: Por confirmar, this person's own; v0.40.0: with their review day
     if(wsame&&SH_OWN.every(k=>(x[k]==null?null:x[k])===(v[k]==null?null:v[k]))&&x.vmod===v.modified) return;
-    SH_OWN.forEach(k=>{ x[k]=v[k]==null?null:v[k]; }); if(x.status!=='done') x.status=vw?'waiting':'pending'; x.vmod=v.modified; x.vcreated=v.created; n++; });
+    SH_OWN.forEach(k=>{ x[k]=v[k]==null?null:v[k]; });
+    if(x.status!=='done'){ if(vw){ if(x.status!=='waiting') x.cdate=x.date; if(v.review) x.date=v.review; x.status='waiting'; }
+      else { if(x.status==='waiting'&&'cdate' in x) x.date=x.cdate; delete x.cdate; x.status='pending'; } }
+    x.vmod=v.modified; x.vcreated=v.created; n++; });
   // Left, or taken out by its owner
   W.tasks.forEach((x,i)=>{ if(!x||!x.share||x.share===me) return; const m=mine.get(x.id); if(!m||!(m.leftAt||m.removed)) return;
     W.tasks[i]=null; W.subtasks=W.subtasks.filter(s=>!s||s.taskId!==x.id); delete st.known.shared_tasks[x.id]; n++;
@@ -103,14 +109,14 @@ function shMayDelete(id, dry, st){ const me=shMe(), ms=DB.shareMembers.filter(m=
   return false; }
 
 /* ---------- Keys ---------- */
-const SH_AAD = c => cryptoTE.encode('shared_tasks.'+c);
+const SH_AAD = (c, t) => cryptoTE.encode((t||'shared_tasks')+'.'+c);
 async function shSetKey(id, raw){ const k=await cryptoSubtle().importKey('raw', cryptoUnb64(raw), {name:'AES-GCM', length:256}, false, ['encrypt','decrypt']);
   SHK.raw.set(id, raw); SHK.key.set(id, k); cryptoKdbDo('readwrite', s=>s.put({id:'share:'+id, key:k, owner:shMe()})).catch(()=>{}); return k; }
-async function shEnc(k, v, c){ if(v==null||v===''||(typeof v==='string'&&v.startsWith(SH_PREFIX))) return v;
-  const iv=cryptoRandom(12), ct=new Uint8Array(await cryptoSubtle().encrypt({name:'AES-GCM', iv, additionalData:SH_AAD(c)}, k, cryptoTE.encode(String(v))));
+async function shEnc(k, v, c, t){ if(v==null||v===''||(typeof v==='string'&&v.startsWith(SH_PREFIX))) return v;
+  const iv=cryptoRandom(12), ct=new Uint8Array(await cryptoSubtle().encrypt({name:'AES-GCM', iv, additionalData:SH_AAD(c, t)}, k, cryptoTE.encode(String(v))));
   const out=new Uint8Array(12+ct.length); out.set(iv); out.set(ct, 12); return SH_PREFIX+cryptoB64(out); }
-async function shDec(k, v, c){ if(typeof v!=='string'||!v.startsWith(SH_PREFIX)) return v; const b=cryptoUnb64(v.slice(SH_PREFIX.length));
-  return cryptoTD.decode(await cryptoSubtle().decrypt({name:'AES-GCM', iv:b.subarray(0,12), additionalData:SH_AAD(c)}, k, b.subarray(12))); }
+async function shDec(k, v, c, t){ if(typeof v!=='string'||!v.startsWith(SH_PREFIX)) return v; const b=cryptoUnb64(v.slice(SH_PREFIX.length));
+  return cryptoTD.decode(await cryptoSubtle().decrypt({name:'AES-GCM', iv:b.subarray(0,12), additionalData:SH_AAD(c, t)}, k, b.subarray(12))); }
 // The keys of these tasks: here already, or opened from this person's member rows (here, or asked to the server)
 async function shKeysFor(inner, ids){ const me=shMe(), miss=[...new Set(ids)].filter(id=>!SHK.key.has(id)); if(!miss.length||!me) return;
   if(!TM.priv) await teamKeys(); if(!TM.priv) throw new Error('Las claves del equipo no están todavía en este dispositivo');
@@ -120,18 +126,20 @@ async function shKeysFor(inner, ids){ const me=shMe(), miss=[...new Set(ids)].fi
   for(const m of rows){ if(SHK.key.has(m.taskId)||!m.key) continue;
     try{ const o=await teamOpen(m.key, 'share'); if(o&&o.k) await shSetKey(m.taskId, o.k); }catch(e){ log('warn','Compartidas: la clave de una tarea no se puede abrir'); } } }
 const SH_COLS=['title','notes','steps'];
+// The tables sealed with a task's key: their columns and the task a row belongs to (v0.40.0: the comments, decision 90)
+const SH_SEALED={shared_tasks:{cols:SH_COLS, tid:r=>r.id}, shared_comments:{cols:['body'], tid:r=>r.task_id}};
 // Rows from the server, opened with their task's key; a value that does not open is marked unreadable (the merge keeps this device's)
-async function shOpenRows(inner, rows){ if(!Array.isArray(rows)||!rows.length) return rows;
-  const need=rows.filter(r=>r&&!r.deleted&&SH_COLS.some(c=>typeof r[c]==='string'&&r[c].startsWith(SH_PREFIX))).map(r=>r.id);
+async function shOpenRows(inner, rows, table){ if(!Array.isArray(rows)||!rows.length) return rows; const T=SH_SEALED[table||'shared_tasks'];
+  const need=rows.filter(r=>r&&!r.deleted&&T.cols.some(c=>typeof r[c]==='string'&&r[c].startsWith(SH_PREFIX))).map(T.tid);
   if(need.length) await shKeysFor(inner, need);
-  const out=[]; for(const r of rows){ if(!r||r.deleted||!need.includes(r.id)){ out.push(r); continue; } const k=SHK.key.get(r.id), o=Object.assign({}, r);
-    for(const c of SH_COLS){ if(typeof r[c]!=='string'||!r[c].startsWith(SH_PREFIX)) continue; try{ if(!k) throw new Error('sin clave'); o[c]=await shDec(k, r[c], c); }catch(e){ o[c]=CRYPTO_UNREAD; } }
+  const out=[]; for(const r of rows){ if(!r||r.deleted||!need.includes(T.tid(r))){ out.push(r); continue; } const k=SHK.key.get(T.tid(r)), o=Object.assign({}, r);
+    for(const c of T.cols){ if(typeof r[c]!=='string'||!r[c].startsWith(SH_PREFIX)) continue; try{ if(!k) throw new Error('sin clave'); o[c]=await shDec(k, r[c], c, table); }catch(e){ o[c]=CRYPTO_UNREAD; } }
     out.push(o); }
   return out; }
 // Rows up, sealed with their task's key; without it nothing goes (the pass fails and is tried again)
-async function shSealRows(inner, rows){ await shKeysFor(inner, rows.filter(r=>r&&!SHK.key.has(r.id)).map(r=>r.id)); const out=[];
-  for(const r of rows){ const k=SHK.key.get(r.id); if(!k) throw new Error('Falta la clave de una tarea compartida'); const o=Object.assign({}, r);
-    for(const c of SH_COLS) if(c in o) o[c]=await shEnc(k, o[c], c); out.push(o); }
+async function shSealRows(inner, rows, table){ const T=SH_SEALED[table||'shared_tasks']; await shKeysFor(inner, rows.filter(r=>r&&!SHK.key.has(T.tid(r))).map(T.tid)); const out=[];
+  for(const r of rows){ const k=SHK.key.get(T.tid(r)); if(!k) throw new Error('Falta la clave de una tarea compartida'); const o=Object.assign({}, r);
+    for(const c of T.cols) if(c in o) o[c]=await shEnc(k, o[c], c, table); out.push(o); }
   return out; }
 
 /* ---------- Sharing, leaving, taking out ---------- */

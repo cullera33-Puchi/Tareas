@@ -59,5 +59,6 @@ Desde la 0016, una tarea se puede compartir con miembros del Equipo: es la misma
 | `migrations/0017_shared_fix.sql` | Tareas compartidas: el aviso «te ha compartido una tarea» sale, y «Por confirmar» pasa a ser de cada persona | v0.39.1 |
 | `migrations/0018_shared_comments.sql` | Tareas compartidas: comentarios, recordatorios por la app y día de revisión propio de «Por confirmar» | v0.40.0 |
 | `migrations/0019_shared_delete_fix.sql` | Tareas compartidas: marcar como eliminada una fila de las tablas compartidas sin que falle la sincronización | v0.40.1 |
+| `migrations/0020_shared_comment_upsert.sql` | Tareas compartidas: marcar como visto un recordatorio por la app sin que falle la sincronización | v0.40.1 |
 
-`all.sql` es la suma de las diecinueve en orden. Las claves de la app (URL y clave pública) no van aquí: están en los secretos del repositorio de GitHub.
+`all.sql` es la suma de las veinte en orden. Las claves de la app (URL y clave pública) no van aquí: están en los secretos del repositorio de GitHub.

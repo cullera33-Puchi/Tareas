@@ -57,7 +57,7 @@ end;
 $$;
 
 -- The tasks that waited until now: their owner's view keeps waiting (once: a view already marked is left alone)
-update public.shared_views v set waiting = true, modified = now()
+update public.shared_views v set waiting = true, modified = date_trunc('milliseconds', now()) -- the app keeps milliseconds: a row a hair newer than its copy would be refused
   from public.shared_tasks t
   where t.id = v.task_id and t.status = 'waiting' and v.owner_id = t.owner_id and not v.waiting;
 

@@ -1,5 +1,14 @@
 [
   {
+    "version": "0.40.1",
+    "date": "2026-11-19",
+    "items": [
+      "En una incidencia del buzón, el botón «Copiar incidencia y registro» copia todo de una vez para pegarlo donde quieras.",
+      "El registro que acompaña a la incidencia ya se puede seleccionar con el dedo o el ratón.",
+      "Arreglado: tras eliminar una tarea compartida, el iPhone podía dejar de sincronizar. Lo corregimos esta tarde en el servidor."
+    ]
+  },
+  {
     "version": "0.40.0",
     "date": "2026-11-19",
     "items": [

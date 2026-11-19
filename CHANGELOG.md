@@ -1,5 +1,14 @@
 # Registro de cambios
 
+## v0.40.1. Copiar una incidencia con su registro (19 de noviembre de 2026)
+
+- Buzón de sugerencias e incidencias (Equipo): la ficha lleva «Copiar incidencia y registro» («Copiar texto» en una sugerencia), que copia quién, cuándo, versión, dispositivo, el texto y el registro adjunto (`feedbackText`). El registro dentro de la ficha se puede seleccionar: la app bloquea la selección de texto en toda la interfaz y no se podía copiar. Prueba `admin_copies` en `rm-QT`.
+- Incluye en el repositorio la migración `0019_shared_delete_fix.sql`, aplicada en Supabase el mismo día.
+
+## Supabase 0019, borrados en las tablas compartidas (19 de noviembre de 2026, sin versión nueva de la app)
+
+- Corregido: marcar como eliminada una fila de `shared_views`, `shared_members` o `shared_comments` fallaba por NOT NULL y paraba toda la sincronización del dispositivo (iPhone de Enric, de las 11:44 a las 16:01). La migración `0019_shared_delete_fix.sql` rellena esas columnas en los disparadores de inserción. Prueba `sql_delete_marks` en `rm-SH`.
+
 ## v0.40.0. Comentarios, recordatorio con ventana y día de revisión propio en las tareas compartidas (19 de noviembre de 2026)
 
 - Comentarios (decisión 90a): sección «Comentarios» en el detalle y el inspector de una tarea compartida, debajo de los pasos, con autor, día y hora; Intro o el botón envía. Contador de no leídos en la fila (globo azul; en el escritorio, hueco propio de indicadores), sin notificación en el móvil; abrir la tarea los da por leídos (`readAt`, parte propia de cada persona, `shared_views.read_at`). Cada uno edita y borra solo los suyos, con Deshacer (tocar el propio en el iPhone; clic derecho o el botón de tres puntos en el escritorio). Cifrados con la clave de la tarea (`s1:`, datos adicionales `shared_comments.body`). No van al resumen de estado ni al texto compartido.

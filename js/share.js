@@ -44,9 +44,11 @@ const shStepCmp = (a,b) => (+a.order||0)-(+b.order||0) || String(a.id).localeCom
 const shStepsJSON = steps => JSON.stringify((steps||[]).filter(s=>s&&s.id).slice().sort(shStepCmp).map(s=>({id:String(s.id), title:String(s.title||''), done:!!s.done, order:+s.order||0})));
 function shTaskRecs(tasks, subtasks){ const ids=shIds(tasks); if(!ids.size) return []; const by=new Map();
   (subtasks||[]).forEach(s=>{ if(s&&ids.has(s.taskId)){ let a=by.get(s.taskId); if(!a) by.set(s.taskId, a=[]); a.push(s); } });
-  return tasks.filter(x=>x&&x.share).map(x=>{ const r={id:x.id, share:x.share, created:x.created, modified:x.modified, steps:shStepsJSON(by.get(x.id))}; SH_COMMON.forEach(k=>{ r[k]=x[k]; }); return r; }); }
+  return tasks.filter(x=>x&&x.share).map(x=>{ const r={id:x.id, share:x.share, created:x.created, modified:x.modified, steps:shStepsJSON(by.get(x.id))}; SH_COMMON.forEach(k=>{ r[k]=x[k]; }); r.status=shCommonStatus(r.status); return r; }); }
+// v0.39.1: Por confirmar is each person's own (shared_views.waiting); the common part says pending. A common 'waiting' (written by v0.39.0) reads as pending
+const shCommonStatus = s => s==='waiting'?'pending':s;
 function shViewRecs(tasks){ const me=shMe(); if(!me) return [];
-  return tasks.filter(x=>x&&x.share&&x.spaceId).map(x=>{ const v={id:x.id+':'+me, taskId:x.id, created:x.vcreated||x.created, modified:x.vmod||x.modified}; SH_OWN.forEach(k=>{ v[k]=x[k]==null?null:x[k]; }); return v; }); }
+  return tasks.filter(x=>x&&x.share&&x.spaceId).map(x=>{ const v={id:x.id+':'+me, taskId:x.id, created:x.vcreated||x.created, modified:x.vmod||x.modified}; SH_OWN.forEach(k=>{ v[k]=x[k]==null?null:x[k]; }); v.waiting=x.status==='waiting'; return v; }); }
 function shDerive(W){ W.shareTasks=shTaskRecs(W.tasks, W.subtasks); W.shareViews=shViewRecs(W.tasks); }
 // A step changed after the task's common part: the task is newer (its steps go up with it). Called before the upload is collected
 function shStepsBump(D){ let n=0; const by=new Map(); const ids=shIds(D.tasks); if(!ids.size) return 0;
@@ -69,7 +71,9 @@ function shFold(W, st, stats){ const me=shMe(); let n=0; const gone=[];
   recs.forEach((r,id)=>{ let x=idx.has(id)?W.tasks[idx.get(id)]:null;
     if(x&&x.share){ const now=shTaskRecs([x], stepsOf(id))[0]; if(syncSig(syncToRow('shared_tasks', now))===syncSig(syncToRow('shared_tasks', r))&&x.modified===r.modified) return; }
     if(!x){ x={id, spaceId:null, projectId:null, reminder:null, notes:'', status:'pending', priority:'none', carried:false, completed:null, created:r.created||r.modified}; W.tasks.push(x); idx.set(id, W.tasks.length-1); }
+    const ow=x.status==='waiting'; // v0.39.1: this person's own Por confirmar stays (the view below may change it)
     SH_COMMON.forEach(k=>{ x[k]=r[k]==null?(k==='notes'||k==='title'?'':null):r[k]; }); x.share=r.share||x.share; x.modified=r.modified; if(!x.created) x.created=r.created||r.modified;
+    if(x.status!=='done') x.status=ow?'waiting':'pending';
     if(x.repeat) x.repeat=null; if(x.someday) x.someday=null; // a shared task never repeats nor waits for some day
     let list=null; try{ list=JSON.parse(r.steps||'[]'); }catch(e){ list=null; } // a list that did not open (another key): the steps stay
     if(Array.isArray(list)&&shStepsJSON(stepsOf(id))!==shStepsJSON(list)){ const was=new Map(stepsOf(id).map(s=>[s.id,s]));
@@ -78,8 +82,9 @@ function shFold(W, st, stats){ const me=shMe(); let n=0; const gone=[];
   // Deleted by its owner (the merge took it out of the list)
   W.tasks.forEach((x,i)=>{ if(x&&x.share&&!recs.has(x.id)){ W.tasks[i]=null; W.subtasks=W.subtasks.filter(s=>!s||s.taskId!==x.id); n++; if(x.share!==me&&x.spaceId) gone.push({title:x.title, by:x.share, why:'deleted'}); } });
   views.forEach((v,tid)=>{ const x=idx.has(tid)?W.tasks[idx.get(tid)]:null; if(!x||!x.share) return;
-    if(SH_OWN.every(k=>(x[k]==null?null:x[k])===(v[k]==null?null:v[k]))&&x.vmod===v.modified) return;
-    SH_OWN.forEach(k=>{ x[k]=v[k]==null?null:v[k]; }); x.vmod=v.modified; x.vcreated=v.created; n++; });
+    const vw=!!v.waiting, wsame=x.status==='done'||(x.status==='waiting')===vw; // v0.39.1: Por confirmar, this person's own
+    if(wsame&&SH_OWN.every(k=>(x[k]==null?null:x[k])===(v[k]==null?null:v[k]))&&x.vmod===v.modified) return;
+    SH_OWN.forEach(k=>{ x[k]=v[k]==null?null:v[k]; }); if(x.status!=='done') x.status=vw?'waiting':'pending'; x.vmod=v.modified; x.vcreated=v.created; n++; });
   // Left, or taken out by its owner
   W.tasks.forEach((x,i)=>{ if(!x||!x.share||x.share===me) return; const m=mine.get(x.id); if(!m||!(m.leftAt||m.removed)) return;
     W.tasks[i]=null; W.subtasks=W.subtasks.filter(s=>!s||s.taskId!==x.id); delete st.known.shared_tasks[x.id]; n++;
@@ -203,4 +208,11 @@ function shAddMenu(id, src){ const x=task(id); if(!shPending(x)) return; const d
   popMenu({anchor:src, align:UI.wide?'right':undefined, title:UI.wide?'':'Añadir al proyecto', groups:[activeProjects().map(p=>({label:p.name, icon:dot(p.color), fn:()=>shAccept(id, p.id)})), [{label:'Sin proyecto', icon:dot('var(--ink3)'), fn:()=>shAccept(id, null)}]]}); }
 
 // The rows: two people in grey on a task shared with someone (iPhone, after the notes icon; desktop, a column of its own)
+/* v0.39.1: who else is in a shared task, by first name, on the row (Enric, 19 November): «Jorge», «Jorge y Ana», «Jorge y 2 más»; in a task
+   shared with me, whoever shared it first. The tooltip says it in full (shPeopleText). On the desktop in the column Persona (shtag), on the
+   iPhone on the grey line (shn) */
+const shNames = x => { const o=shOthers(x).map(m=>m.userId); if(x&&x.share&&x.share!==shMe()) o.sort((a,b)=>(b===x.share)-(a===x.share)); return o.map(u=>teamFirst(teamMember(u))); };
+const shShort = ns => ns.length<=2 ? listY(ns) : ns[0]+' y '+(ns.length-1)+' más';
+function shTagHTML(x, cls){ if(!x||!x.share) return ''; const ns=shNames(x); if(!ns.length) return '';
+  return '<span class="'+(cls||'shtag')+'" title="'+esc(shPeopleText(x))+'">'+TI.share+esc(shShort(ns))+'</span>'; }
 function shIconHTML(x){ if(!x||!x.share) return ''; const t=shPeopleText(x); return t?'<span class="ish" title="'+esc(t)+'">'+TI.share+'</span>':''; }

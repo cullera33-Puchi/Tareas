@@ -231,13 +231,24 @@ const personOrder = xs => xs.slice().sort((a,b)=>{ const da=a.date||'~', db=b.da
 // The open names of a task: its responsible and, while it waits, whom it waits for (one entry per person)
 function openPeople(x){ const out=[]; if(!isOpen(x)||isSomeday(x)) return out; /* decision 85 */ [x.responsible, x.status==='waiting'?x.waitingFor:null].forEach(n=>{ const s=String(n||'').replace(/\s+/g,' ').trim(), k=personKey(s); if(k&&!out.some(o=>o.k===k)) out.push({k, s}); }); return out; }
 // [{key, name, n}] of the active space, the most open tasks first, then by name. A name with no contact keeps the spelling of its oldest task
-function peopleList(){ const by=new Map();
-  spaceTasks().slice().sort((a,b)=>a.created<b.created?-1:a.created>b.created?1:0).forEach(x=>openPeople(x).forEach(({k, s})=>{ let e=by.get(k); if(!e){ const c=contactByName(s); e={key:k, name:c?c.name:s, n:0}; by.set(k, e); } e.n++; }));
+function peopleList(){ const by=new Map(), seen=new Map(), count=(e, x)=>{ let ids=seen.get(e); if(!ids) seen.set(e, ids=new Set()); if(!ids.has(x.id)){ ids.add(x.id); e.n++; } };
+  const xs=spaceTasks().slice().sort((a,b)=>a.created<b.created?-1:a.created>b.created?1:0);
+  xs.forEach(x=>openPeople(x).forEach(({k, s})=>{ let e=by.get(k); if(!e){ const c=contactByName(s); e={key:k, name:c?c.name:s, n:0}; by.set(k, e); } count(e, x); }));
+  // v0.39.1: the people a task is shared with, under the name the list already has for them (or their contact's, or the team's)
+  xs.forEach(x=>{ if(!x.share||!isOpen(x)||isSomeday(x)) return; shOthers(x).forEach(o=>{ const m=teamMember(o.userId); if(!m) return;
+    let e=[...by.values()].find(e=>memberIs(m, e.key)); if(!e){ const c=memberContact(m), nm=c?c.name:teamName(m), k=personKey(nm); e=by.get(k); if(!e){ e={key:k, name:nm, n:0}; by.set(k, e); } } count(e, x); }); });
   return [...by.values()].sort((a,b)=>b.n-a.n||nameCmp(a.name, b.name)); }
-// The two groups of a person's view (UI.query, when the desktop search has one, filters them)
-function personGroups(name){ const k=personKey(name); if(!k) return {mine:[], wait:[]}; let xs=spaceTasks().filter(x=>isOpen(x)&&!isSomeday(x)); if(UI.query) xs=xs.filter(queryMatcher(UI.query));
+/* v0.39.1: a member of the team is the person of a name when it is their whole name or first name, or a contact of that name has their mail */
+const memberMail = m => String(m&&m.email||'').trim().toLowerCase();
+const memberContact = m => { const e=memberMail(m); return e ? DB.contacts.find(c=>c&&String(c.email||'').trim().toLowerCase()===e)||null : null; };
+const memberIs = (m, k) => { if(!m||!k) return false; if(personKey(teamName(m))===k||personKey(teamFirst(m))===k) return true; const c=memberContact(m); return !!c&&personKey(c.name)===k; };
+const sharedWith = (x, k) => !!x.share && shOthers(x).some(o=>memberIs(teamMember(o.userId), k));
+// The groups of a person's view (UI.query, when the desktop search has one, filters them). v0.39.1: Compartidas con, the shared tasks
+// with that person that are in neither of the other two
+function personGroups(name){ const k=personKey(name); if(!k) return {mine:[], wait:[], shared:[]}; let xs=spaceTasks().filter(x=>isOpen(x)&&!isSomeday(x)); if(UI.query) xs=xs.filter(queryMatcher(UI.query));
   const wait=xs.filter(x=>x.status==='waiting'&&personKey(x.waitingFor)===k), mine=xs.filter(x=>personKey(x.responsible)===k&&!wait.includes(x));
-  return {mine:personOrder(mine), wait:personOrder(wait)}; }
+  const shared=xs.filter(x=>!wait.includes(x)&&!mine.includes(x)&&sharedWith(x, k));
+  return {mine:personOrder(mine), wait:personOrder(wait), shared:personOrder(shared)}; }
 // The name a view shows: the contact's spelling, else the list's, else as it came
 function personLabel(name){ const c=contactByName(name); if(c) return c.name; const k=personKey(name), e=peopleList().find(p=>p.key===k); return e?e.name:String(name||'').trim(); }
 const personFirst = name => String(name||'').trim().split(' ')[0];
@@ -249,14 +260,15 @@ function remindAll(name){ const q=UI.query; UI.query=''; let xs; try{ xs=personR
 function personContactLine(name){ const c=contactByName(name); return c?[c.phone, c.email].map(v=>String(v||'').trim()).filter(Boolean):[]; }
 // The two groups (or the empty state), shared by the iPhone screen and the desktop column
 function personListHTML(name){ const g=personGroups(name), nm=personLabel(name), pk=personKey(name), R=x=>rowHTML(x, {person:pk});
-  if(!g.mine.length&&!g.wait.length){ if(UI.query) return '<div class="empty">'+I.search.replace('<svg','<svg style="width:44px;height:44px"')+'<b>Sin resultados</b>Prueba con otra palabra</div>';
-    return '<div class="empty pempty">'+I.person.replace('<svg','<svg style="width:44px;height:44px"')+'<b>Nada pendiente con '+esc(nm)+'</b>Aquí verás lo que le toca y lo que esperas de '+esc(personFirst(nm))+'.</div>'; }
+  if(!g.mine.length&&!g.wait.length&&!g.shared.length){ if(UI.query) return '<div class="empty">'+I.search.replace('<svg','<svg style="width:44px;height:44px"')+'<b>Sin resultados</b>Prueba con otra palabra</div>';
+    return '<div class="empty pempty">'+I.person.replace('<svg','<svg style="width:44px;height:44px"')+'<b>Nada pendiente con '+esc(nm)+'</b>Aquí verás lo que le toca, lo que esperas de '+esc(personFirst(nm))+' y lo que compartís.</div>'; }
   return (g.mine.length?gsec(gtitle('Le toca a '+esc(nm), g.mine.length, '', ' data-pgroup="mine"'), g.mine.map(R).join('')):'')+
-    (g.wait.length?gsec(gtitle('Esperando a '+esc(nm), g.wait.length, '', ' data-pgroup="wait"'), g.wait.map(R).join('')):''); }
+    (g.wait.length?gsec(gtitle('Esperando a '+esc(nm), g.wait.length, '', ' data-pgroup="wait"'), g.wait.map(R).join('')):'')+
+    (g.shared.length?gsec(gtitle('Compartidas con '+esc(nm), g.shared.length, '', ' data-pgroup="shared"'), g.shared.map(R).join('')):''); }
 // iPhone: the Proyectos tab's section, under the projects
 function peopleSectionHTML(){ const ps=peopleList(); if(!ps.length) return ''; const chev=I.chev.replace('<svg','<svg class="chev"');
   return '<div class="group-title">Personas</div><div class="group people">'+ps.map(p=>'<button class="cell" data-open-person="'+esc(p.name)+'"><span class="picon pperson">'+I.person+'</span><span class="lbl">'+esc(p.name)+'</span><span class="count">'+p.n+'</span>'+chev+'</button>').join('')+'</div>'+
-    '<div class="footnote">Lo que le toca a cada persona y lo que esperas de ella.</div>'; }
+    '<div class="footnote">Lo que le toca a cada persona, lo que esperas de ella y lo que compartís.</div>'; }
 // iPhone: the person's pushed screen
 function viewPerson(name){ const nm=personLabel(name);
   if(UI.select&&UI.select.scope==='project') return selectNav()+'<div class="scroll">'+personListHTML(name)+'</div>'; // the selection of the screen on top

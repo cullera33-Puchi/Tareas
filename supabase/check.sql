@@ -53,6 +53,7 @@ with checks(orden, pieza, ok) as (
   union all select 48, 'Compartidas: tablas shared_tasks, shared_members, shared_views y shared_events (0016)', (select count(*) from information_schema.tables where table_schema='public' and table_name in ('shared_tasks','shared_members','shared_views','shared_events')) = 4
   union all select 49, 'Compartidas: reglas de acceso por participante (0016)', (select count(*) from pg_policies where schemaname='public' and tablename in ('shared_tasks','shared_members','shared_views')) >= 8
   union all select 50, 'Compartidas: reglas de escritura y avisos (0016)', (select count(*) from pg_trigger where tgname in ('tareas_shared_task_before','tareas_shared_task_after','tareas_shared_member_before','tareas_shared_member_after','tareas_shared_view_before') and not tgisinternal) = 5
+  union all select 51, 'Compartidas: «Por confirmar» de cada persona y aviso al compartir (0017)', exists (select 1 from information_schema.columns where table_schema='public' and table_name='shared_views' and column_name='waiting')
 )
 select orden as "N.º", pieza as "Pieza", case when ok then 'OK' else 'FALTA' end as "Estado"
 from checks order by orden;

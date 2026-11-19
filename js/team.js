@@ -483,6 +483,7 @@ async function feedbackStatus(f, st, quiet){ try{ await SY.remote.feedbackMark(f
 function teamAct(a, el, detailId, e){
   switch(a){
     case 'tmRecv': recvSheet(); break;
+    case 'tmNudges': nudgeSheet(); break; // decision 90: the line «N recordatorios»
     case 'tmRecvAdd': recvAddMenu(el.dataset.id, el); break;
     case 'tmRecvDrop': recvDrop(el.dataset.id); break;
     case 'tmNotice': if(detailId) noticeSheet(detailId); break;

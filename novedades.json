@@ -1,5 +1,15 @@
 [
   {
+    "version": "0.40.0",
+    "date": "2026-11-19",
+    "items": [
+      "Comentarios en las tareas compartidas: escribe en la sección «Comentarios» del detalle y lo ve la otra persona. En la fila verás un globo con los que no has leído.",
+      "Nuevo canal «En Tareas» en «Enviar recordatorio»: a la otra persona le sale una ventana al abrir la app, sin sonido. En la tarea ves si lo ha visto.",
+      "Si no la atiende, le queda una línea «1 recordatorio» arriba de Hoy. Como mucho, un recordatorio cada 4 horas por tarea.",
+      "En una tarea compartida, el día de revisión de «Por confirmar» es solo tuyo: ya no mueve la fecha de la otra persona ni le avisa de que la has aplazado."
+    ]
+  },
+  {
     "version": "0.39.1",
     "date": "2026-11-19",
     "items": [

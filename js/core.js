@@ -2,7 +2,7 @@
 /* Tareas. Core: version, log, utilities, data (DB in localStorage), UI state, Deshacer toast and the task actions.
    A classic script: index.html loads every file of js/ in order and they share their global names. Only declarations and
    listeners run at load; the start itself (first screen, timers, sync, service worker) is in boot.js, the last file. */
-const APP_VERSION = '0.39.1';
+const APP_VERSION = '0.40.0';
 let pendingSW = null; // service worker installed and waiting to take over
 let updateRequested = false; // the user asked for the waiting worker to take over
 
@@ -208,14 +208,14 @@ const KEY = 'tareas-v1';
 let DB = null;
 function blank(){
   const t=new Date().toISOString();
-  return { spaces:[{id:'trabajo',name:'Trabajo',order:0,created:t},{id:'personal',name:'Personal',order:1,created:t}], projects:[], tasks:[], voiceNotes:[], attachments:[], subtasks:[], projectNotes:[], contacts:[], shareMembers:[], settings:{activeSpace:'trabajo', filter:'hoy', doneOpen:false, theme:'auto', tipsSeen:false, shakeUndo:false, allGroup:'date', hoyGroup:'date'} };
+  return { spaces:[{id:'trabajo',name:'Trabajo',order:0,created:t},{id:'personal',name:'Personal',order:1,created:t}], projects:[], tasks:[], voiceNotes:[], attachments:[], subtasks:[], projectNotes:[], contacts:[], shareMembers:[], shareComments:[], settings:{activeSpace:'trabajo', filter:'hoy', doneOpen:false, theme:'auto', tipsSeen:false, shakeUndo:false, allGroup:'date', hoyGroup:'date'} };
 }
 let lastRaw = null; // the stored text this window last read or wrote; another window may have changed it since
 function load(){
   let raw=null; try{ raw=localStorage.getItem(KEY); }catch(e){ log('error','No se pudieron leer los datos: '+(e&&e.message||e)); }
   lastRaw=raw; if(!raw) return blank();
   let d=null; try{ d=JSON.parse(raw); }catch(e){}
-  const b=blank(), lists=['spaces','projects','tasks','voiceNotes','attachments','subtasks','projectNotes','contacts','shareMembers']; // subtasks: decision 46; projectNotes: decision 47; contacts: decision 48c
+  const b=blank(), lists=['spaces','projects','tasks','voiceNotes','attachments','subtasks','projectNotes','contacts','shareMembers','shareComments']; // shareComments: decision 90; subtasks: decision 46; projectNotes: decision 47; contacts: decision 48c
   if(!d || typeof d!=='object' || Array.isArray(d) || !lists.some(k=>Array.isArray(d[k]))){
     // Unreadable data: keep the raw text aside before the first save replaces it
     try{ localStorage.setItem(KEY+'-corrupt', raw); }catch(e){}
@@ -610,13 +610,14 @@ function removeFromAhora(ids){ const xs=ids.map(task).filter(x=>x&&x.focus); if(
 const waitSnap = x => ({status:x.status, waitingFor:x.waitingFor||null, date:x.date, carried:x.carried, reminder:x.reminder||null, focus:x.focus||null});
 function waitUndo(id, o){ const x=task(id); if(!x) return; const p={status:o.status, waitingFor:o.waitingFor, date:o.date, carried:o.carried, reminder:o.reminder}; if(o.focus||x.focus) p.focus=o.focus; updTask(id, p); }
 function setWaiting(id, who, date){ const x=task(id); if(!x||x.status==='done') return; const old=waitSnap(x), was=x.status==='waiting';
-  const p=Object.assign(date!==undefined&&date!==x.date ? dayPatch(x, date, {status:'waiting'}) : {}, {status:'waiting', waitingFor:personName(who), carried:false}); if(x.focus) p.focus=null;
+  const p=x.share ? Object.assign(date!==undefined&&date!==x.date?{date}:{}, {status:'waiting', waitingFor:personName(who)}) // v0.40.0: a shared task's review day is this person's own; its common date and counts stay
+    : Object.assign(date!==undefined&&date!==x.date ? dayPatch(x, date, {status:'waiting'}) : {}, {status:'waiting', waitingFor:personName(who), carried:false}); if(x.focus) p.focus=null;
   releaseHold(id); let nc=null; batch(()=>{ nc=p.waitingFor?ensureContact(p.waitingFor):null; updTask(id, p); }); haptic(8); // decision 48c: a new name becomes a contact log('info', was?'Por confirmar cambiada':'Por confirmar', {date:x.date});
   const when=x.date&&x.date>todayStr()?', revisar '+dayWords(x.date):x.date?', revisar hoy':'';
   toast('Por confirmar'+(x.waitingFor?', esperando a '+x.waitingFor:'')+when, ()=>batch(()=>{ waitUndo(id, old); dropContact(nc); save(); })); }
 // Volver a pendiente: the task comes back to the lists as it was before it waited (a past date becomes today, carried, as rollOver)
 function unWait(id){ const x=task(id); if(!x||x.status!=='waiting') return; const old=waitSnap(x), t=todayStr();
-  releaseHold(id); updTask(id, Object.assign(x.date&&x.date<t ? dayPatch(x, t, {carried:true}) : {}, {status:'pending', waitingFor:null})); haptic(6); log('info','Vuelve a pendiente');
+  releaseHold(id); updTask(id, Object.assign(x.date&&x.date<t&&!x.share ? dayPatch(x, t, {carried:true}) : {}, {status:'pending', waitingFor:null})); haptic(6); log('info','Vuelve a pendiente'); // v0.40.0: a shared one gets its common date back
   toast('Vuelve a pendiente', ()=>waitUndo(id, old)); }
 
 /* ---------- Actions ---------- */
@@ -631,9 +632,13 @@ function updTask(id, patch){ const x=task(id); if(!x) return; if('date' in patch
   // Block 9: a reminder that changes notifies once more (reminderSent cleared), unless it is already past: then it is marked as sent and never notifies
   if('reminder' in patch && !('reminderSent' in patch) && (patch.reminder||null)!==(x.reminder||null)) patch.reminderSent=sentStamp(patch.reminder);
   // Decision 88: a shared task keeps two times, its common part's (modified) and this person's own part's (vmod)
-  if(x.share){ const now=new Date().toISOString(), ks=Object.keys(patch), st0=x.status; Object.assign(x, patch);
+  if(x.share){ const now=new Date().toISOString(), ks=Object.keys(patch), st0=x.status, d0=x.date; Object.assign(x, patch);
     const stOwn=st0!==x.status&&(st0==='waiting'||x.status==='waiting'), stCommon=shCommonStatus(st0)!==shCommonStatus(x.status); // v0.39.1: Por confirmar is each person's own
-    if(ks.some(k=>SH_OWN.includes(k))||stOwn) x.vmod=now; if(ks.some(k=>!SH_OWN.includes(k)&&k!=='vmod'&&k!=='modified'&&k!=='sentTo'&&!(k==='status'&&!stCommon))) x.modified=now; save(); return; }
+    // v0.40.0: while it waits here, its date is this person's review day and the common date waits in cdate (js/share.js)
+    const wasW=st0==='waiting', isW=x.status==='waiting', dateOwn=isW||(wasW&&!('date' in patch));
+    if(!wasW&&isW) x.cdate=d0; else if(wasW&&!isW){ if(!('date' in patch)&&'cdate' in x) x.date=x.cdate; delete x.cdate; }
+    if(ks.some(k=>SH_OWN.includes(k))||stOwn||(dateOwn&&ks.includes('date'))) x.vmod=now;
+    if(ks.some(k=>!SH_OWN.includes(k)&&k!=='vmod'&&k!=='modified'&&k!=='sentTo'&&!(k==='status'&&!stCommon)&&!(k==='date'&&dateOwn))) x.modified=now; save(); return; }
   Object.assign(x, patch, {modified:new Date().toISOString()}); save(); }
 /* Decision 25: a task that changes day through rollOver, Aplazar, Pasar lo pendiente a mañana, the reviews, planning, the desktop quick dates
    or a calendar drag takes a reminder set on its old day to the new day, at the same time. If that time has already passed (yesterday's

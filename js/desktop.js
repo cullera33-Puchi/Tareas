@@ -256,7 +256,7 @@ function deskMain(){
   if(v==='hoy') focusCheck(); const foco=v==='hoy'&&focusOn(); // decision 65d: focus mode, the list area shows only Ahora
   if(foco){ title='Ahora'; search=false; body=focusRowsHTML(); }
   else if(v==='hoy'||v==='todas'){ const f=v; title=f==='hoy'?(isClosed()?'Mañana':'Hoy'):'Todas'; pf=true; // the day closed: Hoy shows tomorrow
-    body = addBarHTML(null)+colHeadHTML()+(UI.query||f==='hoy'&&isClosed()?'':ahoraHTML())+
+    body = addBarHTML(null)+(f==='hoy'&&!UI.query?nudgeBannerHTML():'')+colHeadHTML()+(UI.query||f==='hoy'&&isClosed()?'':ahoraHTML())+ // decision 90: a reminder not seen yet
       listHTML(UI.query?'todas':f); }
   else if(v==='ahora'){ title='Ahora'; body=colHeadHTML()+ahoraViewHTML(); } // decision 39
   else if(v==='waiting'){ title='Por confirmar'; body=colHeadHTML()+waitingViewHTML(); } // decision 41

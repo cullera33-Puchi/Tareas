@@ -21,13 +21,13 @@ const addDays=(d,n)=>{ const x=new Date(d+'T12:00:00'); x.setDate(x.getDate()+n)
 const SE='00000000-0000-4000-8000-0000000000e1', SV='00000000-0000-4000-8000-0000000000e5', SX='00000000-0000-4000-8000-0000000000e3', SA='00000000-0000-4000-8000-0000000000e6';
 async function sqlTests(){
   const rd=f=>fs.readFileSync(path.join(ROOT,'supabase/migrations',f),'utf8'), mig=rd('0016_shared.sql');
-  const mig17=rd('0017_shared_fix.sql'); // v0.39.1
-  const body=(mig+'\n'+mig17).split('\n').filter(l=>!/^\s*--/.test(l)).join('\n').replace(/on delete cascade/gi,'');
+  const mig17=rd('0017_shared_fix.sql'), mig18=rd('0018_shared_comments.sql'); // v0.39.1; v0.40.0
+  const body=(mig+'\n'+mig17+'\n'+mig18).split('\n').filter(l=>!/^\s*--/.test(l)).join('\n').replace(/on delete cascade/gi,'');
   check('sql_no_drop_delete', !/\b(drop|delete|truncate)\b/i.test(body), body.match(/.*\b(drop|delete|truncate)\b.*/gi));
   let db=await pgSetup(); for(const f of MIGS) await db.exec(strip(rd(f)));
   await db.exec(`insert into auth.users (id,email,email_confirmed_at,created_at,raw_user_meta_data) values ('${SE}','enric@example.com',now(),'2026-10-01','{}'),('${SV}','victor@example.com',now(),'2026-11-05','{}'),('${SA}','ana@example.com',now(),'2026-11-05','{}'),('${SX}','x@example.com',now(),'2026-11-05 10:00','{}')`);
   await db.exec(rd('0013_team.sql')); await db.exec(rd('0014_notice_follow.sql')); await db.exec(rd('0015_someday.sql'));
-  let err=null; try{ await db.exec(mig); await db.exec(mig); await db.exec(mig17); await db.exec(mig17); }catch(e){ err=e.message; } check('sql_runs_twice', !err, err);
+  let err=null; try{ await db.exec(mig); await db.exec(mig); await db.exec(mig17); await db.exec(mig17); await db.exec(mig18); await db.exec(mig18); }catch(e){ err=e.message; } check('sql_runs_twice', !err, err);
   const q=async s=>(await db.query(s)).rows, tryq=async s=>{ try{ return {rows:await q(s)}; }catch(e){ return {error:e.message}; } };
   const as=async(uid,fn)=>{ await db.exec(`set test.uid='${uid}'; set role authenticated;`); try{ return await fn(); } finally{ await db.exec(`reset role; reset test.uid;`); } };
   await as(SE,()=>q(`select public.tareas_team_invite('victor@example.com','Víctor')`)); await as(SE,()=>q(`select public.tareas_team_invite('ana@example.com','Ana')`));
@@ -85,10 +85,30 @@ async function sqlTests(){
   await as(SE,()=>q(`update public.shared_tasks set deleted=now(), modified=now()+interval '1 hour' where id='t1'`));
   const del=(await q(`select deleted from public.shared_tasks where id='t1'`))[0].deleted, evr=await as(SV,()=>tryq(`select * from public.shared_events`));
   check('sql_owner_deletes', !!del && !!evr.error, {del, evr});
+  /* v0.40.0 (decision 90, 0018_shared_comments.sql): comments and reminders */
+  await as(SE,()=>q(`insert into public.shared_tasks (id,title,status,modified,created) values ('t2','s1:x','pending',now(),now())`));
+  await as(SE,()=>q(`insert into public.shared_members (id,task_id,user_id,key,modified,created) values ('t2:${SE}','t2','${SE}','t1:k0',now(),now()),('t2:${SV}','t2','${SV}','t1:k1',now(),now())`));
+  const cplain=await as(SV,()=>tryq(`insert into public.shared_comments (id,task_id,kind,body,modified,created) values ('c0','t2','comment','hola',now(),now())`));
+  const cok=await as(SV,()=>tryq(`insert into public.shared_comments (id,task_id,kind,body,modified,created) values ('c1','t2','comment','s1:aa',now(),now()) returning owner_id`));
+  const cout=await as(SA,()=>tryq(`insert into public.shared_comments (id,task_id,kind,body,modified,created) values ('c2','t2','comment','s1:bb',now(),now())`));
+  const nself=await as(SE,()=>tryq(`insert into public.shared_comments (id,task_id,kind,body,to_user,modified,created) values ('n0','t2','nudge','s1:cc','${SE}',now(),now())`));
+  const nok=await as(SE,()=>tryq(`insert into public.shared_comments (id,task_id,kind,body,to_user,group_id,modified,created) values ('n1','t2','nudge','s1:dd','${SV}','g1',now(),now())`));
+  check('sql_comments_insert', /plaintext_refused/.test(cplain.error||'') && cok.rows&&cok.rows[0].owner_id===SV && !!cout.error && /tareas_nudge_to/.test(nself.error||'') && !nok.error, {cplain, cok, cout, nself, nok});
+  const rE=await as(SE,()=>q(`select id from public.shared_comments order by id`)), rA=await as(SA,()=>q(`select id from public.shared_comments`));
+  await as(SE,()=>q(`update public.shared_comments set body='s1:hack', deleted=now(), modified=now()+interval '1 second' where id='c1'`)); // not his
+  await as(SV,()=>q(`update public.shared_comments set seen=now(), body='s1:hack', modified=now()+interval '1 second' where id='n1'`)); // the person reminded: seen only
+  await as(SE,()=>q(`update public.shared_comments set seen=null, modified=now()+interval '2 second' where id='n1'`)); // the author never unmarks it
+  const c1=(await q(`select body, deleted from public.shared_comments where id='c1'`))[0], n1=(await q(`select body, seen from public.shared_comments where id='n1'`))[0];
+  await as(SV,()=>q(`update public.shared_comments set deleted=now(), modified=now()+interval '3 second' where id='c1'`));
+  const c1d=(await q(`select deleted from public.shared_comments where id='c1'`))[0].deleted;
+  check('sql_comments_rules', rE.length===2 && rA.length===0 && c1.body==='s1:aa' && !c1.deleted && n1.body==='s1:dd' && !!n1.seen && !!c1d, {rE, rA, c1, n1, c1d});
+  await as(SV,()=>q(`insert into public.shared_views (id,task_id,space_id,review,read_at,modified) values ('t2:${SV}','t2','s1','2026-12-01',now(),now())`));
+  const vr=(await q(`select review, read_at from public.shared_views where id='t2:${SV}'`))[0];
+  check('sql_views_review', String(vr.review).length>0 && !!vr.read_at, vr);
   await db.close();
   db=await pgSetup(); const all=strip(fs.readFileSync(path.join(ROOT,'supabase/all.sql'),'utf8')); err=null; try{ await db.exec(all); await db.exec(all); }catch(e){ err=e.message; }
   let rows=[]; try{ rows=(await db.query(fs.readFileSync(path.join(ROOT,'supabase/check.sql'),'utf8'))).rows; }catch(e){ err=err||e.message; }
-  check('sql_all_check', !err && /0001 a 0017/.test(all.split('\n')[0]) && rows.length>=51 && rows.every(x=>x.Estado==='OK') && rows.filter(x=>/\(0016\)/.test(x.Pieza)).length===3, {err, bad:rows.filter(x=>x.Estado!=='OK')});
+  check('sql_all_check', !err && /0001 a 0018/.test(all.split('\n')[0]) && rows.length>=52 && rows.every(x=>x.Estado==='OK') && rows.filter(x=>/\(0016\)/.test(x.Pieza)).length===3, {err, bad:rows.filter(x=>x.Estado!=='OK')});
   await db.close();
 }
 
@@ -169,6 +189,53 @@ async function appTests(browser){
   check('waiting_own', stw.status==='pending' && !!vwE && vwE.waiting===true && vst==='pending' && est.s==='waiting' && est.wait.includes('e1') && !est.shared.includes('e1'), {st:stw.status, vw:vwE&&vwE.waiting, vst, est});
   await ep.evaluate(()=>unWait('e1')); await synced(ep);
   check('waiting_back', [...fake.t.shared_views.values()].find(v=>v.task_id==='e1'&&v.owner_id===UE.uid).waiting===false && await ep.evaluate(()=>task('e1').status==='pending'));
+  /* v0.40.0: the review day is Enric's own; the common date stays for Víctor */
+  const cd0=fake.t.shared_tasks.get('e1').date, R5=addDays(today(),5);
+  await ep.evaluate(d=>setWaiting('e1', 'Víctor', d), R5); await synced(ep);
+  await vp.evaluate(()=>syncRun('prueba')); await vp.waitForTimeout(600);
+  const vwR=[...fake.t.shared_views.values()].find(v=>v.task_id==='e1'&&v.owner_id===UE.uid);
+  x={common:fake.t.shared_tasks.get('e1').date, review:vwR.review, eDate:await ep.evaluate(()=>task('e1').date), eC:await ep.evaluate(()=>task('e1').cdate), vDate:await vp.evaluate(()=>task('e1').date), ev:(fake.sharedEvents||[]).filter(e=>e.kind==='later'&&e.actor_id===UE.uid).length};
+  check('review_own', x.common===cd0 && x.review===R5 && x.eDate===R5 && x.eC===cd0 && x.vDate===cd0, x);
+  await ep.evaluate(()=>unWait('e1')); await synced(ep);
+  x={eDate:await ep.evaluate(()=>task('e1').date), cdate:await ep.evaluate(()=>'cdate' in task('e1')), common:fake.t.shared_tasks.get('e1').date, review:[...fake.t.shared_views.values()].find(v=>v.task_id==='e1'&&v.owner_id===UE.uid).review||null};
+  check('review_back', x.eDate===cd0 && !x.cdate && x.common===cd0 && x.review===null, x);
+  /* v0.40.0 (decision 90): comments, both ways; the count of unread ones on the row; opening the task reads them */
+  await ep.evaluate(()=>addComment('e1', 'He hablado con el cliente')); await synced(ep);
+  const cs=[...fake.t.shared_comments.values()];
+  check('cm_sealed', cs.length===1 && /^s1:/.test(cs[0].body) && cs[0].owner_id===UE.uid, cs);
+  await vp.evaluate(()=>{ UI.stack.forEach(x=>x.el.remove()); UI.stack=[]; render(); return syncRun('prueba'); }); await until(vp, ()=>DB.shareComments.length===1);
+  x=await vp.evaluate(()=>{ const d=document.createElement('div'); d.innerHTML=rowHTML(task('e1')); const b=d.querySelector('.icm b'); return {n:cmUnread(task('e1')), badge:b&&b.textContent, body:DB.shareComments[0].body}; });
+  check('cm_unread', x.n===1 && x.badge==='1' && x.body==='He hablado con el cliente', x);
+  await vp.evaluate(()=>openDetail('e1')); await vp.waitForTimeout(1200);
+  x=await vp.evaluate(()=>({n:cmUnread(task('e1')), rows:[...document.querySelectorAll('.pushed-screen .cmts .cmt .cmb')].map(e=>e.textContent)}));
+  await synced(vp);
+  const vV=[...fake.t.shared_views.values()].find(v=>v.task_id==='e1'&&v.owner_id===UV.uid);
+  check('cm_read', x.n===0 && x.rows[0]==='He hablado con el cliente' && !!(vV&&vV.read_at), {x, read:vV&&vV.read_at});
+  await vp.evaluate(()=>{ const c=document.querySelector('.pushed-screen .cmts'); if(c) c.scrollIntoView({block:'center'}); }); await vp.waitForTimeout(200); await shot(vp, 'v4-comentarios');
+  await vp.evaluate(()=>{ const ta=document.querySelector('.pushed-screen [data-role=cmtadd]'); ta.value='Perfecto, gracias'; ta.dispatchEvent(new KeyboardEvent('keydown', {key:'Enter', bubbles:true})); });
+  await synced(vp); await ep.evaluate(()=>syncRun('prueba')); await until(ep, ()=>DB.shareComments.length===2);
+  x=await ep.evaluate(()=>({n:cmUnread(task('e1')), by:DB.shareComments.map(c=>c.body)}));
+  check('cm_reply', x.n===1 && x.by.includes('Perfecto, gracias'), x);
+  const vc=await vp.evaluate(()=>DB.shareComments.find(c=>c.body==='Perfecto, gracias').id);
+  await ep.evaluate(id=>deleteComment(id), vc); await synced(ep); // not his: nothing happens
+  await vp.evaluate(id=>deleteComment(id), vc); await synced(vp);
+  check('cm_delete_own', !fake.t.shared_comments.get(vc)||!!fake.t.shared_comments.get(vc).deleted ? !!fake.t.shared_comments.get(vc).deleted : false, fake.t.shared_comments.get(vc));
+  /* The reminder through the app: «En Tareas» first in the sheet, the window on Víctor's side once, seen on Enric's */
+  x=await ep.evaluate(()=>({vias:remindVias('Víctor Sanz', [task('e1')]).map(v=>v.kind), people:taskPeople(task('e1'))}));
+  check('nudge_via', x.vias[0]==='app' && x.people.length>=1, x);
+  x=await ep.evaluate(()=>[cmNudge('Víctor Sanz', '¿Cómo va?', [task('e1')]), cmNudge('Víctor Sanz', 'Otra vez', [task('e1')])]); await synced(ep);
+  const nu=[...fake.t.shared_comments.values()].filter(c=>c.kind==='nudge');
+  check('nudge_sent', x[0]===1 && x[1]===0 && nu.length===1 && nu[0].to_user===UV.uid && /^s1:/.test(nu[0].body), {x, nu});
+  await vp.evaluate(()=>{ if(UI.stack.length) pop(); }); await vp.waitForTimeout(700);
+  await vp.evaluate(()=>syncRun('prueba')); const shown=await until(vp, ()=>!!document.querySelector('#sheet.on .nudgesheet'), null, 8000);
+  x=await vp.evaluate(()=>({t:(document.querySelector('#sheet .nudgesheet .nh')||{}).textContent, b:(document.querySelector('#sheet .nudgesheet .nb')||{}).textContent, task:(document.querySelector('#sheet .nudgesheet [data-ntask]')||{}).textContent}));
+  check('nudge_window', shown && /Enric te ha recordado esta tarea/.test(x.t||'') && x.b==='«¿Cómo va?»' && /SteerCo/.test(x.task||''), x);
+  await sheetIn(vp); await vp.waitForTimeout(400); await shot(vp, 'v5-recordatorio');
+  await vp.click('#sheet [data-x=ok]'); await settled(vp); await synced(vp);
+  await ep.evaluate(()=>syncRun('prueba')); await until(ep, ()=>DB.shareComments.some(c=>c.kind==='nudge'&&c.seen));
+  x=await ep.evaluate(()=>{ const c=DB.shareComments.find(c=>c.kind==='nudge'); const d=document.createElement('div'); d.innerHTML=cmRowHTML(c); return (d.querySelector('.cms')||{}).textContent; });
+  await ep.evaluate(()=>{ openDetail('e1'); }); await ep.waitForTimeout(600); await ep.evaluate(()=>{ const c=document.querySelector('#desk .pane .cmts'); if(c) c.scrollIntoView({block:'center'}); }); await ep.waitForTimeout(200); await shot(ep, 'e5-comentarios');
+  check('nudge_seen', x==='visto' && !!nu[0].id && !!fake.t.shared_comments.get(nu[0].id).seen && await vp.evaluate(()=>!cmNudgesForMe().length&&!nudgeBannerHTML()), x);
   // Víctor postpones it (a later day): an event by him
   await vp.evaluate(d=>{ const t=task('e1'); updTask('e1', dayPatch(t, d)); }, D4); await synced(vp);
   check('event_later', (fake.sharedEvents||[]).some(e=>e.kind==='later'&&e.actor_id===UV.uid), fake.sharedEvents);

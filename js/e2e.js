@@ -69,16 +69,16 @@ function cryptoRemote(inner){ if(!inner||inner.__crypto) return inner;
       out.push(await crOpenRow(k2, table, r)); }
     return out; };
   // Decision 88: a shared task opens with its own key (js/share.js), never with the account's
-  w.pull=async(table, after, limit)=>table==='shared_tasks'?shOpenRows(inner, await inner.pull(table, after, limit)):open(table, await inner.pull(table, after, limit));
-  w.byIds=async(table, ids)=>table==='shared_tasks'?shOpenRows(inner, await inner.byIds(table, ids)):open(table, await inner.byIds(table, ids));
+  w.pull=async(table, after, limit)=>SH_SEALED[table]?shOpenRows(inner, await inner.pull(table, after, limit), table):open(table, await inner.pull(table, after, limit));
+  w.byIds=async(table, ids)=>SH_SEALED[table]?shOpenRows(inner, await inner.byIds(table, ids), table):open(table, await inner.byIds(table, ids));
   // Rows up: the listed columns encrypted (a value already encrypted with this key goes as it is). On without the key nothing plain may leave
-  w.upsert=async(table, rows)=>{ if(table==='shared_tasks') return inner.upsert(table, await shSealRows(inner, rows)); if(!CRYPTO_COLS[table]) return inner.upsert(table, rows); const k=crKey();
+  w.upsert=async(table, rows)=>{ if(SH_SEALED[table]) return inner.upsert(table, await shSealRows(inner, rows, table)); if(!CRYPTO_COLS[table]) return inner.upsert(table, rows); const k=crKey();
     if(!k){ if(crOn()) throw crLockedErr(); return inner.upsert(table, rows); }
     const send=[]; for(const r of rows) send.push(await cryptoSealRow(k, table, r)); return inner.upsert(table, send); };
   // Realtime: opened in order, one after another
   if(inner.subscribe) w.subscribe=(uid, onRow, onStatus)=>{ let chain=Promise.resolve();
     return inner.subscribe(uid, (table, row)=>{ chain=chain.then(async()=>{
-      if(table==='shared_tasks'){ const o=(await shOpenRows(inner, [row]))[0]; if(o) onRow(table, o); return; } // decision 88
+      if(SH_SEALED[table]){ const o=(await shOpenRows(inner, [row], table))[0]; if(o) onRow(table, o); return; } // decision 88; v0.40.0 the comments
       if(!cryptoRowEnc(table, row)){ onRow(table, row); return; }
       const k=crKey(); if(!k){ CR.force=true; crCheckSoon(); return; } // another device turned encryption on: a pass reads the account
       onRow(table, await crOpenRow(k, table, row)); }).catch(e=>log('error','Tiempo real: '+(e&&e.message||e))); }, onStatus); };

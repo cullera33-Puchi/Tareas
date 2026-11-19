@@ -19,6 +19,7 @@ backupChain=refreshBackups().then(()=>{ if(onSettings()) render(); return dailyB
 })();
 wideMQ.addEventListener('change', applyWide); // first applied at start, before the first render
 syncBoot(); if(SY) bindPullRefresh(); // block 8: nothing happens without config.js
+setTimeout(cmNudgeCheck, 1500); // decision 90: a reminder received while the app was closed
 pushCheck(); // block 9: a subscription the browser renewed or dropped while the app was closed
 
 /* ---------- Service worker: offline cache and update notice ---------- */

@@ -21,13 +21,13 @@ const addDays=(d,n)=>{ const x=new Date(d+'T12:00:00'); x.setDate(x.getDate()+n)
 const SE='00000000-0000-4000-8000-0000000000e1', SV='00000000-0000-4000-8000-0000000000e5', SX='00000000-0000-4000-8000-0000000000e3', SA='00000000-0000-4000-8000-0000000000e6';
 async function sqlTests(){
   const rd=f=>fs.readFileSync(path.join(ROOT,'supabase/migrations',f),'utf8'), mig=rd('0016_shared.sql');
-  const mig17=rd('0017_shared_fix.sql'), mig18=rd('0018_shared_comments.sql'); // v0.39.1; v0.40.0
-  const body=(mig+'\n'+mig17+'\n'+mig18).split('\n').filter(l=>!/^\s*--/.test(l)).join('\n').replace(/on delete cascade/gi,'');
+  const mig17=rd('0017_shared_fix.sql'), mig18=rd('0018_shared_comments.sql'), mig19=rd('0019_shared_delete_fix.sql'); // v0.39.1; v0.40.0; v0.40.1
+  const body=(mig+'\n'+mig17+'\n'+mig18+'\n'+mig19).split('\n').filter(l=>!/^\s*--/.test(l)).join('\n').replace(/on delete cascade/gi,'');
   check('sql_no_drop_delete', !/\b(drop|delete|truncate)\b/i.test(body), body.match(/.*\b(drop|delete|truncate)\b.*/gi));
   let db=await pgSetup(); for(const f of MIGS) await db.exec(strip(rd(f)));
   await db.exec(`insert into auth.users (id,email,email_confirmed_at,created_at,raw_user_meta_data) values ('${SE}','enric@example.com',now(),'2026-10-01','{}'),('${SV}','victor@example.com',now(),'2026-11-05','{}'),('${SA}','ana@example.com',now(),'2026-11-05','{}'),('${SX}','x@example.com',now(),'2026-11-05 10:00','{}')`);
   await db.exec(rd('0013_team.sql')); await db.exec(rd('0014_notice_follow.sql')); await db.exec(rd('0015_someday.sql'));
-  let err=null; try{ await db.exec(mig); await db.exec(mig); await db.exec(mig17); await db.exec(mig17); await db.exec(mig18); await db.exec(mig18); }catch(e){ err=e.message; } check('sql_runs_twice', !err, err);
+  let err=null; try{ await db.exec(mig); await db.exec(mig); await db.exec(mig17); await db.exec(mig17); await db.exec(mig18); await db.exec(mig18); await db.exec(mig19); await db.exec(mig19); }catch(e){ err=e.message; } check('sql_runs_twice', !err, err);
   const q=async s=>(await db.query(s)).rows, tryq=async s=>{ try{ return {rows:await q(s)}; }catch(e){ return {error:e.message}; } };
   const as=async(uid,fn)=>{ await db.exec(`set test.uid='${uid}'; set role authenticated;`); try{ return await fn(); } finally{ await db.exec(`reset role; reset test.uid;`); } };
   await as(SE,()=>q(`select public.tareas_team_invite('victor@example.com','Víctor')`)); await as(SE,()=>q(`select public.tareas_team_invite('ana@example.com','Ana')`));
@@ -104,11 +104,19 @@ async function sqlTests(){
   check('sql_comments_rules', rE.length===2 && rA.length===0 && c1.body==='s1:aa' && !c1.deleted && n1.body==='s1:dd' && !!n1.seen && !!c1d, {rE, rA, c1, n1, c1d});
   await as(SV,()=>q(`insert into public.shared_views (id,task_id,space_id,review,read_at,modified) values ('t2:${SV}','t2','s1','2026-12-01',now(),now())`));
   const vr=(await q(`select review, read_at from public.shared_views where id='t2:${SV}'`))[0];
+  /* v0.40.1 (0019): a deletion mark as the app sends it (upsert with id, deleted and modified only) on the three tables */
+  const up=(t, id, d)=>`insert into public.${t} (id, deleted, modified) values ('${id}', ${d}, now()+interval '9 second') on conflict (id) do update set deleted = excluded.deleted, modified = excluded.modified`;
+  const dv=await as(SV,()=>tryq(up('shared_views', 't2:'+SV, 'now()')));
+  const dc=await as(SV,()=>tryq(up('shared_comments', 'c1', 'now()')));
+  const dm=await as(SE,()=>tryq(up('shared_members', 't2:'+SV, 'null')));
+  const dx=await as(SE,()=>tryq(up('shared_comments', 'n1', 'now()'))); // his own reminder: he may delete it
+  const after=(await q(`select (select deleted from public.shared_views where id='t2:${SV}') v, (select task_id from public.shared_views where id='t2:${SV}') vt, (select deleted from public.shared_comments where id='n1') n`))[0];
+  check('sql_delete_marks', !dv.error && !dc.error && !dm.error && !dx.error && !!after.v && after.vt==='t2' && !!after.n, {dv, dc, dm, dx, after});
   check('sql_views_review', String(vr.review).length>0 && !!vr.read_at, vr);
   await db.close();
   db=await pgSetup(); const all=strip(fs.readFileSync(path.join(ROOT,'supabase/all.sql'),'utf8')); err=null; try{ await db.exec(all); await db.exec(all); }catch(e){ err=e.message; }
   let rows=[]; try{ rows=(await db.query(fs.readFileSync(path.join(ROOT,'supabase/check.sql'),'utf8'))).rows; }catch(e){ err=err||e.message; }
-  check('sql_all_check', !err && /0001 a 0018/.test(all.split('\n')[0]) && rows.length>=52 && rows.every(x=>x.Estado==='OK') && rows.filter(x=>/\(0016\)/.test(x.Pieza)).length===3, {err, bad:rows.filter(x=>x.Estado!=='OK')});
+  check('sql_all_check', !err && /0001 a 0019/.test(all.split('\n')[0]) && rows.length>=52 && rows.every(x=>x.Estado==='OK') && rows.filter(x=>/\(0016\)/.test(x.Pieza)).length===3, {err, bad:rows.filter(x=>x.Estado!=='OK')});
   await db.close();
 }
 

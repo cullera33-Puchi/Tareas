@@ -478,7 +478,7 @@ async function appTests(browser, st){
   check('N_saved_on_server', fake.t.push_subscriptions.size===1 && rowA.owner_id===USER.uid && rowA.endpoint==='http://127.0.0.1:'+PUSH_PORT+'/push/A' && rowA.p256dh===devA.p256dh && rowA.auth===devA.authB64 && rowA.device==='iPhone', rowA);
   check('N_toast_on', /Notificaciones activadas/.test(await toastText(ap)));
   // Asked once: the next reminder shows no sheet
-  await ap.click('.screen.detail [data-act=pickReminder]'); await ap.waitForTimeout(650); await ap.locator('#sheet .chip', {hasText:'En una hora'}).click(); await ap.waitForTimeout(900);
+  await ap.click('.screen.detail [data-act=pickReminder]'); await ap.waitForTimeout(650); await ap.locator('#sheet .chip', {hasText:'Mañana a las 9:00'}).click(); await ap.waitForTimeout(900); // always offered ('En una hora' merges with 18:00 from 16:55)
   check('N_offer_once', (await sheetH2(ap))==='' && await ap.evaluate(()=>!document.querySelector('.screen.detail .push-note')));
   const logA=await ap.evaluate(()=>LOG.map(e=>e.m));
   check('N_logged', ['Permiso de notificaciones: granted','Suscripción a notificaciones creada','Suscripción guardada en la cuenta'].every(m=>logA.includes(m)), logA.slice(-10));

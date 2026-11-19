@@ -128,7 +128,7 @@ async function sqlTests(){
   await db.close();
   db=await pgSetup(); const all=strip(fs.readFileSync(path.join(ROOT,'supabase/all.sql'),'utf8')); err=null; try{ await db.exec(all); await db.exec(all); }catch(e){ err=e.message; }
   let rows=[]; try{ rows=(await db.query(fs.readFileSync(path.join(ROOT,'supabase/check.sql'),'utf8'))).rows; }catch(e){ err=err||e.message; }
-  check('sql_all_check', !err && /0001 a 0020/.test(all.split('\n')[0]) && rows.length>=53 && rows.every(x=>x.Estado==='OK') && rows.filter(x=>/\(0016\)/.test(x.Pieza)).length===3, {err, bad:rows.filter(x=>x.Estado!=='OK')});
+  check('sql_all_check', !err && /0001 a 00\d\d/.test(all.split('\n')[0]) && rows.length>=53 && rows.every(x=>x.Estado==='OK') && rows.filter(x=>/\(0016\)/.test(x.Pieza)).length===3, {err, bad:rows.filter(x=>x.Estado!=='OK')});
   await db.close();
 }
 

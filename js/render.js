@@ -322,6 +322,7 @@ function rowHTML(x, opts={}){
     if(x.reminder) meta.push('<span class="bell">'+I.bell+(x.date&&localDay(x.reminder)===x.date?fmtTime(x.reminder):fmtDateTime(x.reminder))+'</span>'); // the reminder's own day when it is not the task's date (moved task, no date)
     if(x.estimate) meta.push('<span class="est">'+estLabel(x.estimate)+'</span>'); // decision 56a
     // v0.37.2: the people after the day, the reminder and the estimate; their names shrink before those are cut
+    { const sh=shTagHTML(x, 'shn'); if(sh) meta.push(sh); } // v0.39.1: who else is in a shared task
     if(x.status==='waiting'&&x.waitingFor&&!isViewPerson(x.waitingFor, opts)) meta.push('<span class="waitfor">Esperando a '+esc(x.waitingFor)+'</span>');
     if(respShown(x)&&!isViewPerson(x.responsible, opts)) meta.push(respMetaHTML(x)); } // decision 48c: who does it, in grey; decision 65a: not the person whose view it is
   const ind=opts.compact?'':(x.focus&&!done&&!opts.simple&&!opts.inFocus?'<span class="ist" title="En Ahora">'+I.starF+'</span>':'')+(x.notes&&x.notes.trim()?I.note:'')+(hasAtt(x.id)?I.clip:'')+(x.repeat&&repParse(x.repeat)?'<span class="irp" title="'+esc(repSummary(x.repeat))+'">'+I.repeat+'</span>':''); // decision 29: a paperclip when it has photos or audio
@@ -335,7 +336,7 @@ function rowHTML(x, opts={}){
      the priority, so the title gets the width. The line never wraps: the capsule and the names shrink first (stylesheet) */
   // A row with nothing else on the grey line keeps its steps and icons on the right, so it stays one line
   let star=opts.compact?'':(x.focus&&!done&&!opts.simple&&!opts.inFocus?'<span class="ist" title="En Ahora">'+I.starF+'</span>':'');
-  if(!opts.compact){ const pm=meta.findIndex(m=>/class="(waitfor|resp)"/.test(m)), icons=shIconHTML(x)+(x.notes&&x.notes.trim()?I.note:'')+(hasAtt(x.id)?I.clip:'')+(x.repeat&&repParse(x.repeat)?'<span class="irp" title="'+esc(repSummary(x.repeat))+'">'+I.repeat+'</span>':''); // decision 88: shared
+  if(!opts.compact){ const pm=meta.findIndex(m=>/class="(shn|waitfor|resp)"/.test(m)), icons=(done?shIconHTML(x):'')+(x.notes&&x.notes.trim()?I.note:'')+(hasAtt(x.id)?I.clip:'')+(x.repeat&&repParse(x.repeat)?'<span class="irp" title="'+esc(repSummary(x.repeat))+'">'+I.repeat+'</span>':''); // decision 88: shared
     if(!meta.length) star+=icons+prog;
     else { if(prog) meta.splice(pm<0?meta.length:pm, 0, prog); if(icons) meta.push('<span class="micons">'+icons+'</span>'); } }
   return '<div class="row'+(done?' done':'')+(held?' held':'')+(opts.byDay?' byday':'')+(selected?' selected':'')+'" data-id="'+x.id+'"'+(pc?' style="'+tagVars(pc)+'"':'')+'>'+
@@ -347,11 +348,11 @@ function rowHTML(x, opts={}){
    indicators, the date (or "Aplazada", or when it was done), the reminder and the priority. The R3 rules decide what each column says */
 // Desktop indicators in fixed slots (star of Ahora, notes, paperclip, repeat), so each icon keeps its column from row to row; a slot no row
 // of the list uses takes no room (stylesheet). The column header draws the same empty slots, so its cells stay over the rows'
-const IND_SLOTS=['st','sh','nt','cl','rp']; // decision 88: sh, a shared task
+const IND_SLOTS=['st','nt','cl','rp']; // v0.39.1: a shared task says its people in the column Persona (shTagHTML), not with an icon
 const indSlotsHTML = f => IND_SLOTS.map(k=>'<span class="is is-'+k+'">'+(f?f(k):'')+'</span>').join('');
 function deskIndHTML(x, v, opts){ if(opts.compact) return '';
   return indSlotsHTML(k=> k==='st'?(x.focus&&!v.done&&!opts.simple&&!opts.inFocus?'<span class="ist" title="En Ahora">'+I.starF+'</span>':'')
-    : k==='sh'?shIconHTML(x) : k==='nt'?(x.notes&&x.notes.trim()?I.note:'') : k==='cl'?(hasAtt(x.id)?I.clip:'')
+    : k==='nt'?(x.notes&&x.notes.trim()?I.note:'') : k==='cl'?(hasAtt(x.id)?I.clip:'')
     : (x.repeat&&repParse(x.repeat)?'<span class="irp" title="'+esc(repSummary(x.repeat))+'">'+I.repeat+'</span>':'')); }
 /* v0.33.1: a right-hand column takes room only when some row of the list uses it (the :has rules of the stylesheet). The blocks at the
    foot of a list, Completadas and Por confirmar más adelante, are rows apart (opts.xs, class xs): what they show (the time a task was
@@ -371,7 +372,7 @@ function deskRowHTML(x, opts, v){ const t=v.t; let date='', dcls='', rem='', dra
   const ds=UI.dsel, own=!opts.simple, multi=deskMulti(), sel=own&&multi&&ds.ids.has(x.id), cur=own&&!multi&&ds.cur===x.id, edit=own&&ds.edit&&ds.edit.id===x.id;
   v.selecting=own&&ds.mode;
   // v0.33.1: Esperando a and the responsible in a column of their own, Persona, right after the title (decisions 41 and 48c)
-  const per=(v.done?'':doneByTagHTML(x))+(x.status==='waiting'&&x.waitingFor&&!v.done&&!isViewPerson(x.waitingFor, opts)?'<span class="wtag" title="Esperando a '+esc(x.waitingFor)+'">'+MI.wait+esc(x.waitingFor)+'</span>':'')+(v.done||isViewPerson(x.responsible, opts)?'':respTagHTML(x));
+  const per=(v.done?'':doneByTagHTML(x))+shTagHTML(x)+(x.status==='waiting'&&x.waitingFor&&!v.done&&!isViewPerson(x.waitingFor, opts)?'<span class="wtag" title="Esperando a '+esc(x.waitingFor)+'">'+MI.wait+esc(x.waitingFor)+'</span>':'')+(v.done||isViewPerson(x.responsible, opts)?'':respTagHTML(x));
   const est=x.estimate&&!v.done?estLabel(x.estimate):'', remH=rem?I.bell+rem:'';
   /* v0.37.2 (E1): under the title, a grey line with «Aplazada 4 veces» and, when the list is too narrow for them, what the columns hidden by
      fitCols would show (classes hc-<column> on .main). Without either it takes no height */

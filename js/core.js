@@ -2,7 +2,7 @@
 /* Tareas. Core: version, log, utilities, data (DB in localStorage), UI state, Deshacer toast and the task actions.
    A classic script: index.html loads every file of js/ in order and they share their global names. Only declarations and
    listeners run at load; the start itself (first screen, timers, sync, service worker) is in boot.js, the last file. */
-const APP_VERSION = '0.39.0';
+const APP_VERSION = '0.39.1';
 let pendingSW = null; // service worker installed and waiting to take over
 let updateRequested = false; // the user asked for the waiting worker to take over
 
@@ -631,7 +631,9 @@ function updTask(id, patch){ const x=task(id); if(!x) return; if('date' in patch
   // Block 9: a reminder that changes notifies once more (reminderSent cleared), unless it is already past: then it is marked as sent and never notifies
   if('reminder' in patch && !('reminderSent' in patch) && (patch.reminder||null)!==(x.reminder||null)) patch.reminderSent=sentStamp(patch.reminder);
   // Decision 88: a shared task keeps two times, its common part's (modified) and this person's own part's (vmod)
-  if(x.share){ const now=new Date().toISOString(), ks=Object.keys(patch); Object.assign(x, patch); if(ks.some(k=>SH_OWN.includes(k))) x.vmod=now; if(ks.some(k=>!SH_OWN.includes(k)&&k!=='vmod'&&k!=='modified'&&k!=='sentTo')) x.modified=now; save(); return; }
+  if(x.share){ const now=new Date().toISOString(), ks=Object.keys(patch), st0=x.status; Object.assign(x, patch);
+    const stOwn=st0!==x.status&&(st0==='waiting'||x.status==='waiting'), stCommon=shCommonStatus(st0)!==shCommonStatus(x.status); // v0.39.1: Por confirmar is each person's own
+    if(ks.some(k=>SH_OWN.includes(k))||stOwn) x.vmod=now; if(ks.some(k=>!SH_OWN.includes(k)&&k!=='vmod'&&k!=='modified'&&k!=='sentTo'&&!(k==='status'&&!stCommon))) x.modified=now; save(); return; }
   Object.assign(x, patch, {modified:new Date().toISOString()}); save(); }
 /* Decision 25: a task that changes day through rollOver, Aplazar, Pasar lo pendiente a mañana, the reviews, planning, the desktop quick dates
    or a calendar drag takes a reminder set on its old day to the new day, at the same time. If that time has already passed (yesterday's

@@ -1,5 +1,13 @@
 # Registro de cambios
 
+## v0.39.1. Tareas compartidas: aviso, con quién y «Por confirmar» de cada persona (19 de noviembre de 2026)
+
+- Corregido (primer uso real con Jorge): el aviso «Enric ha compartido una tarea contigo» no salía nunca. La regla de escritura de `shared_members` conservaba `pushed` para cualquiera que no fuera el propietario de la tarea, también para `send-reminders` (sin usuario), así que la función reclamaba la fila cada minuto, no quedaba marcada y no avisaba; además, esas filas cambiaban cada minuto. Migración `0017_shared_fix.sql`: solo se frena a una persona con sesión que no sea el propietario. Las tareas ya aceptadas quedan marcadas sin avisar.
+- «Por confirmar» pasa a ser de cada persona (decisión 89): columna nueva `shared_views.waiting`; la parte común dice pendiente (un `waiting` común escrito por la v0.39.0 se lee como pendiente). Quien marca la tarea como por confirmar la ve así; los demás la ven pendiente. Completarla sigue siendo común. Las vistas de las tareas que ya esperaban quedan esperando para su propietario. `updTask` separa el cambio entre pendiente y por confirmar (parte propia) del resto del estado (parte común).
+- Con quién está compartida, sin abrirla: en el escritorio, cápsula azul con el icono y «Jorge», «Jorge y Ana» o «Jorge y 2 más» en la columna Persona (sustituye al icono de la columna de indicadores); en el iPhone, el mismo texto en azul en la línea gris. Los nombres completos, en el aviso del ratón (`shNames`, `shTagHTML`).
+- «Por persona»: grupo nuevo «Compartidas con X» con las tareas compartidas con esa persona que no están en «Le toca a» ni en «Esperando a». Un miembro del Equipo es la persona de un nombre si coincide su nombre completo o su nombre de pila, o si el contacto de ese nombre tiene su correo (`memberIs`). La lista de personas cuenta también las compartidas.
+- Pruebas: `rm-SH` comprueba el aviso marcado por el servicio, la columna `waiting`, el nombre en la fila de los dos lados, el grupo de «Por persona» y «Por confirmar» de cada persona.
+
 ## v0.39.0. Tareas compartidas (18 de noviembre de 2026)
 
 - Tareas compartidas entre miembros del Equipo (decisión 88, punto 43 revisado con Enric el 18 de noviembre). «Compartir con…» sustituye a «Avisar a…» en la pulsación larga, el clic derecho, el menú del detalle, el detalle y el inspector; lo ya enviado con «Avisar a…» (Recibidas, líneas de seguimiento) sigue igual. Solo con miembros del Equipo que ya tienen sus claves, y no en tareas que se repiten.

@@ -246,7 +246,7 @@ body:not(.desktop) .row-meta>span+span{margin-left:.75em;} /* decision 27d: the 
 body:not(.desktop) .row-meta{display:flex;align-items:center;min-width:0;}
 body:not(.desktop) .row-meta>span{flex:none;white-space:nowrap;}
 body:not(.desktop) .row-meta>.tag{flex:0 1 auto;min-width:3.4em;max-width:none;}
-body:not(.desktop) .row-meta>:is(.waitfor,.resp){flex:0 1 auto;min-width:2.6em;overflow:hidden;text-overflow:ellipsis;}
+body:not(.desktop) .row-meta>:is(.waitfor,.resp,.shn){flex:0 1 auto;min-width:2.6em;overflow:hidden;text-overflow:ellipsis;}
 body:not(.desktop) .row-meta .micons{display:inline-flex;align-items:center;gap:4px;color:var(--ink3);}
 body:not(.desktop) .row-meta .micons svg,body:not(.desktop) .row-meta .micons .irp{width:12px;height:12px;display:block;}
 body:not(.desktop) .row-meta .sprog svg{width:11px;height:11px;}
@@ -631,7 +631,7 @@ body.pdragging,body.pdragging *{cursor:grabbing !important;user-select:none;-web
 .app.desktop .rsub .s-date:is(.carried,.review){color:var(--orange);font-weight:500;}
 .app.desktop .rsub svg{width:10px;height:10px;flex:none;}
 .app.desktop .rsub .s-per{flex:0 1 auto;gap:4px;overflow:hidden;}
-.app.desktop .rsub .s-per :is(.wtag,.rtag,.dtag){max-width:none;flex:0 1 auto;}
+.app.desktop .rsub .s-per :is(.wtag,.rtag,.dtag,.shtag){max-width:none;flex:0 1 auto;}
 .app.desktop .main.hc-date .rsub .s-date,.app.desktop .main.hc-dl .rsub .s-dl,.app.desktop .main.hc-rem .rsub .s-rem,.app.desktop .main.hc-est .rsub .s-est,
 .app.desktop .main.hc-steps .rsub .s-steps,.app.desktop .main.hc-per .rsub .s-per{display:inline-flex;}
 .app.desktop .main.hc-date .rc-date,.app.desktop .main.hc-dl .rc-dl,.app.desktop .main.hc-rem .rc-rem,.app.desktop .main.hc-est .rc-est,
@@ -670,7 +670,9 @@ body.pdragging,body.pdragging *{cursor:grabbing !important;user-select:none;-web
 /* Persona: Esperando a first, then the responsible, each clipped to the column (the full name in its tooltip) */
 .app.desktop .rc-per{flex:none;width:var(--col-per,150px);display:flex;align-items:center;justify-content:flex-start;gap:4px;min-width:0;text-align:left;}
 .app.desktop.has-pane .rc-per{width:var(--col-per,120px);}
-.app.desktop .rc-per .wtag,.app.desktop .rc-per .rtag{flex:0 1 auto;min-width:0;max-width:100%;}
+.app.desktop .rc-per .wtag,.app.desktop .rc-per .rtag,.app.desktop .rc-per .shtag{flex:0 1 auto;min-width:0;max-width:100%;}
+.app.desktop .rc-per .shtag + :is(.wtag,.rtag){flex-shrink:2;}
+.app.desktop .rc-per .shtag{display:block;text-overflow:ellipsis;}
 .app.desktop .rc-per .dtag + :is(.wtag,.rtag){flex-shrink:3;}
 .app.desktop .rc-per .wtag + .rtag{flex-shrink:2;}
 .app.desktop .rc-per .rtag,.app.desktop .rc-per .wtag{display:block;text-overflow:ellipsis;}
@@ -1626,6 +1628,11 @@ body.desktop .sgopen svg{width:6px;height:11px;}
 .row-meta .resp svg{width:11px;height:11px;}
 .rtag{flex:0 0 auto;min-width:0;max-width:40%;display:inline-flex;align-items:center;gap:3px;overflow:hidden;white-space:nowrap;font-size:11px;color:var(--ink2);background:var(--fill);border-radius:5px;padding:1px 6px;}
 .rtag svg{width:10px;height:10px;}
+/* v0.39.1: who else is in a shared task: a blue capsule on the desktop (Persona), blue grey text on the iPhone's grey line */
+.shtag{flex:0 0 auto;min-width:0;max-width:40%;display:inline-flex;align-items:center;gap:3px;overflow:hidden;white-space:nowrap;font-size:11px;color:var(--blue);background:color-mix(in srgb, var(--blue) 12%, transparent);border-radius:5px;padding:1px 6px;}
+.shtag svg{width:11px;height:11px;flex:none;}
+.row-meta .shn{display:inline-flex;align-items:center;gap:3px;color:var(--blue);}
+.row-meta .shn svg{width:12px;height:12px;flex:none;}
 /* The filter by responsible: the iPhone chip first in the row of project chips; the desktop pop-up button beside Proyecto */
 .pchips .chip.rchip{gap:4px;}
 .pchips .chip.rchip svg{width:13px;height:13px;}

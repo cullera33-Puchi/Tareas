@@ -1,5 +1,15 @@
 [
   {
+    "version": "0.39.1",
+    "date": "2026-11-19",
+    "items": [
+      "Ya llega el aviso «Enric ha compartido una tarea contigo». Hasta ahora no salía.",
+      "En la lista ves con quién está compartida cada tarea: «Jorge», o «Jorge y 2 más». En el ordenador va en la columna Persona.",
+      "En «Por persona» hay un grupo nuevo, «Compartidas con…», con las tareas que compartes con esa persona.",
+      "«Por confirmar» es ahora de cada persona: si tú esperas a Jorge, a él la tarea le sale como pendiente normal."
+    ]
+  },
+  {
     "version": "0.39.0",
     "date": "2026-11-18",
     "items": [

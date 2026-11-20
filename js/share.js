@@ -44,7 +44,8 @@ const shStepCmp = (a,b) => (+a.order||0)-(+b.order||0) || String(a.id).localeCom
 const shStepsJSON = steps => JSON.stringify((steps||[]).filter(s=>s&&s.id).slice().sort(shStepCmp).map(s=>({id:String(s.id), title:String(s.title||''), done:!!s.done, order:+s.order||0})));
 function shTaskRecs(tasks, subtasks){ const ids=shIds(tasks); if(!ids.size) return []; const by=new Map();
   (subtasks||[]).forEach(s=>{ if(s&&ids.has(s.taskId)){ let a=by.get(s.taskId); if(!a) by.set(s.taskId, a=[]); a.push(s); } });
-  return tasks.filter(x=>x&&x.share).map(x=>{ const r={id:x.id, share:x.share, created:x.created, modified:x.modified, steps:shStepsJSON(by.get(x.id))}; SH_COMMON.forEach(k=>{ r[k]=x[k]; }); r.status=shCommonStatus(r.status); if(x.status==='waiting'&&'cdate' in x) r.date=x.cdate; return r; }); }
+  return tasks.filter(x=>x&&x.share).map(x=>{ const r={id:x.id, share:x.share, created:x.created, modified:x.modified, steps:shStepsJSON(by.get(x.id))}; SH_COMMON.forEach(k=>{ r[k]=x[k]; }); r.status=shCommonStatus(r.status); if(x.status==='waiting'&&'cdate' in x) r.date=x.cdate;
+    if(x.cxBad&&x.cxBad.length){ r.cxBad=x.cxBad.slice(); r.cxBad.forEach(f=>{ r[f]=CRYPTO_PLACEHOLDER; }); } return r; }); } // a text that did not open here never goes up (syncNoPlaceholder)
 // v0.39.1: Por confirmar is each person's own (shared_views.waiting); the common part says pending. A common 'waiting' (written by v0.39.0) reads as pending
 const shCommonStatus = s => s==='waiting'?'pending':s;
 /* v0.40.0: the review day is this person's own too. While a shared task waits here, x.date is this person's review day (every list reads
@@ -76,6 +77,7 @@ function shFold(W, st, stats){ const me=shMe(); let n=0; const gone=[];
     if(!x){ x={id, spaceId:null, projectId:null, reminder:null, notes:'', status:'pending', priority:'none', carried:false, completed:null, created:r.created||r.modified}; W.tasks.push(x); idx.set(id, W.tasks.length-1); }
     const ow=x.status==='waiting', rd=x.date; // v0.39.1: this person's own Por confirmar stays (the view below may change it); v0.40.0: and their review day
     SH_COMMON.forEach(k=>{ x[k]=r[k]==null?(k==='notes'||k==='title'?'':null):r[k]; }); x.share=r.share||x.share; x.modified=r.modified; if(!x.created) x.created=r.created||r.modified;
+    if(r.cxBad&&r.cxBad.length) x.cxBad=r.cxBad.slice(); else delete x.cxBad; // its texts that did not open (crUnread), kept as a local mark
     if(x.status!=='done'){ x.status=ow?'waiting':'pending'; if(ow){ x.cdate=x.date; x.date=rd; } } else delete x.cdate;
     if(x.repeat) x.repeat=null; if(x.someday) x.someday=null; // a shared task never repeats nor waits for some day
     let list=null; try{ list=JSON.parse(r.steps||'[]'); }catch(e){ list=null; } // a list that did not open (another key): the steps stay
@@ -109,6 +111,9 @@ function shMayDelete(id, dry, st){ const me=shMe(), ms=DB.shareMembers.filter(m=
   return false; }
 
 /* ---------- Keys ---------- */
+// The keys of the shared tasks kept on this device go with the account: «Cerrar sesión» and a change of account (decision 75.8)
+const shKeysForget = () => { SHK.raw.clear(); SHK.key.clear();
+  return cryptoKdbDo('readwrite', st=>{ const q=st.openCursor(); q.onsuccess=()=>{ const c=q.result; if(!c) return; if(String(c.key).startsWith('share:')) c.delete(); c.continue(); }; }); };
 const SH_AAD = (c, t) => cryptoTE.encode((t||'shared_tasks')+'.'+c);
 async function shSetKey(id, raw){ const k=await cryptoSubtle().importKey('raw', cryptoUnb64(raw), {name:'AES-GCM', length:256}, false, ['encrypt','decrypt']);
   SHK.raw.set(id, raw); SHK.key.set(id, k); cryptoKdbDo('readwrite', s=>s.put({id:'share:'+id, key:k, owner:shMe()})).catch(()=>{}); return k; }
@@ -136,9 +141,10 @@ async function shOpenRows(inner, rows, table){ if(!Array.isArray(rows)||!rows.le
     for(const c of T.cols){ if(typeof r[c]!=='string'||!r[c].startsWith(SH_PREFIX)) continue; try{ if(!k) throw new Error('sin clave'); o[c]=await shDec(k, r[c], c, table); }catch(e){ o[c]=CRYPTO_UNREAD; } }
     out.push(o); }
   return out; }
-// Rows up, sealed with their task's key; without it nothing goes (the pass fails and is tried again)
+// Rows up, sealed with their task's key. A row whose task's key is not here is left out (the server answers without it and it is asked for again): one task never stops the whole pass
+const SH_NOKEY=new Set();
 async function shSealRows(inner, rows, table){ const T=SH_SEALED[table||'shared_tasks']; await shKeysFor(inner, rows.filter(r=>r&&!SHK.key.has(T.tid(r))).map(T.tid)); const out=[];
-  for(const r of rows){ const k=SHK.key.get(T.tid(r)); if(!k) throw new Error('Falta la clave de una tarea compartida'); const o=Object.assign({}, r);
+  for(const r of rows){ const k=SHK.key.get(T.tid(r)); if(!k){ if(!SH_NOKEY.has(T.tid(r))){ SH_NOKEY.add(T.tid(r)); log('warn','Compartidas: falta la clave de una tarea; sus cambios esperan', {table, id:T.tid(r)}); } continue; } const o=Object.assign({}, r);
     for(const c of T.cols) if(c in o) o[c]=await shEnc(k, o[c], c, table); out.push(o); }
   return out; }
 
@@ -169,10 +175,19 @@ function shLeave(id, quiet){ const x=task(id), me=shMe(); if(!x||!x.share||x.sha
   const now=new Date().toISOString(), i=DB.tasks.indexOf(x), ss=cutSteps(new Set([id]));
   batch(()=>{ if(i>=0) DB.tasks.splice(i,1); if(m){ m.leftAt=now; m.modified=now; } save(); }); log('info','Compartidas: tarea dejada'); render();
   if(!quiet) toast(x.spaceId?'Has salido de la tarea':'Tarea rechazada', ()=>{ batch(()=>{ if(!task(id)) DB.tasks.push(x); putSteps(ss); if(m){ m.leftAt=null; m.modified=new Date().toISOString(); } save(); }); render(); }); }
+/* A deletion of several tasks (a selection, a space) with shared ones among them: what it means for them, said before (as confirmDelete
+   does for one), and its Deshacer. Its owner deletes a task for everyone in it; anyone else leaves it (shMayDelete) */
+function shDeleteText(xs){ const me=shMe(); if(!me) return ''; const own=xs.filter(x=>x&&x.share===me&&shOthers(x).length), got=xs.filter(x=>x&&x.share&&x.share!==me), a=[];
+  if(own.length) a.push(own.length===1?'"'+clipTitle(own[0].title)+'" se eliminará también para '+listY(shOthers(own[0]).map(m=>teamFirst(teamMember(m.userId)))):own.length+' tareas compartidas se eliminarán también para las personas con las que las compartiste');
+  if(got.length) a.push(got.length===1?'Saldrás de "'+clipTitle(got[0].title)+'", que te compartió '+teamFirst(teamMember(got[0].share))+'; para los demás no cambia nada':'Saldrás de '+got.length+' tareas que te compartieron; para los demás no cambia nada');
+  return a.length?a.join('. ')+'. ':''; }
+// Deshacer of such a deletion: the tasks shared with this person come back to it (the member row left meanwhile is taken back, as in shLeave)
+function shUnleave(xs){ const me=shMe(), now=new Date().toISOString(); if(!me) return;
+  xs.forEach(x=>{ if(!x||!x.share||x.share===me) return; const m=DB.shareMembers.find(r=>r&&r.id===x.id+':'+me); if(m&&m.leftAt){ m.leftAt=null; m.modified=now; } }); }
 // Recibidas: added to this person's tasks, in the active space, with the project chosen
 function shAccept(id, projectId){ const x=task(id); if(!shPending(x)) return; const now=new Date().toISOString();
-  x.spaceId=space().id; x.projectId=projectId||null; x.vmod=now; x.vcreated=now; save(); haptic(8); log('info','Compartidas: tarea añadida'); render();
-  toast('Añadida a tus tareas', ()=>{ x.spaceId=null; x.projectId=null; x.vmod=new Date().toISOString(); save(); render(); }); }
+  x.spaceId=space().id; x.projectId=projectId||null; x.vmod=now; x.vcreated=now; save(); haptic(8); log('info','Compartidas: tarea añadida'); teamRepaint(); // the Recibidas sheet loses its card too
+  toast('Añadida a tus tareas', ()=>{ x.spaceId=null; x.projectId=null; x.vmod=new Date().toISOString(); save(); teamRepaint(); }); }
 
 /* ---------- The sheet: who is in the task ---------- */
 const canShare = x => !!x && shOn() && isOpen(x) && !repParse(x.repeat) && (!x.share||x.share===shMe()) && teamPeers().length>0;

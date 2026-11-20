@@ -1,5 +1,16 @@
 [
   {
+    "version": "0.40.2",
+    "date": "2026-11-19",
+    "items": [
+      "Tareas compartidas: un paso marcado ya no se pierde si la otra persona cambia la tarea a la vez.",
+      "Al añadir una tarea desde Recibidas, la tarjeta desaparece al momento y «No, gracias» ya no puede sacarte de una tarea que acabas de añadir.",
+      "Eliminar varias tareas o un espacio avisa de qué pasa con las compartidas: las tuyas se eliminan también para los demás y de las que te compartieron sales.",
+      "Tu día de revisión en «Por confirmar» ya no toca la tarea de los demás, y Deshacer tras completarla lo recupera.",
+      "Una tarea compartida que no se puede leer ya no detiene la sincronización del resto."
+    ]
+  },
+  {
     "version": "0.40.1",
     "date": "2026-11-19",
     "items": [

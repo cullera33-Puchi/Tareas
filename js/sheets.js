@@ -21,9 +21,9 @@ function bulkDelete(){ const xs=selectedTasks(); if(!xs.length) return; const re
     batch(()=>{ undoS=skip.map(x=>skipOccurrence(x.id, true)).filter(Boolean); removedT=DB.tasks.filter(x=>ids.has(x.id)); removedV=DB.voiceNotes.filter(v=>ids.has(v.taskId)); DB.tasks=DB.tasks.filter(x=>!ids.has(x.id)); DB.voiceNotes=DB.voiceNotes.filter(v=>!ids.has(v.taskId)); removedA=cutAttachments(ids); removedS=cutSteps(ids); save(); });
     log('info','Eliminadas en bloque: '+removedT.length+(undoS.length?', '+undoS.length+' pasadas a su siguiente fecha':'')); endSelect(); haptic(14);
     const parts=[]; if(removedT.length) parts.push(removedT.length+(removedT.length===1?' tarea eliminada':' tareas eliminadas')); if(undoS.length) parts.push(undoS.length+(undoS.length===1?' pasada a su siguiente fecha':' pasadas a su siguiente fecha'));
-    toast(parts.join(', '), ()=>batch(()=>{ undoS.forEach(u=>u()); DB.tasks.push(...removedT); DB.voiceNotes.push(...removedV); putAttachments(removedA); putSteps(removedS); save(); })); };
-  if(rep.length){ askRepeatDelete({n:xs.length, rep:rep.length}, ()=>run(true), ()=>run(false)); return; }
-  confirmSheet('Eliminar '+xs.length+(xs.length===1?' tarea':' tareas'), 'Podrás deshacerlo durante unos segundos.', ()=>run(false)); }
+    toast(parts.join(', '), ()=>batch(()=>{ undoS.forEach(u=>u()); DB.tasks.push(...removedT); DB.voiceNotes.push(...removedV); putAttachments(removedA); putSteps(removedS); shUnleave(removedT); save(); })); };
+  if(rep.length){ askRepeatDelete({n:xs.length, rep:rep.length, pre:shDeleteText(xs)}, ()=>run(true), ()=>run(false)); return; }
+  confirmSheet('Eliminar '+xs.length+(xs.length===1?' tarea':' tareas'), shDeleteText(xs)+'Podrás deshacerlo durante unos segundos.', ()=>run(false)); } // decision 88: the shared ones among them said first
 function bulkReschedule(date, label){ const xs=selectedTasks(); if(!xs.length) return; const prev=xs.map(daySnap); batch(()=>xs.forEach(x=>updTask(x.id, dayPatch(x, date)))); endSelect(); toast(xs.length+(xs.length===1?' tarea aplazada a ':' tareas aplazadas a ')+label, ()=>batch(()=>prev.forEach(undoDay))); }
 function bulkPostponeSheet(src){ const sel=selSet(); if(!sel||!sel.size) return; const t=todayStr(); const opts=uniqueBy([['Mañana',addDays(t,1)],['Fin de semana',weekendDay()],['Próxima semana',nextWeekday(1,true)],['En una semana',addDays(t,7)]], o=>o[1]);
   popMenu({anchor:src, align:UI.wide?'left':undefined, title:'Aplazar '+sel.size+(sel.size===1?' tarea':' tareas'), groups:[opts.map(([l,d])=>dateItem(l, d, ()=>bulkReschedule(d,l.toLowerCase()))), [dateItem('Sin fecha', null, ()=>bulkReschedule(null,'sin fecha'))]]}); }
@@ -310,7 +310,7 @@ function spaceLoadText(L){ const n=(k,one,many)=>k?k+' '+(k===1?one:many):''; co
   return parts.length>1 ? parts.slice(0,-1).join(', ')+' y '+parts[parts.length-1] : parts.join(''); }
 // Decision 28a: confirmation with what goes, a local copy first (as before the first sync), then one Deshacer for everything
 function confirmDeleteSpace(sp){ const L=spaceLoad(sp.id), n=L.ps.length+L.ts.length+spaceVoice(L)+L.ns.length;
-  const text = n ? 'Se '+(n===1?'eliminará ':'eliminarán ')+spaceLoadText(L)+' del espacio "'+sp.name+'". Podrás deshacerlo durante unos segundos.' : 'El espacio "'+sp.name+'" está vacío.';
+  const text = n ? 'Se '+(n===1?'eliminará ':'eliminarán ')+spaceLoadText(L)+' del espacio "'+sp.name+'". '+shDeleteText(L.ts)+'Podrás deshacerlo durante unos segundos.' : 'El espacio "'+sp.name+'" está vacío.';
   confirmSheet('Eliminar espacio', text, async()=>{ flushEdits();
     try{ await Promise.race([BK.put(todayStr()), new Promise((_,rej)=>setTimeout(()=>rej(new Error('tiempo agotado')), 4000))]); await refreshBackups(); log('info','Copia local antes de eliminar un espacio', {space:sp.name, tasks:DB.tasks.length}); }
     catch(e){ log('warn','Copia local antes de eliminar un espacio no disponible: '+(e&&e.message||e)); }

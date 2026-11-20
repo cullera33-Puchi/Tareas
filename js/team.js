@@ -493,7 +493,7 @@ function teamAct(a, el, detailId, e){
     case 'tmNotice': if(detailId) noticeSheet(detailId); break;
     case 'tmShare': if(detailId) shareSheet(detailId); break; // decision 88
     case 'tmShAdd': shAddMenu(el.dataset.id, el); break;
-    case 'tmShDrop': shLeave(el.dataset.id); teamRepaint(); break;
+    case 'tmShDrop': if(shPending(task(el.dataset.id))) shLeave(el.dataset.id); teamRepaint(); break; // a card left on screen after the task was added never leaves it
     case 'tmFeedback': feedbackSheet(); break;
     case 'tmInvite': inviteSheet(); break;
     case 'tmMember': memberSheet(el.dataset.id); break;

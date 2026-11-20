@@ -22,7 +22,9 @@ function cmUnread(x){ if(!x||!x.share) return 0; const me=shMe(), r=x.readAt||''
 function cmBadgeHTML(x){ const n=cmUnread(x); return n?'<span class="icm" title="'+(n===1?'1 comentario sin leer':n+' comentarios sin leer')+'">'+CMI.bubble+'<b>'+n+'</b></span>':''; }
 
 /* ---------- Actions ---------- */
-function cmMarkRead(x){ if(!x||!x.share||!cmUnread(x)) return; const now=new Date().toISOString(); x.readAt=now; x.vmod=now; save(); }
+// Read up to the newest comment too: its time is the author's clock, which may run ahead of this one (else it would stay unread, and the detail would mark it again and again)
+function cmMarkRead(x){ if(!x||!x.share||!cmUnread(x)) return; const now=new Date().toISOString();
+  x.readAt=DB.shareComments.reduce((m,c)=>c&&c.taskId===x.id&&(c.created||'')>m?c.created:m, now); x.vmod=now; save(); }
 function addComment(taskId, text){ const x=task(taskId), me=shMe(), v=String(text||'').trim(); if(!x||!x.share||!me||!v) return null;
   const now=new Date().toISOString(), c={id:uid(), taskId, kind:'comment', body:v, toUser:null, groupId:null, seen:null, addedBy:me, created:now, modified:now};
   batch(()=>{ DB.shareComments.push(c); x.readAt=now; x.vmod=now; save(); }); haptic(6); log('info','Comentario añadido'); return c; }

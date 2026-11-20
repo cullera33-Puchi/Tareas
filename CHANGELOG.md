@@ -1,5 +1,20 @@
 # Registro de cambios
 
+## v0.40.2. Correcciones de las tareas compartidas tras la revisión del código (19 de noviembre de 2026)
+
+Revisión de v0.39.0 a v0.40.1 (tareas compartidas, comentarios y recordatorios por la app). Pruebas nuevas `fix_*` en `rm-SH`, comprobadas contra el código anterior.
+
+- Un paso cambiado en una tarea compartida podía perderse: el modificado de la tarea solo se ponía al día al preparar la subida, después de fusionar lo recibido, y una copia de otra persona algo posterior se quedaba con la lista de pasos. Ahora `syncApply` ejecuta `shStepsBump` antes de fusionar.
+- Comentarios: si el reloj del otro móvil va adelantado, su comentario seguía contando como no leído y el detalle lo marcaba una y otra vez (guardado, dibujo y sincronización cada 1,5 s). `cmMarkRead` lee hasta el comentario más reciente.
+- Recibidas (iPhone): tras «Añadir a mis tareas» la tarjeta seguía en la hoja, y «No, gracias» en ella sacaba de la tarea recién añadida. `shAccept` repinta la hoja (`teamRepaint`) y «No, gracias» solo actúa sobre una tarea pendiente de aceptar.
+- El recuento de aplazamientos de una tarea compartida podía bajar para todos con dos copias del mismo modificado: la regla del punto 56 (gana el mayor recuento y el primer día más antiguo) vale también para `shared_tasks`.
+- Cambiar el día de revisión propio de una tarea compartida por confirmar quitaba la marca común de aplazada y daba a la parte común un modificado nuevo. `updTask` ya no añade `carried:false` en ese caso.
+- Deshacer tras completar una tarea compartida por confirmar perdía el día de revisión propio: `completeTask` guarda la fecha como `doneSnap`.
+- Eliminar varias tareas o un espacio con tareas compartidas no avisaba: la confirmación dice ahora que las propias se eliminan también para los demás y que de las recibidas se sale (`shDeleteText`); Deshacer devuelve también las recibidas (`shUnleave`).
+- Una tarea compartida con un texto que no se pudo descifrar podía subir «(texto no legible)» en lugar del título real o, sin su clave, detener cada pasada de sincronización. La marca `cxBad` pasa a la tarea y la fila no sube ese texto; una fila sin clave se deja fuera con un aviso en el registro y el resto sincroniza.
+- «Cerrar sesión» y el cambio de cuenta olvidan también las claves de las tareas compartidas guardadas en el dispositivo (`shKeysForget`).
+- `check.sql`: comprobaciones separadas para 0019 y 0020.
+
 ## v0.40.1. Copiar una incidencia con su registro (19 de noviembre de 2026)
 
 - Buzón de sugerencias e incidencias (Equipo): la ficha lleva «Copiar incidencia y registro» («Copiar texto» en una sugerencia), que copia quién, cuándo, versión, dispositivo, el texto y el registro adjunto (`feedbackText`). El registro dentro de la ficha se puede seleccionar: la app bloquea la selección de texto en toda la interfaz y no se podía copiar. Prueba `admin_copies` en `rm-QT`.

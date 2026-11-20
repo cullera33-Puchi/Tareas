@@ -55,7 +55,8 @@ with checks(orden, pieza, ok) as (
   union all select 50, 'Compartidas: reglas de escritura y avisos (0016)', (select count(*) from pg_trigger where tgname in ('tareas_shared_task_before','tareas_shared_task_after','tareas_shared_member_before','tareas_shared_member_after','tareas_shared_view_before') and not tgisinternal) = 5
   union all select 51, 'Compartidas: «Por confirmar» de cada persona y aviso al compartir (0017)', exists (select 1 from information_schema.columns where table_schema='public' and table_name='shared_views' and column_name='waiting')
   union all select 52, 'Compartidas: comentarios, recordatorios por la app y día de revisión propio (0018)', to_regclass('public.shared_comments') is not null and exists (select 1 from information_schema.columns where table_schema='public' and table_name='shared_views' and column_name='review')
-  union all select 53, 'Compartidas: borrar filas y marcar recordatorios vistos sin que falle la sincronización (0020)', exists (select 1 from pg_proc where proname='tareas_shared_comment_before' and prosrc like '%0020%')
+  union all select 53, 'Compartidas: borrar filas sin que falle la sincronización (0019)', (select count(*) from pg_proc where proname in ('tareas_shared_view_before','tareas_shared_member_before') and prosrc like '%0019%') = 2
+  union all select 54, 'Compartidas: marcar recordatorios vistos sin que falle la sincronización (0020)', exists (select 1 from pg_proc where proname='tareas_shared_comment_before' and prosrc like '%0020%')
 )
 select orden as "N.º", pieza as "Pieza", case when ok then 'OK' else 'FALTA' end as "Estado"
 from checks order by orden;

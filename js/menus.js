@@ -285,8 +285,8 @@ function confirmDelete(id, after){ const x=task(id); if(!x) return; releaseHold(
    its series, or the series. The bottom action sheet on the iPhone, a macOS alert with three buttons on the desktop (Intro: only this one). o: {n, rep, title} */
 function askRepeatDelete(o, onlyFn, seriesFn){ const one=o.n===1, k=o.rep||1;
   const only=one?'Eliminar solo esta':'Eliminar solo estas', all=one||k===1?'Eliminar la serie':'Eliminar las series';
-  const text=one ? '"'+o.title+'" se repite. Si eliminas solo esta, pasa a su siguiente fecha. Podrás deshacerlo durante unos segundos.'
-    : (k===1?'Una de las '+o.n+' tareas se repite.':k+' de las '+o.n+' tareas se repiten.')+' Si eliminas solo estas, las que se repiten pasan a su siguiente fecha y las demás se eliminan. Podrás deshacerlo durante unos segundos.';
+  const text=(o.pre||'')+(one ? '"'+o.title+'" se repite. Si eliminas solo esta, pasa a su siguiente fecha. Podrás deshacerlo durante unos segundos.'
+    : (k===1?'Una de las '+o.n+' tareas se repite.':k+' de las '+o.n+' tareas se repiten.')+' Si eliminas solo estas, las que se repiten pasan a su siguiente fecha y las demás se eliminan. Podrás deshacerlo durante unos segundos.');
   if(UI.wide){ macAlert({title:one?'Eliminar tarea que se repite':'Eliminar '+o.n+' tareas', text, ok:only, fn:onlyFn, more:[{label:all, red:true, fn:seriesFn}]}); return; } // Intro takes the smaller step
   actionSheet(text, [{label:only, red:true, fn:onlyFn}, {label:all, red:true, fn:seriesFn}]); }
 function detailMenu(id, src){ const x=task(id); if(!x) return;

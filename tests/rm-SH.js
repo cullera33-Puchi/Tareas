@@ -128,7 +128,7 @@ async function sqlTests(){
   await db.close();
   db=await pgSetup(); const all=strip(fs.readFileSync(path.join(ROOT,'supabase/all.sql'),'utf8')); err=null; try{ await db.exec(all); await db.exec(all); }catch(e){ err=e.message; }
   let rows=[]; try{ rows=(await db.query(fs.readFileSync(path.join(ROOT,'supabase/check.sql'),'utf8'))).rows; }catch(e){ err=err||e.message; }
-  check('sql_all_check', !err && /0001 a 00\d\d/.test(all.split('\n')[0]) && rows.length>=53 && rows.every(x=>x.Estado==='OK') && rows.filter(x=>/\(0016\)/.test(x.Pieza)).length===3, {err, bad:rows.filter(x=>x.Estado!=='OK')});
+  check('sql_all_check', !err && /0001 a 00\d\d/.test(all.split('\n')[0]) && rows.length>=54 && rows.every(x=>x.Estado==='OK') && rows.filter(x=>/\(0016\)/.test(x.Pieza)).length===3, {err, bad:rows.filter(x=>x.Estado!=='OK')});
   await db.close();
 }
 
@@ -256,6 +256,39 @@ async function appTests(browser){
   x=await ep.evaluate(()=>{ const c=DB.shareComments.find(c=>c.kind==='nudge'); const d=document.createElement('div'); d.innerHTML=cmRowHTML(c); return (d.querySelector('.cms')||{}).textContent; });
   await ep.evaluate(()=>{ openDetail('e1'); }); await ep.waitForTimeout(600); await ep.evaluate(()=>{ const c=document.querySelector('#desk .pane .cmts'); if(c) c.scrollIntoView({block:'center'}); }); await ep.waitForTimeout(200); await shot(ep, 'e5-comentarios');
   check('nudge_seen', x==='visto' && !!nu[0].id && !!fake.t.shared_comments.get(nu[0].id).seen && await vp.evaluate(()=>!cmNudgesForMe().length&&!nudgeBannerHTML()), x);
+  /* v0.40.2: the corrections of the review of 19 November */
+  // A comment stamped by a clock ahead of this one is read once and for all (no endless marking while the detail is open)
+  x=await vp.evaluate(()=>{ const t=task('e1'), fut=new Date(Date.now()+120e3).toISOString(); DB.shareComments.push({id:'cmfut', taskId:'e1', kind:'comment', body:'Del futuro', toUser:null, groupId:null, seen:null, addedBy:t.share, created:fut, modified:fut});
+    const a=cmUnread(t); cmMarkRead(t); const b=cmUnread(t); DB.shareComments=DB.shareComments.filter(c=>c.id!=='cmfut'); save(); return {a, b}; });
+  check('fix_read_clock', x.a===1 && x.b===0, x);
+  // This person's own review day leaves the common part (and its Aplazada mark) alone; Deshacer of a completion gives it back
+  x=await vp.evaluate(rd=>{ const t=task('e1'), m0=t.modified, c0=!!t.carried, d0=t.date; updTask('e1', {status:'waiting', date:rd, waitingFor:null});
+    const a={m:t.modified===m0, c:!!t.carried===c0, st:t.status, d:t.date, cd:t.cdate};
+    completeTask('e1'); const done={st:t.status, d:t.date}; undoFn(); const b={st:t.status, d:t.date, cd:t.cdate};
+    unWait('e1'); return {a, done, b, back:{st:t.status, d:t.date}, d0}; }, addDays(today(),3));
+  check('fix_review_own', x.a.m && x.a.c && x.a.st==='waiting' && x.a.d===addDays(today(),3) && x.a.cd===x.d0 && x.done.st==='done' && x.done.d===x.d0 && x.b.st==='waiting' && x.b.d===addDays(today(),3) && x.b.cd===x.d0 && x.back.st==='pending' && x.back.d===x.d0, x);
+  await synced(vp);
+  // A deletion of several says what happens to the shared ones among them
+  x={own:await ep.evaluate(()=>shDeleteText([task('e1')])), got:await vp.evaluate(()=>shDeleteText([task('e1')]))};
+  check('fix_delete_text', /se eliminará también para Víctor/.test(x.own) && /^Saldrás de ".*", que te compartió Enric/.test(x.got), x);
+  // A text that did not open never goes up in place of the real one
+  x=await ep.evaluate(()=>{ const r=shTaskRecs([Object.assign({}, task('e1'), {cxBad:['title']})], [])[0], row=syncNoPlaceholder('shared_tasks', r, syncToRow('shared_tasks', r)); return {t:r.title, has:'title' in row, notes:'notes' in row}; });
+  check('fix_unreadable', x.t==='(texto no legible)' && !x.has && x.notes, x);
+  // A step ticked here is not taken away by an older-looking copy from elsewhere merged before the upload
+  x=await ep.evaluate(()=>{ const t=task('e1'), st0=DB.subtasks.filter(s=>s.taskId==='e1'), rec=shTaskRecs([t], st0)[0], now=new Date().toISOString();
+    const row=Object.assign(syncToRow('shared_tasks', Object.assign({}, rec, {title:'Título de otro', modified:new Date(Date.parse(now)-1).toISOString()})), {server_ts:now});
+    DB.subtasks.push({id:'stfix', taskId:'e1', title:'Paso nuevo', done:false, order:9999, created:now, modified:now}); SY.quiet=true; save(); SY.quiet=false;
+    syncApply({shared_tasks:[row]}, {}); const kept=DB.subtasks.some(s=>s.id==='stfix'), title=task('e1').title;
+    DB.subtasks=DB.subtasks.filter(s=>s.id!=='stfix'); stepTouch('e1'); save(); return {kept, title}; });
+  check('fix_steps_merge', x.kept && x.title!=='Título de otro', x);
+  await synced(ep);
+  // Two copies with the same time: the postponed count of a shared task never goes down
+  x=await ep.evaluate(()=>{ const t=task('e1'), rec=shTaskRecs([t], DB.subtasks.filter(s=>s.taskId==='e1'))[0];
+    const row=Object.assign(syncToRow('shared_tasks', Object.assign({}, rec, {postponed:3, carriedSince:addDays(todayStr(),-5)})), {server_ts:new Date().toISOString()});
+    t.postponed=1; SY.quiet=true; save(); SY.quiet=false; syncApply({shared_tasks:[row]}, {}); const r={p:task('e1').postponed, cs:task('e1').carriedSince};
+    updTask('e1', {postponed:null, carriedSince:null}); return r; });
+  check('fix_tally', x.p===3 && x.cs===addDays(today(),-5), x);
+  await synced(ep); await vp.evaluate(()=>syncRun('prueba')); await synced(vp);
   // Víctor postpones it (a later day): an event by him
   await vp.evaluate(d=>{ const t=task('e1'); updTask('e1', dayPatch(t, d)); }, D4); await synced(vp);
   check('event_later', (fake.sharedEvents||[]).some(e=>e.kind==='later'&&e.actor_id===UV.uid), fake.sharedEvents);

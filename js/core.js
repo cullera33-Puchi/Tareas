@@ -2,7 +2,7 @@
 /* Tareas. Core: version, log, utilities, data (DB in localStorage), UI state, Deshacer toast and the task actions.
    A classic script: index.html loads every file of js/ in order and they share their global names. Only declarations and
    listeners run at load; the start itself (first screen, timers, sync, service worker) is in boot.js, the last file. */
-const APP_VERSION = '0.40.1';
+const APP_VERSION = '0.40.2';
 let pendingSW = null; // service worker installed and waiting to take over
 let updateRequested = false; // the user asked for the waiting worker to take over
 
@@ -627,12 +627,15 @@ function addTask(data){
   if(x.projectId){ const p=proj(x.projectId); if(p) x.spaceId=p.spaceId; }
   DB.tasks.push(x); save(); return x;
 }
-function updTask(id, patch){ const x=task(id); if(!x) return; if('date' in patch && !('carried' in patch)) patch.carried=false;
+function updTask(id, patch){ const x=task(id); if(!x) return;
+  // A new date clears the Aplazada mark; not this person's own review day of a shared task that waits (the mark is common, decision 88)
+  if('date' in patch && !('carried' in patch) && !(x.share && ('status' in patch?patch.status:x.status)==='waiting')) patch.carried=false;
   if(x.someday && !('someday' in patch) && (patch.date || patch.reminder || patch.focus || patch.status==='waiting')) patch.someday=null; // decision 85: a day, a reminder, Ahora or Por confirmar take it out of Algún día
   // Block 9: a reminder that changes notifies once more (reminderSent cleared), unless it is already past: then it is marked as sent and never notifies
   if('reminder' in patch && !('reminderSent' in patch) && (patch.reminder||null)!==(x.reminder||null)) patch.reminderSent=sentStamp(patch.reminder);
   // Decision 88: a shared task keeps two times, its common part's (modified) and this person's own part's (vmod)
   if(x.share){ const now=new Date().toISOString(), ks=Object.keys(patch), st0=x.status, d0=x.date; Object.assign(x, patch);
+    if(x.cxBad){ x.cxBad=x.cxBad.filter(f=>!ks.includes(f)); if(!x.cxBad.length) delete x.cxBad; } // a text written here again goes up
     const stOwn=st0!==x.status&&(st0==='waiting'||x.status==='waiting'), stCommon=shCommonStatus(st0)!==shCommonStatus(x.status); // v0.39.1: Por confirmar is each person's own
     // v0.40.0: while it waits here, its date is this person's review day and the common date waits in cdate (js/share.js)
     const wasW=st0==='waiting', isW=x.status==='waiting', dateOwn=isW||(wasW&&!('date' in patch));
@@ -688,7 +691,7 @@ function undoDone(o){ const x=task(o.id); if(!x) return; if(x.status==='done'&&o
 const doneSnap = x => ({id:x.id, status:x.status, completed:x.completed, date:x.date, carried:x.carried, focus:x.focus||null});
 function completeTask(id, silent){
   const x=task(id); if(!x) return;
-  const was = x.status, prev={id, status:was, completed:null, focus:x.focus||null}; const nx=applyDone(id, was!=='done'); // a waiting task completes too (decision 41)
+  const was = x.status, prev=was==='done'?{id, status:was, completed:null, focus:x.focus||null}:doneSnap(x); const nx=applyDone(id, was!=='done'); // a waiting task completes too (decision 41); its date back on Deshacer (the review day of a shared one, v0.40.0)
   if(was!=='done'){ haptic(12); if(!silent) toast(doneText(1, nx), ()=>undoDone(prev)); }
   else haptic(8);
 }
@@ -740,6 +743,6 @@ function deleteSpace(id){ const i=DB.spaces.findIndex(sp=>sp.id===id); if(DB.spa
   DB.spaces.splice(i,1); DB.projects=DB.projects.filter(p=>!P.has(p)); DB.tasks=DB.tasks.filter(x=>!T.has(x)); DB.voiceNotes=DB.voiceNotes.filter(v=>!V.has(v)); DB.attachments=DB.attachments.filter(a=>!AT.has(a)); DB.subtasks=DB.subtasks.filter(s=>!SS.has(s)); cutNotes(new Set(L.ps.map(p=>p.id)));
   L.ts.forEach(x=>HELD.delete(x.id)); if(was){ DB.settings.activeSpace=DB.spaces.slice().sort((a,b)=>a.order-b.order)[0].id; resetListState(); } save();
   return ()=>{ if(DB.spaces.some(x=>x.id===id)) return; DB.spaces.splice(Math.min(i, DB.spaces.length), 0, sp);
-    const has=(list, o)=>list.some(x=>x.id===o.id); L.ps.forEach(p=>{ if(!has(DB.projects,p)) DB.projects.push(p); }); L.ts.forEach(x=>{ if(!has(DB.tasks,x)) DB.tasks.push(x); }); L.vs.forEach(v=>{ if(!has(DB.voiceNotes,v)) DB.voiceNotes.push(v); }); L.as.forEach(a=>{ if(!has(DB.attachments,a)) DB.attachments.push(a); }); putSteps(L.ss); putNotes(L.ns);
+    const has=(list, o)=>list.some(x=>x.id===o.id); L.ps.forEach(p=>{ if(!has(DB.projects,p)) DB.projects.push(p); }); L.ts.forEach(x=>{ if(!has(DB.tasks,x)) DB.tasks.push(x); }); L.vs.forEach(v=>{ if(!has(DB.voiceNotes,v)) DB.voiceNotes.push(v); }); L.as.forEach(a=>{ if(!has(DB.attachments,a)) DB.attachments.push(a); }); putSteps(L.ss); putNotes(L.ns); shUnleave(L.ts);
     if(was){ DB.settings.activeSpace=id; resetListState(); } save(); }; }
 function addProject(name, color){ const t=new Date().toISOString(); const p={id:uid(), spaceId:space().id, name, color, order:DB.projects.length, archived:false, created:t, modified:t}; DB.projects.push(p); save(); return p; }

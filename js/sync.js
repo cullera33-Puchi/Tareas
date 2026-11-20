@@ -266,8 +266,8 @@ function syncMerge(W, st, table, rows, stats){
     if(dirty && known[id]!=='x' && rsig!==known[id] && rm!==lm) stats.conflicts.push({table, id, won:takeRemote?'servidor':'local'});
     known[id]=rsig; // what the server holds now: a local copy that stays different goes up afterwards
     // Decision 56: rollOver counts without touching modified, so two copies with the same time can each hold part of the count (a device
-    // closed for days counts once from its old copy). With equal times the count never goes down: the higher count and the earlier first day win
-    const tally=table==='tasks'&&remote&&rm===lm ? {postponed:Math.max(+local.postponed||0, +remote.postponed||0)||null, carriedSince:[local.carriedSince, remote.carriedSince].filter(Boolean).sort()[0]||null} : null;
+    // closed for days counts once from its old copy). With equal times the count never goes down: the higher count and the earlier first day win (a shared task too, decision 88)
+    const tally=(table==='tasks'||table==='shared_tasks')&&remote&&rm===lm ? {postponed:Math.max(+local.postponed||0, +remote.postponed||0)||null, carriedSince:[local.carriedSince, remote.carriedSince].filter(Boolean).sort()[0]||null} : null;
     if(!takeRemote){ if(tally&&(tally.postponed!==(local.postponed||null)||tally.carriedSince!==(local.carriedSince||null))){ Object.assign(W[list][i], tally); stats.updated++; } return; } // counted as a change, so the merged copy is kept
     if(!remote){ W[list][i]=null; removed=true; stats.removed++;
       if(table==='tasks'){ W.voiceNotes.forEach((v,j)=>{ if(v&&v.taskId===id){ W.voiceNotes[j]=null; } }); W.attachments.forEach((a,j)=>{ if(a&&a.taskId===id){ W.attachments[j]=null; } }); W.subtasks.forEach((s,j)=>{ if(s&&s.taskId===id){ W.subtasks[j]=null; } }); }
@@ -283,6 +283,7 @@ function syncMerge(W, st, table, rows, stats){
    pulled: {table: rows}; o.cursor moves the tables' cursors (a pull; realtime events do not); o.pool runs the space matching */
 function syncApply(pulled, o){ o=o||{};
   const st=syncState(), stats={added:0, updated:0, removed:0, conflicts:[], remaps:[]};
+  shStepsBump(DB); // decision 88: a step changed here makes its shared task newer before the merge, or a newer copy from elsewhere would take its steps away
   const W={spaces:DB.spaces.map(x=>Object.assign({},x)), projects:DB.projects.map(x=>Object.assign({},x)), tasks:DB.tasks.map(x=>Object.assign({},x)), voiceNotes:DB.voiceNotes.map(x=>Object.assign({},x)), attachments:DB.attachments.map(x=>Object.assign({},x)), subtasks:DB.subtasks.map(x=>Object.assign({},x)), projectNotes:DB.projectNotes.map(x=>Object.assign({},x)), contacts:DB.contacts.map(x=>Object.assign({},x)), shareMembers:DB.shareMembers.map(x=>Object.assign({},x)), shareComments:DB.shareComments.map(x=>Object.assign({},x)), settings:Object.assign({}, DB.settings)};
   shDerive(W); // decision 88: the shared tasks as the rows of shared_tasks and shared_views, folded back into the tasks after their merge
   if(o.pool || W.spaces.some(s=>INITIAL_SPACES.includes(s.id))) stats.remaps=syncRemapSpaces(W, o.pool||null);
@@ -620,7 +621,7 @@ async function syncSwitchAccount(force){ if(!syncOtherOwner()||SY.switching) ret
   let dropped=null; try{ dropped=pushDrop(); localStorage.removeItem(PUSH_KEY); }catch(e){} // the old account's notifications stop reaching this device
   await syncWithin(Promise.resolve(dropped).catch(()=>{}), 3000);
   await syncWithin(FS.tx(['files','thumbs','meta'], 'readwrite', (f,t,m)=>{ f.clear(); t.clear(); m.clear(); }).catch(()=>{}), 5000);
-  await syncWithin(Promise.all([cryptoKeyForget().catch(()=>{}), cryptoKdbDo('readwrite', st=>st.delete('ecdh')).catch(()=>{})]), 5000);
+  await syncWithin(Promise.all([cryptoKeyForget().catch(()=>{}), cryptoKdbDo('readwrite', st=>st.delete('ecdh')).catch(()=>{}), shKeysForget().catch(()=>{})]), 5000);
   try{ sessionStorage.setItem(SWITCHED_KEY, '1'); }catch(e){}
   location.reload(); }
 // The screen over the app while the device is emptied
@@ -634,7 +635,7 @@ function syncSwitchBoot(){ let m=null, done=false; try{ m=JSON.parse(localStorag
   LOG=[]; try{ localStorage.removeItem(LOGKEY); }catch(e){} // whatever this window read of the log is the old account's
   const st=syncState(); let msg=null; // logged once the marker is gone (no window writes the log while it is there)
   if(st.firstFor===m.to&&!st.owner){ // it got as far as the new account's sync state: finish what an interruption may have left of the old one
-    FS.tx(['files','thumbs','meta'], 'readwrite', (f,t,x)=>{ f.clear(); t.clear(); x.clear(); }).catch(()=>{}); cryptoKeyForget().catch(()=>{}); cryptoKdbDo('readwrite', s=>s.delete('ecdh')).catch(()=>{});
+    FS.tx(['files','thumbs','meta'], 'readwrite', (f,t,x)=>{ f.clear(); t.clear(); x.clear(); }).catch(()=>{}); cryptoKeyForget().catch(()=>{}); cryptoKdbDo('readwrite', s=>s.delete('ecdh')).catch(()=>{}); shKeysForget().catch(()=>{});
     if(!syncLocalEmpty()){ const s=DB.settings||{}, fresh=blank(); ['theme','tipsSeen'].forEach(k=>{ if(k in s) fresh.settings[k]=s[k]; });
       try{ localStorage.setItem(KEY, JSON.stringify(fresh)); DB=fresh; syncWrite({user:st.user||null, firstFor:m.to, known:{}, cursor:{}, del:{}, missing:st.missing||[]}); // and nothing the new account already had here is taken for deleted
         msg=['warn','Datos de otra cuenta escritos durante el cambio: se vacía de nuevo']; }catch(e){} }

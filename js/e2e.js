@@ -72,7 +72,7 @@ function cryptoRemote(inner){ if(!inner||inner.__crypto) return inner;
   w.pull=async(table, after, limit)=>SH_SEALED[table]?shOpenRows(inner, await inner.pull(table, after, limit), table):open(table, await inner.pull(table, after, limit));
   w.byIds=async(table, ids)=>SH_SEALED[table]?shOpenRows(inner, await inner.byIds(table, ids), table):open(table, await inner.byIds(table, ids));
   // Rows up: the listed columns encrypted (a value already encrypted with this key goes as it is). On without the key nothing plain may leave
-  w.upsert=async(table, rows)=>{ if(SH_SEALED[table]) return inner.upsert(table, await shSealRows(inner, rows, table)); if(!CRYPTO_COLS[table]) return inner.upsert(table, rows); const k=crKey();
+  w.upsert=async(table, rows)=>{ if(SH_SEALED[table]){ const sealed=await shSealRows(inner, rows, table); return sealed.length?inner.upsert(table, sealed):[]; } if(!CRYPTO_COLS[table]) return inner.upsert(table, rows); const k=crKey();
     if(!k){ if(crOn()) throw crLockedErr(); return inner.upsert(table, rows); }
     const send=[]; for(const r of rows) send.push(await cryptoSealRow(k, table, r)); return inner.upsert(table, send); };
   // Realtime: opened in order, one after another
@@ -166,6 +166,7 @@ async function crForget(why){ CR.key=null; CR.kid=null; CR.owner=null; CR.keyP=P
 async function cryptoSignedOut(){ CR.keyP=Promise.resolve(); CR.row=undefined; CR.for=null; CR.asked=false; CR.lockLogged=false; CR.bad.clear(); CR.repaired=null;
   try{ localStorage.setItem(CR_OUT, String(Date.now())); }catch(e){}
   if(CR.key||CR.owner) await crForget('sesión cerrada'); else await cryptoKeyForget().catch(()=>{});
+  await shKeysForget().catch(()=>{});
   try{ localStorage.setItem(CR_OUT, String(Date.now())); }catch(e){} } // again, after the key left IndexedDB: the other windows drop theirs
 const cryptoSignOutRecent = () => { let t=0; try{ t=+localStorage.getItem(CR_OUT)||0; }catch(e){} return Date.now()-t<60e3; };
 // Another window of the app used «Cerrar sesión»: this one drops the key from memory too (IndexedDB is already empty)
